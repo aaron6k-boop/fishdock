@@ -10,7 +10,8 @@ import { monthsText, ukMonth } from "../lib/time.js";
 import TodayCard from "./TodayCard.jsx";
 import SpeciesSheet from "./SpeciesSheet.jsx";
 import { RigSheet } from "../pages/Tackle.jsx";
-import GearCard from "./GearCard.jsx";
+import GearCard, { ShopLinks, VideoLink } from "./GearCard.jsx";
+import { rigQuery } from "../data/shops.js";
 import { Sheet, Notice, Sources, Icon, Seg } from "./ui.jsx";
 import { HookGlyph, RigDiagram } from "./art.jsx";
 import FishPhoto, { useFishInfo, AboutFish } from "./FishPhoto.jsx";
@@ -102,9 +103,10 @@ export default function AdviceSheet({ species: sp, spot, row = null, onClose }) 
           <button type="button" className="rig-card" onClick={() => setRigOpen(a.rig)}>
             <RigDiagram rig={a.rig} compact />
             <span className="t">{a.rig.name}</span>
-            <span className="s">Tap for step by step</span>
+            <span className="s">Tap for step by step and how to bait it</span>
           </button>
         ) : null}
+        {a.rig ? <div className="rig-links"><VideoLink rig={a.rig} /><ShopLinks q={rigQuery(a.rig)} label={a.rig.name} /></div> : null}
         {a.line ? <p className="small"><b>Line:</b> {a.line}</p> : null}
         {a.weight ? <p className="small"><b>Lead or float:</b> {a.weight}</p> : null}
       </section>

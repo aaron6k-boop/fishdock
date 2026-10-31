@@ -1,7 +1,7 @@
 // ---- shop links: every rig and stock bait has search words, and the links are plain shop searches ----
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SHOPS, RIG_SEARCH, BAIT_SEARCH, rigQuery, baitQuery } from "../src/data/shops.js";
+import { SHOPS, RIG_SEARCH, BAIT_SEARCH, rigQuery, baitQuery, videoQuery, videoUrl } from "../src/data/shops.js";
 import { GEAR, gearFor } from "../src/data/gear.js";
 import { RIGS } from "../src/data/rigs.js";
 import { BAITS } from "../src/data/baits.js";
@@ -14,8 +14,9 @@ test("shops: each link is the shop's own search over https, with only the search
     assert.ok(/pulley\+rig|pulley%20rig/.test(u.search), u.href);
     assert.doesNotMatch(u.href, /tag=|affiliate|ref=/i, "no affiliate tags");
   }
-  assert.equal(SHOPS[0].url("frozen squid bait"), "https://www.amazon.co.uk/s?k=frozen+squid+bait");
-  assert.equal(SHOPS[1].url("2/0 hooks"), "https://www.gooutdoors.co.uk/search?q=2%2F0+hooks");
+  assert.equal(SHOPS[0].id, "amazon", "Amazon first, as the default");
+  assert.equal(SHOPS[0].url("frozen squid bait"), "https://www.amazon.co.uk/s?k=frozen+squid+bait&s=price-asc-rank", "cheapest first");
+  assert.equal(SHOPS[1].url("2/0 hooks"), "https://www.gooutdoors.co.uk/search?q=2%2F0+hooks&sort=price+asc", "cheapest first");
 });
 
 test("shops: every rig and stock bait has search words", () => {
@@ -37,4 +38,13 @@ test("gear: kit lists suit the fish and its water", () => {
     assert.doesNotMatch(`${g.name} ${g.why}`, /£|\d+\s?(lb|kg|g|mm|cm|in)\b/i, "no prices or sizes in kit ideas");
     for (const id of g.species || []) assert.ok(SPECIES.some((s) => s.id === id), `${g.id}: unknown species ${id}`);
   }
+});
+
+test("videos: a YouTube search for every rig, worded as how to tie or fish it", () => {
+  for (const r of RIGS) {
+    const q = videoQuery(r);
+    assert.match(q, /^how to /, r.id);
+    assert.ok(videoUrl(r).startsWith("https://www.youtube.com/results?search_query=how+to+"), r.id);
+  }
+  assert.equal(videoQuery(RIGS.find((r) => r.id === "pulley")), "how to tie a pulley rig sea fishing");
 });

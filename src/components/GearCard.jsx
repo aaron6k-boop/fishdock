@@ -1,7 +1,8 @@
 // ---- GearCard: ready-tied rigs, bait and useful kit for a fish, with links to search for each in UK shops ----
 import { RIGS } from "../data/rigs.js";
 import { BAITS } from "../data/baits.js";
-import { SHOPS, rigQuery, baitQuery } from "../data/shops.js";
+import { SHOPS, rigQuery, baitQuery, videoUrl } from "../data/shops.js";
+import GearIcon from "./GearIcon.jsx";
 import { gearFor } from "../data/gear.js";
 import { KitIcon } from "./RigScene.jsx";
 import { BaitThumb } from "./BaitPhoto.jsx";
@@ -10,14 +11,19 @@ import { BaitThumb } from "./BaitPhoto.jsx";
 export function ShopLinks({ q, label }) {
   return (
     <span className="shop-links" aria-label={label ? `Search shops for ${label}` : "Search shops"}>
-      {SHOPS.map((s) => (
-        <a key={s.id} className="shop-link" href={s.url(q)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" title={`Search ${s.name} for “${q}”`}>{s.short || s.name}</a>
+      {SHOPS.map((s, i) => (
+        <a key={s.id} className={`shop-link${i === 0 ? " main" : ""}`} href={s.url(q)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" title={`Search ${s.name} for “${q}”${s.cheapest ? ", cheapest first" : ""}`}>{s.short || s.name}</a>
       ))}
     </span>
   );
 }
 
 const baitById = (id) => BAITS.find((b) => b.id === id);
+
+/** A YouTube search for how to tie (or fish) this rig. */
+export function VideoLink({ rig, label = "How to tie it" }) {
+  return <a className="yt-link" href={videoUrl(rig)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" title="Search YouTube for videos on this rig">{label}</a>;
+}
 
 /** advice: from buildAdvice (its rig and baits come first). method: the method in use, for the kit list. */
 export default function GearCard({ species, advice, method, title = "Get the gear" }) {
@@ -41,7 +47,7 @@ export default function GearCard({ species, advice, method, title = "Get the gea
         <ul className="gear-list">{rigs.map((r) => (
           <li key={r.id}>
             <span className="kit-ico"><KitIcon text={/float/i.test(r.name) ? "float" : /feeder/i.test(r.name) ? "feeder" : /lure|spinner|plastic|fly/i.test(r.name) ? r.name : "hook"} /></span>
-            <span className="grow"><span className="t">{r.name}{r === advice?.rig ? <span className="tag ok">Advised</span> : null}</span>{r.hook ? <span className="s">Hooks: {r.hook}</span> : null}<ShopLinks q={rigQuery(r)} label={r.name} /></span>
+            <span className="grow"><span className="t">{r.name}{r === advice?.rig ? <span className="tag ok">Advised</span> : null}</span>{r.hook ? <span className="s">Hooks: {r.hook}</span> : null}<span className="shop-links"><VideoLink rig={r} /></span><ShopLinks q={rigQuery(r)} label={r.name} /></span>
           </li>
         ))}</ul>
       </> : null}
@@ -68,13 +74,13 @@ export default function GearCard({ species, advice, method, title = "Get the gea
         <span className="eyebrow">Useful kit <span className="tag">General kit ideas</span></span>
         <ul className="gear-list">{kit.map((g) => (
           <li key={g.id}>
-            <span className="kit-ico"><KitIcon text={g.name} /></span>
+            <span className="kit-ico">{g.id ? <GearIcon id={g.id} /> : <KitIcon text={g.name} />}</span>
             <span className="grow"><span className="t">{g.name}</span><span className="s">{g.why}</span><ShopLinks q={g.q} label={g.name} /></span>
           </li>
         ))}</ul>
       </> : null}
 
-      <p className="tiny">Each link opens that shop's own search. FishDock doesn't sell, check or earn from anything there, and prices change. Match the hook size and line to the advice above, and buy live worms, crab and maggots fresh from a local tackle shop where you can.</p>
+      <p className="tiny">Each link opens that shop's own search, cheapest first on Amazon and GO Outdoors. FishDock can't see prices, so it can't say which shop is cheapest, and doesn't sell, check or earn from anything there. Match the hook size and line to the advice above, and buy live worms, crab and maggots fresh from a local tackle shop where you can.</p>
     </section>
   );
 }

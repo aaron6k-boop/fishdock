@@ -3,12 +3,15 @@
 // sell anything, isn't paid for these links (no affiliate tags), and doesn't check the products or prices: the app
 // says so wherever the links appear. Search addresses checked on 31 October 2026 (each returned matching products
 // for "pulley rig"). Only the search words are sent, nothing about the angler.
+// FishDock can't see live prices, so it can't compare shops: Amazon comes first as the default, and each shop's
+// search is sorted cheapest first where the shop allows it in the address (Amazon and GO Outdoors do; Glasgow
+// Angling Centre's search has no sort, so it shows its own order).
 
 export const SHOPS_CHECKED = "2026-10-31";
 const enc = (q) => encodeURIComponent(q).replace(/%20/g, "+");
 export const SHOPS = [
-  { id: "amazon", name: "Amazon", short: "Amazon", url: (q) => `https://www.amazon.co.uk/s?k=${enc(q)}` },
-  { id: "go-outdoors", name: "GO Outdoors", short: "GO Outdoors", url: (q) => `https://www.gooutdoors.co.uk/search?q=${enc(q)}` },
+  { id: "amazon", name: "Amazon", short: "Amazon", cheapest: true, url: (q) => `https://www.amazon.co.uk/s?k=${enc(q)}&s=price-asc-rank` },
+  { id: "go-outdoors", name: "GO Outdoors", short: "GO Outdoors", cheapest: true, url: (q) => `https://www.gooutdoors.co.uk/search?q=${enc(q)}&sort=price+asc` },
   { id: "gac", name: "Glasgow Angling Centre", short: "Glasgow Angling", url: (q) => `https://www.fishingmegastore.com/view.php?module=productsnew&search=${enc(q)}` },
 ];
 
@@ -40,3 +43,12 @@ export function baitQuery(b, sp) {
   const words = String(b?.name || "").replace(/\s*\(.*?\)|,.*$|\d+(\.\d+)?\s*(mm|cm|in)\b.*$/gi, "").trim();
   return `${words} ${sp?.type === "fresh" ? "fishing" : "sea fishing"}`.trim();
 }
+
+// ---- videos: a YouTube search for how to tie or fish each rig (FishDock doesn't pick or check the videos) ----
+const VIDEO_WORDS = { "sea-spinner": "how to fish a spinner for bass", spinner: "how to fish a spinner for perch", fly: "how to tie a fly leader trout",
+  "weightless-soft-plastic": "how to rig a weedless soft plastic for bass", feathers: "how to fish mackerel feathers", "pike-lure": "how to make a pike wire trace",
+  "drop-shot": "how to tie a drop shot rig", waggler: "how to set up a waggler float", "stick-float": "how to set up a stick float",
+  "method-feeder": "how to fish the method feeder", "cage-feeder": "how to fish a cage feeder", "maggot-feeder": "how to fish a maggot feeder",
+  "bolt-hair-rig": "how to tie a hair rig carp", "freeline-fresh": "how to freeline bread for carp", freeline: "how to freeline bait sea fishing" };
+export const videoQuery = (rig) => VIDEO_WORDS[rig?.id] || `how to tie a ${rigQuery(rig).replace(/ sea fishing$/, "")} ${rig?.type === "fresh" ? "fishing" : "sea fishing"}`.replace(/\s+/g, " ").trim();
+export const videoUrl = (rig) => `https://www.youtube.com/results?search_query=${enc(videoQuery(rig))}`;

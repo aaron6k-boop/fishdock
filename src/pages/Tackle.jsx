@@ -16,7 +16,8 @@ import { WATERS, waterById } from "../lib/pins.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources } from "../components/ui.jsx";
 import { HookGlyph, RigDiagram, WaterColumn } from "../components/art.jsx";
 import { KitIcon } from "../components/RigScene.jsx";
-import GearCard, { ShopLinks } from "../components/GearCard.jsx";
+import GearCard, { ShopLinks, VideoLink } from "../components/GearCard.jsx";
+import BaitOnHook, { BAIT_STYLE, STYLE_BAITS, STYLE_LABEL } from "../components/BaitOnHook.jsx";
 import BaitPhoto, { BaitThumb } from "../components/BaitPhoto.jsx";
 import { rigQuery, baitQuery } from "../data/shops.js";
 import { FishThumb } from "../components/FishPhoto.jsx";
@@ -175,6 +176,7 @@ function Advisor({ water, initialSpecies }) {
                 <>
                   <div className="card-h"><b className="big">{a.rig.name}</b><button type="button" className="linkbtn" onClick={() => setRigOpen(a.rig)}>Step by step</button></div>
                   <RigDiagram rig={a.rig} />
+                  <div className="rig-links"><VideoLink rig={a.rig} /><ShopLinks q={rigQuery(a.rig)} label={a.rig.name} /></div>
                   <div className="kv">
                     {a.line ? <div><span className="k">Line</span><span className="v small">{a.line}</span></div> : null}
                     {a.weight ? <div><span className="k">Lead or float</span><span className="v small">{a.weight}</span></div> : null}
@@ -283,13 +285,16 @@ function RigLibrary({ water }) {
       <div className="search"><Icon name="search" /><input id="rig-q" className="input" placeholder="Search rigs, species or conditions" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <div className="rig-grid">
         {list.map((r) => (
-          <button type="button" key={r.id} className="rig-card" onClick={() => setOpen(r)}>
+          <div key={r.id} className="rig-card">
+            <button type="button" className="rig-open" onClick={() => setOpen(r)}>
             <RigDiagram rig={r} compact />
             <span className="t">{r.name}</span>
             <span className="s">{r.species?.length ? r.species.slice(0, 4).map((id) => SPECIES.find((s) => s.id === id)?.name || id).join(", ") : ""}</span>
             <span className="rig-tags">{r.snaggy ? <span className="tag">Rough ground</span> : null}{r.heavyFlow ? <span className="tag">Tide or flow</span> : null}{r.calm ? <span className="tag">Calm water</span> : null}</span>
             {r.verification !== "verified" ? <span className="tag">{VER[r.verification] || "General guidance"}</span> : null}
-          </button>
+            </button>
+            <div className="rig-links"><VideoLink rig={r} /><ShopLinks q={rigQuery(r)} label={r.name} /></div>
+          </div>
         ))}
       </div>
       {open ? <RigSheet rig={open} onClose={() => setOpen(null)} /> : null}
@@ -322,7 +327,9 @@ export function RigSheet({ rig, onClose }) {
       <div className="chips">{tags.map((t) => <span key={t} className="chip">{t}</span>)}</div>
       {rig.best ? <p className="small"><b>Works best:</b> {rig.best}</p> : null}
       {facts.length ? <div className="rig-facts">{facts.map(([k, v, ico]) => <div key={k} className="rig-fact"><span className="kit-ico"><KitIcon text={ico} /></span><span><span className="k">{k}</span><span className="v">{v}</span></span></div>)}</div> : null}
+      <div className="buy-row"><VideoLink rig={rig} label="Watch how to tie it" /></div>
       <div className="buy-row"><span className="small"><b>Buy it ready-tied:</b></span><ShopLinks q={rigQuery(rig)} label={rig.name} /></div>
+      <BaitIt rig={rig} />
       {kit.length ? (
         <section className="card">
           <div className="card-h"><h2>What you need</h2><span className="aside">{packed.size ? `${[...packed].filter((i) => i < kit.length).length} of ${kit.length} packed` : `${kit.length} items`}</span></div>
@@ -337,6 +344,7 @@ export function RigSheet({ rig, onClose }) {
       {rig.steps?.length ? (
         <section className="card">
           <div className="card-h"><h2>Tie it</h2><span className="aside">Step {step + 1} of {rig.steps.length}</span></div>
+          <div className="buy-row"><VideoLink rig={rig} label="Video help on YouTube" /></div>
           <ol className="tie-steps">{rig.steps.map((t, i) => (
             <li key={i} className={i < step ? "done" : i === step ? "now" : ""}><button type="button" onClick={() => setStep(i)}><span className="n">{i < step ? <Icon name="check" /> : i + 1}</span><span className="t">{t}</span></button></li>
           ))}</ol>
@@ -347,6 +355,28 @@ export function RigSheet({ rig, onClose }) {
       {rig.mistakes?.length ? <section className="card"><h2 className="h2">Common mistakes</h2><div className="ifthen">{rig.mistakes.map((m, i) => <div key={i}><b>{m.m}</b><span>{m.fix}</span></div>)}</div></section> : null}
       <Sources list={rig.sources} />
     </Sheet>
+  );
+}
+
+// ---- how the bait goes on for a rig: a close-up, the rig's own note, and the hooking notes of baits that suit it ----
+function BaitIt({ rig }) {
+  const style = BAIT_STYLE[rig.id] || "worm";
+  const baits = (STYLE_BAITS[style] || []).map((id) => BAITS.find((b) => b.id === id)).filter((b) => b && b.hooking && (b.type === rig.type || b.type === "both"));
+  return (
+    <section className="card">
+      <h2 className="h2">Bait it</h2>
+      <div className="bait-panel">
+        <div className="art"><BaitOnHook rig={rig} /></div>
+        <div className="stack" style={{ gap: 6, minWidth: 0 }}>
+          <b>{STYLE_LABEL[style]}</b>
+          {rig.bait ? <p className="small">{rig.bait}</p> : null}
+        </div>
+      </div>
+      {baits.length ? <ul className="gear-list">{baits.map((b) => (
+        <li key={b.id}><BaitThumb bait={b} /><span className="grow"><span className="t">{b.name}</span><span className="s"><b>How to hook it:</b> {b.hooking}</span><ShopLinks q={baitQuery(b)} label={b.name} /></span></li>
+      ))}</ul> : null}
+      <p className="tiny">The close-up shows the idea, not exact sizes. Rig and hooking notes are from the rig's sources.</p>
+    </section>
   );
 }
 

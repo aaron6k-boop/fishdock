@@ -176,8 +176,28 @@ details.conds[open] summary::before { content: "▾ "; }
 .gear-list .s { font-size: 13px; color: var(--text-2); line-height: 1.4; }
 .bait-thumb { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; background: var(--elev); display: block; }
 .bait-photo img { max-height: 240px; }
+.gear-svg { width: 26px; height: 26px; display: block; fill: none; stroke: #eaf3f5; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.bait-hook { width: 100%; max-width: 280px; height: auto; display: block; }
+.bait-hook .bh-hook { fill: none; stroke: #d9dee2; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.bait-hook .bh-eye { fill: none; stroke: #d9dee2; stroke-width: 2.2; }
+.bait-hook .bh-line { fill: none; stroke: #a9c7cf; stroke-width: 1.6; }
+.bait-hook .bh-wire { fill: none; stroke: #b8bec4; stroke-width: 2; stroke-dasharray: 6 2; }
+.bait-hook .bh-worm { fill: none; stroke: #b5654f; stroke-linecap: round; stroke-linejoin: round; }
+.bait-hook .bh-worm-rings { fill: none; stroke: #7e3c2c; stroke-dasharray: 1.4 4.6; stroke-linecap: butt; opacity: 0.7; }
+.bait-hook .bh-worm-shine { fill: none; stroke: #f0b9a4; stroke-width: 1.6; stroke-linecap: round; opacity: 0.55; }
+.bait-hook .bh-elastic { fill: none; stroke: #f3ead6; stroke-width: 1.2; opacity: 0.85; }
+.bait-hook .bh-maggot { fill: #f3ead2; stroke: #b9a77c; stroke-width: 1; }
+.bait-hook .bh-maggot-rings { stroke: #c9b88f; stroke-width: 0.8; }
+.bait-hook .bh-hair { fill: none; stroke: #f4c7c3; stroke-width: 1.4; }
+.bait-panel { display: grid; grid-template-columns: minmax(110px, 160px) 1fr; gap: 12px; align-items: center; }
+.bait-panel .art { border-radius: var(--r-m); background: linear-gradient(#1f3a44, #10242c); padding: 8px; }
+.yt-link { display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 3px 10px; border-radius: 999px; background: #c4302b; color: #fff; font-size: 12px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.yt-link::before { content: ""; width: 0; height: 0; border-left: 7px solid #fff; border-top: 4.5px solid transparent; border-bottom: 4.5px solid transparent; }
+.rig-card .rig-open { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; }
+.rig-links { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; padding-top: 4px; border-top: 1px solid var(--line); width: 100%; }
 .shop-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
 .shop-link { display: inline-flex; align-items: center; min-height: 30px; padding: 3px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--action) 45%, transparent); color: var(--action); background: var(--action-soft); font-size: 12px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.shop-link.main { background: var(--action); color: var(--action-ink); border-color: var(--action); }
 .shop-link::after { content: "↗"; margin-left: 4px; font-size: 11px; opacity: 0.8; }
 .buy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .tie-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
