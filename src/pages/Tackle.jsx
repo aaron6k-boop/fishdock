@@ -14,7 +14,8 @@ import { BAITS } from "../data/baits.js";
 import { LESSONS } from "../data/lessons.js";
 import { WATERS, waterById } from "../lib/pins.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources } from "../components/ui.jsx";
-import { FishArt, HookGlyph, RigDiagram, WaterColumn } from "../components/art.jsx";
+import { HookGlyph, RigDiagram, WaterColumn } from "../components/art.jsx";
+import { FishThumb } from "../components/FishPhoto.jsx";
 
 const VER = { verified: "Sourced", partial: "Partly sourced", unverified: "General guidance" };
 
@@ -109,7 +110,7 @@ function Advisor({ water, initialSpecies }) {
             const r = here.find((x) => x.species.id === s.id);
             return (
               <button type="button" key={s.id} aria-pressed={s.id === species.id} onClick={() => setSid(s.id)} className="sp-chip">
-                <FishArt art={s.art} size={58} />
+                <span className="chip-photo"><FishThumb species={s} kind="chip" /></span>
                 <span>{s.name}</span>
                 {r ? <i className={`dotlvl lvl-${r.level}`} title={LEVELS[r.level].label} /> : null}
               </button>
@@ -133,7 +134,7 @@ function Advisor({ water, initialSpecies }) {
       {a ? (
         <>
           <div className="advice-head">
-            <FishArt art={species.art} size={110} />
+            <span className="head-photo"><FishThumb species={species} kind="head" /></span>
             <div className="stack" style={{ gap: 4, minWidth: 0 }}>
               <h2>{species.name}: {METHODS[a.method]?.label || "set-up"}</h2>
               {place.generic ? <span className="lvl lvl-possible">General advice, any {waterById(generic).label.toLowerCase()}</span>

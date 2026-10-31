@@ -7,6 +7,8 @@ import { accountsEnabled, onUser, signIn, signOut, idToken } from "../lib/accoun
 import { callJSON, PREVIEW } from "../lib/api.js";
 import { RULES_CHECKED } from "../data/rules.js";
 import { areaSize } from "../lib/geo.js";
+import { SPECIES } from "../data/species.js";
+import { PHOTOS, PHOTO_SOURCE, filePage, licenceUrl } from "../data/photos.js";
 import { Icon, Seg, Sheet, Notice, Beta } from "../components/ui.jsx";
 
 const SOURCES = [
@@ -18,7 +20,7 @@ const SOURCES = [
   ["Sea marks", "OpenSeaMap (ODbL / CC BY-SA)", "https://openseamap.org/", ""],
   ["Base maps", "OpenStreetMap contributors; Esri World Imagery", "https://www.openstreetmap.org/copyright", ""],
   ["Place search", "Open-Meteo geocoding with GeoNames data (CC BY 4.0)", "https://open-meteo.com/en/docs/geocoding-api", "Only the words you type are sent"],
-  ["Fish photos and summaries", "Wikipedia and Wikimedia Commons (free licences only, credited on each photo)", "https://commons.wikimedia.org/", "Text CC BY-SA 4.0"],
+  ["Fish photos and summaries", "Wikimedia Commons and Wikipedia (free licences only; each photographer is credited below)", "https://commons.wikimedia.org/", "Photos load from Wikimedia without a referrer. Text CC BY-SA 4.0"],
   ["Water type when you tap the map", "OpenStreetMap data through the Overpass API (ODbL)", "https://wiki.openstreetmap.org/wiki/Overpass_API", "The tapped point is sent without anything about you, and not stored"],
   ["Species records and photos", "NBN Atlas (linked, not copied)", "https://nbnatlas.org/", ""],
   ["Rules and licences", `GOV.UK, Environment Agency, Natural Resources Wales, Scottish Government, DAERA, MMO and IFCAs (checked ${RULES_CHECKED})`, "https://www.gov.uk/freshwater-rod-fishing-rules", ""],
@@ -85,6 +87,7 @@ export default function Settings() {
         <div className="sources-table">{SOURCES.map(([what, who, url, note]) => (
           <div key={what}><b>{what}</b><span>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{who}</a> : who}</span>{note ? <span className="tiny">{note}</span> : null}</div>
         ))}</div>
+        <PhotoCredits />
         <p className="tiny">Being on a FishDock map never means a place is legal or safe to fish. Always check access, permits, byelaws and conditions.</p>
       </section>
 
@@ -103,5 +106,24 @@ export default function Settings() {
         </Sheet>
       ) : null}
     </main>
+  );
+}
+
+// ---- every fish photo's photographer and licence, as the licences ask ----
+function PhotoCredits() {
+  const rows = SPECIES.filter((sp) => PHOTOS[sp.id]).map((sp) => ({ sp, p: PHOTOS[sp.id] }));
+  return (
+    <details className="credits">
+      <summary>Fish photo credits ({rows.length})</summary>
+      <ul className="credit-list">
+        {rows.map(({ sp, p }) => {
+          const lic = licenceUrl(p);
+          return (
+            <li key={sp.id}><b>{sp.name}</b>: <a href={filePage(p)} target="_blank" rel="noopener noreferrer">{p.author}</a>, {lic ? <a href={lic} target="_blank" rel="noopener noreferrer">{p.licence}</a> : p.licence}</li>
+          );
+        })}
+      </ul>
+      <p className="tiny">All via <a href={PHOTO_SOURCE.url} target="_blank" rel="noopener noreferrer">{PHOTO_SOURCE.name}</a>, checked {new Date(PHOTO_SOURCE.checked).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}. Photos are shown smaller and cropped; follow a name to see the original.</p>
+    </details>
   );
 }

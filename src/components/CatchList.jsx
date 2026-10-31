@@ -1,7 +1,7 @@
 // ---- CatchList: what's caught at a place, in season now first, each with its season in words and its best months ----
 import { LEVELS, seasonWord } from "../lib/catchhere.js";
 import { monthsText } from "../lib/time.js";
-import { FishArt } from "./art.jsx";
+import { FishThumb } from "./FishPhoto.jsx";
 
 const SEASON_TAG = { peak: "Peak now", present: "In season", out: "Out of season" };
 
@@ -28,7 +28,7 @@ function Row({ r, onOpen }) {
   const note = r.note ? (bare ? `At this mark: ${r.note.trim().replace(/\.$/, "").toLowerCase()}` : r.note) : r.level === "occasional" || r.level === "possible" ? r.reason : "";
   return (
     <button type="button" className="li" onClick={() => onOpen?.(sp)}>
-      <span className={`fish-ico ${sp.type === "sea" ? "" : "fresh"}`}><FishArt art={sp.art} size={40} /></span>
+      <span className={`fish-ico ${sp.type === "sea" ? "" : "fresh"}`}><FishThumb species={sp} /></span>
       <span className="grow">
         <span className="t">{sp.name}</span>
         <span className="s">{[word, months].filter(Boolean).join(", ")}</span>

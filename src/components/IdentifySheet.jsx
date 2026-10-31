@@ -6,7 +6,7 @@ import { shrinkImage } from "../lib/storage.js";
 import { track } from "../lib/api.js";
 import { SPECIES } from "../data/species.js";
 import { Sheet, Beta, Notice, Icon } from "./ui.jsx";
-import { FishArt } from "./art.jsx";
+import { FishThumb } from "./FishPhoto.jsx";
 
 export default function IdentifySheet({ onClose, onPick }) {
   const { place } = useApp();
@@ -42,7 +42,7 @@ export default function IdentifySheet({ onClose, onPick }) {
             const sp = SPECIES.find((s) => s.id === c.id);
             return (
               <div key={i} className="li static">
-                <span className="fish-ico">{sp ? <FishArt art={sp.art} size={40} /> : <Icon name="fish" />}</span>
+                <span className="fish-ico">{sp ? <FishThumb species={sp} /> : <Icon name="fish" />}</span>
                 <span className="grow"><span className="t">{c.species} <span className={`conf-${c.confidence}`}>{c.confidence} confidence</span></span><span className="s wrap">{c.why}</span></span>
                 {sp && onPick ? <button type="button" className="btn small" onClick={() => onPick(sp.id)}>Use</button> : null}
               </div>

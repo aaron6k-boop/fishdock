@@ -9,7 +9,7 @@ import { ukDayStart, fmtTime, fmtDay, ukMonth, hoursUntil, fmtShortDay, addUkDay
 import { compass, fmtKm, mapsLink } from "../lib/geo.js";
 import { waterById } from "../lib/pins.js";
 import { Icon, Notice, Sheet, Beta, Seg, Sources } from "../components/ui.jsx";
-import { FishArt } from "../components/art.jsx";
+import { FishThumb } from "../components/FishPhoto.jsx";
 import { BiteStrip, TideChart } from "../components/charts.jsx";
 import Waterscape from "../components/Waterscape.jsx";
 import SpeciesSheet from "../components/SpeciesSheet.jsx";
@@ -234,7 +234,7 @@ export default function Home() {
           <button type="button" className="li" onClick={() => { update({ target: "auto" }); setSheet(null); }}><span className="grow"><span className="t">Best in season here</span><span className="s">FishDock picks the strongest in-season species</span></span>{settings.target === "auto" ? <Icon name="check" /> : null}</button>
           <div className="list">{here.map((r) => (
             <button type="button" key={r.species.id} className="li" onClick={() => { update({ target: r.species.id }); setSheet(null); }}>
-              <span className="fish-ico"><FishArt art={r.species.art} size={40} /></span>
+              <span className="fish-ico"><FishThumb species={r.species} /></span>
               <span className="grow"><span className="t">{r.species.name}</span><span className="s">{LEVELS[r.level].short} · {r.inSeason === "peak" ? "peak season" : r.inSeason === "present" ? "in season" : "out of season"}</span></span>
               {settings.target === r.species.id ? <Icon name="check" /> : null}
             </button>

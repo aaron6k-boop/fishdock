@@ -21,9 +21,10 @@ export const TITLE_OVERRIDES = { "sea-trout": "Sea trout", "brown-trout": "Brown
 // The whole licence name must be one of these (so "CC BY-NC" or "CC BY-ND" never pass as "CC BY").
 const FREE = /^(cc0( 1\.0)?|cc[- ]zero|public domain|pd(-[a-z0-9-]+)?|cc by(-sa)?( \d\.\d)?( [a-z]{2,3})?)$/i;
 
-/** The Commons file name from an upload.wikimedia.org URL, or null if it isn't a Commons file. */
+/** The Commons file name from an upload.wikimedia.org URL, or null if it isn't a Commons file. Wikipedia now adds
+ *  tracking parameters (?utm_source=...) to image URLs; they aren't part of the name. */
 export function commonsFile(url) {
-  const m = String(url || "").match(/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/);
+  const m = String(url || "").match(/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/?#]+)/);
   if (!m) return null;
   try { return decodeURIComponent(m[1]); } catch { return null; }
 }

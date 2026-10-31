@@ -23,6 +23,9 @@ test("fishinfo: Commons file names only", () => {
   assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/commons/4/4f/Raja%20clavata.jpg"), "Raja clavata.jpg");
   assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/en/4/4f/Fair_use.jpg"), null, "English Wikipedia files may be non-free");
   assert.equal(commonsFile(null), null);
+  // Wikipedia's summaries now carry tracking parameters on image URLs; the live photos were lost to this
+  assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/commons/7/77/Atlantic_Cod,_Atlantischer_Kabeljau_(Gadus_morhua).jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail_unscaled"), "Atlantic_Cod,_Atlantischer_Kabeljau_(Gadus_morhua).jpg");
+  assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Raja_clavata.jpg/320px-Raja_clavata.jpg?utm_source=x#top"), "Raja_clavata.jpg");
 });
 
 test("fishinfo: free licences give a credited photo; anything else gives none", () => {

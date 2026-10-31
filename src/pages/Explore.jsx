@@ -10,7 +10,7 @@ import { waterById } from "../lib/pins.js";
 import { searchPlaces } from "../lib/api.js";
 import { ukMonth } from "../lib/time.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources, Beta, MonthStrip } from "../components/ui.jsx";
-import { FishArt } from "../components/art.jsx";
+import { FishThumb } from "../components/FishPhoto.jsx";
 import { Sonar } from "../components/charts.jsx";
 import MapView, { OVERLAYS } from "../components/MapView.jsx";
 import SpeciesSheet from "../components/SpeciesSheet.jsx";
@@ -216,7 +216,7 @@ function SpeciesGuide() {
       <div className="species-grid">
         {list.map((s) => (
           <button key={s.id} type="button" className="sp-card" onClick={() => setOpen(s)}>
-            <FishArt art={s.art} size={130} />
+            <span className="sp-photo"><FishThumb species={s} kind="card" /></span>
             <span className="t">{s.name}</span>
             <MonthStrip peak={s.peak} present={s.present} current={month} />
           </button>
