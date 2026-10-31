@@ -15,7 +15,9 @@
   "vars": {
     "FIREBASE_PROJECT_ID": "fishdock"
   },
-  "observability": { "enabled": true }
-  // D1: once the "fishdock" database exists, add its id here:
-  // "d1_databases": [{ "binding": "DB", "database_name": "fishdock", "database_id": "<id from the dashboard>" }]
+  "observability": { "enabled": true },
+  // FishDock's own D1 database (never DetectDock's). The schema creates itself on the first request.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "fishdock", "database_id": "d6a8e717-4f54-460f-b5c4-6e6c55f206ba" }
+  ]
 }
