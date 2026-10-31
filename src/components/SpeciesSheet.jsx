@@ -11,6 +11,7 @@ import { track } from "../lib/api.js";
 import { useEffect, useMemo, useState } from "react";
 import { Sheet, MonthStrip, Sources, Notice, Icon } from "./ui.jsx";
 import { FishArt, HookGlyph, WaterColumn } from "./art.jsx";
+import FishPhoto, { useFishInfo, AboutFish } from "./FishPhoto.jsx";
 
 export default function SpeciesSheet({ species: sp, onClose }) {
   const { go, nation, place } = useApp();
@@ -18,10 +19,11 @@ export default function SpeciesSheet({ species: sp, onClose }) {
   const month = ukMonth(Date.now());
   const legal = rulesFor({ nation, kind: sp.type === "fresh" ? "river" : "sea", date: Date.now(), speciesId: sp.id, place, speciesOnly: true });
   const firstHook = String(sp.hooks?.range || "").split(/[–-]/)[0]?.trim();
+  const info = useFishInfo(sp.id);
   return (
     <Sheet title={sp.name} aside={sp.latin} onClose={onClose}>
       <div className="species-hero">
-        <FishArt art={sp.art} size={240} title={`Illustration of a ${sp.name.toLowerCase()}`} />
+        <FishPhoto species={sp} info={info} size={240} />
         <div className="row"><span className={`pill ${sp.type === "sea" ? "sea" : "fresh"}`}>{sp.type === "sea" ? "Sea" : sp.type === "both" ? "Sea and fresh" : "Freshwater"}</span>{sp.minSize?.cm ? <span className="chip warn">Min {sp.minSize.cm} cm</span> : null}</div>
       </div>
       <section className="card">
@@ -30,6 +32,8 @@ export default function SpeciesSheet({ species: sp, onClose }) {
         {sp.bestTimes ? <p className="small"><b>Best times:</b> {sp.bestTimes}</p> : null}
         {sp.tempC ? <p className="small muted"><b>Water temperature:</b> {sp.tempC.text}</p> : null}
       </section>
+      <SizesCard sp={sp} />
+      <AboutFish info={info} />
       <section className="card">
         <h2 className="h2">Where and how it lives</h2>
         {sp.habitat ? <p className="small"><b>Habitat:</b> {sp.habitat}</p> : null}
@@ -122,6 +126,19 @@ function Guides({ sp }) {
           <Sources list={open.sources || []} />
         </Sheet>
       ) : null}
+    </section>
+  );
+}
+
+// ---- sizes: the legal minimum (sourced) and what the hook advice says about bigger fish ----
+function SizesCard({ sp }) {
+  if (!sp.minSize?.cm && !sp.hooks?.specimen && !sp.hooks?.small) return null;
+  return (
+    <section className="card">
+      <h2 className="h2">Sizes</h2>
+      {sp.minSize?.cm ? <p className="small"><b>Minimum size:</b> {sp.minSize.text || `${sp.minSize.cm} cm`} {sp.minSize.source ? <a href={sp.minSize.source} target="_blank" rel="noopener noreferrer">Source</a> : null}</p> : <p className="small muted">No minimum size in FishDock's sources; local or fishery rules may set one.</p>}
+      {sp.hooks?.small ? <p className="small"><b>Typical fish:</b> {sp.hooks.small}</p> : null}
+      {sp.hooks?.specimen ? <p className="small"><b>Bigger fish:</b> {sp.hooks.specimen}</p> : null}
     </section>
   );
 }

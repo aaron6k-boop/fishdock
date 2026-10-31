@@ -308,3 +308,12 @@ details.conds[open] summary::before { content: "▾ "; }
 .map-btn.busy svg { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .share-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
+.advice-top { display: flex; align-items: center; gap: 14px; }
+.fish-ico.big { width: 120px; height: 84px; border-radius: 18px; display: grid; place-items: center; flex: none; }
+.fish-ico.big .fish-art { width: 110px; }
+.lvl-yours { background: color-mix(in srgb, #f5b041 22%, transparent); color: #e0a030; }
+.li .s.mine { color: #e0a030; font-weight: 650; }
+.fish-photo { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.fish-photo img { width: 100%; height: auto; max-height: 260px; object-fit: cover; border-radius: var(--r-l); background: var(--elev); }
+.fish-photo figcaption { color: var(--text-3); }
+.fish-photo figcaption a { color: inherit; }

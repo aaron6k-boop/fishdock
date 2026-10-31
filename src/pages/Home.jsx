@@ -16,6 +16,8 @@ import SpeciesSheet from "../components/SpeciesSheet.jsx";
 import IdentifySheet from "../components/IdentifySheet.jsx";
 import Checklist from "../components/Checklist.jsx";
 import CatchList from "../components/CatchList.jsx";
+import AdviceSheet from "../components/AdviceSheet.jsx";
+import { useMyCatches, catchesNear, withMine } from "../lib/myCatches.js";
 import RemindButton from "../components/RemindButton.jsx";
 
 export default function Home() {
@@ -27,7 +29,8 @@ export default function Home() {
   const now = Date.now();
   const dayStart = addUkDays(ukDayStart(now), dayOffset);
   const month = ukMonth(dayStart + 12 * 3600e3);
-  const here = useMemo(() => catchHere(place, month), [place, month]);
+  const myCatches = useMyCatches();
+  const here = useMemo(() => withMine(catchHere(place, month), catchesNear(myCatches, place), month), [place, month, myCatches]);
   const target = settings.target !== "auto" ? app.speciesById(settings.target) : autoTarget(place, month);
   const candidates = here.filter((r) => r.level !== "possible" && r.inSeason !== "out").slice(0, 6);
   if (target && !candidates.some((c) => c.species.id === target.id)) candidates.unshift({ species: target, level: "possible", inSeason: "present" });
@@ -186,7 +189,7 @@ export default function Home() {
 
         <section className="card">
           <div className="card-h"><h2>What can I catch here?</h2><button type="button" className="linkbtn" onClick={() => setSheet("catch")}>All {here.length}</button></div>
-          <CatchList rows={here} limit={5} onOpen={(sp) => setSheet({ species: sp })} />
+          <CatchList rows={here} limit={5} onOpen={(sp) => setSheet({ advice: sp })} />
         </section>
 
         {!place.verified ? (
@@ -220,7 +223,7 @@ export default function Home() {
         <Sheet title="What can I catch here?" aside={`${place.name}, ${fmtDay(dayStart).split(" ").slice(1).join(" ")}`} onClose={() => setSheet(null)}>
           <p className="small muted">Ordered by the strength of the evidence, then by season. FishDock never says a fish is at an exact spot.</p>
           <div className="legend">{Object.entries(LEVELS).map(([k, v]) => <span key={k} className={`lvl lvl-${k}`}>{v.label}</span>)}</div>
-          <CatchList rows={here} onOpen={(sp) => setSheet({ species: sp })} />
+          <CatchList rows={here} onOpen={(sp) => setSheet({ advice: sp })} />
         </Sheet>
       ) : null}
       {sheet === "target" ? (
@@ -236,6 +239,7 @@ export default function Home() {
         </Sheet>
       ) : null}
       {sheet?.species ? <SpeciesSheet species={sheet.species} onClose={() => setSheet(null)} /> : null}
+      {sheet?.advice ? <AdviceSheet species={sheet.advice} spot={place} row={here.find((r) => r.species.id === sheet.advice.id)} onClose={() => setSheet(null)} /> : null}
       {sheet === "identify" ? <IdentifySheet onClose={() => setSheet(null)} /> : null}
       {sheet === "checklist" ? <Checklist onClose={() => setSheet(null)} /> : null}
       {sheet === "conditions" ? <ManualConditions onClose={() => setSheet(null)} /> : null}

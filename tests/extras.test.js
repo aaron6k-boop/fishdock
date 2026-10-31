@@ -96,3 +96,27 @@ test("tide estimate covers the whole week ahead", async () => {
   const phases = new Set(Array.from({ length: 24 }, (_, h) => t.stateAt(now + 6 * 864e5 + h * 3600e3).phase));
   assert.ok(phases.size > 2, "day 6 has a real tide cycle, not one state all day");
 });
+
+test("your own catches count at a place: by mark, or within 1.5 km of the logged position", async () => {
+  const { catchesNear, withMine } = await import("../src/lib/myCatches.js");
+  const { catchHere } = await import("../src/lib/catchhere.js");
+  const { spotById } = await import("../src/data/spots.js");
+  const gorleston = { ...spotById("gorleston-south-pier"), verified: true };
+  const catches = [
+    { species: "thornback-ray", at: Date.UTC(2026, 9, 31, 13), place: { id: "custom", lat: 52.5721, lon: 1.7369 } },
+    { species: "thornback-ray", at: Date.UTC(2026, 9, 20), place: { id: "gorleston-south-pier" } },
+    { species: "conger", at: Date.UTC(2026, 9, 31), pos: { lat: 52.573, lon: 1.738 } },
+    { species: "cod", at: 1, pos: { lat: 52.93, lon: 1.30 } }, // Cromer, far away
+    { species: null, at: 1, place: { id: "gorleston-south-pier" } },
+  ];
+  const mine = catchesNear(catches, gorleston);
+  assert.deepEqual(mine.get("thornback-ray"), { n: 2, last: Date.UTC(2026, 9, 31, 13) });
+  assert.ok(mine.has("conger") && !mine.has("cod"));
+  const rows = withMine(catchHere(gorleston, 10), mine, 10);
+  const conger = rows.find((r) => r.species.id === "conger");
+  assert.ok(conger.mine, "a fish you caught there gets your badge");
+  assert.equal(rows.find((r) => r.species.id === "thornback-ray").mine.n, 2);
+  // a fish nobody listed but you caught still appears, as "Yours"
+  const rows2 = withMine([], new Map([["tope", { n: 1, last: 5 }]]), 7);
+  assert.equal(rows2[0].level, "yours");
+});

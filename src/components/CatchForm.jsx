@@ -59,7 +59,7 @@ export default function CatchForm({ onClose, existing, session, onSaved, gps }) 
       lengthCm: lenCm ?? null, weightKg: existing && f.lb === "" && f.oz === "" && f.kg === "" ? existing.weightKg ?? null : toKg(f.lb, f.oz, f.kg, units.weight),
       bait: f.bait || null, hook: f.hook || null, rig: f.rig || null, method: f.method || null, depthM: f.depthM === "" ? null : Number(f.depthM),
       released: !!f.released, notes: f.notes || "", photo: f.photo || null,
-      place: existing?.place || { id: place.id, name: place.name, kind: place.kind, region: place.region || null },
+      place: existing?.place || { id: place.id, name: place.name, kind: place.kind, region: place.region || null, lat: place.lat ?? null, lon: place.lon ?? null },
       pos: existing?.pos || (settings.privacy.saveGps && gps ? gps : null),
       conditions: existing?.conditions || { windKph: c?.windKph ?? null, windDir: c?.windDir ?? null, pressureHpa: c?.pressureHpa ?? null, tempC: c?.tempC ?? null, waveM: c?.waveM ?? null, tide: tst?.phase || null, tideFlooding: tst?.flooding ?? null, biteScore: score },
       sessionId: existing?.sessionId || session?.id || null, private: true,

@@ -33,6 +33,7 @@ function Row({ r, onOpen }) {
         <span className="t">{sp.name}</span>
         <span className="s">{[word, months].filter(Boolean).join(", ")}</span>
         {note ? <span className="s">{note}</span> : null}
+        {r.mine ? <span className="s mine">You've caught {r.mine.n === 1 ? "one" : r.mine.n} here{r.mine.last ? `, last ${new Date(r.mine.last).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span> : null}
       </span>
       <span className="end">
         <span className={`lvl lvl-${r.level}`}>{LEVELS[r.level].short}</span>

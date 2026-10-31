@@ -15,6 +15,7 @@ import { handleFeedback } from "../../server/feedback.js";
 import { handleMetrics } from "../../server/metrics.js";
 import { handleAdmin } from "../../server/admin.js";
 import { handleWater } from "../../server/water.js";
+import { handleFishInfo } from "../../server/fishinfo.js";
 
 const port = Number(process.argv[2] || 8792);
 // --dist serves the production build (dist/, as Cloudflare Pages would); otherwise the single-file e2e build.
@@ -30,7 +31,7 @@ function staticFile(pathname) {
   return { type: "text/plain", body: "not found" };
 }
 const env = { DB: createD1(":memory:"), ADMIRALTY_API_KEY: "test-key", GEMINI_API_KEY: "test-key", ADMIN_EMAILS: "admin@fishdock.example" };
-const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater };
+const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater, fishinfo: handleFishInfo };
 
 // ---- outside services, shaped like the real ones ----
 const now = Date.now();
@@ -52,6 +53,11 @@ globalThis.fetch = async (input, init) => {
     if (url.includes("/floods")) return J({ items: [] });
     return J({ items: [{ "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/E1", notation: "E1", label: "Test station", riverName: "River Test", lat: 51.95, long: -2.6, measures: [{ "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/E1-level-stage-i-15_min-m", parameter: "level", qualifier: "Stage" }], stageScale: { typicalRangeLow: 0.3, typicalRangeHigh: 1.9 } }] });
   }
+  if (url.includes("en.wikipedia.org/api/rest_v1/page/summary/")) {
+    const name = decodeURIComponent(url.split("/summary/")[1].split("?")[0]).replace(/_/g, " ");
+    return J({ title: name, extract: `${name} is a fish found in UK waters. It can grow to about 1 m long (test text).`, content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/" + name.replace(/ /g, "_") } }, originalimage: { source: "https://upload.wikimedia.org/wikipedia/commons/4/4f/Test_fish.jpg" } });
+  }
+  if (url.includes("commons.wikimedia.org/w/api.php")) return J({ query: { pages: { "1": { imageinfo: [{ url: "https://upload.wikimedia.org/wikipedia/commons/4/4f/Test_fish.jpg", thumburl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Test_fish.jpg/640px-Test_fish.jpg", thumbwidth: 640, thumbheight: 400, descriptionurl: "https://commons.wikimedia.org/wiki/File:Test_fish.jpg", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, Artist: { value: "Test Photographer" }, LicenseUrl: { value: "https://creativecommons.org/licenses/by-sa/4.0" } } }] } } } });
   if (url.includes("overpass-api.de")) {
     // inland (west of 1.0 E and south of 52.8 N here) is a named river; anything else is the coast by a pier
     const q = decodeURIComponent(String(init?.body || "").slice(5));

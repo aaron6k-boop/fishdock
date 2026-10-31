@@ -10,6 +10,10 @@
 // - The point (4 decimal places, about 10 m) goes to Overpass with nothing about who asked. Nothing is stored:
 //   no cache row, no log line with coordinates. A tapped point can be someone's private mark.
 // - OpenStreetMap data is © OpenStreetMap contributors, ODbL; the attribution travels with every answer.
+// - If every Overpass instance fails, Open-Meteo's marine model is asked whether the point (to 2 decimal places,
+//   about 1 km) has wave data. If it does, the answer is "sea", marked as a low-certainty guess. If it has none,
+//   the kind is unknown (null) and the app asks. The marine model's coastal cells reach a little inland, which is
+//   why this is only ever a guess.
 
 import { json, err, guard, latLon, toResponse, cleanLine } from "./http.js";
 import { ensureSchema } from "./db.js";
@@ -130,6 +134,15 @@ export async function handleWater(request, env, now = Date.now(), deps = {}) {
       } catch (e) {
         if (!(e instanceof UpstreamError)) throw e;
       }
+    }
+    // ---- fallback: is there sea here at all? ----
+    try {
+      const m = await ctx.upstreamJson("open-meteo-marine", `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&hourly=wave_height&forecast_days=1`, { noDataStatuses: [400], timeoutMs: 5000 });
+      const waves = (m?.hourly?.wave_height || []).filter((v) => typeof v === "number");
+      if (waves.length) return json({ kind: "sea", subtype: "beach", name: null, sure: "low", source: "open-meteo-marine", attribution: "Sea check: Open-Meteo marine forecast (CC BY 4.0)" });
+      return json({ kind: null, subtype: null, name: null, sure: "low", source: "open-meteo-marine", attribution: "Sea check: Open-Meteo marine forecast (CC BY 4.0)" });
+    } catch (e) {
+      if (!(e instanceof UpstreamError)) throw e;
     }
     return err(502, "upstream", "Couldn't check the map data just now. Choose the water type yourself.");
   } catch (e) {

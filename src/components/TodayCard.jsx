@@ -14,7 +14,7 @@ const range = (w) => `${fmtTime(w.start)} to ${fmtTime(w.end)}`;
 const dayTag = (t, dayStart) => (t >= addUkDays(dayStart, 1) ? ` ${fmtShortDay(t).split(" ")[0]}` : "");
 
 /** spot: { lat, lon, kind, subtype, tidePref?, name }. here: catchHere(spot) for the species chips. */
-export default function TodayCard({ spot, here, borrowed = null }) {
+export default function TodayCard({ spot, here, borrowed = null, species = null }) {
   const [live, setLive] = useState({ cond: null, tides: null });
   const [targetId, setTargetId] = useState(null);
   const sea = spot.kind === "sea";
@@ -29,7 +29,7 @@ export default function TodayCard({ spot, here, borrowed = null }) {
   const dayStart = ukDayStart(now);
   const month = ukMonth(now);
   const inSeason = (here || []).filter((r) => r.inSeason !== "out");
-  const target = (targetId && inSeason.find((r) => r.species.id === targetId)?.species) || autoTarget(spot, month);
+  const target = species || (targetId && inSeason.find((r) => r.species.id === targetId)?.species) || autoTarget(spot, month);
   const tide = useMemo(() => (sea ? tideModel(spot, live.tides) : null), [spot, sea, live.tides]);
   const cond = live.cond?.hourly?.length ? live.cond : null;
   const sun = useMemo(() => ASTRO.sunDay(dayStart, spot.lat, spot.lon), [dayStart, spot.lat, spot.lon]);
@@ -51,8 +51,8 @@ export default function TodayCard({ spot, here, borrowed = null }) {
 
   return (
     <section className="card today-card">
-      <div className="card-h"><h2>{showDay === today ? "Best times today" : "Best times tomorrow"}</h2><span className="aside">{target.name}</span></div>
-      {inSeason.length > 1 ? (
+      <div className="card-h"><h2>{showDay === today ? "Best time to go today" : "Best time to go tomorrow"}</h2><span className="aside">{target.name}</span></div>
+      {!species && inSeason.length > 1 ? (
         <div className="chips scroll" role="group" aria-label="Species">
           {inSeason.slice(0, 8).map((r) => <button key={r.species.id} type="button" className="chip" aria-pressed={target.id === r.species.id} onClick={() => setTargetId(r.species.id)}>{r.species.name}</button>)}
         </div>

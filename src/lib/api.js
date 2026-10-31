@@ -42,6 +42,16 @@ export const getConditions = (lat, lon) => cached("conditions", lat, lon);
 export const getTides = (lat, lon) => cached("tides", lat, lon);
 export const getRiver = (lat, lon) => cached("river", lat, lon);
 
+/** A free-licensed photo and Wikipedia's summary for one FishDock species (kept in memory for the visit). */
+export async function getFishInfo(id) {
+  if (PREVIEW) return { preview: true, photo: null, extract: null };
+  const key = `fishinfo:${id}`;
+  if (memo.has(key)) return memo.get(key).data;
+  const data = await getJSON(`/api/fishinfo?id=${encodeURIComponent(id)}`, { timeout: 12000 });
+  if (!data.error) memo.set(key, { at: Date.now(), data });
+  return data;
+}
+
 /** What water is at a tapped point (OpenStreetMap via the server). Kept in memory only, per point. */
 export async function getWater(lat, lon) {
   if (PREVIEW) return { source: null, preview: true, kind: null };

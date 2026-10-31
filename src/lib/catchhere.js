@@ -13,6 +13,7 @@ export const LEVELS = {
   seasonal: { label: "Seasonally present", short: "Seasonal", rank: 3 },
   occasional: { label: "Occasionally recorded", short: "Occasional", rank: 2 },
   possible: { label: "Possible from habitat", short: "Possible", rank: 1 },
+  yours: { label: "You've caught it here", short: "Yours", rank: 5 },
 };
 
 /** Which stretch of coast a point is on, for species ranges. Rough by design. */

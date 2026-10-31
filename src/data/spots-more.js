@@ -7,6 +7,51 @@
 
 export const MORE_SPOTS = [
   {
+    id: "gorleston-south-pier",
+    name: "Gorleston South Pier",
+    region: "Norfolk (Great Yarmouth), East of England",
+    nation: "England",
+    kind: "sea",
+    subtype: "pier",
+    lat: 52.5718,
+    lon: 1.7365,
+    coordsVerified: false,
+    species: [
+      {
+        id: "cod",
+        name: "Cod",
+        level: "seasonal",
+        note: "Area-wide: codling feature in the Great Yarmouth Mercury sea fishing column"
+      },
+      {
+        id: "sole",
+        name: "Sole",
+        level: "seasonal",
+        note: "Area-wide: soles feature in the Great Yarmouth Mercury sea fishing column"
+      },
+      {
+        id: "thornback-ray",
+        name: "Thornback ray",
+        level: "occasional",
+        note: "Caught from the pier by a FishDock angler, October 2026"
+      }
+    ],
+    best: "Sources found give no tide or season detail for the pier itself, so check locally. The sea anglers club NESA has a Gorleston pier wall match report.",
+    tidePref: null,
+    baits: [],
+    access: "The pier has been closed at times (the Great Yarmouth Mercury reported a closure that kept anglers away): check it is open before you go.",
+    safety: "A working harbour entrance: watch for shipping and keep back from the edge.",
+    sources: [
+      "https://www.nesa.co.uk/threads/saturday-23rd-gorleston-on-sea-pier-wall-the-report.17575",
+      "https://www.greatyarmouthmercury.co.uk/news/21091091.sea-fishing-codling-still-proving-difficult/",
+      "https://www.greatyarmouthmercury.co.uk/news/21089739.sea-fishing-soles-come-fore-keep-rod-low/",
+      "https://www.greatyarmouthmercury.co.uk/news/21044345.pier-closure-keeps-anglers-away/",
+      "https://en.wikipedia.org/wiki/Gorleston_South_Pier_Lighthouse"
+    ],
+    verification: "partial",
+    checked: "2026-10-31"
+  },
+  {
     id: "roker-pier",
     name: "Roker Pier, Sunderland",
     region: "Tyne and Wear, North East England",

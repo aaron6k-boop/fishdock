@@ -17,6 +17,8 @@ import IdentifySheet from "../components/IdentifySheet.jsx";
 import PinSheet from "../components/PinSheet.jsx";
 import TodayCard from "../components/TodayCard.jsx";
 import CatchList from "../components/CatchList.jsx";
+import AdviceSheet from "../components/AdviceSheet.jsx";
+import { useMyCatches, catchesNear, withMine } from "../lib/myCatches.js";
 import { ReportSheet } from "./Tackle.jsx";
 
 export default function Explore() {
@@ -121,7 +123,8 @@ export function SpotSheet({ s, onClose }) {
   const [report, setReport] = useState(false);
   const [species, setSpecies] = useState(null);
   const month = ukMonth(Date.now());
-  const all = useMemo(() => catchHere({ ...s, verified: true }, month), [s, month]);
+  const myCatches = useMyCatches();
+  const all = useMemo(() => withMine(catchHere({ ...s, verified: true }, month), catchesNear(myCatches, s), month), [s, month, myCatches]);
   const here = all.filter((r) => r.level !== "possible");
   const fav = settings.favourites.includes(s.id);
   return (
@@ -139,13 +142,19 @@ export function SpotSheet({ s, onClose }) {
         <h2 className="h2">What's caught here</h2>
         <CatchList rows={here} onOpen={setSpecies} />
       </section>
+      {s.alsoCaught?.length ? (
+        <section className="card">
+          <h2 className="h2">Also caught here</h2>
+          {s.alsoCaught.map((x) => <p key={x.name} className="small"><b>{x.name}:</b> {x.note} {x.link ? <a href={x.link} target="_blank" rel="noopener noreferrer">Rules</a> : null}</p>)}
+        </section>
+      ) : null}
       {s.access ? <section className="card"><h2 className="h2">Access, parking and permits</h2><p className="small">{s.access}</p></section> : null}
       {s.safety ? <Notice kind="danger"><b>Safety:</b> {s.safety}</Notice> : null}
       <p className="tiny">{s.verification === "partial" ? "Some details here rest on one or two sources. " : ""}Last checked {s.checked || "October 2026"}.</p>
       <Sources list={s.sources} />
       <button type="button" className="btn ghost" onClick={() => setReport(true)}><Icon name="flag" />Report wrong or out-of-date information</button>
       {report ? <ReportSheet kind="inaccurate-spot" refText={`spot:${s.id}`} onClose={() => setReport(false)} /> : null}
-      {species ? <SpeciesSheet species={species} onClose={() => setSpecies(null)} /> : null}
+      {species ? <AdviceSheet species={species} spot={{ ...s, verified: true }} row={here.find((r) => r.species.id === species.id)} onClose={() => setSpecies(null)} /> : null}
     </Sheet>
   );
 }

@@ -7,10 +7,11 @@ import { SPOTS } from "../data/spots.js";
 import { WATERS, waterById, waterFor, MAX_PINS, parseCoords, inUk, makePin, savePin, removePin, placeFromPin, nearestSpot, defaultPinName } from "../lib/pins.js";
 import { catchHere } from "../lib/catchhere.js";
 import { getWater } from "../lib/api.js";
+import { useMyCatches, catchesNear, withMine } from "../lib/myCatches.js";
 import { ukMonth } from "../lib/time.js";
 import { fmtKm, mapsLink, nationAt } from "../lib/geo.js";
 import MapView from "./MapView.jsx";
-import SpeciesSheet from "./SpeciesSheet.jsx";
+import AdviceSheet from "./AdviceSheet.jsx";
 import TodayCard from "./TodayCard.jsx";
 import CatchList from "./CatchList.jsx";
 import { Sheet, Icon, Notice } from "./ui.jsx";
@@ -60,7 +61,8 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
 
   const label = name.trim() || pin?.name || found?.name || (pos ? defaultPinName(pos.lat, pos.lon) : "Pinned spot");
   const spot = useMemo(() => (pos && w ? { id: "pin", name: label, lat: pos.lat, lon: pos.lon, kind: w.kind, subtype: w.id, nation: nationAt(pos.lat, pos.lon), verified: false } : null), [pos, w, label]);
-  const here = useMemo(() => (spot ? catchHere(spot, ukMonth(Date.now())) : []), [spot]);
+  const myCatches = useMyCatches();
+  const here = useMemo(() => (spot ? withMine(catchHere(spot, ukMonth(Date.now())), catchesNear(myCatches, spot), ukMonth(Date.now())) : []), [spot, myCatches]);
 
   function moveTo(p) { setPos(p); setFocus({ ...p, zoom: 15, key: Date.now() }); }
   function readText(e) {
@@ -149,6 +151,9 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
 
       {spot ? (
         <>
+          <TodayCard key={`${spot.lat},${spot.lon},${spot.subtype}`} spot={spot} here={here}
+            borrowed={near && near.d < 3 && near.spot.kind === "sea" && spot.kind === "sea" && near.spot.tidePref ? { pref: near.spot.tidePref, name: near.spot.name } : null} />
+
           <section className="card">
             <div className="card-h"><h2>Likely to catch here</h2><span className="aside">{here.filter((r) => r.inSeason !== "out").length} in season</span></div>
             {here.length ? <CatchList rows={here} onOpen={setSpecies} limit={allFish ? 100 : 10} /> : <p className="small muted">No species profile matches this water type here.</p>}
@@ -156,8 +161,6 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
             <p className="tiny">From documented marks within {fmtKm(25)} and each species' habitat and UK range: a guide to the area, not a record of this exact spot.</p>
           </section>
 
-          <TodayCard key={`${spot.lat},${spot.lon},${spot.subtype}`} spot={spot} here={here}
-            borrowed={near && near.d < 3 && near.spot.kind === "sea" && spot.kind === "sea" && near.spot.tidePref ? { pref: near.spot.tidePref, name: near.spot.name } : null} />
 
           <section className="card">
             <div className="field">
@@ -176,7 +179,7 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
           {found?.kind ? <p className="tiny">Water type: OpenStreetMap contributors (ODbL).</p> : null}
         </>
       ) : null}
-      {species ? <SpeciesSheet species={species} onClose={() => setSpecies(null)} /> : null}
+      {species && spot ? <AdviceSheet species={species} spot={spot} row={here.find((r) => r.species.id === species.id)} onClose={() => setSpecies(null)} /> : null}
     </Sheet>
   );
 }

@@ -429,6 +429,7 @@ const CORE = [
     access: "Owned by North Norfolk District Council, and anglers follow a voluntary code of conduct. No bait or fee details were found: check locally for current charges and rules.",
     safety: "Busy with tourists, so cast with care. Take a drop net to land decent fish.",
     sources: ["https://britishseafishing.co.uk/?p=1271", "https://en.wikipedia.org/wiki/Cromer_Pier"],
+    alsoCaught: [{ name: "Lobster", note: "Hooked on a bottom rig by a FishDock angler, October 2026. Lobsters are protected by size limits and other rules: put back any carrying eggs, and check Eastern IFCA's rules before keeping one.", link: "https://www.eastern-ifca.gov.uk/" }],
     verification: "partial", checked: C,
   },
   {

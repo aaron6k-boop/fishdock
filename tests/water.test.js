@@ -86,7 +86,10 @@ test("water: GET asks Overpass once and answers the classification with attribut
 
 test("water: guard, method, area and upstream failures", async (t) => {
   const s = setup();
-  const net = stubFetch(t, [[(url) => OVERPASS_URLS.some(([, u]) => u === url), () => new Response("busy", { status: 504 })]]);
+  const net = stubFetch(t, [
+    [(url) => OVERPASS_URLS.some(([, u]) => u === url), () => new Response("busy", { status: 504 })],
+    [/marine-api\.open-meteo\.com/, () => new Response("down", { status: 503 })],
+  ]);
   assert.equal((await s.call(handleWater, "/api/water")("GET", "?lat=52.57&lon=1.73", { fishdock: false })).status, 403);
   assert.equal((await s.call(handleWater, "/api/water")("POST", "?lat=52.57&lon=1.73")).status, 405);
   assert.equal((await s.call(handleWater, "/api/water")("GET", "?lat=40.4&lon=-3.7")).body.error, "out_of_area");
@@ -94,9 +97,9 @@ test("water: guard, method, area and upstream failures", async (t) => {
   const r = await s.call(handleWater, "/api/water")("GET", "?lat=52.57&lon=1.73");
   assert.equal(r.status, 502);
   assert.match(r.body.message, /Choose the water type yourself/);
-  assert.equal(net.calls.length, OVERPASS_URLS.length, "every instance was tried once");
+  assert.equal(net.calls.length, OVERPASS_URLS.length + 1, "every instance was tried once, then the sea check");
   const health = (await s.db.prepare("SELECT upstream, last_error FROM source_health ORDER BY upstream").all()).results;
-  assert.deepEqual(health.map((h) => h.last_error), ["http_504", "http_504", "http_504"]);
+  assert.deepEqual(health.map((h) => [h.upstream, h.last_error]), [["open-meteo-marine", "http_503"], ["overpass", "http_504"], ["overpass-coffee", "http_504"], ["overpass-vk", "http_504"]]);
 });
 
 test("water: a refusing main instance falls back to the next one, with a proper User-Agent", async (t) => {
@@ -131,4 +134,25 @@ test("water: an Overpass timeout remark with no elements is retried on the next 
   assert.equal(r.status, 200);
   assert.equal(r.body.subtype, "reservoir");
   assert.equal(net.calls.length, 2);
+});
+
+test("water: when Overpass is down, wave data says it's the sea (a low-certainty guess)", async (t) => {
+  const s = setup();
+  const net = stubFetch(t, [
+    [(url) => OVERPASS_URLS.some(([, u]) => u === url), () => new Response("origin down", { status: 521 })],
+    [/marine-api\.open-meteo\.com\/v1\/marine\?latitude=52\.57&longitude=1\.74&hourly=wave_height/, () => ({ hourly: { time: ["2026-10-31T00:00"], wave_height: [null, 0.8, 0.9] } })],
+  ]);
+  const r = await s.call(handleWater, "/api/water")("GET", "?lat=52.5732&lon=1.7412");
+  assert.equal(r.status, 200);
+  assert.deepEqual({ kind: r.body.kind, subtype: r.body.subtype, sure: r.body.sure, source: r.body.source }, { kind: "sea", subtype: "beach", sure: "low", source: "open-meteo-marine" });
+  assert.doesNotMatch(net.calls.at(-1).url, /52\.5732|1\.7412/, "only a 2 decimal place point goes to the marine model");
+  // inland: no wave data, so the kind is unknown and the app asks
+  const s2 = setup();
+  stubFetch(t, [
+    [(url) => OVERPASS_URLS.some(([, u]) => u === url), () => new Response("origin down", { status: 521 })],
+    [/marine-api/, () => new Response(JSON.stringify({ error: true, reason: "No data is available for this location" }), { status: 400 })],
+  ]);
+  const r2 = await s2.call(handleWater, "/api/water")("GET", "?lat=52.2&lon=-1.5");
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.kind, null);
 });
