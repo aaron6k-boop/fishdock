@@ -297,3 +297,5 @@ details.conds[open] summary::before { content: "▾ "; }
 .water-switch button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
 .water-switch button[aria-pressed="true"]:first-child { color: var(--tide); }
 .water-switch button[aria-pressed="true"]:last-child { color: var(--action); }
+.guide-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; line-height: 1.45; }
+.today-card .kv { margin-top: 2px; }

@@ -774,6 +774,12 @@ export const MORE_SPOTS = [
         name: "Barbel",
         level: "common",
         note: "Angling Times covers barbel fishing on the Trent in general"
+      },
+      {
+        id: "carp",
+        name: "Carp",
+        level: "occasional",
+        note: "River-wide: Trent carp to over 30lb are reported; not a record for this stretch"
       }
     ],
     best: "Sources found give no timings for the Nottingham stretch. Angling Times has a guide to the best Trent stretches and to Trent barbel fishing.",
@@ -784,7 +790,9 @@ export const MORE_SPOTS = [
     sources: [
       "https://www.anglingtimes.co.uk/advice/tips/barbel-fishing-on-the-river-trent",
       "https://www.pressreader.com/uk/angling-times-uk/20210629/283506503954336",
-      "https://happeningnext.com/event/lets-fish-nottingham-river-trent-notts-aa-15-08-2026-eid1ef0l2ijoisa"
+      "https://happeningnext.com/event/lets-fish-nottingham-river-trent-notts-aa-15-08-2026-eid1ef0l2ijoisa",
+      "https://www.anglingtimes.co.uk/news/stories/perfect-rig-placement-fools-30lb-plus-warrior-trent-carp/",
+      "https://www.anglingtimes.co.uk/advice/tips/how-to-catch-carp-on-the-river-trent/"
     ],
     verification: "partial",
     checked: "2026-10-31"
@@ -1647,6 +1655,45 @@ export const MORE_SPOTS = [
       "https://www.fisheriesireland.ie/sites/default/files/2023-02/fish_stock_survey_melvin_2021.pdf"
     ],
     verification: "verified",
+    checked: "2026-10-31"
+  },
+  {
+    id: "bristol-avon-claverton",
+    name: "Bristol Avon at Claverton (Bathampton AA)",
+    region: "Somerset, near Bath",
+    nation: "England",
+    kind: "river",
+    subtype: "river",
+    lat: 51.3786,
+    lon: -2.3049,
+    coordsVerified: false,
+    species: [
+      {
+        id: "carp",
+        name: "Carp",
+        level: "occasional",
+        note: "River-wide: a Bristol Avon carp caught on luncheon meat after dark was reported; not a record for this stretch"
+      },
+      {
+        id: "barbel",
+        name: "Barbel",
+        level: "common",
+        note: "River-wide: the Environment Agency has written about Bristol Avon barbel"
+      }
+    ],
+    best: "The carp report was an after-dark capture. Sources found give no other timings, so check locally.",
+    tidePref: null,
+    baits: [
+      "luncheon meat"
+    ],
+    access: "Bathampton Angling Association water: a club or day permit is needed (check the club). An Environment Agency rod licence is required.",
+    safety: "Banks can be steep and slippery after rain.",
+    sources: [
+      "https://www.anglingtimes.co.uk/news/stories/rolling-meat-after-dark-fools-superb-bristol-avon-carp/",
+      "https://www.gethooked.co.uk/fishing-venue/682/bathampton-angling-association-bristol-avon-claverton?page=18",
+      "https://www.gov.uk/government/news/be-on-the-lookout-for-bristol-avons-blue-bellied-barbel"
+    ],
+    verification: "partial",
     checked: "2026-10-31"
   },
 ];

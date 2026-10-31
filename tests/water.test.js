@@ -3,7 +3,7 @@
 // `out tags` carry only type, id and tags). Written from the Overpass documentation, not captured live.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleWater, classifyWater, overpassQuery, OVERPASS_URL } from "../server/water.js";
+import { handleWater, classifyWater, overpassQuery, OVERPASS_URL, OVERPASS_URLS } from "../server/water.js";
 import { setup, stubFetch } from "./helpers/fishdock.js";
 
 const area = (tags) => ({ type: "area", id: 3600000000 + Math.floor(Math.random() * 1e6), tags });
@@ -59,7 +59,7 @@ test("water: the query asks about the point to 4 decimal places", () => {
   const q = overpassQuery(52.573049, 1.739012);
   assert.match(q, /is_in\(52\.5730,1\.7390\)/);
   assert.match(q, /around:90,52\.5730,1\.7390\)\["waterway"/);
-  assert.match(q, /around:2500,52\.5730,1\.7390\)\["natural"="coastline"\]/);
+  assert.match(q, /around:1500,52\.5730,1\.7390\)\["natural"="coastline"\]/);
   assert.doesNotMatch(q, /52\.573049/);
 });
 
@@ -86,7 +86,7 @@ test("water: GET asks Overpass once and answers the classification with attribut
 
 test("water: guard, method, area and upstream failures", async (t) => {
   const s = setup();
-  stubFetch(t, [[(url) => url === OVERPASS_URL, () => new Response("busy", { status: 504 })]]);
+  const net = stubFetch(t, [[(url) => OVERPASS_URLS.some(([, u]) => u === url), () => new Response("busy", { status: 504 })]]);
   assert.equal((await s.call(handleWater, "/api/water")("GET", "?lat=52.57&lon=1.73", { fishdock: false })).status, 403);
   assert.equal((await s.call(handleWater, "/api/water")("POST", "?lat=52.57&lon=1.73")).status, 405);
   assert.equal((await s.call(handleWater, "/api/water")("GET", "?lat=40.4&lon=-3.7")).body.error, "out_of_area");
@@ -94,4 +94,29 @@ test("water: guard, method, area and upstream failures", async (t) => {
   const r = await s.call(handleWater, "/api/water")("GET", "?lat=52.57&lon=1.73");
   assert.equal(r.status, 502);
   assert.match(r.body.message, /Choose the water type yourself/);
+  assert.equal(net.calls.length, OVERPASS_URLS.length, "every instance was tried once");
+  const health = (await s.db.prepare("SELECT upstream, last_error FROM source_health ORDER BY upstream").all()).results;
+  assert.deepEqual(health.map((h) => h.last_error), ["http_504", "http_504", "http_504"]);
+});
+
+test("water: a refusing main instance falls back to the next one, with a proper User-Agent", async (t) => {
+  const s = setup();
+  const net = stubFetch(t, [
+    [(url) => url === OVERPASS_URLS[0][1], () => new Response("rate limited", { status: 429 })],
+    [(url) => url === OVERPASS_URLS[1][1], () => ({ elements: [way({ waterway: "river", name: "River Yare" })] })],
+  ]);
+  const r = await s.call(handleWater, "/api/water")("GET", "?lat=52.6&lon=1.3");
+  assert.equal(r.status, 200);
+  assert.equal(r.body.name, "River Yare");
+  assert.equal(net.calls.length, 2);
+  assert.match(net.calls[1].headers.get("user-agent"), /^FishDock\/[\d.]+ \(\+https:\/\//);
+  // an answer without elements (an Overpass error remark) is skipped too
+  const s2 = setup();
+  stubFetch(t, [
+    [(url) => url === OVERPASS_URLS[0][1], () => ({ remark: "runtime error: Query timed out" })],
+    [(url) => url === OVERPASS_URLS[1][1], () => ({ elements: [] })],
+  ]);
+  const r2 = await s2.call(handleWater, "/api/water")("GET", "?lat=52.6&lon=1.3");
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.kind, null);
 });

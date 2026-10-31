@@ -27,11 +27,12 @@ export async function handleHealth(request, env, now = Date.now()) {
   if (env?.DB) {
     try {
       await ensureSchema(env.DB);
-      const rows = await env.DB.prepare("SELECT upstream, last_ok, last_fail FROM source_health ORDER BY upstream").all();
+      const rows = await env.DB.prepare("SELECT upstream, last_ok, last_fail, last_error FROM source_health ORDER BY upstream").all();
       out.upstreams = (rows.results || []).map((r) => ({
         name: r.upstream,
         lastOk: r.last_ok ? new Date(r.last_ok).toISOString() : null,
         lastFail: r.last_fail ? new Date(r.last_fail).toISOString() : null,
+        lastError: r.last_error || null, // a short code such as "timeout" or "http_429", never an upstream body
       }));
     } catch {
       out.ok = false;

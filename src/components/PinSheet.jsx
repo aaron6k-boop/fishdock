@@ -5,18 +5,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../lib/store.js";
 import { SPOTS } from "../data/spots.js";
 import { WATERS, waterById, parseCoords, inUk, makePin, savePin, removePin, placeFromPin, nearestSpot, defaultPinName } from "../lib/pins.js";
-import { catchHere, LEVELS, autoTarget } from "../lib/catchhere.js";
-import { biteDay, band, biteProfile } from "../lib/bitescore.js";
-import { tideModel } from "../lib/tides.js";
-import { getWater, getConditions, getTides } from "../lib/api.js";
-import { ukDayStart, ukMonth, fmtTime, fmtShortDay, monthsText } from "../lib/time.js";
+import { catchHere } from "../lib/catchhere.js";
+import { getWater } from "../lib/api.js";
+import { ukMonth } from "../lib/time.js";
 import { fmtKm, mapsLink, nationAt } from "../lib/geo.js";
 import MapView from "./MapView.jsx";
 import SpeciesSheet from "./SpeciesSheet.jsx";
-import { FishArt } from "./art.jsx";
+import TodayCard from "./TodayCard.jsx";
+import CatchList from "./CatchList.jsx";
 import { Sheet, Icon, Notice } from "./ui.jsx";
-
-const TIDE_WORDS = { flood: "the flood (rising tide)", ebb: "the ebb (falling tide)", moving: "a moving tide, either way", high: "around high water", low: "around low water" };
 const KIND_TITLE = { sea: "The sea", river: "River", lake: "Lake", canal: "Canal", fishery: "Fishery" };
 
 export default function PinSheet({ at = null, pin = null, withMap = true, onClose, onDone }) {
@@ -34,8 +31,6 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
   const [msg, setMsg] = useState("");
   const [mapOk, setMapOk] = useState(withMap && !preview);
   const [base, setBase] = useState("map");
-  const [live, setLive] = useState({ cond: null, tides: null });
-  const [targetId, setTargetId] = useState(null);
   const [species, setSpecies] = useState(null);
   const others = useMemo(() => (settings.pins || []).filter((p) => p.id !== pin?.id), [settings.pins, pin?.id]);
   const near = useMemo(() => (pos ? nearestSpot(pos.lat, pos.lon) : null), [pos]);
@@ -51,45 +46,20 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
     getWater(pos.lat, pos.lon).then((r) => {
       if (gone) return;
       setChecking(false);
-      if (r?.kind && waterById(r.subtype)) { setFound(r); setWater(r.subtype); setShowTypes(false); }
-      else { setFound({ error: r?.preview ? "preview" : r?.error || "none", message: r?.message }); setWater(null); setShowTypes(true); }
+      if (r?.kind && waterById(r.subtype)) { setFound(r); setWater(r.subtype); setShowTypes(false); return; }
+      // The map lookup failed or found nothing: within 3 km of a documented mark, start from that mark's water type.
+      const n = nearestSpot(pos.lat, pos.lon);
+      const guess = n && n.d <= 3 && waterById(n.spot.subtype === "breakwater" || n.spot.subtype === "harbour" ? "pier" : n.spot.subtype === "reservoir" ? "lake" : n.spot.subtype);
+      setFound({ error: r?.preview ? "preview" : r?.error || "none", message: r?.message, guess: guess ? n.spot : null });
+      setWater(guess ? guess.id : null);
+      setShowTypes(!guess);
     });
     return () => { gone = true; };
   }, [pos?.lat, pos?.lon]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- live weather and tides for the area (the same cached calls Home makes) ----
-  useEffect(() => {
-    if (!pos || !w) return;
-    let gone = false;
-    Promise.all([getConditions(pos.lat, pos.lon), w.kind === "sea" ? getTides(pos.lat, pos.lon) : Promise.resolve(null)])
-      .then(([cond, tides]) => { if (!gone) setLive({ cond, tides }); });
-    return () => { gone = true; };
-  }, [pos?.lat, pos?.lon, w?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const label = name.trim() || pin?.name || found?.name || (pos ? defaultPinName(pos.lat, pos.lon) : "Pinned spot");
   const spot = useMemo(() => (pos && w ? { id: "pin", name: label, lat: pos.lat, lon: pos.lon, kind: w.kind, subtype: w.id, nation: nationAt(pos.lat, pos.lon), verified: false } : null), [pos, w, label]);
-  const now = Date.now();
-  const dayStart = ukDayStart(now);
-  const month = ukMonth(now);
-  const here = useMemo(() => (spot ? catchHere(spot, month) : []), [spot, month]);
-  const inSeason = here.filter((r) => r.inSeason !== "out");
-  const target = (targetId && here.find((r) => r.species.id === targetId)?.species) || (spot ? autoTarget(spot, month) : null);
-  const tide = useMemo(() => (spot?.kind === "sea" ? tideModel(spot, live.tides) : null), [spot, live.tides]);
-  const cond = live.cond?.hourly?.length ? live.cond : null;
-  const day = useMemo(() => (spot && target ? biteDay({ place: spot, species: target, dayStart, tide, cond, river: null, now }) : null), [spot, target, dayStart, tide, cond]); // eslint-disable-line react-hooks/exhaustive-deps
-  const week = useMemo(() => (spot && target ? Array.from({ length: 7 }, (_, i) => {
-    const ds = dayStart + i * 864e5;
-    const d = biteDay({ place: spot, species: target, dayStart: ds, tide, cond, river: null, now });
-    // today counts only what's still to come
-    const slots = i === 0 ? d.slots.filter((s) => s.t + 900e3 > now) : d.slots;
-    const best = (i === 0 ? d.windows.filter((x) => x.end > now) : d.windows).sort((a, b) => b.peak - a.peak)[0] || null;
-    return { ds, today: i === 0, peak: slots.length ? Math.max(...slots.map((s) => s.score)) : 0, best };
-  }) : []), [spot, target, dayStart, tide, cond]); // eslint-disable-line react-hooks/exhaustive-deps
-  const bestDay = week.reduce((a, b) => (!a || b.peak > a.peak ? b : a), null);
-  const tidesToday = tide ? tide.events.filter((e) => e.t >= now - 1800e3 && e.t < dayStart + 864e5 + 6 * 3600e3).slice(0, 4) : [];
-  const peakSlot = day?.windows[0] ? day.slots.filter((s) => s.t >= day.windows[0].start && s.t <= day.windows[0].end).sort((a, b) => b.score - a.score)[0] : null;
-  const tidePref = target ? biteProfile(target).tide : null;
-  const docTide = near && near.d < 3 && near.spot.kind === "sea" && near.spot.tidePref ? near.spot.tidePref : null;
+  const here = useMemo(() => (spot ? catchHere(spot, ukMonth(Date.now())) : []), [spot]);
 
   function moveTo(p) { setPos(p); setFocus({ ...p, zoom: 15, key: Date.now() }); }
   function readText(e) {
@@ -158,14 +128,15 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
           {checking ? <p className="small muted"><Icon name="search" size={14} /> Checking the map…</p>
             : w && !showTypes ? (
               <div className="row between nowrap">
-                <span className="small"><b>{w.label}</b>{found?.kind && found.subtype === w.id ? <span className="muted"> · {found.sure === "low" ? "best guess" : "detected"} from OpenStreetMap</span> : null}</span>
+                <span className="small"><b>{w.label}</b>{found?.kind && found.subtype === w.id ? <span className="muted"> · {found.sure === "low" ? "best guess" : "detected"} from OpenStreetMap</span>
+                  : found?.guess && waterById(water) && !found.kind ? <span className="muted"> · guessed from {found.guess.name} nearby</span> : null}</span>
                 <button type="button" className="linkbtn" onClick={() => setShowTypes(true)}>Change</button>
               </div>
             ) : (
               <>
                 <b className="small">{found?.error === "none" || found?.kind === null ? "Couldn't tell what water this is." : found?.error ? "Choose the water type." : "What kind of water is it?"}</b>
                 {found?.error && found.error !== "none" && found.error !== "preview" && found.message ? <p className="tiny">{found.message}</p> : null}
-                <WaterGrid value={water} onPick={(id) => { setWater(id); setShowTypes(false); setTargetId(null); }} />
+                <WaterGrid value={water} onPick={(id) => { setWater(id); setShowTypes(false); }} />
               </>
             )}
         </section>
@@ -174,50 +145,12 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
       {spot ? (
         <>
           <section className="card">
-            <div className="card-h"><h2>Likely to catch here</h2><span className="aside">{inSeason.length} in season</span></div>
-            {here.length ? (
-              <div className="list">{here.slice(0, 8).map((r) => (
-                <button key={r.species.id} type="button" className="li" onClick={() => setSpecies(r.species)}>
-                  <span className={`fish-ico ${r.species.type === "sea" ? "" : "fresh"}`}><FishArt art={r.species.art} size={40} /></span>
-                  <span className="grow">
-                    <span className="t">{r.species.name}</span>
-                    <span className="s">{r.species.peak?.length ? `Best ${monthsText(r.species.peak)}` : r.species.present?.length ? `Here ${monthsText(r.species.present)}` : r.reason}</span>
-                  </span>
-                  <span className="end">
-                    <span className={`lvl lvl-${r.level}`}>{LEVELS[r.level].short}</span>
-                    <span className={`tiny season-${r.inSeason}`}>{r.inSeason === "peak" ? "Peak now" : r.inSeason === "present" ? "In season" : "Out of season"}</span>
-                  </span>
-                </button>
-              ))}</div>
-            ) : <p className="small muted">No species profile matches this water type here.</p>}
+            <div className="card-h"><h2>Likely to catch here</h2><span className="aside">{here.filter((r) => r.inSeason !== "out").length} in season</span></div>
+            {here.length ? <CatchList rows={here} onOpen={setSpecies} limit={10} /> : <p className="small muted">No species profile matches this water type here.</p>}
             <p className="tiny">From documented marks within {fmtKm(25)} and each species' habitat and UK range: a guide to the area, not a record of this exact spot.</p>
           </section>
 
-          {target && day ? (
-            <section className="card">
-              <div className="card-h"><h2>Best times today</h2><span className="aside">{target.name}</span></div>
-              {inSeason.length > 1 ? (
-                <div className="chips scroll" role="group" aria-label="Species">
-                  {inSeason.slice(0, 6).map((r) => <button key={r.species.id} type="button" className="chip" aria-pressed={target.id === r.species.id} onClick={() => setTargetId(r.species.id)}>{r.species.name}</button>)}
-                </div>
-              ) : null}
-              {day.windows.length ? (
-                <div className="windows">{day.windows.map((x, i) => <div className="window" key={i}><b>{fmtTime(x.start)}–{fmtTime(x.end)}</b><span>Peak {x.peak}, {band(x.peak).label}</span></div>)}</div>
-              ) : <p className="small muted">No stand-out window today.</p>}
-              {spot.kind === "sea" ? (
-                <div className="kv">
-                  {tidesToday.map((e, i) => <div key={i}><span className="k">{e.type === "HW" ? "High water" : "Low water"}</span><span className="v">{fmtTime(e.t)}{e.t >= dayStart + 864e5 ? ` (${fmtShortDay(e.t).split(" ")[0]})` : ""}</span></div>)}
-                </div>
-              ) : null}
-              <ul className="small tips">
-                {spot.kind === "sea" && tidePref ? <li>{target.name} usually feed best on {TIDE_WORDS[tidePref] || tidePref}.{docTide && docTide !== tidePref ? ` At ${near.spot.name}, anglers favour ${TIDE_WORDS[docTide] || docTide}.` : ""}</li> : null}
-                {peakSlot?.f.tideState ? <li>Tide in today's best window: {peakSlot.f.tideState.toLowerCase()}.</li> : null}
-                {bestDay?.best ? <li>Best day this week: {bestDay.today ? "today" : fmtShortDay(bestDay.ds)}, {fmtTime(bestDay.best.start)}–{fmtTime(bestDay.best.end)} (peak {bestDay.best.peak}).</li> : null}
-                {target.peak?.length ? <li>Best months for {target.name.toLowerCase()}: {monthsText(target.peak)}.</li> : null}
-              </ul>
-              <p className="tiny">{cond ? "Uses live weather for the area" : "Without live weather yet"}{spot.kind === "sea" ? (tide?.source === "estimate" ? `, and tides estimated from ${tide.station?.name} (can be out by an hour; check official times)` : tide ? `, and ${tide.label}` : ", no tide station close enough") : ""}. BiteScore is a guide, not a promise.</p>
-            </section>
-          ) : null}
+          <TodayCard key={`${spot.lat},${spot.lon},${spot.subtype}`} spot={{ ...spot, tidePref: near && near.d < 3 && near.spot.kind === "sea" ? near.spot.tidePref : null }} here={here} />
 
           <section className="card">
             <div className="field">

@@ -86,3 +86,23 @@ export function tideModel(place, api, now = Date.now()) {
     rangeLabel: sf > 0.72 ? "Spring tides" : sf < 0.28 ? "Neap tides" : ASTRO.springFactor(now + 864e5) > sf ? "Building to springs" : "Dropping to neaps",
   };
 }
+
+/**
+ * Clock windows for a mark's preferred tide that overlap [from, to): "high" and "low" are two hours either side of
+ * that tide, "flood" runs from low water to high water and "ebb" from high water to low water. "moving" and
+ * unknown preferences give nothing (they are about avoiding slack, not a window). Each is { start, end, at }.
+ */
+export function tideWindows(tide, pref, from, to) {
+  if (!tide?.events?.length || !pref) return [];
+  const H2 = 2 * 3600e3, ev = tide.events, out = [];
+  for (let i = 0; i < ev.length; i++) {
+    const e = ev[i], next = ev[i + 1];
+    let w = null;
+    if (pref === "high" && e.type === "HW") w = { start: e.t - H2, end: e.t + H2, at: e.t };
+    else if (pref === "low" && e.type === "LW") w = { start: e.t - H2, end: e.t + H2, at: e.t };
+    else if (pref === "flood" && e.type === "LW" && next?.type === "HW") w = { start: e.t, end: next.t, at: next.t };
+    else if (pref === "ebb" && e.type === "HW" && next?.type === "LW") w = { start: e.t, end: next.t, at: e.t };
+    if (w && w.end > from && w.start < to) out.push(w);
+  }
+  return out;
+}

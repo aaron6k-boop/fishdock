@@ -1,6 +1,16 @@
 // Beginner lessons: general angling practice written for FishDock (not from a single source), kept short.
 // Rules mentioned link to the official pages in the Rules screen; nothing here replaces them.
 export const LESSONS = [
+  { id: "river-carp", title: "Finding carp on a river", minutes: 3, species: ["carp"], steps: [
+    "River carp roam a long way, so finding them matters more than bait. Walk the bank and look before you set up.",
+    "Look for slower, deeper water off the main flow: wide bends, slacks behind islands and bridge piers, and the steadier edges of weirpools.",
+    "Marinas, boatyards, lock cuttings and backwaters hold carp, especially when the river is high and coloured.",
+    "Cover counts: overhanging trees, reedbeds, lilies, moored boats and snags. Warm-water outfalls can hold fish in winter.",
+    "Watch at dawn and dusk for carp rolling, bubbling or clouding the water. In towns they often follow people who feed the ducks.",
+    "Bait one or two spots little and often for a few days before you fish, so passing carp learn to stop there.",
+    "Use strong tackle and keep fish out of snags. Check the coarse close season (Rules) and the club's rules for that stretch." ],
+    note: "General guidance written for FishDock from the guides below. Rivers with carp reports are listed under Where to catch carp.",
+    sources: ["https://www.anglingtimes.co.uk/advice/tips/how-to-catch-your-first-river-carp/", "https://www.carpology.net/article/11-steps-to-making-the-most-out-of-your-local-river", "https://www.anglingtimes.co.uk/advice/tips/how-to-catch-carp-on-the-river-trent/", "https://www.anglinglines.com/blog/river-carp-fishing/"] },
   { id: "first-sea", title: "Your first sea fishing trip", minutes: 4, steps: [
     "Pick a safe, popular mark: a pier, a harbour wall or a gently sloping beach. Avoid rocks until you know the tides.",
     "Check the tide times. Most beaches fish best from about two hours before high water to an hour after.",

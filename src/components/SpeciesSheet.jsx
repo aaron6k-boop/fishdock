@@ -2,9 +2,13 @@
 import { useApp } from "../lib/store.js";
 import { ukMonth } from "../lib/time.js";
 import { rigById } from "../data/rigs.js";
+import { SPOTS } from "../data/spots.js";
+import { LESSONS } from "../data/lessons.js";
 import { rulesFor } from "../lib/rules.js";
+import { LEVELS } from "../lib/catchhere.js";
+import { distanceKm, fmtKm } from "../lib/geo.js";
 import { track } from "../lib/api.js";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Sheet, MonthStrip, Sources, Notice, Icon } from "./ui.jsx";
 import { FishArt, HookGlyph, WaterColumn } from "./art.jsx";
 
@@ -32,6 +36,8 @@ export default function SpeciesSheet({ species: sp, onClose }) {
         {sp.depth ? <p className="small"><b>Depth:</b> {sp.depth}</p> : null}
         {sp.behaviour ? <p className="small"><b>Feeding:</b> {sp.behaviour}</p> : null}
       </section>
+      <WhereToCatch sp={sp} onClose={onClose} />
+      <Guides sp={sp} />
       <section className="card">
         <div className="card-h"><h2>Bait, hooks and presentation</h2></div>
         <div className="advice-mini">
@@ -59,5 +65,63 @@ export default function SpeciesSheet({ species: sp, onClose }) {
       ) : null}
       <Sources list={sp.sources} />
     </Sheet>
+  );
+}
+
+// ---- where to catch it: documented marks that name this species, nearest first, by kind of water ----
+const waterGroup = (s) => (s.kind === "sea" ? "sea" : s.kind === "river" ? "river" : "still");
+const GROUPS = [["all", "All"], ["river", "Rivers"], ["still", "Lakes and canals"], ["sea", "Sea"]];
+
+function WhereToCatch({ sp, onClose }) {
+  const { place, update, say, go } = useApp();
+  const marks = useMemo(() => SPOTS
+    .map((s) => ({ s, rec: (s.species || []).find((x) => x.id === sp.id) }))
+    .filter((x) => x.rec)
+    .map((x) => ({ ...x, d: distanceKm(place, x.s) }))
+    .sort((a, b) => a.d - b.d), [sp.id, place]);
+  const groups = GROUPS.filter(([g]) => g === "all" || marks.some((m) => waterGroup(m.s) === g));
+  const [g, setG] = useState("all");
+  const [more, setMore] = useState(false);
+  const list = marks.filter((m) => g === "all" || waterGroup(m.s) === g);
+  return (
+    <section className="card">
+      <div className="card-h"><h2>Where to catch {sp.name.toLowerCase()}</h2><span className="aside">{marks.length ? `${marks.length} documented marks` : ""}</span></div>
+      {groups.length > 2 ? <div className="chips">{groups.map(([k, l]) => <button key={k} type="button" className="chip" aria-pressed={g === k} onClick={() => { setG(k); setMore(false); }}>{l}</button>)}</div> : null}
+      {list.length ? (
+        <div className="list">{list.slice(0, more ? 100 : 6).map(({ s, rec, d }) => (
+          <button key={s.id} type="button" className="li" onClick={() => { update({ placeId: s.id }); say(`Fishing at ${s.name}`); onClose(); go("home"); }}>
+            <span className={`pill ${s.kind === "sea" ? "sea" : "fresh"}`}>{s.kind === "river" ? "River" : s.kind === "sea" ? s.subtype || "Sea" : "Still"}</span>
+            <span className="grow"><span className="t">{s.name}</span><span className="s">{LEVELS[rec.level]?.short || ""}{rec.note ? ` · ${rec.note}` : ` · ${s.region}`}</span></span>
+            <span className="end tiny num">{fmtKm(d)}</span>
+          </button>
+        ))}</div>
+      ) : <p className="small muted">No documented mark names {sp.name.toLowerCase()} yet. Tap any water on the Explore map to see what's likely there.</p>}
+      {list.length > 6 && !more ? <button type="button" className="linkbtn" onClick={() => setMore(true)}>Show all {list.length}</button> : null}
+      <p className="tiny">Nearest to {place.name} first. Tap one to fish there. Notes marked "river-wide" come from reports about the whole river, not that stretch.</p>
+    </section>
+  );
+}
+
+// ---- guides from the Learn tab that are about this species ----
+function Guides({ sp }) {
+  const [open, setOpen] = useState(null);
+  const list = LESSONS.filter((l) => l.species?.includes(sp.id));
+  if (!list.length) return null;
+  return (
+    <section className="card">
+      <h2 className="h2">Guides</h2>
+      <div className="list">{list.map((l) => (
+        <button key={l.id} type="button" className="li" onClick={() => setOpen(l)}>
+          <Icon name="book" /><span className="grow"><span className="t">{l.title}</span><span className="s">{l.steps.length} tips · about {l.minutes} min</span></span><Icon name="chevron" className="go" />
+        </button>
+      ))}</div>
+      {open ? (
+        <Sheet title={open.title} onClose={() => setOpen(null)}>
+          <ol className="guide-steps">{open.steps.map((t, i) => <li key={i}>{t}</li>)}</ol>
+          {open.note ? <p className="tiny">{open.note}</p> : null}
+          <Sources list={open.sources || []} />
+        </Sheet>
+      ) : null}
+    </section>
   );
 }

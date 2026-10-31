@@ -15,6 +15,8 @@ import MapView, { OVERLAYS } from "../components/MapView.jsx";
 import SpeciesSheet from "../components/SpeciesSheet.jsx";
 import IdentifySheet from "../components/IdentifySheet.jsx";
 import PinSheet from "../components/PinSheet.jsx";
+import TodayCard from "../components/TodayCard.jsx";
+import CatchList from "../components/CatchList.jsx";
 import { ReportSheet } from "./Tackle.jsx";
 
 export default function Explore() {
@@ -116,8 +118,10 @@ function Spots() {
 export function SpotSheet({ s, onClose }) {
   const { update, settings, say, go } = useApp();
   const [report, setReport] = useState(false);
+  const [species, setSpecies] = useState(null);
   const month = ukMonth(Date.now());
-  const here = catchHere({ ...s, verified: true }, month).filter((r) => r.level !== "possible");
+  const all = useMemo(() => catchHere({ ...s, verified: true }, month), [s, month]);
+  const here = all.filter((r) => r.level !== "possible");
   const fav = settings.favourites.includes(s.id);
   return (
     <Sheet title={s.name} aside={`${s.region}, ${s.nation} · ${s.subtype || s.kind}`} onClose={onClose}>
@@ -128,15 +132,10 @@ export function SpotSheet({ s, onClose }) {
       </div>
       {s.coordsVerified === false ? <Notice kind="warn">Approximate position. Check the exact access point locally before you travel.</Notice> : null}
       {s.best ? <section className="card"><h2 className="h2">When it fishes best</h2><p className="small">{s.best}</p>{s.baits?.length ? <div className="chips">{s.baits.map((b) => <span key={b} className="chip">{b}</span>)}</div> : null}</section> : null}
+      <TodayCard spot={s} here={here} />
       <section className="card">
         <h2 className="h2">What's caught here</h2>
-        <div className="list">{here.map((r) => (
-          <div key={r.species.id} className="li static">
-            <span className="fish-ico"><FishArt art={r.species.art} size={40} /></span>
-            <span className="grow"><span className="t">{r.species.name}</span><span className="s">{r.note || r.reason}</span></span>
-            <span className={`lvl lvl-${r.level}`}>{LEVELS[r.level].short}</span>
-          </div>
-        ))}</div>
+        <CatchList rows={here} onOpen={setSpecies} />
       </section>
       {s.access ? <section className="card"><h2 className="h2">Access, parking and permits</h2><p className="small">{s.access}</p></section> : null}
       {s.safety ? <Notice kind="danger"><b>Safety:</b> {s.safety}</Notice> : null}
@@ -144,6 +143,7 @@ export function SpotSheet({ s, onClose }) {
       <Sources list={s.sources} />
       <button type="button" className="btn ghost" onClick={() => setReport(true)}><Icon name="flag" />Report wrong or out-of-date information</button>
       {report ? <ReportSheet kind="inaccurate-spot" refText={`spot:${s.id}`} onClose={() => setReport(false)} /> : null}
+      {species ? <SpeciesSheet species={species} onClose={() => setSpecies(null)} /> : null}
     </Sheet>
   );
 }

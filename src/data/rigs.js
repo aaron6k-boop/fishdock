@@ -251,7 +251,7 @@ export const RIGS = [
   },
   {
     id: "bolt-hair-rig", name: "Safe bolt rig with a hair", type: "fresh",
-    methods: ["carp", "ledger"], species: ["carp", "tench", "bream", "barbel", "chub"],
+    methods: ["carp", "ledger"], species: ["carp", "tench", "bream", "barbel", "chub", "wels-catfish"],
     snaggy: null, heavyFlow: false, calm: false,
     diagram: [{ k: "line" }, { k: "lead", label: "lead on safety clip" }, { k: "swivel" }, { k: "hooklength", label: "hooklink" }, { k: "hook", hair: true }],
     components: ["Mainline", "Tail rubber", "Safety lead clip with pin", "Lead", "Rig swivel", "Hooklink, weaker than the mainline", "Hook tied with a knotless knot and hair", "Hookbait on the hair"],
@@ -267,7 +267,7 @@ export const RIGS = [
   },
   {
     id: "method-feeder", name: "Method feeder", type: "fresh",
-    methods: ["method-feeder", "feeder", "carp"], species: ["carp", "tench", "bream"],
+    methods: ["method-feeder", "feeder", "carp"], species: ["carp", "tench", "bream", "crucian-carp"],
     snaggy: null, heavyFlow: false, calm: false,
     diagram: [{ k: "line" }, { k: "lead", kind: "method" }, { k: "hooklength", label: "short hooklink" }, { k: "hook", hair: true }],
     components: ["Mainline", "Method feeder frame", "Swivel sized to sit snugly in the feeder base", "Short hooklink", "Curved-shank hook", "Micro rig swivel on the shank", "Hook bead", "Hookbait on a small band or floss"],
@@ -299,7 +299,7 @@ export const RIGS = [
   },
   {
     id: "maggot-feeder", name: "Maggot feeder", type: "fresh",
-    methods: ["feeder"], species: ["bream", "roach", "tench", "dace"],
+    methods: ["feeder"], species: ["bream", "roach", "tench", "dace", "ide"],
     snaggy: null, heavyFlow: false, calm: false,
     diagram: [{ k: "line" }, { k: "lead", kind: "feeder", label: "maggot feeder" }, { k: "swivel" }, { k: "hooklength" }, { k: "hook" }],
     components: ["5–6lb mainline", "Running maggot feeder, capped at both ends", "Quick-change hooklength swivel", "12–18in of 4lb hooklength", "Size 16 wide-gape hook"],
@@ -333,7 +333,7 @@ export const RIGS = [
   // ---- freshwater: float and freeline ----
   {
     id: "waggler", name: "Waggler float", type: "fresh",
-    methods: ["float"], species: ["roach", "tench", "carp", "bream", "rudd", "perch"],
+    methods: ["float"], species: ["roach", "tench", "carp", "bream", "rudd", "perch", "crucian-carp", "ide", "gudgeon"],
     snaggy: null, heavyFlow: false, calm: false,
     diagram: [{ k: "line" }, { k: "shot", label: "locking shot" }, { k: "float", label: "waggler" }, { k: "shot", label: "droppers" }, { k: "hook" }],
     components: ["Mainline", "Bulk locking shot", "Silicone float adaptor with waggler", "Bulk locking shot", "Mid-depth droppers (No6 or No8)", "Two or three No8 spread to the hook", "Hook"],
@@ -349,7 +349,7 @@ export const RIGS = [
   },
   {
     id: "stick-float", name: "Stick float", type: "fresh",
-    methods: ["float", "rock-float"], species: ["roach", "chub", "grayling", "barbel", "thick-lipped-mullet", "dace"],
+    methods: ["float", "rock-float"], species: ["roach", "chub", "grayling", "barbel", "thick-lipped-mullet", "dace", "gudgeon"],
     snaggy: null, heavyFlow: false, calm: false,
     diagram: [{ k: "line", label: "floating line" }, { k: "float", label: "stick float" }, { k: "shot", label: "shirt-button shot" }, { k: "shot", label: "droppers" }, { k: "hook" }],
     components: ["2–3lb floating mainline", "Stick float on three rubbers (under the tip, mid-body and over the stem)", "No8 depth marker just under the float", "Shirt-button shot (pairs of No8 or No6) down the top two-thirds", "Two No8 droppers near the hook", "Hook: fine wire for maggot or caster, stronger for big baits or chub"],
@@ -447,7 +447,7 @@ export const RIGS = [
   },
   {
     id: "spinner", name: "Spinner or spoon (freshwater)", type: "fresh",
-    methods: ["fresh-lure"], species: ["perch", "brown-trout", "salmon", "sea-trout"],
+    methods: ["fresh-lure"], species: ["perch", "brown-trout", "salmon", "sea-trout", "ide"],
     snaggy: null, heavyFlow: false, calm: false,
     diagram: [{ k: "line" }, { k: "swivel" }, { k: "lure", label: "spinner" }],
     components: ["Mainline", "Swivel to cut line twist", "Spinner, spoon or small plug"],

@@ -63,8 +63,13 @@ export function catchHere(place, month) {
     const peak = r.species.peak?.includes(month), present = r.species.present?.includes(month);
     return { ...r, inSeason: peak ? "peak" : present ? "present" : "out" };
   });
+  // What's in season now comes first (peak, then present, then out of season). Within that, fish of the current
+  // half of the year lead (winter fish in winter, summer fish in summer), then mixed or all-year fish, then the
+  // rest; then the strength of the evidence.
   const seasonRank = { peak: 2, present: 1, out: 0 };
-  return list.sort((a, b) => LEVELS[b.level].rank - LEVELS[a.level].rank || seasonRank[b.inSeason] - seasonRank[a.inSeason] || a.species.name.localeCompare(b.species.name));
+  const half = SUMMER.has(month) ? "Summer" : "Winter";
+  const fit = (sp) => { const w = seasonWord(sp); return w === half ? 2 : w === "Summer and winter" || w === "All year" ? 1 : 0; };
+  return list.sort((a, b) => seasonRank[b.inSeason] - seasonRank[a.inSeason] || fit(b.species) - fit(a.species) || LEVELS[b.level].rank - LEVELS[a.level].rank || a.species.name.localeCompare(b.species.name));
 }
 
 /** The best target for "auto": the strongest in-season species at this place. */
@@ -74,4 +79,15 @@ export function autoTarget(place, month) {
   const order = (id) => { const i = (place.species || []).findIndex((x) => x.id === id); return i < 0 ? 99 : i; };
   const recorded = list.filter((r) => r.level !== "possible").sort((a, b) => order(a.species.id) - order(b.species.id));
   return (recorded.find((r) => r.inSeason === "peak") || recorded.find((r) => r.inSeason === "present") || list.find((r) => r.inSeason !== "out") || list[0])?.species || null;
+}
+
+const SUMMER = new Set([4, 5, 6, 7, 8, 9]);
+/** "Summer", "Winter", "Summer and winter" or "All year", from a species' peak and present months. */
+export function seasonWord(species) {
+  const peak = species?.peak || [], present = species?.present || [];
+  if (present.length >= 12 && peak.length >= 8) return "All year";
+  const s = peak.filter((m) => SUMMER.has(m)).length, w = peak.length - s;
+  if (s >= 2 && w >= 2) return "Summer and winter";
+  if (!peak.length) return present.length >= 12 ? "All year" : "";
+  return s >= w ? "Summer" : "Winter";
 }

@@ -16,13 +16,23 @@ import { ensureSchema } from "./db.js";
 import { upstreamCtx, UpstreamError } from "./upstream.js";
 import { dataThrottle } from "./throttle.js";
 
-export const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+// Public Overpass instances, tried in turn (https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances).
+// The main instance limits busy networks, and Cloudflare's outgoing addresses are shared, so a second and third
+// instance keep taps working when one refuses or is slow.
+export const OVERPASS_URLS = [
+  ["overpass", "https://overpass-api.de/api/interpreter"],
+  ["overpass-coffee", "https://overpass.private.coffee/api/interpreter"],
+  ["overpass-vk", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"],
+];
+export const OVERPASS_URL = OVERPASS_URLS[0][1];
+// Overpass asks for a User-Agent that says who is calling and how to reach them.
+export const OVERPASS_UA = "FishDock/0.2 (+https://fishdock.aaron6k.workers.dev; UK fishing app)";
 export const ATTRIBUTION = "Water features © OpenStreetMap contributors (ODbL)";
-export const WATER = { riverM: 90, coastM: 2500, pierM: 60, shoreM: 150, estuaryRiverM: 1500 };
+export const WATER = { riverM: 90, coastM: 1500, pierM: 60, shoreM: 150, tryMs: 4500 };
 
 export function overpassQuery(lat, lon) {
   const p = `${lat.toFixed(4)},${lon.toFixed(4)}`;
-  return `[out:json][timeout:8];
+  return `[out:json][timeout:6];
 is_in(${p})->.a;
 (
   area.a["natural"="water"];
@@ -105,18 +115,22 @@ export async function handleWater(request, env, now = Date.now(), deps = {}) {
     }
     const { lat, lon } = latLon(new URL(request.url));
     const ctx = upstreamCtx(db, now, deps);
-    try {
-      const raw = await ctx.upstreamJson("overpass", OVERPASS_URL, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: "data=" + encodeURIComponent(overpassQuery(lat, lon)),
-        timeoutMs: 9000,
-      });
-      return json({ ...classifyWater(raw?.elements), source: "openstreetmap", attribution: ATTRIBUTION });
-    } catch (e) {
-      if (e instanceof UpstreamError) return err(502, "upstream", "Couldn't check the map data just now. Choose the water type yourself.");
-      throw e;
+    const body = "data=" + encodeURIComponent(overpassQuery(lat, lon));
+    for (const [name, url] of OVERPASS_URLS) {
+      try {
+        const raw = await ctx.upstreamJson(name, url, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": OVERPASS_UA },
+          body,
+          timeoutMs: WATER.tryMs,
+        });
+        if (!Array.isArray(raw?.elements)) continue; // an Overpass error page or a timeout remark: try the next one
+        return json({ ...classifyWater(raw.elements), source: "openstreetmap", attribution: ATTRIBUTION });
+      } catch (e) {
+        if (!(e instanceof UpstreamError)) throw e;
+      }
     }
+    return err(502, "upstream", "Couldn't check the map data just now. Choose the water type yourself.");
   } catch (e) {
     return toResponse(e, now, "water");
   }
