@@ -70,7 +70,7 @@ export function shapeScenes(answer) {
 }
 
 const searchUrl = (lat, lon, radius) => "https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=geosearch"
-  + `&ggscoord=${lat}%7C${lon}&ggsradius=${radius}&ggslimit=50&ggsnamespace=6&prop=imageinfo%7Ccoordinates&codistancefrompoint=${lat}%7C${lon}`
+  + `&ggscoord=${lat}%7C${lon}&ggsradius=${radius}&ggslimit=50&ggsnamespace=6&prop=imageinfo%7Ccoordinates&colimit=max&codistancefrompoint=${lat}%7C${lon}`
   + "&iiprop=url%7Csize%7Cmime%7Cextmetadata&iiextmetadatafilter=LicenseShortName%7CLicenseUrl%7CArtist%7CImageDescription";
 
 export async function handleScene(request, env, now = Date.now(), deps = {}) {

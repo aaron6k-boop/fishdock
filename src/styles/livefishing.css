@@ -176,3 +176,14 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
   .fs-banner, .catch-card, .fs-cardwrap { animation: none; }
   .live-badge .rec-dot { animation: none; }
 }
+
+/* the demo page (#try) */
+.try-head h1 { margin: 0 0 2px; font-size: 22px; letter-spacing: -0.02em; }
+.try-head p { margin: 0; }
+.try-fish { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; max-height: 300px; overflow-y: auto; }
+.try-fish-b { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 4px 6px; border-radius: 12px; border: 2px solid transparent; background: var(--elev); color: var(--text-2); font-size: 11.5px; font-weight: 600; line-height: 1.2; text-align: center; }
+.try-fish-b img, .try-fish-b .ph { width: 100%; height: 46px; object-fit: contain; display: grid; place-items: center; color: var(--text-3); }
+.try-fish-b.on { border-color: var(--action); color: var(--text); }
+.try-drawn { width: 100%; aspect-ratio: 3 / 2; display: grid; place-items: center; background: linear-gradient(180deg, #6f93b0, #c7d6df 44%, #2c4a5c 45%, #0f2430); color: #fff; font-weight: 700; font-size: 12px; text-shadow: 0 1px 2px #000; }
+.chip.on { background: var(--action-soft); color: var(--action); border-color: color-mix(in srgb, var(--action) 50%, transparent); }
+.moments .chip { cursor: pointer; }
