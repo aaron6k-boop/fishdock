@@ -1,7 +1,7 @@
 // ---- charts: BiteScore timeline, tide curve, sonar spot finder ----
 import { band } from "../lib/bitescore.js";
 import { fmtTime, ukHour } from "../lib/time.js";
-import { distanceKm, bearingDeg, fmtKm } from "../lib/geo.js";
+import { distanceKm, bearingDeg, fmtKm, distanceUnit } from "../lib/geo.js";
 
 export function BiteStrip({ day, sun, tide, now = Date.now(), onPick, picked }) {
   if (!day) return null;
@@ -72,7 +72,8 @@ export function TideChart({ tide, dayStart, now = Date.now() }) {
 /** Sonar: spots around a centre by bearing and distance (log scale). Works with no map tiles at all. */
 export function Sonar({ center, spots, onPick, selected }) {
   const C = 200, R = 178;
-  const rings = [5, 20, 60, 150];
+  // ring distances in km, chosen to be round numbers in the unit shown
+  const rings = distanceUnit() === "km" ? [5, 20, 60, 150] : [3, 12, 40, 90].map((mi) => mi * 1.609344);
   const rOf = (km) => Math.min(R, (Math.log10(1 + km) / Math.log10(1 + 160)) * R);
   const pts = spots.map((s) => {
     const km = distanceKm(center, s), b = bearingDeg(center, s) * Math.PI / 180, r = rOf(km);
@@ -87,7 +88,7 @@ export function Sonar({ center, spots, onPick, selected }) {
       </defs>
       <circle cx={C} cy={C} r={R} className="bg" />
       <path d={`M${C},${C} L${C},${C - R} A${R},${R} 0 0 1 ${C + R * Math.sin(0.6)},${C - R * Math.cos(0.6)} Z`} className="sweep" />
-      {rings.map((km) => <g key={km}><circle cx={C} cy={C} r={rOf(km)} className="ring" /><text x={C + 4} y={C - rOf(km) + 12}>{km} km</text></g>)}
+      {rings.map((km) => <g key={km}><circle cx={C} cy={C} r={rOf(km)} className="ring" /><text x={C + 4} y={C - rOf(km) + 12}>{fmtKm(km)}</text></g>)}
       {[0, 45, 90, 135].map((a) => <line key={a} x1={C + R * Math.sin(a * Math.PI / 180)} y1={C - R * Math.cos(a * Math.PI / 180)} x2={C - R * Math.sin(a * Math.PI / 180)} y2={C + R * Math.cos(a * Math.PI / 180)} className="spoke" />)}
       <text x={C - 4} y={C - R - 6} className="lbl-n">N</text>
       {pts.map(({ s, x, y, km }) => (

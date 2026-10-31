@@ -6,6 +6,7 @@ import { all, onChange, remove } from "../lib/storage.js";
 import { biteDay, conditionsAt } from "../lib/bitescore.js";
 import { autoTarget } from "../lib/catchhere.js";
 import { ukDayStart, ukMonth, fmtTime, fmtDuration, fmtDateTime, fmtClock } from "../lib/time.js";
+import { fmtKm } from "../lib/geo.js";
 import { createMotionWatch, createAlarmListen, alertAngler } from "../lib/smartbite.js";
 import { SPECIES, speciesById } from "../data/species.js";
 import { Icon, Beta, Notice, Sheet, Seg, Empty } from "../components/ui.jsx";
@@ -193,7 +194,7 @@ function SessionPlot({ track, events, at }) {
       {d ? <path d={d} className="plot-track" /> : null}
       {evs.map((e, i) => <circle key={i} cx={sx(e.pos)} cy={sy(e.pos)} r={e.type === "catch" ? 6 : 4.5} className={`plot-ev ev-${e.type}`}><title>{EV[e.type]?.[1]} {fmtTime(e.t)}</title></circle>)}
       {here ? <circle cx={sx(here)} cy={sy(here)} r="5.5" className="plot-me" /> : null}
-      <text x={P} y={H - 6} className="plot-scale">{metres < 1000 ? `${Math.round(metres)} m across` : `${(metres / 1000).toFixed(1)} km across`}</text>
+      <text x={P} y={H - 6} className="plot-scale">{`${fmtKm(metres / 1000)} across`}</text>
     </svg>
   );
 }

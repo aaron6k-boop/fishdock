@@ -41,9 +41,24 @@ export function coarseCell(lat, lon) {
   return { lat: +(qLat + 0.05).toFixed(2), lon: +(qLon + 1 / 14).toFixed(2), label: `${qLat.toFixed(1)}°, ${qLon.toFixed(1)}° (10 km area)` };
 }
 
-export function fmtKm(km) {
-  if (km == null) return "";
-  return km < 1 ? `${Math.round(km * 1000)} m` : km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+// ---- distances: miles by default (UK roads and anglers), kilometres if chosen in Settings ----
+let UNIT = "mi";
+/** Set from settings.units.distance on every App render, so every screen formats the same way. */
+export function setDistanceUnit(u) { UNIT = u === "km" ? "km" : "mi"; }
+export const distanceUnit = () => UNIT;
+/** The size of the approximate area used when sharing (coarseCell), in the chosen unit. */
+export const areaSize = () => (UNIT === "km" ? "10 km" : "6 miles");
+
+/** A distance given in km, in the chosen unit. long: "12 miles" rather than "12 mi". Short distances in yards or metres. */
+export function fmtKm(km, long = false) {
+  if (km == null || !Number.isFinite(km)) return "";
+  if (UNIT === "km") {
+    return km < 1 ? `${Math.round(km * 1000 / 10) * 10} m` : km < 10 ? `${+km.toFixed(1)} km` : `${Math.round(km)} km`;
+  }
+  const mi = km / 1.609344;
+  if (mi < 0.25) return `${Math.max(10, Math.round(mi * 1760 / 10) * 10)} yd`;
+  const v = mi < 10 ? +mi.toFixed(1) : Math.round(mi);
+  return `${v}${long ? (v === 1 ? " mile" : " miles") : " mi"}`;
 }
 
 export function mapsLink(lat, lon, label) {

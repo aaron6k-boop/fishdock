@@ -47,3 +47,21 @@ export function hoursUntil(ms, now = Date.now()) {
 }
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A list of months (1..12) as words: "all year", "Oct to Feb", "Jun to Aug and Dec". */
+export function monthsText(list) {
+  const set = new Set((list || []).filter((m) => m >= 1 && m <= 12));
+  if (!set.size) return "";
+  if (set.size === 12) return "all year";
+  // runs of consecutive months, wrapping December into January, starting from a month whose previous one is missing
+  const before = (m) => ((m + 10) % 12) + 1;
+  const start = MONTHS.map((_, i) => i + 1).find((m) => set.has(m) && !set.has(before(m)));
+  const runs = [];
+  for (let i = 0, m = start; i < 12; i++, m = (m % 12) + 1) {
+    if (!set.has(m)) continue;
+    if (runs.length && runs[runs.length - 1].end === before(m)) runs[runs.length - 1].end = m;
+    else runs.push({ start: m, end: m });
+  }
+  const words = runs.map((r) => (r.start === r.end ? MONTHS[r.start - 1] : `${MONTHS[r.start - 1]} to ${MONTHS[r.end - 1]}`));
+  return words.length > 1 ? `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}` : words[0];
+}

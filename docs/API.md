@@ -40,6 +40,21 @@ alerts and warnings within 20 km. Elsewhere: `{ "source": null, "note": "..." }`
   "floods": [{ "severity": "Flood alert", "level": 3, "area": "...", "message": "..." }] }
 ```
 
+### `GET /api/water?lat=&lon=`
+
+What kind of water is at a point someone tapped on the map, from OpenStreetMap through the Overpass API
+(`server/water.js`). The app uses it to pre-fill the water type in the tap-to-check sheet, and people can always
+change it.
+
+```json
+{ "kind": "sea"|"river"|"lake"|"canal"|"fishery"|null, "subtype": "beach"|"pier"|"rocks"|"estuary"|"river"|"lake"|"reservoir"|"canal"|"fishery"|null,
+  "name": "River Yare"|null, "sure": "high"|"medium"|"low", "source": "openstreetmap", "attribution": "Water features © OpenStreetMap contributors (ODbL)" }
+```
+
+The point goes to Overpass at 4 decimal places (about 10 m), with nothing about who asked. Nothing is cached or
+logged, because a tapped point can be someone's private mark. If Overpass fails, the route returns 502 with a
+plain message, and the app asks for the water type.
+
 ## AI (Beta, daily allowance per account and globally; guests get a small per-network allowance)
 
 ### `POST /api/ai/cast`

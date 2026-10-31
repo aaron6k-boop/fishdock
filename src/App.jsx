@@ -5,7 +5,7 @@ import { SPOTS, spotById } from "./data/spots.js";
 import { SPECIES, speciesById } from "./data/species.js";
 import { getConditions, getTides, getRiver, PREVIEW, track } from "./lib/api.js";
 import { tideModel } from "./lib/tides.js";
-import { nationAt } from "./lib/geo.js";
+import { nationAt, setDistanceUnit } from "./lib/geo.js";
 import { activeSession, onSessionChange, recoverSession } from "./lib/session.js";
 import { restore } from "./lib/account.js";
 import { startSync } from "./lib/sync.js";
@@ -57,6 +57,7 @@ function routeFromHash() {
 
 export default function App() {
   const [settings, setSettings] = useState(loadSettings);
+  setDistanceUnit(settings.units?.distance); // before any child formats a distance this render
   const [tab, setTab] = useState(routeFromHash);
   const [picker, setPicker] = useState(false);
   const [toast, setToast] = useState("");

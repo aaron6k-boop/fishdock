@@ -6,13 +6,14 @@ const KEY = "fishdock.settings.v1";
 
 export const DEFAULT_SETTINGS = {
   theme: PREVIEW ? "system" : "dark", // "dark" | "light" | "system" (dark first, as DetectDock; the preview follows the viewer)
-  units: { length: "cm", weight: "lb" },
+  units: { length: "cm", weight: "lb", distance: "mi" },
   placeId: "chesil-beach-ferry-bridge", // a spot id, or "custom"
   custom: null,               // { name, lat, lon, kind } when placeId === "custom"
   target: "auto",             // species id or "auto" (best in season here)
   method: "auto",
   onboarded: false,
   favourites: [],             // spot ids
+  pins: [],                   // spots pinned on the map (lib/pins.js), newest first; never leave the phone
   nation: "auto",
   privacy: { approxShare: true, saveGps: true, analytics: true },
   beta: { smartBite: true, castAdvisor: true, community: true },

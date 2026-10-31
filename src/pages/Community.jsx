@@ -4,7 +4,7 @@ import { useApp } from "../lib/store.js";
 import { callJSON, PREVIEW } from "../lib/api.js";
 import { accountsEnabled, onUser, signIn, idToken } from "../lib/account.js";
 import { shrinkImage } from "../lib/storage.js";
-import { coarseCell } from "../lib/geo.js";
+import { coarseCell, areaSize } from "../lib/geo.js";
 import { fmtDateTime } from "../lib/time.js";
 import { SPECIES, speciesById } from "../data/species.js";
 import { Icon, Beta, Seg, Sheet, Notice, Empty } from "../components/ui.jsx";
@@ -80,7 +80,7 @@ function Compose({ place, onClose, onPosted }) {
       <Seg value={kind} onChange={setKind} options={[{ value: "catch", label: "Catch" }, { value: "report", label: "Report" }, { value: "question", label: "Question" }]} />
       <div className="field"><label htmlFor="cp-sp">Species</label><select id="cp-sp" className="input" value={species} onChange={(e) => setSpecies(e.target.value)}><option value="">None</option>{SPECIES.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
       <div className="field"><label htmlFor="cp-text">Your post</label><textarea id="cp-text" className="input" maxLength={1000} value={text} onChange={(e) => setText(e.target.value)} placeholder="What, when, how. Please don't name a precise mark if it isn't public." /></div>
-      <div className="field"><span className="lbl">Area shown</span><Seg value={area} onChange={setArea} options={[...(place.region ? [{ value: place.region, label: place.region }] : []), { value: cell.label, label: "10 km area" }, { value: "", label: "No location" }]} /></div>
+      <div className="field"><span className="lbl">Area shown</span><Seg value={area} onChange={setArea} options={[...(place.region ? [{ value: place.region, label: place.region }] : []), { value: cell.label, label: `${areaSize()} area` }, { value: "", label: "No location" }]} /></div>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) setPhoto(await shrinkImage(f, 1280, 0.8)); }} id="cp-photo" />
       <div className="row"><button type="button" className="btn" onClick={() => fileRef.current?.click()}><Icon name="camera" />{photo ? "Change photo" : "Add photo"}</button>{photo ? <img src={photo.dataUrl} alt="" className="thumb" /> : null}</div>
       <p className="tiny">Photos are re-encoded on your phone, which removes their GPS data, and checked again on the server.</p>

@@ -227,8 +227,25 @@ details.conds[open] summary::before { content: "▾ "; }
 .vf-empty b { font-size: 16px; }
 
 /* explore */
-.map-wrap { position: relative; border-radius: var(--r-l); overflow: hidden; border: 1px solid var(--line); }
+/* isolation keeps Leaflet's own z-indexes (panes 400, controls 800+) inside the map, under sheets and the tab bar */
+.map-wrap { position: relative; isolation: isolate; z-index: 0; border-radius: var(--r-l); overflow: hidden; border: 1px solid var(--line); }
 .map { height: min(56vh, 460px); width: 100%; background: var(--elev); }
+.map.short { height: min(40vh, 320px); }
+.map-hint { position: absolute; left: 10px; top: 10px; right: 60px; z-index: 500; pointer-events: none; }
+.map-hint span { display: inline-block; padding: 6px 10px; border-radius: 999px; background: color-mix(in srgb, var(--card) 92%, transparent); border: 1px solid var(--line); font-size: 12px; font-weight: 600; box-shadow: var(--shadow); }
+.fd-pin { width: 34px; height: 42px; color: #ff6b4a; filter: drop-shadow(0 2px 3px #0007); }
+.fd-pin svg { width: 34px; height: 42px; display: block; }
+.fd-pin.saved { color: #ffb347; width: 26px; height: 32px; }
+.fd-pin.saved svg { width: 26px; height: 32px; }
+.pin-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r-l); background: var(--card); border: 1px solid color-mix(in srgb, #ff6b4a 45%, var(--line)); }
+.pin-bar .grow { min-width: 0; }
+.pin-bar .t { display: block; font-weight: 650; }
+.water-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+@media (min-width: 520px) { .water-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.water-grid button { min-height: 44px; padding: 6px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--elev); color: var(--text-2); font-weight: 600; font-size: 13.5px; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+.water-grid button small { font-size: 11px; font-weight: 600; color: var(--text-3); }
+.water-grid button[aria-pressed="true"] { background: var(--action-soft); color: var(--action); border-color: color-mix(in srgb, var(--action) 55%, transparent); }
+.water-group { font-size: 12px; font-weight: 700; letter-spacing: .02em; color: var(--text-3); margin: 4px 0 2px; }
 .map-btn { position: absolute; top: 10px; right: 10px; z-index: 500; width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); display: grid; place-items: center; box-shadow: var(--shadow); }
 .map-btn svg { width: 20px; height: 20px; }
 .sonar { color: var(--tide); }
@@ -262,3 +279,13 @@ details.conds[open] summary::before { content: "▾ "; }
 .wk-bar i { display: block; width: 100%; border-radius: 7px; background: var(--b3); }
 .wk.l4 .wk-bar i { background: var(--b4); } .wk.l5 .wk-bar i { background: var(--b5); } .wk.l1 .wk-bar i, .wk.l2 .wk-bar i { background: var(--b2); }
 .linkish { background: none; border: 0; padding: 0; text-align: left; color: inherit; display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+
+/* pins and tap-to-check */
+.grow-btn { flex: 1 1 0; min-width: 0; }
+.li:has(> .li-main) { gap: 8px; padding-block: 6px; }
+.li-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 5px 0; background: none; border: 0; text-align: left; color: inherit; }
+.li-main .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.li-main .end { display: flex; align-items: center; gap: 6px; }
+.water-card { display: flex; flex-direction: column; gap: 6px; }
+.tips { margin: 2px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.linkbtn { white-space: nowrap; }

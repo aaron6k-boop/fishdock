@@ -14,6 +14,7 @@ import { handleCommunity } from "../../server/community.js";
 import { handleFeedback } from "../../server/feedback.js";
 import { handleMetrics } from "../../server/metrics.js";
 import { handleAdmin } from "../../server/admin.js";
+import { handleWater } from "../../server/water.js";
 
 const port = Number(process.argv[2] || 8792);
 // --dist serves the production build (dist/, as Cloudflare Pages would); otherwise the single-file e2e build.
@@ -29,12 +30,12 @@ function staticFile(pathname) {
   return { type: "text/plain", body: "not found" };
 }
 const env = { DB: createD1(":memory:"), ADMIRALTY_API_KEY: "test-key", GEMINI_API_KEY: "test-key", ADMIN_EMAILS: "admin@fishdock.example" };
-const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin };
+const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater };
 
 // ---- outside services, shaped like the real ones ----
 const now = Date.now();
 const hours = Array.from({ length: 72 }, (_, i) => new Date(Math.floor(now / 3600e3) * 3600e3 + (i - 6) * 3600e3).toISOString().slice(0, 16));
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, init) => {
   const url = String(typeof input === "string" ? input : input.url);
   const J = (b) => new Response(JSON.stringify(b), { headers: { "content-type": "application/json" } });
   if (url.includes("api.open-meteo.com")) return J({ utc_offset_seconds: 0, hourly: { time: hours, temperature_2m: hours.map((_, i) => 10 + 3 * Math.sin(i / 4)), wind_speed_10m: hours.map((_, i) => 14 + (i % 9)), wind_gusts_10m: hours.map((_, i) => 26 + (i % 9)), wind_direction_10m: hours.map(() => 230), pressure_msl: hours.map((_, i) => 1014 - i * 0.15), precipitation: hours.map((_, i) => (i % 11 === 0 ? 0.6 : 0)), cloud_cover: hours.map(() => 60), is_day: hours.map((t) => (+t.slice(11, 13) >= 7 && +t.slice(11, 13) < 17 ? 1 : 0)) } });
@@ -50,6 +51,13 @@ globalThis.fetch = async (input) => {
     if (url.includes("/readings")) return J({ items: Array.from({ length: 48 }, (_, i) => ({ dateTime: new Date(now - (47 - i) * 900e3).toISOString(), value: 0.82 + i * 0.002 })) });
     if (url.includes("/floods")) return J({ items: [] });
     return J({ items: [{ "@id": "http://environment.data.gov.uk/flood-monitoring/id/stations/E1", notation: "E1", label: "Test station", riverName: "River Test", lat: 51.95, long: -2.6, measures: [{ "@id": "http://environment.data.gov.uk/flood-monitoring/id/measures/E1-level-stage-i-15_min-m", parameter: "level", qualifier: "Stage" }], stageScale: { typicalRangeLow: 0.3, typicalRangeHigh: 1.9 } }] });
+  }
+  if (url.includes("overpass-api.de")) {
+    // inland (west of 1.0 E and south of 52.8 N here) is a named river; anything else is the coast by a pier
+    const q = decodeURIComponent(String(init?.body || "").slice(5));
+    const m = q.match(/is_in\((-?[\d.]+),(-?[\d.]+)\)/);
+    const inland = m && +m[2] < 1.0 && +m[1] < 52.8;
+    return J({ elements: inland ? [{ type: "way", id: 1, tags: { waterway: "river", name: "River Test" } }] : [{ type: "way", id: 2, tags: { natural: "coastline" } }, { type: "way", id: 3, tags: { man_made: "pier", name: "Test Pier" } }] });
   }
   if (url.includes("generativelanguage.googleapis.com")) return J({ candidates: [{ content: { parts: [{ text: JSON.stringify({ summary: "A shingle beach with a gentle swell.", scene: "beach", features: [{ x: 0.55, y: 0.58, kind: "surf", label: "Second breaker line", why: "Waves turn over food here.", how: "Cast just beyond it.", confidence: "medium" }], avoid: [], safety: ["Steep shingle: keep well back from the waterline."], candidates: [{ species: "Bass", id: "bass", confidence: "high", why: "Silver, two dorsal fins, spiny gill cover." }] }) }] } }] });
   if (url.includes("googleapis.com/service_accounts") || url.includes("securetoken")) return J({ keys: [] });

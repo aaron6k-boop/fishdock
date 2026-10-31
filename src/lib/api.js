@@ -42,6 +42,16 @@ export const getConditions = (lat, lon) => cached("conditions", lat, lon);
 export const getTides = (lat, lon) => cached("tides", lat, lon);
 export const getRiver = (lat, lon) => cached("river", lat, lon);
 
+/** What water is at a tapped point (OpenStreetMap via the server). Kept in memory only, per point. */
+export async function getWater(lat, lon) {
+  if (PREVIEW) return { source: null, preview: true, kind: null };
+  const key = `water:${lat.toFixed(4)},${lon.toFixed(4)}`;
+  if (memo.has(key)) return memo.get(key).data;
+  const data = await getJSON(`/api/water?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`, { timeout: 12000 });
+  if (data.source) memo.set(key, { at: Date.now(), data });
+  return data;
+}
+
 export async function postJSON(path, body, token) {
   if (PREVIEW) return { error: "preview", message: "This needs the FishDock server, which the preview doesn't have." };
   try {

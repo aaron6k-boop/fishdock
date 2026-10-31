@@ -104,14 +104,18 @@ export function Tabs({ value, options, onChange, label }) {
 
 export function Sheet({ title, onClose, children, wide, aside }) {
   const ref = useRef(null);
+  // The latest onClose, read through a ref so a parent re-render (live data, the clock) doesn't re-run this
+  // effect and pull focus back to the sheet while someone is typing in it.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e) => { if (e.key === "Escape") closeRef.current(); };
     document.addEventListener("keydown", onKey);
     const prev = document.activeElement;
     ref.current?.focus();
     const body = document.body; const ov = body.style.overflow; body.style.overflow = "hidden";
     return () => { document.removeEventListener("keydown", onKey); body.style.overflow = ov; prev?.focus?.(); };
-  }, [onClose]);
+  }, []);
   return (
     <div className="scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={`sheet${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}>

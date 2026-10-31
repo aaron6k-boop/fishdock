@@ -6,7 +6,7 @@
 //   possible   - only the habitat and the species' known UK range suggest it; no record found
 import { SPOTS } from "../data/spots.js";
 import { SPECIES, speciesById } from "../data/species.js";
-import { distanceKm } from "./geo.js";
+import { distanceKm, fmtKm } from "./geo.js";
 
 export const LEVELS = {
   common: { label: "Commonly recorded", short: "Common", rank: 4 },
@@ -47,7 +47,7 @@ export function catchHere(place, month) {
     if (s.id === place.id || (s.kind === "sea") !== (place.kind === "sea")) continue;
     const d = distanceKm(place, s);
     if (d > 25) continue;
-    for (const x of s.species || []) add(x.id, "occasional", `Recorded at ${s.name}, ${Math.round(d)} km away`);
+    for (const x of s.species || []) add(x.id, "occasional", `Recorded at ${s.name}, ${fmtKm(d, true)} away`);
   }
   // 3. habitat and range only
   const coast = coastOf(place.lat, place.lon);
@@ -55,7 +55,8 @@ export function catchHere(place, month) {
   for (const sp of SPECIES) {
     if (!kindMatches(sp, place.kind)) continue;
     if (sp.range && !sp.range.includes(coast) && !sp.range.includes("uk")) continue;
-    if (sp.waters && water && !sp.waters.some((w) => w === water || (water === "fishery" && w === "lake"))) continue;
+    // "sea" alone (an older "My location" choice) says nothing about the habitat, so it doesn't narrow the list
+    if (sp.waters && water && water !== "sea" && !sp.waters.some((w) => w === water || (water === "fishery" && w === "lake"))) continue;
     add(sp.id, "possible", "Suitable habitat within its UK range");
   }
   const list = [...out.values()].map((r) => {

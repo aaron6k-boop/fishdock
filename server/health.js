@@ -16,6 +16,7 @@ export async function handleHealth(request, env, now = Date.now()) {
     sources: {
       weather: "open-meteo",
       rivers: "environment-agency",
+      water: "openstreetmap (overpass)",
       tides: env?.ADMIRALTY_API_KEY ? "admiralty" : "on-phone estimate (no ADMIRALTY_API_KEY)",
       ai: env?.GEMINI_API_KEY ? "gemini" : "off (no GEMINI_API_KEY)",
       accounts: env?.FIREBASE_PROJECT_ID ? `firebase project set` : "off",

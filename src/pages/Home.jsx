@@ -6,7 +6,8 @@ import { biteDay, band, explain, conditionsAt } from "../lib/bitescore.js";
 import { catchHere, LEVELS, autoTarget } from "../lib/catchhere.js";
 import { rulesFor } from "../lib/rules.js";
 import { ukDayStart, fmtTime, fmtDay, ukMonth, hoursUntil, fmtShortDay } from "../lib/time.js";
-import { compass } from "../lib/geo.js";
+import { compass, fmtKm, mapsLink } from "../lib/geo.js";
+import { waterById } from "../lib/pins.js";
 import { Icon, Notice, Sheet, Beta, Seg, Sources } from "../components/ui.jsx";
 import { FishArt } from "../components/art.jsx";
 import { BiteStrip, TideChart } from "../components/charts.jsx";
@@ -157,7 +158,7 @@ export default function Home() {
                   <Icon name={tide.source === "estimate" ? "warn" : "info"} />
                   <div>{tide.source === "estimate"
                     ? <>Estimated from the Moon and published {tide.station?.name} tide times. It can be out by about an hour, more at some places, and has no heights. Check the official times before you go: <a href="https://easytide.admiralty.co.uk/" target="_blank" rel="noopener noreferrer">Admiralty EasyTide</a>.</>
-                    : <>{tide.label}{tide.station ? `, ${tide.station.name}${tide.station.distanceKm != null ? ` (${tide.station.distanceKm.toFixed(0)} km)` : ""}` : ""}. Tide times are predictions; wind and pressure shift them.</>}</div>
+                    : <>{tide.label}{tide.station ? `, ${tide.station.name}${tide.station.distanceKm != null ? ` (${fmtKm(tide.station.distanceKm)})` : ""}` : ""}. Tide times are predictions; wind and pressure shift them.</>}</div>
                 </div>
               </>
             ) : <p className="muted small">No tide station close enough to estimate. Check <a href="https://easytide.admiralty.co.uk/" target="_blank" rel="noopener noreferrer">Admiralty EasyTide</a>.</p>}
@@ -185,6 +186,18 @@ export default function Home() {
             {here.slice(0, 5).map((r) => <CatchRow key={r.species.id} r={r} onOpen={() => setSheet({ species: r.species })} />)}
           </div>
         </section>
+
+        {!place.verified ? (
+          <section className="card">
+            <div className="card-h"><h2>{place.name}</h2><span className="aside">{waterById(place.subtype)?.label || place.kind}</span></div>
+            <p className="small muted">{place.pinId ? "Your pin" : "Your location"}, kept on this phone. It isn't a documented mark, so what's likely here comes from documented marks within {fmtKm(25, true)} and each species' habitat.</p>
+            <p className="tiny">Being able to pin a spot doesn't mean you may fish there. Check access, permits and byelaws.</p>
+            <div className="row">
+              <a className="btn small" href={mapsLink(place.lat, place.lon)} target="_blank" rel="noopener noreferrer"><Icon name="route" />Directions</a>
+              <button type="button" className="btn small" onClick={app.openPicker}><Icon name="pin" />Change place</button>
+            </div>
+          </section>
+        ) : null}
 
         {place.verified && (place.safety || place.access) ? (
           <section className="card">
@@ -276,11 +289,11 @@ function RiverCard({ river, preview }) {
       {river?.source ? (
         <>
           <div className="kv">
-            <div><span className="k">Station</span><span className="v">{river.station?.name}{river.station?.distanceKm != null ? ` (${river.station.distanceKm.toFixed(1)} km)` : ""}</span></div>
+            <div><span className="k">Station</span><span className="v">{river.station?.name}{river.station?.distanceKm != null ? ` (${fmtKm(river.station.distanceKm)})` : ""}</span></div>
             <div><span className="k">Level</span><span className="v">{river.readings?.at(-1)?.levelM?.toFixed(2)} m</span></div>
             <div><span className="k">State</span><span className="v">{river.state}, {river.trend}</span></div>
           </div>
-          {river.floods?.length ? river.floods.map((f, i) => <Notice key={i} kind={f.level <= 2 ? "danger" : "warn"}><b>{f.severity}:</b> {f.area}</Notice>) : <p className="tiny">No flood alerts or warnings within 20 km.</p>}
+          {river.floods?.length ? river.floods.map((f, i) => <Notice key={i} kind={f.level <= 2 ? "danger" : "warn"}><b>{f.severity}:</b> {f.area}</Notice>) : <p className="tiny">No flood alerts or warnings within {fmtKm(20, true)}.</p>}
           {river.state === "high" && river.trend === "rising" ? <Notice kind="danger"><b>Rising river.</b> Banks undercut and give way in high water. Stay well back from the edge.</Notice> : null}
         </>
       ) : <p className="small muted">{preview ? "River levels and flood warnings connect on the deployed app (Environment Agency, England)." : river?.note || river?.message || "No river level station close enough. Check the river yourself before you set up."}</p>}

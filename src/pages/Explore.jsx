@@ -6,6 +6,7 @@ import { SPECIES } from "../data/species.js";
 import { all } from "../lib/storage.js";
 import { catchHere, LEVELS } from "../lib/catchhere.js";
 import { distanceKm, fmtKm, mapsLink } from "../lib/geo.js";
+import { waterById } from "../lib/pins.js";
 import { ukMonth } from "../lib/time.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources, Beta, MonthStrip } from "../components/ui.jsx";
 import { FishArt } from "../components/art.jsx";
@@ -13,6 +14,7 @@ import { Sonar } from "../components/charts.jsx";
 import MapView, { OVERLAYS } from "../components/MapView.jsx";
 import SpeciesSheet from "../components/SpeciesSheet.jsx";
 import IdentifySheet from "../components/IdentifySheet.jsx";
+import PinSheet from "../components/PinSheet.jsx";
 import { ReportSheet } from "./Tackle.jsx";
 
 export default function Explore() {
@@ -37,6 +39,9 @@ function Spots() {
   const [open, setOpen] = useState(null);
   const [marks, setMarks] = useState([]);
   const [showMarks, setShowMarks] = useState(false);
+  const [drop, setDrop] = useState(null);       // a pin dropped by tapping the map, not yet saved
+  const [pinOpen, setPinOpen] = useState(null); // { at } for a new pin, { pin } for a saved one
+  const pins = settings.pins || [];
   useEffect(() => {
     if (!showMarks) { setMarks([]); return; }
     all("sessions").then((ss) => setMarks(ss.flatMap((s) => s.events.filter((e) => e.type === "mark" && e.pos).map((e) => ({ lat: e.pos.lat, lon: e.pos.lon, label: e.data?.label || e.data?.kind || "Mark" })))));
@@ -45,6 +50,8 @@ function Spots() {
     .filter((s) => kind === "all" || (kind === "sea" ? s.kind === "sea" : s.kind !== "sea"))
     .filter((s) => !q || `${s.name} ${s.region} ${s.nation} ${(s.species || []).map((x) => x.name || x.id).join(" ")}`.toLowerCase().includes(q.toLowerCase()))
     .map((s) => ({ s, d: distanceKm(place, s) })).sort((a, b) => a.d - b.d), [kind, q, place]);
+  const shownSpots = useMemo(() => list.map((x) => x.s), [list]);
+
   const toggle = (k) => setOverlays((o) => (o.includes(k) ? o.filter((x) => x !== k) : [...o, k]));
   return (
     <>
@@ -55,7 +62,10 @@ function Spots() {
       </div>
       {view === "map" && mapOk ? (
         <>
-          <MapView spots={list.map((x) => x.s)} marks={marks} center={place} overlays={overlays} base={base} onPick={setOpen} onFail={() => { setMapOk(false); setView("sonar"); }} />
+          <MapView spots={shownSpots} marks={marks} pins={pins} dropped={drop} center={place} overlays={overlays} base={base} onPick={setOpen}
+            onPickPin={(p) => setPinOpen({ pin: p, tapped: true })} onTap={(p) => { setDrop(p); setPinOpen({ at: p, tapped: true }); }}
+            hint="Tap the water to see what's there"
+            onFail={() => { setMapOk(false); setView("sonar"); }} />
           <div className="chips">
             <button type="button" className="chip" aria-pressed={base === "satellite"} onClick={() => setBase(base === "map" ? "satellite" : "map")}><Icon name="layers" />Satellite</button>
             {Object.entries(OVERLAYS).map(([k, o]) => <button key={k} type="button" className="chip" aria-pressed={overlays.includes(k)} onClick={() => toggle(k)}>{o.label}</button>)}
@@ -71,6 +81,21 @@ function Spots() {
           <div className="row tiny"><span className="dotkey sea" /> Sea <span className="dotkey fresh" /> Freshwater{!mapOk ? " · Maps load on the deployed app" : ""}</div>
         </section>
       ) : null}
+      {view !== "map" || !mapOk ? (
+        <button type="button" className="li card-like" onClick={() => setPinOpen({})}><Icon name="pin" /><span className="grow"><span className="t">Pin a spot to check</span><span className="s">Anywhere you want to fish, kept on this phone</span></span><Icon name="chevron" className="go" /></button>
+      ) : null}
+      {pins.length ? (
+        <section className="card">
+          <div className="card-h"><h2>My pins</h2><span className="aside"><Icon name="lock" size={13} /> on this phone</span></div>
+          <div className="list">{pins.map((p) => (
+            <button key={p.id} type="button" className="li" onClick={() => setPinOpen({ pin: p })}>
+              <span className={`pill ${p.kind === "sea" ? "sea" : "fresh"}`}>{waterById(p.subtype)?.label.split(" ")[0] || "Pin"}</span>
+              <span className="grow"><span className="t">{place.pinId === p.id ? "✓ " : ""}{p.name}</span><span className="s">{waterById(p.subtype)?.label || p.kind}{p.nation ? ` · ${p.nation}` : ""}</span></span>
+              <span className="end tiny num">{fmtKm(distanceKm(place, p))}</span>
+            </button>
+          ))}</div>
+        </section>
+      ) : null}
       <section className="card">
         <div className="card-h"><h2>{list.length} documented marks</h2><span className="aside">nearest first</span></div>
         <div className="list">{list.slice(0, view === "list" ? 100 : 12).map(({ s, d }) => (
@@ -83,6 +108,7 @@ function Spots() {
         <p className="tiny">Marks come from published angling guides, clubs and councils. Being listed doesn't mean you may fish there: check access, permits and byelaws.</p>
       </section>
       {open ? <SpotSheet s={open} onClose={() => setOpen(null)} /> : null}
+      {pinOpen ? <PinSheet at={pinOpen.at} pin={pinOpen.pin} withMap={!pinOpen.tapped} onClose={() => { setPinOpen(null); setDrop(null); }} /> : null}
     </>
   );
 }

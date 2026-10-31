@@ -6,6 +6,7 @@ import { exportFile } from "../lib/files.js";
 import { accountsEnabled, onUser, signIn, signOut, idToken } from "../lib/account.js";
 import { callJSON, PREVIEW } from "../lib/api.js";
 import { RULES_CHECKED } from "../data/rules.js";
+import { areaSize } from "../lib/geo.js";
 import { Icon, Seg, Sheet, Notice, Beta } from "../components/ui.jsx";
 
 const SOURCES = [
@@ -45,6 +46,7 @@ export default function Settings() {
       <section className="card">
         <h2 className="h2">Units and look</h2>
         <div className="cond-row"><span>Length</span><Seg value={settings.units.length} onChange={(v) => update((s) => ({ units: { ...s.units, length: v } }))} options={[{ value: "cm", label: "Centimetres" }, { value: "in", label: "Inches" }]} /></div>
+        <div className="cond-row"><span>Distance</span><Seg value={settings.units.distance} onChange={(v) => update((s) => ({ units: { ...s.units, distance: v } }))} options={[{ value: "mi", label: "Miles" }, { value: "km", label: "Kilometres" }]} /></div>
         <div className="cond-row"><span>Weight</span><Seg value={settings.units.weight} onChange={(v) => update((s) => ({ units: { ...s.units, weight: v } }))} options={[{ value: "lb", label: "lb and oz" }, { value: "kg", label: "kg" }]} /></div>
         <div className="cond-row"><span>Theme</span><Seg value={settings.theme} onChange={(v) => update({ theme: v })} options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }, { value: "system", label: "System" }]} /></div>
         <div className="cond-row"><span>Rules for</span><Seg value={settings.nation} onChange={(v) => update({ nation: v })} options={[{ value: "auto", label: "Where I fish" }, "England", "Wales", "Scotland", { value: "Northern Ireland", label: "NI" }]} /></div>
@@ -54,7 +56,7 @@ export default function Settings() {
         <h2 className="h2">Privacy</h2>
         <p className="small muted">Private by default: your catches, marks and sessions stay on this phone. FishDock never sells or shares location data and shows no adverts.</p>
         <label className="toggle" htmlFor="pv-gps"><span>Save GPS positions with sessions and catches</span><input id="pv-gps" type="checkbox" checked={settings.privacy.saveGps} onChange={priv("saveGps")} /></label>
-        <label className="toggle" htmlFor="pv-approx"><span>Only ever share an approximate area (10 km)</span><input id="pv-approx" type="checkbox" checked disabled /></label>
+        <label className="toggle" htmlFor="pv-approx"><span>Only ever share an approximate area (about {areaSize()})</span><input id="pv-approx" type="checkbox" checked disabled /></label>
         <label className="toggle" htmlFor="pv-an"><span>Send anonymous usage counts (no ids, no locations)</span><input id="pv-an" type="checkbox" checked={settings.privacy.analytics} onChange={priv("analytics")} /></label>
       </section>
 
