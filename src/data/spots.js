@@ -5,9 +5,11 @@
 // wrasse, "dogfish" to lesser spotted dogfish). Species with no FishDock profile (poor cod, turbot, brill, John Dory,
 // rockling, bull huss, blennies) are left out.
 
+import { MORE_SPOTS } from "./spots-more.js";
+
 const C = "2026-10-31";
 
-export const SPOTS = [
+const CORE = [
   {
     id: "chesil-beach-ferry-bridge",
     name: "Chesil Beach (Ferry Bridge to Bridging Camp)", region: "Dorset, South West England", nation: "England",
@@ -832,5 +834,7 @@ export const SPOTS = [
     verification: "partial", checked: C,
   },
 ];
+
+export const SPOTS = [...CORE, ...MORE_SPOTS];
 
 export const spotById = (id) => SPOTS.find((s) => s.id === id) || null;
