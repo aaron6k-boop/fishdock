@@ -29,16 +29,21 @@ export default function TodayCard({ spot, here, borrowed = null, species = null 
   const dayStart = ukDayStart(now);
   const month = ukMonth(now);
   const inSeason = (here || []).filter((r) => r.inSeason !== "out");
-  const target = species || (targetId && inSeason.find((r) => r.species.id === targetId)?.species) || autoTarget(spot, month);
-  const tide = useMemo(() => (sea ? tideModel(spot, live.tides) : null), [spot, sea, live.tides]);
+  // Recalculate only when the place itself changes, not whenever a parent re-renders with a new object for it
+  // (typing a pin's name, say): a week of 30-minute slots is the heaviest sum on the phone.
+  const placeKey = `${spot.lat},${spot.lon},${spot.kind},${spot.subtype},${spot.verified ? 1 : 0},${spot.id || ""}`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stable = useMemo(() => spot, [placeKey]);
+  const target = species || (targetId && inSeason.find((r) => r.species.id === targetId)?.species) || autoTarget(stable, month);
+  const tide = useMemo(() => (sea ? tideModel(stable, live.tides) : null), [stable, sea, live.tides]);
   const cond = live.cond?.hourly?.length ? live.cond : null;
   const sun = useMemo(() => ASTRO.sunDay(dayStart, spot.lat, spot.lon), [dayStart, spot.lat, spot.lon]);
   const days = useMemo(() => (target ? [0, 1, 2, 3, 4, 5, 6].map((i) => {
     const ds = addUkDays(dayStart, i);
-    const d = biteDay({ place: spot, species: target, dayStart: ds, tide, cond, river: null, now });
+    const d = biteDay({ place: stable, species: target, dayStart: ds, tide, cond, river: null, now });
     const windows = i === 0 ? d.windows.filter((x) => x.end > now) : d.windows;
     return { ds, i, windows, d, best: [...windows].sort((a, b) => b.peak - a.peak)[0] || null };
-  }) : []), [spot, target, dayStart, tide, cond]); // eslint-disable-line react-hooks/exhaustive-deps
+  }) : []), [stable, target?.id, dayStart, tide, cond]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!target) return null;
   const today = days[0];
   const showDay = today?.windows.length ? today : days[1];

@@ -317,3 +317,55 @@ details.conds[open] summary::before { content: "▾ "; }
 .fish-photo img { width: 100%; height: auto; max-height: 260px; object-fit: cover; border-radius: var(--r-l); background: var(--elev); }
 .fish-photo figcaption { color: var(--text-3); }
 .fish-photo figcaption a { color: inherit; }
+
+/* forecast strip */
+.fc-strip { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin-inline: -14px; padding: 4px 14px 2px; scroll-snap-type: x proximity; }
+.fc-strip::-webkit-scrollbar { display: none; }
+.fc-col { flex: none; width: 52px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; border-radius: 12px; scroll-snap-align: start; }
+.fc-col.now { background: var(--action-soft); }
+.fc-col.newday { border-left: 1px dashed var(--line); border-radius: 0 12px 12px 0; }
+.fc-time { font-size: 11.5px; font-weight: 650; color: var(--text-2); }
+.fc-col.now .fc-time { color: var(--action); }
+.fc-temp { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fc-windv { display: inline-flex; align-items: center; gap: 1px; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.fc-windv.strong { color: var(--danger); }
+.fc-wind path { fill: currentColor; }
+.fc-wind { transition: transform .3s ease; }
+.fc-gust { font-size: 11px; color: var(--text-3); min-height: 14px; font-variant-numeric: tabular-nums; }
+.fc-rainbar { width: 8px; height: 18px; border-radius: 3px; background: var(--elev); display: flex; align-items: flex-end; overflow: hidden; }
+.fc-rainbar i { display: block; width: 100%; background: #4aa3df; }
+.fc-wave { font-size: 11.5px; color: var(--tide); font-weight: 650; font-variant-numeric: tabular-nums; }
+.fc-key { flex: none; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; padding: 0 6px 8px; font-size: 10.5px; color: var(--text-3); }
+.fc-key .strong { color: var(--danger); }
+.fc-sky .sun circle { fill: #f6c445; } .fc-sky .sun line { stroke: #f6c445; stroke-width: 2; stroke-linecap: round; }
+.fc-sky .moon { fill: #c9d4e3; }
+.fc-sky .cloud { fill: #b9c4d0; }
+:root[data-theme="light"] .fc-sky .cloud { fill: #9aa8b6; }
+.fc-sky .rain line { stroke: #4aa3df; stroke-width: 2; stroke-linecap: round; }
+.tide-week summary { cursor: pointer; font-weight: 650; font-size: 14px; color: var(--action); padding: 6px 0; }
+.tide-week table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tide-week th { text-align: left; font-weight: 650; padding: 6px 8px 6px 0; white-space: nowrap; vertical-align: top; width: 1%; }
+.tide-week td { padding: 6px 0; display: flex; flex-wrap: wrap; gap: 4px 10px; border-top: 1px solid var(--line); }
+.tide-week tr:first-child td { border-top: 0; }
+.tide-week td span { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tide-week .hw { color: var(--tide); font-weight: 650; }
+.tide-week .lw { color: var(--text-2); }
+.place-results { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-inline: -14px; padding: 0 14px; }
+.place-results::-webkit-scrollbar { display: none; }
+.chip.place { flex: none; padding: 7px 11px; font-size: 13px; color: var(--text); }
+.chip.place small { color: var(--text-3); font-weight: 600; margin-left: 2px; }
+.chip.place svg { color: var(--action); }
+
+/* Light theme: the hero's white text needs a darker scrim behind it, because the page colour it fades into is pale. */
+:root[data-theme="light"] .hero::after {
+  background: linear-gradient(90deg, #060a0dc4, #060a0d55 70%, #060a0d22), linear-gradient(0deg, var(--bg) 0, color-mix(in srgb, var(--bg) 40%, transparent) 7%, #060a0d00 26%);
+}
+:root[data-theme="light"] .hero .score-cap { color: #f3f6f9; text-shadow: 0 1px 6px #000a; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .hero::after {
+    background: linear-gradient(90deg, #060a0dc4, #060a0d55 70%, #060a0d22), linear-gradient(0deg, var(--bg) 0, color-mix(in srgb, var(--bg) 40%, transparent) 7%, #060a0d00 26%);
+  }
+  :root:not([data-theme="dark"]) .hero .score-cap { color: #f3f6f9; text-shadow: 0 1px 6px #000a; }
+}
+/* Long values in key/value grids (line, lead advice) read as text, not as big numbers */
+.kv .v.small { font-size: 13.5px; font-weight: 500; line-height: 1.45; font-variant-numeric: normal; }

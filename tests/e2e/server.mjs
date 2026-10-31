@@ -16,6 +16,7 @@ import { handleMetrics } from "../../server/metrics.js";
 import { handleAdmin } from "../../server/admin.js";
 import { handleWater } from "../../server/water.js";
 import { handleFishInfo } from "../../server/fishinfo.js";
+import { handlePlaces } from "../../server/places.js";
 
 const port = Number(process.argv[2] || 8792);
 // --dist serves the production build (dist/, as Cloudflare Pages would); otherwise the single-file e2e build.
@@ -31,7 +32,7 @@ function staticFile(pathname) {
   return { type: "text/plain", body: "not found" };
 }
 const env = { DB: createD1(":memory:"), ADMIRALTY_API_KEY: "test-key", GEMINI_API_KEY: "test-key", ADMIN_EMAILS: "admin@fishdock.example" };
-const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater, fishinfo: handleFishInfo };
+const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater, fishinfo: handleFishInfo, places: handlePlaces };
 
 // ---- outside services, shaped like the real ones ----
 const now = Date.now();
@@ -39,8 +40,9 @@ const hours = Array.from({ length: 72 }, (_, i) => new Date(Math.floor(now / 360
 globalThis.fetch = async (input, init) => {
   const url = String(typeof input === "string" ? input : input.url);
   const J = (b) => new Response(JSON.stringify(b), { headers: { "content-type": "application/json" } });
-  if (url.includes("api.open-meteo.com")) return J({ utc_offset_seconds: 0, hourly: { time: hours, temperature_2m: hours.map((_, i) => 10 + 3 * Math.sin(i / 4)), wind_speed_10m: hours.map((_, i) => 14 + (i % 9)), wind_gusts_10m: hours.map((_, i) => 26 + (i % 9)), wind_direction_10m: hours.map(() => 230), pressure_msl: hours.map((_, i) => 1014 - i * 0.15), precipitation: hours.map((_, i) => (i % 11 === 0 ? 0.6 : 0)), cloud_cover: hours.map(() => 60), is_day: hours.map((t) => (+t.slice(11, 13) >= 7 && +t.slice(11, 13) < 17 ? 1 : 0)) } });
+  if (url.includes("geocoding-api.open-meteo.com")) return J({ results: [{ name: "Gorleston-on-Sea", latitude: 52.5764, longitude: 1.7291, feature_code: "PPL", country_code: "GB", admin1: "England", admin2: "Norfolk" }, { name: "Gorleston Beach", latitude: 52.5650, longitude: 1.7350, feature_code: "BCH", country_code: "GB", admin1: "England", admin2: "Norfolk" }] });
   if (url.includes("marine-api.open-meteo.com")) return J({ utc_offset_seconds: 0, hourly: { time: hours, wave_height: hours.map(() => 0.9), swell_wave_height: hours.map(() => 0.6), swell_wave_period: hours.map(() => 9), sea_surface_temperature: hours.map(() => 13.4) } });
+  if (url.includes("api.open-meteo.com")) return J({ utc_offset_seconds: 0, hourly: { time: hours, temperature_2m: hours.map((_, i) => 10 + 3 * Math.sin(i / 4)), wind_speed_10m: hours.map((_, i) => 14 + (i % 9)), wind_gusts_10m: hours.map((_, i) => 26 + (i % 9)), wind_direction_10m: hours.map(() => 230), pressure_msl: hours.map((_, i) => 1014 - i * 0.15), precipitation: hours.map((_, i) => (i % 11 === 0 ? 0.6 : 0)), cloud_cover: hours.map(() => 60), is_day: hours.map((t) => (+t.slice(11, 13) >= 7 && +t.slice(11, 13) < 17 ? 1 : 0)) } });
   if (url.includes("admiraltyapi") && /Stations\/?(\?|$)/.test(url)) return J({ type: "FeatureCollection", features: [{ type: "Feature", geometry: { type: "Point", coordinates: [-2.4383, 50.5650] }, properties: { Id: "0028", Name: "Portland", Country: "England" } }] });
   if (url.includes("admiraltyapi") && url.includes("TidalEvents")) {
     const base = Math.floor(now / 864e5) * 864e5;

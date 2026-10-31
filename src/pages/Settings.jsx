@@ -17,6 +17,8 @@ const SOURCES = [
   ["Depth shading", "EMODnet Bathymetry (coarse modelled grid)", "https://emodnet.ec.europa.eu/en/bathymetry", "Not for navigation"],
   ["Sea marks", "OpenSeaMap (ODbL / CC BY-SA)", "https://openseamap.org/", ""],
   ["Base maps", "OpenStreetMap contributors; Esri World Imagery", "https://www.openstreetmap.org/copyright", ""],
+  ["Place search", "Open-Meteo geocoding with GeoNames data (CC BY 4.0)", "https://open-meteo.com/en/docs/geocoding-api", "Only the words you type are sent"],
+  ["Fish photos and summaries", "Wikipedia and Wikimedia Commons (free licences only, credited on each photo)", "https://commons.wikimedia.org/", "Text CC BY-SA 4.0"],
   ["Water type when you tap the map", "OpenStreetMap data through the Overpass API (ODbL)", "https://wiki.openstreetmap.org/wiki/Overpass_API", "The tapped point is sent without anything about you, and not stored"],
   ["Species records and photos", "NBN Atlas (linked, not copied)", "https://nbnatlas.org/", ""],
   ["Rules and licences", `GOV.UK, Environment Agency, Natural Resources Wales, Scottish Government, DAERA, MMO and IFCAs (checked ${RULES_CHECKED})`, "https://www.gov.uk/freshwater-rod-fishing-rules", ""],

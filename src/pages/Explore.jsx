@@ -7,6 +7,7 @@ import { all } from "../lib/storage.js";
 import { catchHere, LEVELS } from "../lib/catchhere.js";
 import { distanceKm, fmtKm, mapsLink } from "../lib/geo.js";
 import { waterById } from "../lib/pins.js";
+import { searchPlaces } from "../lib/api.js";
 import { ukMonth } from "../lib/time.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources, Beta, MonthStrip } from "../components/ui.jsx";
 import { FishArt } from "../components/art.jsx";
@@ -33,7 +34,7 @@ export default function Explore() {
 }
 
 function Spots() {
-  const { place, settings, preview, nav } = useApp();
+  const { place, settings, preview, nav, say } = useApp();
   const [kind, setKind] = useState("all");
   const [q, setQ] = useState("");
   const [view, setView] = useState(preview ? "sonar" : "map");
@@ -45,6 +46,16 @@ function Spots() {
   const [marks, setMarks] = useState([]);
   const [showMarks, setShowMarks] = useState(false);
   const [drop, setDrop] = useState(null);       // a pin dropped by tapping the map, not yet saved
+  const [focus, setFocus] = useState(null);     // move the map to a searched place
+  const [places, setPlaces] = useState([]);
+  // ---- search any UK place by name (only the words are sent), a moment after typing stops ----
+  useEffect(() => {
+    const t = q.trim();
+    if (t.length < 3) { setPlaces([]); return; }
+    let gone = false;
+    const timer = setTimeout(() => searchPlaces(t).then((r) => { if (!gone) setPlaces(r.results || []); }), 450);
+    return () => { gone = true; clearTimeout(timer); };
+  }, [q]);
   const [pinOpen, setPinOpen] = useState(null); // { at } for a new pin, { pin } for a saved one
   const pins = settings.pins || [];
   useEffect(() => {
@@ -60,14 +71,26 @@ function Spots() {
   const toggle = (k) => setOverlays((o) => (o.includes(k) ? o.filter((x) => x !== k) : [...o, k]));
   return (
     <>
-      <div className="search"><Icon name="search" /><input id="spot-q" className="input" placeholder="Search marks, species or regions" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="search"><Icon name="search" /><input id="spot-q" className="input" placeholder="Search marks, fish, towns or beaches" value={q} onChange={(e) => setQ(e.target.value)} enterKeyHint="search" /></div>
+      {places.length ? (
+        <div className="place-results" role="list" aria-label="Places">
+          {places.map((p) => (
+            <button key={`${p.lat},${p.lon}`} type="button" className="chip place" role="listitem" onClick={() => {
+              setFocus({ lat: p.lat, lon: p.lon, zoom: p.kind === "Town" || p.kind === "City" ? 13 : 14, key: Date.now() });
+              if (view !== "map" && mapOk) setView("map");
+              say(`${p.name}: tap the water to see what's there`);
+              setQ("");
+            }}><Icon name="pin" size={14} />{p.name}<small>{p.kind}{p.area ? `, ${p.area.split(",")[0]}` : ""}</small></button>
+          ))}
+        </div>
+      ) : null}
       <div className="row between">
         <Seg value={kind} onChange={setKind} options={[{ value: "all", label: "All" }, { value: "sea", label: "Sea" }, { value: "fresh", label: "Freshwater" }]} />
         <Seg value={view} onChange={setView} options={[...(mapOk ? [{ value: "map", label: "Map" }] : []), { value: "sonar", label: "Sonar" }, { value: "list", label: "List" }]} />
       </div>
       {view === "map" && mapOk ? (
         <>
-          <MapView spots={shownSpots} marks={marks} pins={pins} dropped={drop} center={place} overlays={overlays} base={base} onPick={setOpen}
+          <MapView spots={shownSpots} marks={marks} pins={pins} dropped={drop} center={place} focus={focus} overlays={overlays} base={base} onPick={setOpen}
             onPickPin={(p) => setPinOpen({ pin: p, tapped: true })} onTap={(p) => { setDrop(p); setPinOpen({ at: p, tapped: true }); }}
             hint="Tap the water to see what's there"
             onFail={() => { setMapOk(false); setView("sonar"); }} />

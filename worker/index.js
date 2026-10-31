@@ -14,11 +14,12 @@ import { handleAdmin } from "../server/admin.js";
 import { handleHealth } from "../server/health.js";
 import { handleWater } from "../server/water.js";
 import { handleFishInfo } from "../server/fishinfo.js";
+import { handlePlaces } from "../server/places.js";
 import { onRequest as authHelper } from "../functions/_middleware.js";
 
 const API = {
   conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync,
-  community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, health: handleHealth, water: handleWater, fishinfo: handleFishInfo,
+  community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, health: handleHealth, water: handleWater, fishinfo: handleFishInfo, places: handlePlaces,
 };
 
 const notFound = () => new Response(JSON.stringify({ error: "not_found", message: "There's nothing here." }), {

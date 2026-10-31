@@ -19,6 +19,8 @@ import CatchList from "../components/CatchList.jsx";
 import AdviceSheet from "../components/AdviceSheet.jsx";
 import { useMyCatches, catchesNear, withMine } from "../lib/myCatches.js";
 import RemindButton from "../components/RemindButton.jsx";
+import ForecastStrip from "../components/ForecastStrip.jsx";
+import TideWeek from "../components/TideWeek.jsx";
 
 export default function Home() {
   const app = useApp();
@@ -161,6 +163,7 @@ export default function Home() {
             {tide ? (
               <>
                 <TideChart tide={tide} dayStart={dayStart} now={now} />
+                <TideWeek tide={tide} now={now} />
                 <div className={`notice ${tide.source === "estimate" ? "warn" : "tide"}`}>
                   <Icon name={tide.source === "estimate" ? "warn" : "info"} />
                   <div>{tide.source === "estimate"
@@ -265,6 +268,7 @@ function ConditionsCard({ place, live, c, manual, onEdit, preview }) {
       ) : (
         <p className="small muted">{preview ? "Live weather and sea state need the full app (Open-Meteo, through FishDock's server). In this preview you can enter what you see." : live.cond?.message || "Loading the forecast…"}</p>
       )}
+      {live.cond?.hourly?.length ? <ForecastStrip cond={live.cond} sea={place.kind === "sea"} /> : null}
       {c?.windKph > 45 || c?.gustKph > 65 ? <Notice kind="danger"><b>Storm-force wind.</b> Stay off exposed rocks, piers and steep shingle. Big waves arrive without warning.</Notice> : null}
       {place.kind === "sea" && c?.waveM > 2.5 ? <Notice kind="danger"><b>Big sea.</b> Waves over 2.5 m: rock marks and low breakwaters are dangerous today.</Notice> : null}
       <button type="button" className="linkbtn" onClick={onEdit}>{src ? "Add what you see (water colour, weed)" : "Enter conditions"}</button>

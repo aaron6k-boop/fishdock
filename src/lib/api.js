@@ -42,6 +42,16 @@ export const getConditions = (lat, lon) => cached("conditions", lat, lon);
 export const getTides = (lat, lon) => cached("tides", lat, lon);
 export const getRiver = (lat, lon) => cached("river", lat, lon);
 
+/** UK places by name (towns, beaches, harbours, lakes), to move the map. Only the words are sent. */
+export async function searchPlaces(q) {
+  if (PREVIEW) return { results: [], preview: true };
+  const key = `places:${q.trim().toLowerCase()}`;
+  if (memo.has(key)) return memo.get(key).data;
+  const data = await getJSON(`/api/places?q=${encodeURIComponent(q.trim())}`, { timeout: 8000 });
+  if (Array.isArray(data.results)) memo.set(key, { at: Date.now(), data });
+  return data;
+}
+
 /** A free-licensed photo and Wikipedia's summary for one FishDock species (kept in memory for the visit). */
 export async function getFishInfo(id) {
   if (PREVIEW) return { preview: true, photo: null, extract: null };
