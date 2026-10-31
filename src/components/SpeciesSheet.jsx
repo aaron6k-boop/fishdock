@@ -10,7 +10,7 @@ import { distanceKm, fmtKm } from "../lib/geo.js";
 import { track } from "../lib/api.js";
 import { useEffect, useMemo, useState } from "react";
 import { Sheet, MonthStrip, Sources, Notice, Icon } from "./ui.jsx";
-import { FishArt, HookGlyph, WaterColumn } from "./art.jsx";
+import { HookGlyph, WaterColumn } from "./art.jsx";
 import FishPhoto, { useFishInfo, AboutFish } from "./FishPhoto.jsx";
 
 export default function SpeciesSheet({ species: sp, onClose, onPicked }) {

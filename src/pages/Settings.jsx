@@ -20,6 +20,7 @@ const SOURCES = [
   ["Sea marks", "OpenSeaMap (ODbL / CC BY-SA)", "https://openseamap.org/", ""],
   ["Base maps", "OpenStreetMap contributors; Esri World Imagery", "https://www.openstreetmap.org/copyright", ""],
   ["Place search", "Open-Meteo geocoding with GeoNames data (CC BY 4.0)", "https://open-meteo.com/en/docs/geocoding-api", "Only the words you type are sent"],
+  ["Fish pictures", "FishDock's own pictures for some species; the rest use the free-licensed photos below", null, ""],
   ["Fish photos and summaries", "Wikimedia Commons and Wikipedia (free licences only; each photographer is credited below)", "https://commons.wikimedia.org/", "Photos load from Wikimedia without a referrer. Text CC BY-SA 4.0"],
   ["Water type when you tap the map", "OpenStreetMap data through the Overpass API (ODbL)", "https://wiki.openstreetmap.org/wiki/Overpass_API", "The tapped point is sent without anything about you, and not stored"],
   ["Species records and photos", "NBN Atlas (linked, not copied)", "https://nbnatlas.org/", ""],

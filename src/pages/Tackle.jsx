@@ -15,6 +15,7 @@ import { LESSONS } from "../data/lessons.js";
 import { WATERS, waterById } from "../lib/pins.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources } from "../components/ui.jsx";
 import { HookGlyph, RigDiagram, WaterColumn } from "../components/art.jsx";
+import { KitIcon } from "../components/RigScene.jsx";
 import { FishThumb } from "../components/FishPhoto.jsx";
 
 const VER = { verified: "Sourced", partial: "Partly sourced", unverified: "General guidance" };
@@ -280,7 +281,8 @@ function RigLibrary({ water }) {
           <button type="button" key={r.id} className="rig-card" onClick={() => setOpen(r)}>
             <RigDiagram rig={r} compact />
             <span className="t">{r.name}</span>
-            <span className="s">{r.hook ? `Hooks ${r.hook}` : ""}{r.species?.length ? ` · ${r.species.slice(0, 3).map((id) => SPECIES.find((s) => s.id === id)?.name || id).join(", ")}` : ""}</span>
+            <span className="s">{r.species?.length ? r.species.slice(0, 4).map((id) => SPECIES.find((s) => s.id === id)?.name || id).join(", ") : ""}</span>
+            <span className="rig-tags">{r.snaggy ? <span className="tag">Rough ground</span> : null}{r.heavyFlow ? <span className="tag">Tide or flow</span> : null}{r.calm ? <span className="tag">Calm water</span> : null}</span>
             {r.verification !== "verified" ? <span className="tag">{VER[r.verification] || "General guidance"}</span> : null}
           </button>
         ))}
@@ -291,25 +293,50 @@ function RigLibrary({ water }) {
 }
 
 export function RigSheet({ rig, onClose }) {
+  const { say } = useApp();
   const [step, setStep] = useState(0);
+  // what's packed: ticked on this phone only, so a half-packed bag is still ticked tomorrow
+  const key = `fishdock.kit.${rig.id}`;
+  const [packed, setPacked] = useState(() => { try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch { return new Set(); } });
+  const toggle = (i) => setPacked((p) => {
+    const n = new Set(p);
+    if (n.has(i)) n.delete(i); else n.add(i);
+    try { localStorage.setItem(key, JSON.stringify([...n])); } catch { /* storage blocked: kept for now */ }
+    return n;
+  });
+  const kit = rig.components || [];
+  const copy = async () => {
+    const text = `${rig.name}: what you need\n${kit.map((c) => `- ${c}`).join("\n")}${rig.hook ? `\nHook: ${rig.hook}` : ""}${rig.line ? `\nLine: ${rig.line}` : ""}${rig.weight ? `\nLead or float: ${rig.weight}` : ""}`;
+    try { await navigator.clipboard.writeText(text); say("List copied"); } catch { say("Couldn't copy on this browser"); }
+  };
+  const tags = [rig.type === "sea" ? "Sea" : rig.type === "fresh" ? "Freshwater" : "Sea or fresh", rig.snaggy ? "Good over rough ground" : null, rig.heavyFlow ? "Holds in tide or flow" : null, rig.calm ? "Best in calm water" : null].filter(Boolean);
+  const facts = [["Hook", rig.hook, "hook"], ["Line", rig.line, "line"], ["Lead or float", rig.weight, "lead"], ["Bait", rig.bait, "bait"]].filter((f) => f[1]);
   return (
     <Sheet title={rig.name} aside={VER[rig.verification] || ""} onClose={onClose}>
       <RigDiagram rig={rig} />
-      <div className="kv">
-        {rig.hook ? <div><span className="k">Hook</span><span className="v small">{rig.hook}</span></div> : null}
-        {rig.line ? <div><span className="k">Line</span><span className="v small">{rig.line}</span></div> : null}
-        {rig.weight ? <div><span className="k">Lead or float</span><span className="v small">{rig.weight}</span></div> : null}
-        {rig.bait ? <div><span className="k">Bait</span><span className="v small">{rig.bait}</span></div> : null}
-      </div>
-      {rig.components?.length ? <section className="card"><h2 className="h2">You'll need</h2><ul className="steps">{rig.components.map((c, i) => <li key={i}>{c}</li>)}</ul></section> : null}
+      <div className="chips">{tags.map((t) => <span key={t} className="chip">{t}</span>)}</div>
+      {rig.best ? <p className="small"><b>Works best:</b> {rig.best}</p> : null}
+      {facts.length ? <div className="rig-facts">{facts.map(([k, v, ico]) => <div key={k} className="rig-fact"><span className="kit-ico"><KitIcon text={ico} /></span><span><span className="k">{k}</span><span className="v">{v}</span></span></div>)}</div> : null}
+      {kit.length ? (
+        <section className="card">
+          <div className="card-h"><h2>What you need</h2><span className="aside">{packed.size ? `${[...packed].filter((i) => i < kit.length).length} of ${kit.length} packed` : `${kit.length} items`}</span></div>
+          <ul className="kit">{kit.map((c, i) => (
+            <li key={i}><button type="button" className={`kit-row${packed.has(i) ? " on" : ""}`} aria-pressed={packed.has(i)} onClick={() => toggle(i)}>
+              <span className="kit-ico"><KitIcon text={c} /></span><span className="kit-t">{c}</span><span className="kit-tick">{packed.has(i) ? <Icon name="check" /> : null}</span>
+            </button></li>
+          ))}</ul>
+          <div className="row"><button type="button" className="btn small" onClick={copy}><Icon name="copy" />Copy the list</button>{packed.size ? <button type="button" className="linkbtn" onClick={() => { setPacked(new Set()); try { localStorage.removeItem(key); } catch { /* ignore */ } }}>Clear ticks</button> : null}</div>
+        </section>
+      ) : null}
       {rig.steps?.length ? (
         <section className="card">
           <div className="card-h"><h2>Tie it</h2><span className="aside">Step {step + 1} of {rig.steps.length}</span></div>
-          <p className="step-now">{rig.steps[step]}</p>
-          <div className="row"><button type="button" className="btn small" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button><button type="button" className="btn small primary" disabled={step === rig.steps.length - 1} onClick={() => setStep(step + 1)}>Next step</button></div>
+          <ol className="tie-steps">{rig.steps.map((t, i) => (
+            <li key={i} className={i < step ? "done" : i === step ? "now" : ""}><button type="button" onClick={() => setStep(i)}><span className="n">{i < step ? <Icon name="check" /> : i + 1}</span><span className="t">{t}</span></button></li>
+          ))}</ol>
+          <div className="row"><button type="button" className="btn small" disabled={step === 0} onClick={() => setStep(step - 1)}>Back</button><button type="button" className="btn small primary" disabled={step === rig.steps.length - 1} onClick={() => setStep(step + 1)}>{step === rig.steps.length - 1 ? "Done" : "Next step"}</button></div>
         </section>
       ) : null}
-      {rig.best ? <p className="small"><b>Works best:</b> {rig.best}</p> : null}
       {rig.species?.length ? <div className="chips">{rig.species.map((id) => <span key={id} className="chip">{SPECIES.find((s) => s.id === id)?.name || id}</span>)}</div> : null}
       {rig.mistakes?.length ? <section className="card"><h2 className="h2">Common mistakes</h2><div className="ifthen">{rig.mistakes.map((m, i) => <div key={i}><b>{m.m}</b><span>{m.fix}</span></div>)}</div></section> : null}
       <Sources list={rig.sources} />

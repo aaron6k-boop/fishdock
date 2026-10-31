@@ -55,6 +55,8 @@ const files = [];
 const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else files.push("/" + relative(out, p).split("\\").join("/")); } };
 walk(join(out, "assets"));
 files.push("/index.html", "/manifest.webmanifest", "/icon.svg", "/theme-init.js");
+// the small fish drawings, so lists and cards have their pictures offline from the start (the large ones are kept once seen)
+for (const f of readdirSync(join(out, "fish"))) if (f.endsWith("-s.webp")) files.push("/fish/" + f);
 writeFileSync(join(out, "precache.json"), JSON.stringify({ build: BUILD_ID, files }));
 writeFileSync(join(out, "build.json"), JSON.stringify({ build: BUILD_ID }));
 

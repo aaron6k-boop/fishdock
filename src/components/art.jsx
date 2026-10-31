@@ -1,4 +1,5 @@
 // ---- art: species illustrations, rig diagrams, hook sizes and the water column, all drawn from data ----
+import RigScene from "./RigScene.jsx";
 
 // Fish are drawn from a small set of body plans plus each species' colours and markings, so every species card has
 // a recognisable picture without using anyone's photos. They are illustrations, not identification photos.
@@ -138,61 +139,7 @@ export function WaterColumn({ zone = "bottom", kind = "sea" }) {
 }
 
 // ---- rig diagram: drawn from the rig's component list, mainline on the left, hook on the right ----
+/** A rig drawn as it sits in the water (RigScene.jsx). */
 export function RigDiagram({ rig, compact }) {
-  const parts = rig?.diagram || [];
-  const W = 340, H = compact ? 112 : 124, y = 40;
-  let x = 10;
-  const els = [];
-  const step = (W - 40) / Math.max(4, parts.length);
-  parts.forEach((p, i) => {
-    const cx = x + step * 0.5;
-    const key = i;
-    switch (p.k) {
-      case "line": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><text x={x + 2} y={y - 8}>{p.label || "Mainline"}</text></g>); break;
-      case "leader": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln thick" /><text x={x + 2} y={y - 8}>{p.label || "Leader"}</text></g>); break;
-      case "bead": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><circle cx={cx} cy={y} r="4" className="bead" /><text x={cx - 10} y={y + 18}>bead</text></g>); break;
-      case "stop": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><rect x={cx - 2} y={y - 5} width="4" height="10" className="stop" /><text x={cx - 12} y={y + 18}>stop</text></g>); break;
-      case "swivel": els.push(<g key={key}><line x1={x} y1={y} x2={cx - 7} y2={y} className="ln" /><ellipse cx={cx - 3} cy={y} rx="4" ry="3" className="swivel" /><ellipse cx={cx + 3} cy={y} rx="4" ry="3" className="swivel" /><line x1={cx + 7} y1={y} x2={x + step} y2={y} className="ln" /><text x={cx - 14} y={y + 18}>swivel</text></g>); break;
-      case "float": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><path d={`M${cx} ${y - 22} L${cx + 4} ${y - 6} L${cx} ${y + 4} L${cx - 4} ${y - 6} Z`} className="float" /><rect x={cx - 1.5} y={y - 28} width="3" height="7" className="float-tip" /><text x={cx - 14} y={y + 18}>{p.label || "float"}</text></g>); break;
-      case "shot": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" />{[0, 6, 12].map((d) => <circle key={d} cx={x + 6 + d} cy={y} r="2.6" className="lead" />)}<text x={x + 2} y={y + 18}>{p.label || "shot"}</text></g>); break;
-      case "lead": {
-        const leg = p.boom ? 24 : 16;
-        els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><line x1={cx} y1={y} x2={cx} y2={y + leg} className="ln" />
-          {p.kind === "grip" ? <g><path d={`M${cx - 6} ${y + leg} h12 l-3 14 h-6 Z`} className="lead" />{[-6, 6].map((d) => <path key={d} d={`M${cx + d * 0.5} ${y + leg + 12} l${d} 6`} className="wire" />)}</g>
-            : p.kind === "feeder" ? <rect x={cx - 7} y={y + leg} width="14" height="18" rx="3" className="feeder" />
-              : p.kind === "method" ? <ellipse cx={cx} cy={y + leg + 8} rx="10" ry="8" className="method" />
-                : <path d={`M${cx} ${y + leg} l6 6 l-2 10 h-8 l-2 -10 Z`} className="lead" />}
-          <text x={cx} y={y + leg + 30} textAnchor="middle">{p.label || (p.kind === "grip" ? "grip lead" : p.kind === "feeder" ? "feeder" : p.kind === "method" ? "method" : "lead")}</text></g>);
-        break;
-      }
-      case "snood": {
-        const drop = 30;
-        els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><line x1={cx} y1={y} x2={cx + 10} y2={y + drop} className="ln" /><HookPath x={cx + 10} y={y + drop} /><circle cx={cx + 14} cy={y + drop + 10} r="4.5" className="bait" /><text x={cx - 18} y={y + drop + 26}>{p.label || "snood"}</text></g>);
-        break;
-      }
-      case "clip": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><path d={`M${cx - 4} ${y + 2} v6 h8 v-6`} className="clip" /><text x={cx - 14} y={y + 20}>bait clip</text></g>); break;
-      case "wire": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="wire" /><text x={x + 2} y={y - 8}>{p.label || "wire trace"}</text></g>); break;
-      case "hooklength": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln fine" /><text x={x + 2} y={y - 8}>{p.label || "hooklength"}</text></g>); break;
-      case "dropper": els.push(<g key={key}><line x1={x} y1={y} x2={x + step} y2={y} className="ln" /><line x1={cx} y1={y} x2={cx} y2={y - 22} className="ln fine" /><HookPath x={cx} y={y - 26} up /><circle cx={cx + 4} cy={y - 36} r="4" className="bait" /></g>); break;
-      case "hook": {
-        els.push(<g key={key}><line x1={x} y1={y} x2={cx} y2={y} className="ln fine" /><HookPath x={cx} y={y} />{p.bait !== false ? <circle cx={cx + 5} cy={y + 12} r="6" className="bait" /> : null}{p.hair ? <path d={`M${cx} ${y + 16} q6 8 0 14`} className="ln fine" /> : null}<text x={cx + 4} y={y + 34} textAnchor="middle">{p.label || "hook"}</text></g>);
-        break;
-      }
-      case "lure": els.push(<g key={key}><line x1={x} y1={y} x2={cx - 10} y2={y} className="ln fine" /><path d={`M${cx - 10} ${y} q12 -10 26 0 q-12 10 -26 0 Z`} className="lure" /><text x={cx - 14} y={y + 20}>{p.label || "lure"}</text></g>); break;
-      case "trebles": els.push(<g key={key}><line x1={x} y1={y} x2={cx} y2={y} className="wire" /><path d={`M${cx} ${y} v10 m0 0 q-6 4 -8 -2 m8 2 q6 4 8 -2`} className="hookline" /><text x={cx - 18} y={y + 28}>{p.label || "trebles"}</text></g>); break;
-      default: els.push(<line key={key} x1={x} y1={y} x2={x + step} y2={y} className="ln" />);
-    }
-    x += step;
-  });
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="rig-svg" role="img" aria-label={`Diagram of the ${rig?.name || "rig"}`}>
-      <rect x="0" y={y + 20} width={W} height={H - y - 20} className="water" />
-      {els}
-    </svg>
-  );
-}
-function HookPath({ x, y, up }) {
-  return up
-    ? <path d={`M${x} ${y} v-10 a5 5 0 0 1 10 0 v3`} className="hookline" />
-    : <path d={`M${x} ${y} v10 a5 5 0 0 0 10 0 v-3`} className="hookline" />;
+  return <RigScene rig={rig} compact={compact} />;
 }

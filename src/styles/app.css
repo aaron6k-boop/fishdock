@@ -130,30 +130,51 @@ details.conds[open] summary::before { content: "▾ "; }
 .ifthen span { color: var(--text-2); }
 
 /* rigs and knots */
-.rig-svg { width: 100%; height: auto; display: block; background: var(--elev); border-radius: var(--r-m); }
-.rig-svg .ln { stroke: var(--text-2); stroke-width: 1.6; fill: none; }
-.rig-svg .ln.thick { stroke-width: 2.6; }
-.rig-svg .ln.fine { stroke-width: 1.1; stroke-dasharray: 0; }
-.rig-svg .lead { fill: var(--text-3); }
-.rig-svg .wire { stroke: var(--sun); stroke-width: 1.6; fill: none; }
-.rig-svg .hookline { stroke: var(--text); stroke-width: 2; fill: none; stroke-linecap: round; }
-.rig-svg .bead { fill: var(--sun); }
-.rig-svg .stop { fill: var(--danger); }
-.rig-svg .float { fill: var(--danger); }
-.rig-svg .float-tip { fill: var(--sun); }
-.rig-svg .swivel { fill: none; stroke: var(--tide); stroke-width: 2; }
-.rig-svg .feeder { fill: none; stroke: var(--tide); stroke-width: 2; }
-.rig-svg .method { fill: color-mix(in srgb, var(--warn) 60%, var(--elev)); }
-.rig-svg .bait { fill: var(--action); }
-.rig-svg .clip { fill: none; stroke: var(--text-2); stroke-width: 1.6; }
-.rig-svg .lure { fill: var(--tide); }
-.rig-svg .water { fill: var(--tide-soft); }
-.rig-svg text { fill: var(--text-3); font-size: 10px; font-family: var(--font-ui); }
+.rig-scene { width: 100%; height: auto; display: block; border-radius: var(--r-m); background: linear-gradient(#cfe3ea, #e9f1f3 30px); }
+:root:not([data-theme="light"]) .rig-scene { background: linear-gradient(#1c2b33, #23343c 30px); }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .rig-scene { background: linear-gradient(#cfe3ea, #e9f1f3 30px); } }
+.rig-scene .rs-surface { fill: none; stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 1.2; }
+.rig-scene .rs-hook { fill: none; stroke: #dfe3e6; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.rig-scene .rs-hookeye { fill: none; stroke: #dfe3e6; stroke-width: 1.2; }
+.rig-scene .rs-ring { fill: none; stroke: #c9ced2; stroke-width: 1.3; }
+.rig-scene .rs-wire { fill: none; stroke: #c9ced2; stroke-width: 1.2; stroke-linecap: round; }
+.rig-scene .rs-wireline, .rig-scene .rs-hookline { fill: none; stroke: #eef3f2; stroke-width: 1.1; }
+.rig-scene .rs-hair { fill: none; stroke: #f4c7c3; stroke-width: 0.9; }
+.rig-scene .rs-snood { fill: none; stroke: #f4c7c3; stroke-width: 1.2; }
+.rig-scene .rs-tick { stroke: #ffffff; stroke-opacity: 0.45; stroke-width: 0.7; }
+.rig-scene .rs-label text { fill: #ffffff; font-size: 9.5px; font-weight: 600; font-family: var(--font-ui); paint-order: stroke; stroke: #0b1a20; stroke-width: 3px; stroke-linejoin: round; }
 .rig-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 @media (min-width: 520px) { .rig-grid { grid-template-columns: 1fr 1fr; } }
 .rig-card { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 12px; border-radius: var(--r-l); border: 1px solid var(--line); background: var(--card); color: var(--text); text-align: left; min-width: 0; }
 .rig-card .t { font-weight: 650; }
 .rig-card .s { font-size: 12.5px; color: var(--text-2); }
+.rig-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.rig-facts { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 480px) { .rig-facts { grid-template-columns: 1fr 1fr; } }
+.rig-fact { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-m); background: var(--elev); font-size: 13.5px; }
+.rig-fact .k { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
+.rig-fact .v { display: block; color: var(--text); line-height: 1.4; }
+.kit-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(#2a6f84, #12394a); }
+.kit-svg { width: 28px; height: 28px; display: block; }
+.kit-svg .rs-hook { fill: none; stroke: #e3e7ea; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.kit-svg .rs-hookeye, .kit-svg .rs-ring { fill: none; stroke: #d3d8dc; stroke-width: 1.3; }
+.kit-svg .rs-wire, .kit-svg .rs-wireline, .kit-svg .rs-hookline { fill: none; stroke: #d3d8dc; stroke-width: 1.2; stroke-linecap: round; }
+.kit { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.kit-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--r-m); border: 1px solid var(--line); background: var(--card); color: var(--text); text-align: left; font-size: 14px; line-height: 1.35; }
+.kit-row .kit-t { flex: 1; min-width: 0; }
+.kit-row .kit-tick { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); display: grid; place-items: center; color: var(--action-ink); }
+.kit-row .kit-tick svg { width: 15px; height: 15px; }
+.kit-row.on { border-color: color-mix(in srgb, var(--action) 45%, transparent); background: var(--action-soft); }
+.kit-row.on .kit-t { color: var(--text-2); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-2) 50%, transparent); }
+.kit-row.on .kit-tick { background: var(--action); border-color: var(--action); }
+.tie-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tie-steps button { width: 100%; display: flex; gap: 12px; align-items: flex-start; padding: 8px 6px; border-radius: var(--r-m); background: none; border: 0; color: var(--text-2); text-align: left; font-size: 14px; line-height: 1.45; }
+.tie-steps .n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--elev); color: var(--text-2); }
+.tie-steps .n svg { width: 15px; height: 15px; }
+.tie-steps li.done .n { background: var(--action-soft); color: var(--action); }
+.tie-steps li.done .t { color: var(--text-3); }
+.tie-steps li.now button { background: var(--elev); color: var(--text); font-size: 15.5px; }
+.tie-steps li.now .n { background: var(--action); color: var(--action-ink); }
 .step-now { font-size: 16px; line-height: 1.5; margin: 0; }
 .knot-stepper { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: var(--r-l); background: var(--card); border: 1px solid var(--line); }
 .knot-num { font-size: 44px; font-weight: 750; letter-spacing: -0.03em; color: var(--action); font-variant-numeric: tabular-nums; line-height: 1; }
@@ -326,6 +347,7 @@ details.conds[open] summary::before { content: "▾ "; }
 .fish-thumb { display: block; width: 100%; height: 100%; object-fit: cover; background: var(--elev); }
 .fish-ico { overflow: hidden; }
 .fish-ico > .fish-thumb { border-radius: inherit; }
+.fish-thumb.is-art { object-fit: contain; } /* FishDock's pictures: the fish cut out, so none of it is cropped */
 .fish-ico:has(> .fish-thumb) { width: 60px; height: 42px; border-radius: 11px; } /* wider than tall, so more of the fish shows */
 .sp-photo, .chip-photo, .head-photo { display: grid; place-items: center; overflow: hidden; aspect-ratio: 3 / 2; background: var(--elev); }
 .sp-photo { border-radius: var(--r-m); margin: -4px -4px 0; }
@@ -335,6 +357,9 @@ details.conds[open] summary::before { content: "▾ "; }
 .head-photo { flex: none; width: 120px; border-radius: var(--r-m); }
 .head-photo .fish-art { width: 104px; }
 .sp-chip[aria-pressed="true"] .chip-photo { outline: 2px solid var(--action); outline-offset: -2px; }
+.fish-photo figcaption { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; }
+.fish-photo figcaption .seg { flex: none; }
+.fish-photo figcaption .seg button { padding: 5px 12px; font-size: 12.5px; min-height: 30px; }
 
 /* forecast strip */
 .fc-strip { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; margin-inline: -14px; padding: 4px 14px 2px; scroll-snap-type: x proximity; }
