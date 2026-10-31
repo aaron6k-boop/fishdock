@@ -1,0 +1,21 @@
+// FishDock on Cloudflare Workers (the dashboard's "Import a repository" flow). Build: `npm run build`; deploy:
+// `npx wrangler deploy`. The Pages set-up (functions/ + public/_routes.json) keeps working too; both run the same
+// server/*.js code. Keys are added as secrets in the dashboard (Settings → Variables and Secrets), never here.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fishdock",
+  "main": "worker/index.js",
+  "compatibility_date": "2025-10-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/__/*"]
+  },
+  "vars": {
+    "FIREBASE_PROJECT_ID": "fishdock"
+  },
+  "observability": { "enabled": true }
+  // D1: once the "fishdock" database exists, add its id here:
+  // "d1_databases": [{ "binding": "DB", "database_name": "fishdock", "database_id": "<id from the dashboard>" }]
+}

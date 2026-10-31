@@ -3,6 +3,16 @@
 FishDock copies DetectDock's set-up: a GitHub repository connected to its own Cloudflare Pages project, Pages
 Functions for `/api/*`, and one D1 database. **Nothing here has been deployed yet: every step below needs Aaron.**
 
+## Two ways to host it
+
+- **Cloudflare Workers** (the dashboard's current "Create application → Import a repository" flow): build command
+  `npm run build`, deploy command `npx wrangler deploy`. `wrangler.jsonc` serves `dist/` as static assets (with
+  `public/_headers`) and runs `worker/index.js` for `/api/*` and `/__/*`. Add the D1 database id to `wrangler.jsonc`
+  once it exists; add keys as secrets under Settings → Variables and Secrets (secrets survive deploys).
+- **Cloudflare Pages** (as DetectDock): `functions/` and `public/_routes.json`, set up as below.
+
+Both run the same `server/*.js` code.
+
 ## One-off set-up (Aaron)
 
 1. **GitHub:** create a private repository (suggested `aaron6k-boop/fishdock`) and push this code.
