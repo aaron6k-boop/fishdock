@@ -16,6 +16,8 @@ import { WATERS, waterById } from "../lib/pins.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources } from "../components/ui.jsx";
 import { HookGlyph, RigDiagram, WaterColumn } from "../components/art.jsx";
 import { KitIcon } from "../components/RigScene.jsx";
+import GearCard, { ShopLinks } from "../components/GearCard.jsx";
+import { rigQuery, baitQuery } from "../data/shops.js";
 import { FishThumb } from "../components/FishPhoto.jsx";
 
 const VER = { verified: "Sourced", partial: "Partly sourced", unverified: "General guidance" };
@@ -223,6 +225,8 @@ function Advisor({ water, initialSpecies }) {
             </section>
           ) : null}
 
+          <GearCard species={species} advice={a} method={a.method} title="9 · Get the gear" />
+
           <div className="row">
             <button type="button" className="btn" onClick={() => { update((s) => ({ savedSetups: [{ id: Date.now(), species: species.id, method: a.method, rig: a.rig?.id, bait: a.bait.primary?.name, hook: a.hook.range, place: place.name }, ...(s.savedSetups || [])].slice(0, 30) })); say("Set-up saved"); }}><Icon name="star" />Save this set-up</button>
             <button type="button" className="btn ghost" onClick={() => setReport(true)}><Icon name="flag" />Report a problem</button>
@@ -317,6 +321,7 @@ export function RigSheet({ rig, onClose }) {
       <div className="chips">{tags.map((t) => <span key={t} className="chip">{t}</span>)}</div>
       {rig.best ? <p className="small"><b>Works best:</b> {rig.best}</p> : null}
       {facts.length ? <div className="rig-facts">{facts.map(([k, v, ico]) => <div key={k} className="rig-fact"><span className="kit-ico"><KitIcon text={ico} /></span><span><span className="k">{k}</span><span className="v">{v}</span></span></div>)}</div> : null}
+      <div className="buy-row"><span className="small"><b>Buy it ready-tied:</b></span><ShopLinks q={rigQuery(rig)} label={rig.name} /></div>
       {kit.length ? (
         <section className="card">
           <div className="card-h"><h2>What you need</h2><span className="aside">{packed.size ? `${[...packed].filter((i) => i < kit.length).length} of ${kit.length} packed` : `${kit.length} items`}</span></div>
@@ -398,6 +403,7 @@ function BaitLibrary({ water }) {
           {open.hooking ? <p className="small"><b>How to hook it:</b> {open.hooking}</p> : null}
           {open.where ? <p className="small"><b>Where to get it:</b> {open.where}</p> : null}
           {open.storage ? <p className="small"><b>Keeping it fresh:</b> {open.storage}</p> : null}
+          <div className="buy-row"><span className="small"><b>Buy it:</b></span><ShopLinks q={baitQuery(open)} label={open.name} /></div>
           <div className="chips">{(open.species || []).map((id) => <span key={id} className="chip">{SPECIES.find((s) => s.id === id)?.name || id}</span>)}</div>
           <Sources list={open.sources} />
         </Sheet>

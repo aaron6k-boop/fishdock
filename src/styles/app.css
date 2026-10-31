@@ -167,6 +167,17 @@ details.conds[open] summary::before { content: "▾ "; }
 .kit-row.on { border-color: color-mix(in srgb, var(--action) 45%, transparent); background: var(--action-soft); }
 .kit-row.on .kit-t { color: var(--text-2); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-2) 50%, transparent); }
 .kit-row.on .kit-tick { background: var(--action); border-color: var(--action); }
+.gear .eyebrow { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.gear-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.gear-list li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.gear-list li:last-child { border-bottom: 0; }
+.gear-list .grow { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.gear-list .t { font-weight: 650; font-size: 14.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.gear-list .s { font-size: 13px; color: var(--text-2); line-height: 1.4; }
+.shop-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
+.shop-link { display: inline-flex; align-items: center; min-height: 30px; padding: 3px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--action) 45%, transparent); color: var(--action); background: var(--action-soft); font-size: 12px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+.shop-link::after { content: "↗"; margin-left: 4px; font-size: 11px; opacity: 0.8; }
+.buy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .tie-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .tie-steps button { width: 100%; display: flex; gap: 12px; align-items: flex-start; padding: 8px 6px; border-radius: var(--r-m); background: none; border: 0; color: var(--text-2); text-align: left; font-size: 14px; line-height: 1.45; }
 .tie-steps .n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--elev); color: var(--text-2); }

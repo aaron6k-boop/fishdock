@@ -10,6 +10,7 @@ import { monthsText, ukMonth } from "../lib/time.js";
 import TodayCard from "./TodayCard.jsx";
 import SpeciesSheet from "./SpeciesSheet.jsx";
 import { RigSheet } from "../pages/Tackle.jsx";
+import GearCard from "./GearCard.jsx";
 import { Sheet, Notice, Sources, Icon, Seg } from "./ui.jsx";
 import { HookGlyph, RigDiagram } from "./art.jsx";
 import FishPhoto, { useFishInfo, AboutFish } from "./FishPhoto.jsx";
@@ -107,6 +108,8 @@ export default function AdviceSheet({ species: sp, spot, row = null, onClose }) 
         {a.line ? <p className="small"><b>Line:</b> {a.line}</p> : null}
         {a.weight ? <p className="small"><b>Lead or float:</b> {a.weight}</p> : null}
       </section>
+
+      <GearCard species={sp} advice={a} />
 
       <section className="card">
         <h2 className="h2">Where to cast</h2>
