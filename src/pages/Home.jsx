@@ -224,7 +224,7 @@ export default function Home() {
       {sheet === "how" ? <HowSheet day={day} kind={place.kind} onClose={() => setSheet(null)} /> : null}
       {sheet === "catch" ? (
         <Sheet title="What can I catch here?" aside={`${place.name}, ${fmtDay(dayStart).split(" ").slice(1).join(" ")}`} onClose={() => setSheet(null)}>
-          <p className="small muted">Ordered by the strength of the evidence, then by season. FishDock never says a fish is at an exact spot.</p>
+          <p className="small muted">In season now first, then by the strength of the evidence. FishDock never says a fish is at an exact spot.</p>
           <div className="legend">{Object.entries(LEVELS).map(([k, v]) => <span key={k} className={`lvl lvl-${k}`}>{v.label}</span>)}</div>
           <CatchList rows={here} onOpen={(sp) => setSheet({ advice: sp })} />
         </Sheet>

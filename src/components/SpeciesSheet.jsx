@@ -13,7 +13,7 @@ import { Sheet, MonthStrip, Sources, Notice, Icon } from "./ui.jsx";
 import { FishArt, HookGlyph, WaterColumn } from "./art.jsx";
 import FishPhoto, { useFishInfo, AboutFish } from "./FishPhoto.jsx";
 
-export default function SpeciesSheet({ species: sp, onClose }) {
+export default function SpeciesSheet({ species: sp, onClose, onPicked }) {
   const { go, nation, place } = useApp();
   useEffect(() => { track(`species_view:${sp.id}`); }, [sp.id]);
   const month = ukMonth(Date.now());
@@ -40,7 +40,7 @@ export default function SpeciesSheet({ species: sp, onClose }) {
         {sp.depth ? <p className="small"><b>Depth:</b> {sp.depth}</p> : null}
         {sp.behaviour ? <p className="small"><b>Feeding:</b> {sp.behaviour}</p> : null}
       </section>
-      <WhereToCatch sp={sp} onClose={onClose} />
+      <WhereToCatch sp={sp} onClose={onPicked || onClose} />
       <Guides sp={sp} />
       <section className="card">
         <div className="card-h"><h2>Bait, hooks and presentation</h2></div>
@@ -58,7 +58,7 @@ export default function SpeciesSheet({ species: sp, onClose }) {
         {sp.idTip ? <p className="small">{sp.idTip}</p> : null}
         {sp.lookalikes ? <p className="small muted"><b>Don't confuse with:</b> {sp.lookalikes}</p> : null}
         <a className="btn small" href={`https://species.nbnatlas.org/search?q=${encodeURIComponent(sp.latin || sp.name)}`} target="_blank" rel="noopener noreferrer">Photos and UK records on NBN Atlas</a>
-        <p className="tiny">The picture above is an illustration. Use photos and records from NBN Atlas to confirm an ID.</p>
+        <p className="tiny">{info?.photo ? "Check the photo against the ID notes: colours vary with size, season and water." : "The picture above is an illustration. Use photos and records from NBN Atlas to confirm an ID."}</p>
       </section>
       {legal.length || sp.conservation ? (
         <section className="card">

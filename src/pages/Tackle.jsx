@@ -158,7 +158,7 @@ function Advisor({ water, initialSpecies }) {
 
             <section className="acard hook">
               <span className="eyebrow">2 · Hook</span>
-              <div className="hook-row"><HookGlyph size={hookFirst} /><div><b className="big">{a.hook.range ? `Size ${a.hook.range}` : "Not sourced"}</b><span>{a.hook.pattern}</span></div></div>
+              <div className="hook-row"><HookGlyph size={hookFirst} /><div><b className="big">{a.hook.range ? `Size ${a.hook.range}` : "Not sourced for this fish"}</b><span>{a.hook.pattern}</span></div></div>
               {a.hook.size ? <p className="small">{a.hook.size}</p> : null}
               {a.hook.why ? <p className="small muted">{a.hook.why}</p> : null}
               {a.hook.barbless ? <p className="small"><b>Barbless:</b> {a.hook.barbless}</p> : null}

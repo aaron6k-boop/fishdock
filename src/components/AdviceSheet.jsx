@@ -82,7 +82,8 @@ export default function AdviceSheet({ species: sp, spot, row = null, onClose }) 
 
       <section className="card">
         <h2 className="h2">Best bait</h2>
-        {a.bait.primary ? <p><b className="big">{a.bait.primary.name}</b>{a.bait.primary.note ? <span className="small muted"> · {a.bait.primary.note}</span> : null}</p> : <p className="small muted">No sourced bait list yet for this fish.</p>}
+        {a.bait.primary ? <p><b className="big">{a.bait.primary.name}</b>{a.bait.primary.note ? <span className="small muted"> · {a.bait.primary.note}</span> : null}</p>
+          : a.bait.artificial.length ? <p className="small"><b>Usually caught on lures or flies:</b></p> : <p className="small muted">No sourced bait list yet for this fish.</p>}
         {a.bait.size ? <p className="small"><b>How much:</b> {a.bait.size}</p> : null}
         {a.bait.prep ? <p className="small"><b>How to hook it:</b> {a.bait.prep}</p> : null}
         {a.bait.alternatives.length ? <div className="chips">{a.bait.alternatives.map((b) => <span key={b.name} className="chip">{b.name}</span>)}</div> : null}
@@ -91,7 +92,8 @@ export default function AdviceSheet({ species: sp, spot, row = null, onClose }) 
 
       <section className="card">
         <h2 className="h2">Hook and rig</h2>
-        <div className="hook-row"><HookGlyph size={hookFirst || ""} /><div><b className="big">{a.hook.range ? `Size ${a.hook.range}` : "Hook size not sourced"}</b><span>{a.hook.pattern || (a.hook.range ? "" : "Follow the rig's own guide below")}</span></div></div>
+        <div className="hook-row"><HookGlyph size={hookFirst || ""} /><div><b className="big">{a.hook.range ? `Size ${a.hook.range}` : "Hook size not sourced"}</b><span>{a.hook.pattern || (a.hook.range ? "" : "No source gives a size for this fish")}</span></div></div>
+        {a.hook.rigNote ? <p className="small muted"><b>The rig guide's sizes (for other fish):</b> {a.hook.rigNote}</p> : null}
         {a.hook.size ? <p className="small"><b>{cond.size === "specimen" ? "For big fish" : "For typical fish"}:</b> {a.hook.size}</p> : cond.size === "specimen" ? <p className="small muted">No separate big-fish hook advice in the sources for this fish: go up a size with a bigger bait.</p> : null}
         {a.hook.why ? <p className="small muted">{a.hook.why}</p> : null}
         {a.hook.barbless ? <p className="small"><b>Barbless:</b> {a.hook.barbless}</p> : null}
@@ -133,7 +135,7 @@ export default function AdviceSheet({ species: sp, spot, row = null, onClose }) 
       <AboutFish info={info} />
       <button type="button" className="btn block" onClick={() => setProfile(true)}><Icon name="book" />Full {sp.name.toLowerCase()} profile</button>
       <Sources list={a.sources} />
-      {profile ? <SpeciesSheet species={sp} onClose={() => setProfile(false)} /> : null}
+      {profile ? <SpeciesSheet species={sp} onClose={() => setProfile(false)} onPicked={() => { setProfile(false); onClose(); }} /> : null}
       {rigOpen ? <RigSheet rig={rigOpen} onClose={() => setRigOpen(null)} /> : null}
     </Sheet>
   );

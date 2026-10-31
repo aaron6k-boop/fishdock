@@ -63,6 +63,27 @@ function pickRig(species, method, cond) {
 }
 
 /**
+ * A rig's hook note can cover several fish ("Bass in estuaries: 3/0–4/0. Conger: 6/0–8/0."). Only the part for this
+ * species counts as its hook size; a note naming other fish, or another fish in brackets, doesn't. Plain notes
+ * with no fish named ("12–8") apply to whatever the rig is for.
+ */
+export function hookFromRig(note, species) {
+  const text = String(note || "").trim();
+  if (!text || !species) return "";
+  const words = [species.name, species.id.replace(/-/g, " "), ...(species.name.split(/[ (]/).filter((w) => w.length > 3))].map((w) => w.toLowerCase());
+  const parts = text.split(/(?<=\.)\s+(?=[A-Z])/);
+  const named = parts.map((p) => p.match(/^([^:]{2,40}):\s*(.+?)\.?$/)).filter(Boolean);
+  if (named.length) {
+    const hit = named.find((m) => words.some((w) => m[1].toLowerCase().includes(w)));
+    return hit ? hit[2].trim() : "";
+  }
+  const bracket = text.match(/\(([a-z ]+)\)/i);
+  if (bracket && !words.some((w) => bracket[1].toLowerCase().includes(w)) && !/^pac$/i.test(bracket[1].trim())) return "";
+  if (/not given/i.test(text)) return "";
+  return text;
+}
+
+/**
  * Build advice. cond: { tide: "flooding"|"ebbing"|"slack"|"strong"|"", sea: "calm"|"moderate"|"rough"|"",
  * clarity: "clear"|"slight"|"coloured"|"very coloured", flow: "low"|"normal"|"high"|"", snags: "clean"|"snaggy", size: "average"|"specimen" }
  */
@@ -76,8 +97,10 @@ export function buildAdvice({ place, species, method, cond = {}, date = Date.now
   const tack = species.tackle?.[m] || {};
   const here = catchHere(place, month).find((r) => r.species.id === species.id) || null;
   const hooks = species.hooks || {};
+  const fromRig = hookFromRig(rig?.hook, species);
   const hook = {
-    range: tack.hook || hooks.range || rig?.hook || "",
+    range: tack.hook || hooks.range || fromRig || "",
+    rigNote: !(tack.hook || hooks.range || fromRig) && rig?.hook ? rig.hook : "",
     pattern: tack.pattern || hooks.pattern || "",
     why: hooks.why || "",
     size: cond.size === "specimen" ? (hooks.specimen || "") : (hooks.small || ""),

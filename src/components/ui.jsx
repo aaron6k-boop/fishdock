@@ -105,6 +105,7 @@ export function Tabs({ value, options, onChange, label }) {
 // Sheets can open on top of sheets (a species from a spot, say). The page behind stays locked until the last one
 // closes, whatever order React runs their clean-ups in.
 let openSheets = 0, savedOverflow = "";
+const sheetStack = []; let sheetSeq = 0; // Escape closes only the sheet on top
 function lockPage() {
   if (openSheets++ === 0) { savedOverflow = document.body.style.overflow; document.body.style.overflow = "hidden"; }
 }
@@ -120,12 +121,14 @@ export function Sheet({ title, onClose, children, wide, aside }) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") closeRef.current(); };
+    const myId = ++sheetSeq;
+    sheetStack.push(myId);
+    const onKey = (e) => { if (e.key === "Escape" && sheetStack[sheetStack.length - 1] === myId) { e.stopPropagation(); closeRef.current(); } };
     document.addEventListener("keydown", onKey);
     const prev = document.activeElement;
     ref.current?.focus();
     lockPage();
-    return () => { document.removeEventListener("keydown", onKey); unlockPage(); prev?.focus?.(); };
+    return () => { document.removeEventListener("keydown", onKey); const at = sheetStack.indexOf(myId); if (at >= 0) sheetStack.splice(at, 1); unlockPage(); prev?.focus?.(); };
   }, []);
   return (
     <div className="scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>

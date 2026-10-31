@@ -13,6 +13,9 @@ export const OVERLAYS = {
   seamarks: { label: "Sea marks (OpenSeaMap)", url: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png", attribution: "Sea marks © OpenSeaMap contributors", opacity: 1, note: "Buoys, beacons, harbour features. Community data." },
 };
 
+const NONE = []; // stable empty lists, so a parent re-render doesn't redraw every marker
+const textTip = (s) => { const el = document.createElement("span"); el.textContent = s; return el; }; // labels are text, never HTML
+
 const PIN_SVG = '<svg viewBox="0 0 34 42" aria-hidden="true"><path d="M17 40S3 27 3 17a14 14 0 0 1 28 0c0 10-14 23-14 23z" fill="currentColor" stroke="#fff" stroke-width="2.5"/><circle cx="17" cy="17" r="5" fill="#fff"/></svg>';
 
 /**
@@ -20,7 +23,7 @@ const PIN_SVG = '<svg viewBox="0 0 34 42" aria-hidden="true"><path d="M17 40S3 2
  * dropped: the pin being placed ({ lat, lon } or null); with onDrag it can be dragged. onTap(lat, lon): a tap on
  * open map (not on a marker). focus: { lat, lon, zoom, key } moves the map whenever key changes.
  */
-export default function MapView({ spots = [], marks = [], pins = [], dropped = null, center, zoom = 9, focus = null, onPick, onPickPin, onTap, onDrag, overlays, base = "map", onFail, hint, short = false, label = "Map of fishing marks" }) {
+export default function MapView({ spots = NONE, marks = NONE, pins = NONE, dropped = null, center, zoom = 9, focus = null, onPick, onPickPin, onTap, onDrag, overlays, base = "map", onFail, hint, short = false, label = "Map of fishing marks" }) {
   const el = useRef(null), map = useRef(null), tiles = useRef({}), pinLayer = useRef(null), meLayer = useRef(null);
   const app = useApp();
   const [me, setMe] = useState(null); // where the phone is, shown on this map only and never sent anywhere
@@ -73,13 +76,13 @@ export default function MapView({ spots = [], marks = [], pins = [], dropped = n
     const g = L.layerGroup();
     for (const s of spots) {
       const mk = L.circleMarker([s.lat, s.lon], { radius: 8, weight: 2, color: "#ffffff", fillColor: s.kind === "sea" ? "#3fb7e8" : "#45d3a0", fillOpacity: 0.95, bubblingMouseEvents: false });
-      mk.bindTooltip(s.name + (s.coordsVerified === false ? " (approximate)" : ""));
+      mk.bindTooltip(textTip(s.name + (s.coordsVerified === false ? " (approximate)" : "")));
       mk.on("click", () => cb.current.onPick?.(s));
       g.addLayer(mk);
     }
     for (const p of marks) {
       const mk = L.circleMarker([p.lat, p.lon], { radius: 5, weight: 2, color: "#ffc861", fillColor: "#1b1f24", fillOpacity: 1, bubblingMouseEvents: false });
-      mk.bindTooltip(`${p.label} (private)`);
+      mk.bindTooltip(textTip(`${p.label} (private)`));
       g.addLayer(mk);
     }
     if (L.divIcon) {

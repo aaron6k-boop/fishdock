@@ -135,7 +135,7 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
           {checking ? <p className="small muted"><Icon name="search" size={14} /> Checking the map…</p>
             : w && !showTypes ? (
               <div className="row between nowrap">
-                <span className="small"><b>{w.label}</b>{found?.kind && found.subtype === w.id ? <span className="muted"> · {found.sure === "low" ? "best guess" : "detected"} from OpenStreetMap</span>
+                <span className="small"><b>{w.label}</b>{found?.kind && found.subtype === w.id ? <span className="muted"> · {found.sure === "low" ? "best guess" : "detected"} from {found.source === "open-meteo-marine" ? "wave data" : "OpenStreetMap"}</span>
                   : found?.guess && waterById(water) && !found.kind ? <span className="muted"> · guessed from {found.guess.name} nearby</span> : null}</span>
                 <button type="button" className="linkbtn" onClick={() => setShowTypes(true)}>Change</button>
               </div>
@@ -176,7 +176,7 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
             </div>
           </section>
           <Notice kind="warn">A pin isn't a documented mark, and being on the map doesn't mean you may fish there. Check access, permits and byelaws.</Notice>
-          {found?.kind ? <p className="tiny">Water type: OpenStreetMap contributors (ODbL).</p> : null}
+          {found?.kind ? <p className="tiny">{found.attribution || "Water features © OpenStreetMap contributors (ODbL)"}</p> : null}
         </>
       ) : null}
       {species && spot ? <AdviceSheet species={species} spot={spot} row={here.find((r) => r.species.id === species.id)} onClose={() => setSpecies(null)} /> : null}

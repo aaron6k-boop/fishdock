@@ -83,12 +83,13 @@ export function autoTarget(place, month) {
   return (recorded.find((r) => r.inSeason === "peak") || recorded.find((r) => r.inSeason === "present") || list.find((r) => r.inSeason !== "out") || list[0])?.species || null;
 }
 
-const SUMMER = new Set([4, 5, 6, 7, 8, 9]);
+const SUMMER = new Set([4, 5, 6, 7, 8, 9]); // which half of the year a month is in, for ordering
+const HIGH_SUMMER = new Set([5, 6, 7, 8, 9]), WINTER = new Set([11, 12, 1, 2]); // March, April and October are in between
 /** "Summer", "Winter", "Summer and winter" or "All year", from a species' peak and present months. */
 export function seasonWord(species) {
   const peak = species?.peak || [], present = species?.present || [];
   if (present.length >= 12 && peak.length >= 8) return "All year";
-  const s = peak.filter((m) => SUMMER.has(m)).length, w = peak.length - s;
+  const s = peak.filter((m) => HIGH_SUMMER.has(m)).length, w = peak.filter((m) => WINTER.has(m)).length;
   if (s >= 2 && w >= 2) return "Summer and winter";
   if (!peak.length) return present.length >= 12 ? "All year" : "";
   return s >= w ? "Summer" : "Winter";

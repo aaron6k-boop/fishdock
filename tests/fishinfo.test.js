@@ -68,3 +68,19 @@ test("fishinfo: sea trout uses its own page; Commons failure still returns the t
   assert.equal(r.body.photo, null);
   assert.match(r.body.extract, /anadromous/);
 });
+
+test("fishinfo: a Commons outage isn't remembered; a broken file URL doesn't crash", async (t) => {
+  const s = setup();
+  let commonsUp = false;
+  const net = stubFetch(t, [
+    [/page\/summary\/Raja_clavata/, () => SUMMARY],
+    [/commons\.wikimedia\.org/, () => (commonsUp ? meta("CC BY 4.0") : new Response("down", { status: 503 }))],
+  ]);
+  const r1 = await s.call(handleFishInfo, "/api/fishinfo")("GET", "?id=thornback-ray");
+  assert.equal(r1.body.photo, null);
+  commonsUp = true;
+  const r2 = await s.call(handleFishInfo, "/api/fishinfo")("GET", "?id=thornback-ray");
+  assert.equal(r2.body.photo.licence, "CC BY 4.0", "the photo comes back once Commons answers");
+  assert.equal(net.count(/page\/summary/), 1, "the summary itself was kept");
+  assert.equal(commonsFile("https://upload.wikimedia.org/wikipedia/commons/4/4f/Bad%E0%A4%A.jpg"), null);
+});

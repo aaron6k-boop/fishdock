@@ -34,7 +34,7 @@ export default function Explore() {
 }
 
 function Spots() {
-  const { place, settings, preview, nav, say } = useApp();
+  const { place, settings, preview, nav, say, go } = useApp();
   const [kind, setKind] = useState("all");
   const [q, setQ] = useState("");
   const [view, setView] = useState(preview ? "sonar" : "map");
@@ -135,7 +135,7 @@ function Spots() {
         ))}</div>
         <p className="tiny">Marks come from published angling guides, clubs and councils. Being listed doesn't mean you may fish there: check access, permits and byelaws.</p>
       </section>
-      {open ? <SpotSheet s={open} onClose={() => setOpen(null)} /> : null}
+      {open ? <SpotSheet s={open} onClose={() => { setOpen(null); if (nav?.spot) go("explore"); }} /> : null}
       {pinOpen ? <PinSheet at={pinOpen.at} pin={pinOpen.pin} withMap={!pinOpen.tapped} onClose={() => { setPinOpen(null); setDrop(null); }} /> : null}
     </>
   );

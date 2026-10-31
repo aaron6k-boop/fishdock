@@ -4,15 +4,15 @@
 const stamp = (ms) => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 const esc = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/([,;])/g, "\\$1");
 function fold(line) {
-  const out = [];
-  let rest = line;
-  while (new TextEncoder().encode(rest).length > 75) {
-    let n = 75;
-    while (new TextEncoder().encode(rest.slice(0, n)).length > 75) n--;
-    out.push(rest.slice(0, n));
-    rest = " " + rest.slice(n);
+  // by whole characters (code points), so an emoji or accented letter is never cut in half
+  const enc = new TextEncoder(), out = [];
+  let cur = "", bytes = 0;
+  for (const ch of line) {
+    const b = enc.encode(ch).length;
+    if (bytes + b > 75) { out.push(cur); cur = " "; bytes = 1; }
+    cur += ch; bytes += b;
   }
-  out.push(rest);
+  out.push(cur);
   return out.join("\r\n");
 }
 

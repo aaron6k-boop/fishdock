@@ -67,7 +67,7 @@ export async function getWater(lat, lon) {
   if (PREVIEW) return { source: null, preview: true, kind: null };
   const key = `water:${lat.toFixed(4)},${lon.toFixed(4)}`;
   if (memo.has(key)) return memo.get(key).data;
-  const data = await getJSON(`/api/water?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`, { timeout: 16000 });
+  const data = await getJSON(`/api/water?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`, { timeout: 18000 });
   if (data.source) memo.set(key, { at: Date.now(), data });
   return data;
 }

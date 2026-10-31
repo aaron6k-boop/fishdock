@@ -120,3 +120,38 @@ test("your own catches count at a place: by mark, or within 1.5 km of the logged
   const rows2 = withMine([], new Map([["tope", { n: 1, last: 5 }]]), 7);
   assert.equal(rows2[0].level, "yours");
 });
+
+test("hooks from a rig's note: only this fish's size, never another fish's", async () => {
+  const { hookFromRig, buildAdvice } = await import("../src/lib/advisor.js");
+  const { speciesById } = await import("../src/data/species.js");
+  const { spotById } = await import("../src/data/spots.js");
+  assert.equal(hookFromRig("Bass in estuaries: 3/0–4/0. Conger: 6/0–8/0.", speciesById("eel")), "");
+  assert.equal(hookFromRig("Bass in estuaries: 3/0–4/0. Conger: 6/0–8/0.", speciesById("conger")), "6/0–8/0");
+  assert.equal(hookFromRig("Rudd: 12–10. Tench: 16–12.", speciesById("tench")), "16–12");
+  assert.equal(hookFromRig("12–8 (barbel)", speciesById("chub")), "");
+  assert.equal(hookFromRig("Semi-barbless trebles, sizes 4–6 (PAC)", speciesById("pike")), "Semi-barbless trebles, sizes 4–6 (PAC)");
+  assert.equal(hookFromRig("Not given in the rig guide. Grayling: 16–14.", speciesById("dace")), "");
+  // no advice anywhere shows another fish's hook size as this fish's headline
+  const southend = { ...spotById("southend-pier"), verified: true };
+  for (const id of ["dab", "coalfish", "lesser-spotted-dogfish", "garfish", "gurnard", "pouting", "eel"]) {
+    const a = buildAdvice({ place: southend, species: speciesById(id), method: "auto", cond: {} });
+    assert.doesNotMatch(a.hook.range, /bass|conger|cod|smoothhound|rudd|tench|roach|grayling|barbel/i, id);
+  }
+});
+
+test("season words: bass and thornback ray are summer fish, cod and pouting winter", async () => {
+  const { seasonWord } = await import("../src/lib/catchhere.js");
+  const { speciesById } = await import("../src/data/species.js");
+  for (const id of ["bass", "thornback-ray", "mackerel", "smoothhound"]) assert.equal(seasonWord(speciesById(id)), "Summer", id);
+  for (const id of ["cod", "whiting", "pouting"]) assert.equal(seasonWord(speciesById(id)), "Winter", id);
+});
+
+test("calendar lines fold without splitting an emoji", () => {
+  const t = icsEvent({ title: "Fishing 🎣🐟 at Gorleston South Pier with a long name ".repeat(3), start: 0, end: 3600e3, now: 0 });
+  assert.doesNotMatch(t, /�/);
+  for (const line of t.split("\r\n")) {
+    assert.ok(new TextEncoder().encode(line).length <= 75, line);
+    assert.equal(line, new TextDecoder().decode(new TextEncoder().encode(line)), "whole characters only");
+  }
+  assert.ok(t.replace(/\r\n /g, "").includes("🎣🐟"), "unfolding gives the emoji back");
+});

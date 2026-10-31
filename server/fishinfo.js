@@ -24,7 +24,8 @@ const FREE = /^(cc0( 1\.0)?|cc[- ]zero|public domain|pd(-[a-z0-9-]+)?|cc by(-sa)
 /** The Commons file name from an upload.wikimedia.org URL, or null if it isn't a Commons file. */
 export function commonsFile(url) {
   const m = String(url || "").match(/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/(?:thumb\/)?[0-9a-f]\/[0-9a-f]{2}\/([^/]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch { return null; }
 }
 
 const stripHtml = (s) => String(s || "").replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -32,7 +33,7 @@ const stripHtml = (s) => String(s || "").replace(/<[^>]*>/g, " ").replace(/&amp;
 /** Shapes the summary and the Commons metadata into the app's answer. Pure, so it's tested without the network. */
 export function shapeInfo(summary, meta) {
   const page = summary?.content_urls?.desktop?.page || null;
-  const extract = cleanText(summary?.extract || "", FISHINFO.extractMax) || null;
+  const extract = cleanText(String(summary?.extract || "").replace(/\s*\u2014\s*/g, ", "), FISHINFO.extractMax) || null; // no em dashes in the app
   let photo = null;
   const info = meta ? Object.values(meta?.query?.pages || {})[0]?.imageinfo?.[0] : null;
   const ext = info?.extmetadata || {};
@@ -63,20 +64,21 @@ export async function handleFishInfo(request, env, now = Date.now(), deps = {}) 
     const ctx = upstreamCtx(db, now, deps);
     const title = TITLE_OVERRIDES[sp.id] || sp.latin || sp.name;
     try {
-      const got = await cachedJson(ctx, `fishinfo1:${sp.id}`, FISHINFO.ttlMs, async () => {
-        const summary = await ctx.upstreamJson("wikipedia", `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, "_"))}?redirect=true`, { headers: { "user-agent": UA, "api-user-agent": UA } });
-        const file = commonsFile(summary?.originalimage?.source || summary?.thumbnail?.source);
-        let meta = null;
-        if (file) {
-          try {
-            meta = await ctx.upstreamJson("wikimedia-commons", `https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=${FISHINFO.thumbPx}&titles=${encodeURIComponent("File:" + file)}`, { headers: { "user-agent": UA, "api-user-agent": UA } });
-          } catch (e) {
-            if (!(e instanceof UpstreamError)) throw e; // no licence details: no photo, the text still comes back
-          }
+      // The summary and the photo's licence are kept separately: a Commons hiccup isn't remembered for a month.
+      const got = await cachedJson(ctx, `fishsum1:${sp.id}`, FISHINFO.ttlMs, async () =>
+        ctx.upstreamJson("wikipedia", `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, "_"))}?redirect=true`, { headers: { "user-agent": UA, "api-user-agent": UA } }));
+      const summary = got.value;
+      const file = commonsFile(summary?.originalimage?.source || summary?.thumbnail?.source);
+      let meta = null;
+      if (file) {
+        try {
+          meta = (await cachedJson(ctx, `fishimg1:${file}`, FISHINFO.ttlMs, async () =>
+            ctx.upstreamJson("wikimedia-commons", `https://commons.wikimedia.org/w/api.php?action=query&format=json&prop=imageinfo&iiprop=url%7Cextmetadata&iiurlwidth=${FISHINFO.thumbPx}&titles=${encodeURIComponent("File:" + file)}`, { headers: { "user-agent": UA, "api-user-agent": UA } }))).value;
+        } catch (e) {
+          if (!(e instanceof UpstreamError)) throw e; // no licence details: no photo this time, the text still comes back
         }
-        return shapeInfo(summary, meta);
-      });
-      return json({ ...got.value, id: sp.id, cached: got.cached });
+      }
+      return json({ ...shapeInfo(summary, meta), id: sp.id, cached: got.cached });
     } catch (e) {
       if (e instanceof UpstreamError) return err(502, "upstream", "Couldn't reach Wikipedia just now.");
       throw e;

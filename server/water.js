@@ -32,7 +32,7 @@ export const OVERPASS_URL = OVERPASS_URLS[0][1];
 // Overpass asks for a User-Agent that says who is calling and how to reach them.
 export const OVERPASS_UA = "FishDock/0.2 (+https://fishdock.aaron6k.workers.dev; UK fishing app)";
 export const ATTRIBUTION = "Water features © OpenStreetMap contributors (ODbL)";
-export const WATER = { riverM: 90, coastM: 1500, pierM: 60, shoreM: 150, tryMs: 4500 };
+export const WATER = { riverM: 90, coastM: 1500, pierM: 60, shoreM: 150, tryMs: 4000, seaCheckMs: 2500 };
 
 export function overpassQuery(lat, lon) {
   const p = `${lat.toFixed(4)},${lon.toFixed(4)}`;
@@ -137,7 +137,7 @@ export async function handleWater(request, env, now = Date.now(), deps = {}) {
     }
     // ---- fallback: is there sea here at all? ----
     try {
-      const m = await ctx.upstreamJson("open-meteo-marine", `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&hourly=wave_height&forecast_days=1`, { noDataStatuses: [400], timeoutMs: 5000 });
+      const m = await ctx.upstreamJson("open-meteo-marine", `https://marine-api.open-meteo.com/v1/marine?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&hourly=wave_height&forecast_days=1`, { noDataStatuses: [400], timeoutMs: WATER.seaCheckMs });
       const waves = (m?.hourly?.wave_height || []).filter((v) => typeof v === "number");
       if (waves.length) return json({ kind: "sea", subtype: "beach", name: null, sure: "low", source: "open-meteo-marine", attribution: "Sea check: Open-Meteo marine forecast (CC BY 4.0)" });
       return json({ kind: null, subtype: null, name: null, sure: "low", source: "open-meteo-marine", attribution: "Sea check: Open-Meteo marine forecast (CC BY 4.0)" });
