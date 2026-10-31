@@ -41,9 +41,10 @@ export function fmtClock(ms) {
 }
 
 export function hoursUntil(ms, now = Date.now()) {
-  const h = (ms - now) / 3600e3;
-  if (Math.abs(h) < 1) return `${Math.round(h * 60)} min`;
-  return `${h.toFixed(1).replace(/\.0$/, "")} h`;
+  const mins = Math.round(Math.abs(ms - now) / 60e3);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
 }
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

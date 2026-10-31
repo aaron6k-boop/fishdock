@@ -1,7 +1,7 @@
 // ---- Explore: documented marks on a map (or sonar when maps can't load), and the species guide ----
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../lib/store.js";
-import { SPOTS } from "../data/spots.js";
+import { SPOTS, spotById } from "../data/spots.js";
 import { SPECIES } from "../data/species.js";
 import { all } from "../lib/storage.js";
 import { catchHere, LEVELS } from "../lib/catchhere.js";
@@ -31,14 +31,15 @@ export default function Explore() {
 }
 
 function Spots() {
-  const { place, settings, preview } = useApp();
+  const { place, settings, preview, nav } = useApp();
   const [kind, setKind] = useState("all");
   const [q, setQ] = useState("");
   const [view, setView] = useState(preview ? "sonar" : "map");
   const [mapOk, setMapOk] = useState(!preview);
   const [overlays, setOverlays] = useState([]);
   const [base, setBase] = useState("map");
-  const [open, setOpen] = useState(null);
+  const [open, setOpen] = useState(() => (nav?.spot ? spotById(nav.spot) : null));
+  useEffect(() => { if (nav?.spot) setOpen(spotById(nav.spot)); }, [nav?.spot]);
   const [marks, setMarks] = useState([]);
   const [showMarks, setShowMarks] = useState(false);
   const [drop, setDrop] = useState(null);       // a pin dropped by tapping the map, not yet saved
@@ -80,7 +81,7 @@ function Spots() {
         <section className="card sonar-card">
           <div className="card-h"><h2>Around {place.name}</h2><span className="aside">by direction and distance</span></div>
           <Sonar center={place} spots={list.map((x) => x.s)} onPick={setOpen} selected={open?.id} />
-          <div className="row tiny"><span className="dotkey sea" /> Sea <span className="dotkey fresh" /> Freshwater{!mapOk ? " · Maps load on the deployed app" : ""}</div>
+          <div className="row tiny"><span className="dotkey sea" /> Sea <span className="dotkey fresh" /> Freshwater{!mapOk ? " · The map couldn't load here" : ""}</div>
         </section>
       ) : null}
       {view !== "map" || !mapOk ? (
@@ -125,11 +126,12 @@ export function SpotSheet({ s, onClose }) {
   const fav = settings.favourites.includes(s.id);
   return (
     <Sheet title={s.name} aside={`${s.region}, ${s.nation} · ${s.subtype || s.kind}`} onClose={onClose}>
-      <div className="row">
+      <div className="spot-actions">
         <button type="button" className="btn primary" onClick={() => { update({ placeId: s.id }); say(`Fishing at ${s.name}`); onClose(); go("home"); }}><Icon name="pin" />Fish here</button>
         <button type="button" className="btn" onClick={() => update((x) => ({ favourites: fav ? x.favourites.filter((i) => i !== s.id) : [...x.favourites, s.id] }))}><Icon name="star" />{fav ? "Saved" : "Save"}</button>
         <a className="btn" href={mapsLink(s.lat, s.lon)} target="_blank" rel="noopener noreferrer"><Icon name="route" />Directions</a>
       </div>
+      <button type="button" className="linkbtn share-link" onClick={() => shareSpot(s, say)}><Icon name="share" size={15} /> Share this mark</button>
       {s.coordsVerified === false ? <Notice kind="warn">Approximate position. Check the exact access point locally before you travel.</Notice> : null}
       {s.best ? <section className="card"><h2 className="h2">When it fishes best</h2><p className="small">{s.best}</p>{s.baits?.length ? <div className="chips">{s.baits.map((b) => <span key={b} className="chip">{b}</span>)}</div> : null}</section> : null}
       <TodayCard spot={s} here={here} />
@@ -146,6 +148,20 @@ export function SpotSheet({ s, onClose }) {
       {species ? <SpeciesSheet species={species} onClose={() => setSpecies(null)} /> : null}
     </Sheet>
   );
+}
+
+// Documented marks are public information, so they can be shared as a link that opens the mark in FishDock.
+async function shareSpot(s, say) {
+  const url = `${location.origin}/#spot/${s.id}`;
+  const fish = (s.species || []).slice(0, 4).map((x) => x.name).join(", ");
+  const text = `${s.name}, ${s.region}${fish ? `: ${fish}` : ""}. On FishDock:`;
+  try {
+    if (navigator.share) { await navigator.share({ title: s.name, text, url }); return; }
+    await navigator.clipboard.writeText(`${text} ${url}`);
+    say("Link copied");
+  } catch (e) {
+    if (e?.name !== "AbortError") say("Couldn't share from this browser");
+  }
 }
 
 function SpeciesGuide() {

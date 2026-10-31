@@ -52,7 +52,13 @@ class ScreenBoundary extends Component {
 
 function routeFromHash() {
   const h = (location.hash || "").replace(/^#\/?/, "");
+  if (/^spot\/[a-z0-9-]+$/.test(h)) return "explore";
   return ROUTES.has(h) ? h : "home";
+}
+/** A shared link to a documented mark (#spot/<id>) opens it in Explore. Only documented marks: pins are never shared. */
+function navFromHash() {
+  const m = (location.hash || "").match(/^#\/?spot\/([a-z0-9-]+)$/);
+  return m && spotById(m[1]) ? { spot: m[1] } : null;
 }
 
 export default function App() {
@@ -63,13 +69,13 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [live, setLive] = useState({ cond: null, tides: null, river: null, loading: false });
   const [session, setSession] = useState(activeSession());
-  const [nav, setNav] = useState(null); // optional payload for the next screen (e.g. species to open)
+  const [nav, setNav] = useState(navFromHash); // optional payload for the next screen (e.g. species or spot to open)
 
   useEffect(() => { applyTheme(settings.theme); saveSettings(settings); }, [settings]);
   useEffect(() => onSessionChange(() => setSession(activeSession())), []);
   useEffect(() => { restore().then(startSync); recoverSession(); }, []);
   useEffect(() => {
-    const on = () => setTab(routeFromHash());
+    const on = () => { setNav(navFromHash()); setTab(routeFromHash()); };
     addEventListener("hashchange", on);
     return () => removeEventListener("hashchange", on);
   }, []);

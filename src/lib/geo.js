@@ -52,6 +52,7 @@ export const areaSize = () => (UNIT === "km" ? "10 km" : "6 miles");
 /** A distance given in km, in the chosen unit. long: "12 miles" rather than "12 mi". Short distances in yards or metres. */
 export function fmtKm(km, long = false) {
   if (km == null || !Number.isFinite(km)) return "";
+  if (km < 0.03) return "here";
   if (UNIT === "km") {
     return km < 1 ? `${Math.round(km * 1000 / 10) * 10} m` : km < 10 ? `${+km.toFixed(1)} km` : `${Math.round(km)} km`;
   }

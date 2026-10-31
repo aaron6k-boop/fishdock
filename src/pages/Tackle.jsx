@@ -37,7 +37,7 @@ export default function Tackle() {
       {tab === "rigs" ? <RigLibrary water={water} /> : null}
       {tab === "knots" ? <KnotLibrary /> : null}
       {tab === "baits" ? <BaitLibrary water={water} /> : null}
-      {tab === "learn" ? <Lessons /> : null}
+      {tab === "learn" ? <Lessons water={water} /> : null}
     </main>
   );
 }
@@ -200,7 +200,8 @@ function Advisor({ water, initialSpecies }) {
 
             <section className="acard when">
               <span className="eyebrow">6 · When</span>
-              {day?.windows.length ? day.windows.map((w, i) => <p key={i} className="small"><b className="num">{fmtTime(w.start)}–{fmtTime(w.end)}</b> today, BiteScore {w.peak} ({band(w.peak).label})</p>) : <p className="small muted">No strong window today.</p>}
+              {day?.windows.some((w) => w.end > Date.now()) ? day.windows.filter((w) => w.end > Date.now()).map((w, i) => <p key={i} className="small"><b className="num">{fmtTime(w.start)}–{fmtTime(w.end)}</b> today, BiteScore {w.peak} ({band(w.peak).label})</p>)
+                : <p className="small muted">{day?.windows.length ? "Today's best windows have passed. Check tomorrow on Home." : "No strong window today."}</p>}
               {species.bestTimes ? <p className="small muted">{species.bestTimes}</p> : null}
             </section>
           </div>
@@ -258,7 +259,7 @@ export function ReportSheet({ refText, onClose, kind = "inaccurate-forecast" }) 
         setBusy(true);
         const r = await sendFeedback(kind, text.trim().slice(0, 2000), refText);
         setBusy(false);
-        if (r?.error) say(preview ? "Reports send from the deployed app, not the preview" : r.message || "Couldn't send. Try again later.");
+        if (r?.error) say(preview ? "Reports send from the full app, not the preview" : r.message || "Couldn't send. Try again later.");
         else { say("Thanks, report sent"); onClose(); }
       }}>Send report</button>
     </Sheet>
@@ -378,13 +379,13 @@ function BaitLibrary({ water }) {
 }
 
 // ---- Learn: short beginner lessons with a step-by-step reader ----
-function Lessons() {
+function Lessons({ water }) {
   const [open, setOpen] = useState(null);
   const [step, setStep] = useState(0);
   return (
     <>
       <div className="list card">
-        {LESSONS.map((l) => (
+        {LESSONS.filter((l) => !l.water || l.water === "both" || l.water === water).map((l) => (
           <button type="button" key={l.id} className="li" onClick={() => { setOpen(l); setStep(0); }}>
             <span className="fish-ico"><Icon name="book" /></span>
             <span className="grow"><span className="t">{l.title}</span><span className="s">{l.steps.length} steps · about {l.minutes} min</span></span>

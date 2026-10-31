@@ -299,3 +299,12 @@ details.conds[open] summary::before { content: "▾ "; }
 .water-switch button[aria-pressed="true"]:last-child { color: var(--action); }
 .guide-steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; line-height: 1.45; }
 .today-card .kv { margin-top: 2px; }
+.window.past { background: var(--elev); border-color: var(--line); opacity: .7; }
+.window.past b { text-decoration: line-through; text-decoration-thickness: 1px; }
+.spot-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.spot-actions .btn { padding: 0 8px; font-size: 13.5px; gap: 6px; min-width: 0; white-space: nowrap; }
+.spot-actions .btn svg { width: 16px; height: 16px; }
+.map-btn.two { top: 58px; }
+.map-btn.busy svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.share-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }

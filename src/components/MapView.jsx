@@ -1,5 +1,6 @@
 // ---- MapView: documented marks, depth shading and sea marks, plus the angler's private marks and pins (only on this phone) ----
 import { useEffect, useRef, useState } from "react";
+import { useApp } from "../lib/store.js";
 import { Icon } from "./ui.jsx";
 
 // Licensed layers only. Depth shading is coarse modelled bathymetry, not a chart: never for navigation.
@@ -20,7 +21,10 @@ const PIN_SVG = '<svg viewBox="0 0 34 42" aria-hidden="true"><path d="M17 40S3 2
  * open map (not on a marker). focus: { lat, lon, zoom, key } moves the map whenever key changes.
  */
 export default function MapView({ spots = [], marks = [], pins = [], dropped = null, center, zoom = 9, focus = null, onPick, onPickPin, onTap, onDrag, overlays, base = "map", onFail, hint, short = false, label = "Map of fishing marks" }) {
-  const el = useRef(null), map = useRef(null), tiles = useRef({}), pinLayer = useRef(null);
+  const el = useRef(null), map = useRef(null), tiles = useRef({}), pinLayer = useRef(null), meLayer = useRef(null);
+  const app = useApp();
+  const [me, setMe] = useState(null); // where the phone is, shown on this map only and never sent anywhere
+  const [locating, setLocating] = useState(false);
   const cb = useRef({});
   cb.current = { onPick, onPickPin, onTap, onDrag };
   const [failed, setFailed] = useState(false);
@@ -92,6 +96,33 @@ export default function MapView({ spots = [], marks = [], pins = [], dropped = n
     }
     pinLayer.current = g.addTo(m);
   }
+  // ---- where am I: a blue dot with its accuracy circle ----
+  function findMe() {
+    if (!("geolocation" in navigator)) { app?.say?.("This browser can't share its location"); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false);
+        const pt = { lat: p.coords.latitude, lon: p.coords.longitude, acc: Math.min(p.coords.accuracy || 0, 2000) };
+        setMe(pt);
+        map.current?.m.setView([pt.lat, pt.lon], Math.max(map.current.m.getZoom(), 14));
+      },
+      (e) => { setLocating(false); app?.say?.(e.code === 1 ? "Location is blocked. Allow it in your browser settings." : "Couldn't get a location fix"); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 20000 },
+    );
+  }
+  useEffect(() => {
+    const mm = map.current; if (!mm || !me) return;
+    const { L, m } = mm;
+    if (meLayer.current) m.removeLayer(meLayer.current);
+    const g = L.layerGroup();
+    if (me.acc > 15) g.addLayer(L.circle([me.lat, me.lon], { radius: me.acc, weight: 1, color: "#1d4ed8", fillColor: "#1d4ed8", fillOpacity: 0.1, interactive: false }));
+    const dot = L.circleMarker([me.lat, me.lon], { radius: 8, weight: 4, color: "#ffffff", fillColor: "#1d4ed8", fillOpacity: 1, bubblingMouseEvents: false });
+    dot.bindTooltip("You are here (only on this phone)");
+    g.addLayer(L.circleMarker([me.lat, me.lon], { radius: 13, weight: 0, fillColor: "#1d4ed8", fillOpacity: 0.25, interactive: false }));
+    g.addLayer(dot);
+    meLayer.current = g.addTo(m);
+  }, [me]);
   useEffect(() => { drawTiles(); }, [overlays, base]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { drawPins(); }, [spots, marks, pins, dropped?.lat, dropped?.lon]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { map.current?.m.setView([center.lat, center.lon], map.current.m.getZoom()); }, [center.lat, center.lon]);
@@ -102,7 +133,8 @@ export default function MapView({ spots = [], marks = [], pins = [], dropped = n
     <div className="map-wrap">
       <div ref={el} className={`map${short ? " short" : ""}`} role="application" aria-label={label} />
       {hint ? <div className="map-hint" aria-hidden="true"><span>{hint}</span></div> : null}
-      <button type="button" className="map-btn" onClick={() => map.current?.m.setView([center.lat, center.lon], 11)} aria-label="Centre on your place"><Icon name="locate" /></button>
+      <button type="button" className={`map-btn${locating ? " busy" : ""}`} onClick={findMe} aria-label="Show where I am" title="Show where I am"><Icon name="locate" /></button>
+      <button type="button" className="map-btn two" onClick={() => map.current?.m.setView([center.lat, center.lon], 11)} aria-label="Back to your fishing place" title="Back to your fishing place"><Icon name="pin" /></button>
     </div>
   );
 }

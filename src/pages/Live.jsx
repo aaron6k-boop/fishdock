@@ -295,7 +295,7 @@ function SmartBite({ onClose }) {
       setState("on");
     } catch (e) {
       setState("error");
-      setMsg(e?.name === "NotAllowedError" ? `${mode === "rod" ? "Camera" : "Microphone"} permission was refused. Allow it in your browser settings to try Smart Bite.` : preview ? "The preview can't use the camera or microphone. Smart Bite works on the deployed app." : "Couldn't start. Close other apps using the camera or microphone and try again.");
+      setMsg(e?.name === "NotAllowedError" ? `${mode === "rod" ? "Camera" : "Microphone"} permission was refused. Allow it in your browser settings to try Smart Bite.` : preview ? "The preview can't use the camera or microphone. Smart Bite works in the full app." : "Couldn't start. Close other apps using the camera or microphone and try again.");
     }
   }
 

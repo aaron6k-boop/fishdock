@@ -23,8 +23,9 @@ function Row({ r, onOpen }) {
   const sp = r.species;
   const word = seasonWord(sp);
   const months = sp.peak?.length ? `best ${monthsText(sp.peak)}` : sp.present?.length ? monthsText(sp.present) : "";
-  // the source's own note (say "Dover sole in summer"), unless it only repeats the season
-  const note = r.note && !/^(summer|winter|spring|autumn)\.?$/i.test(r.note.trim()) ? r.note : r.level === "occasional" || r.level === "possible" ? r.reason : "";
+  // the source's own note for this mark (say "Dover sole in summer"); a bare season becomes "At this mark: summer"
+  const bare = r.note && /^(summer|winter|spring|autumn|spring to autumn|autumn and winter|summer and autumn)\.?$/i.test(r.note.trim());
+  const note = r.note ? (bare ? `At this mark: ${r.note.trim().replace(/\.$/, "").toLowerCase()}` : r.note) : r.level === "occasional" || r.level === "possible" ? r.reason : "";
   return (
     <button type="button" className="li" onClick={() => onOpen?.(sp)}>
       <span className={`fish-ico ${sp.type === "sea" ? "" : "fresh"}`}><FishArt art={sp.art} size={40} /></span>

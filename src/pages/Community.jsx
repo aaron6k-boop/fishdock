@@ -37,7 +37,7 @@ export default function Community() {
         {(trending.length ? trending.map(([id]) => id) : ["bass", "cod", "carp", "pike", "barbel"]).map((id) => <button key={id} type="button" className="chip" aria-pressed={species === id} onClick={() => setSpecies(id)}>{speciesById(id)?.name || id}</button>)}
       </div>
       {PREVIEW ? <Notice>Community runs on FishDock's server, so it's empty in this preview. Nothing here is made up: once the app is deployed, real posts appear.</Notice> : null}
-      {!PREVIEW && !accountsEnabled() ? <Notice kind="warn">Accounts aren't switched on yet, so you can read but not post. (FishDock needs its own sign-in project before launch.)</Notice> : null}
+      {!PREVIEW && !accountsEnabled() ? <Notice kind="warn">Posting needs an account, and accounts aren't available yet. You can still read everything here.</Notice> : null}
       {!PREVIEW && accountsEnabled() && !user ? <button type="button" className="btn block" onClick={async () => { const r = await signIn(); if (r.error) say("Sign-in didn't complete"); }}><Icon name="users" />Sign in to post, follow and reply</button> : null}
       {feed.error && !PREVIEW ? <Notice kind="warn">{feed.error.message}</Notice> : null}
       {!feed.loading && !feed.posts.length && !feed.error ? <Empty icon="users" title="No posts yet">Be the first to share a catch or a report from your area.</Empty> : null}

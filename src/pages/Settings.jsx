@@ -10,13 +10,14 @@ import { areaSize } from "../lib/geo.js";
 import { Icon, Seg, Sheet, Notice, Beta } from "../components/ui.jsx";
 
 const SOURCES = [
-  ["Weather and sea state", "Open-Meteo forecast and marine APIs (CC BY 4.0)", "https://open-meteo.com/", "Live on the deployed app"],
+  ["Weather and sea state", "Open-Meteo forecast and marine APIs (CC BY 4.0)", "https://open-meteo.com/", "Live"],
   ["Tide predictions", "Admiralty UK Tidal API (UK Hydrographic Office)", "https://admiraltyapi.portal.azure-api.net/", "Needs an API key on the server"],
   ["Tide estimate (fallback)", "On-phone lunar model calibrated on published high-water times", null, "Always available, labelled as an estimate"],
   ["River levels and flood warnings", "Environment Agency real-time flood-monitoring API (Open Government Licence)", "https://environment.data.gov.uk/flood-monitoring/doc/reference", "England only for now"],
   ["Depth shading", "EMODnet Bathymetry (coarse modelled grid)", "https://emodnet.ec.europa.eu/en/bathymetry", "Not for navigation"],
   ["Sea marks", "OpenSeaMap (ODbL / CC BY-SA)", "https://openseamap.org/", ""],
   ["Base maps", "OpenStreetMap contributors; Esri World Imagery", "https://www.openstreetmap.org/copyright", ""],
+  ["Water type when you tap the map", "OpenStreetMap data through the Overpass API (ODbL)", "https://wiki.openstreetmap.org/wiki/Overpass_API", "The tapped point is sent without anything about you, and not stored"],
   ["Species records and photos", "NBN Atlas (linked, not copied)", "https://nbnatlas.org/", ""],
   ["Rules and licences", `GOV.UK, Environment Agency, Natural Resources Wales, Scottish Government, DAERA, MMO and IFCAs (checked ${RULES_CHECKED})`, "https://www.gov.uk/freshwater-rod-fishing-rules", ""],
   ["Fishing marks and tackle", "Published angling guides, clubs and councils, cited on each mark, rig and species", null, ""],
@@ -37,8 +38,8 @@ export default function Settings() {
 
       <section className="card">
         <h2 className="h2">Account</h2>
-        {PREVIEW ? <p className="small muted">This is the phone preview. Everything runs on your phone as a guest; accounts and backup come with the deployed app.</p>
-          : !accountsEnabled() ? <p className="small muted">You're using FishDock as a guest. Accounts and backup switch on once FishDock's own sign-in project is set up.</p>
+        {PREVIEW ? <p className="small muted">This is the phone preview. Everything runs on your phone as a guest; accounts and backup need the full app.</p>
+          : !accountsEnabled() ? <p className="small muted">You're using FishDock as a guest, and everything stays on this phone. Accounts and backup aren't available yet.</p>
             : user ? (<><p className="small">Signed in as <b>{user.email}</b>.</p><button type="button" className="btn small" onClick={signOut}>Sign out</button></>)
               : (<><p className="small muted">Guest mode: everything stays on this phone. Sign in to back up your catches and sessions privately, and to post in Community.</p><button type="button" className="btn primary small" onClick={async () => { const r = await signIn(); if (r.error) say("Sign-in didn't complete"); }}>Sign in with Google</button></>)}
       </section>

@@ -29,7 +29,7 @@ export default function IdentifySheet({ onClose, onPick }) {
 
   return (
     <Sheet title="Identify a fish" aside={<>AI identification <Beta /></>} onClose={onClose}>
-      {!can ? <Notice kind="warn">AI identification isn't available here. In the preview it needs your permission to use Claude; on the deployed app it uses FishDock's server.</Notice> : null}
+      {!can ? <Notice kind="warn">AI identification isn't available here. In the preview it needs your permission to use Claude; the full app uses FishDock's server.</Notice> : null}
       <p className="small muted">Photograph the whole fish side-on, in good light, on a wet mat. Keep it brief and get the fish back in the water.</p>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={choose} id="id-photo" />
       <button type="button" className="btn primary block" onClick={() => fileRef.current?.click()} disabled={busy}><Icon name="camera" />{img ? "Try another photo" : "Take or choose a photo"}</button>

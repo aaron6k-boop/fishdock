@@ -6,6 +6,7 @@ import { biteDay, band, biteProfile } from "../lib/bitescore.js";
 import { tideModel, tideWindows } from "../lib/tides.js";
 import { autoTarget } from "../lib/catchhere.js";
 import { getConditions, getTides } from "../lib/api.js";
+import RemindButton from "./RemindButton.jsx";
 import { ukDayStart, ukMonth, fmtTime, fmtShortDay, monthsText } from "../lib/time.js";
 
 const PREF_WORDS = { flood: "on the flood (low to high water)", ebb: "on the ebb (high to low water)", high: "around high water", low: "around low water", moving: "while the tide is moving" };
@@ -59,9 +60,11 @@ export default function TodayCard({ spot, here }) {
       {showDay?.windows.length ? (
         <div className="windows">{showDay.windows.map((x, i) => <div className="window" key={i}><b>{fmtTime(x.start)}–{fmtTime(x.end)}</b><span>Peak {x.peak}, {band(x.peak).label}</span></div>)}</div>
       ) : <p className="small muted">No stand-out window in the next two days.</p>}
+      {showDay?.best ? <div className="row"><RemindButton win={showDay.best} where={spot.name} species={target.name} /><span className="tiny">Adds the best window to your calendar</span></div> : null}
       <div className="kv">
         {next24.map((e, i) => <div key={i}><span className="k">{e.type === "HW" ? "High water" : "Low water"}</span><span className="v">{fmtTime(e.t)}{dayTag(e.t, dayStart)}</span></div>)}
         <div><span className="k">First light</span><span className="v">{fmtTime(sun.dawn)}</span></div>
+        <div><span className="k">Sunrise</span><span className="v">{fmtTime(sun.sunrise)}</span></div>
         <div><span className="k">Sunset</span><span className="v">{fmtTime(sun.sunset)}</span></div>
         <div><span className="k">Last light</span><span className="v">{fmtTime(sun.dusk)}</span></div>
       </div>

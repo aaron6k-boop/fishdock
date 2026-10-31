@@ -15,6 +15,8 @@ import Waterscape from "../components/Waterscape.jsx";
 import SpeciesSheet from "../components/SpeciesSheet.jsx";
 import IdentifySheet from "../components/IdentifySheet.jsx";
 import Checklist from "../components/Checklist.jsx";
+import CatchList from "../components/CatchList.jsx";
+import RemindButton from "../components/RemindButton.jsx";
 
 export default function Home() {
   const app = useApp();
@@ -99,12 +101,14 @@ export default function Home() {
           ) : null}
           {day?.windows.length ? (
             <div className="windows">
-              {day.windows.map((w, i) => (
-                <div className="window" key={i}><b>{fmtTime(w.start)}–{fmtTime(w.end)}</b><span>Peak {w.peak}{band(w.peak).label ? `, ${band(w.peak).label}` : ""}</span></div>
-              ))}
+              {day.windows.map((w, i) => {
+                const past = dayOffset === 0 && w.end <= now;
+                return <div className={`window${past ? " past" : ""}`} key={i}><b>{fmtTime(w.start)}–{fmtTime(w.end)}</b><span>{past ? "Earlier today" : `Peak ${w.peak}${band(w.peak).label ? `, ${band(w.peak).label}` : ""}`}</span></div>;
+              })}
             </div>
           ) : null}
-          {day?.missing.length ? <p className="tiny">Not included: {day.missing.join(", ")}{app.preview ? " (live data connects on the deployed app)" : ""}. Those count as average.</p> : null}
+          {nextWin && nextWin.end > now ? <div className="row"><RemindButton win={nextWin} where={place.name} species={target?.name} /><span className="tiny">Best window {fmtTime(nextWin.start)}–{fmtTime(nextWin.end)} to your calendar</span></div> : null}
+          {day?.missing.length ? <p className="tiny">Not included: {day.missing.join(", ")}{app.preview ? " (live data needs the full app)" : ""}. Those count as average.</p> : null}
         </section>
 
         {week.length ? (
@@ -182,9 +186,7 @@ export default function Home() {
 
         <section className="card">
           <div className="card-h"><h2>What can I catch here?</h2><button type="button" className="linkbtn" onClick={() => setSheet("catch")}>All {here.length}</button></div>
-          <div className="list">
-            {here.slice(0, 5).map((r) => <CatchRow key={r.species.id} r={r} onOpen={() => setSheet({ species: r.species })} />)}
-          </div>
+          <CatchList rows={here} limit={5} onOpen={(sp) => setSheet({ species: sp })} />
         </section>
 
         {!place.verified ? (
@@ -218,7 +220,7 @@ export default function Home() {
         <Sheet title="What can I catch here?" aside={`${place.name}, ${fmtDay(dayStart).split(" ").slice(1).join(" ")}`} onClose={() => setSheet(null)}>
           <p className="small muted">Ordered by the strength of the evidence, then by season. FishDock never says a fish is at an exact spot.</p>
           <div className="legend">{Object.entries(LEVELS).map(([k, v]) => <span key={k} className={`lvl lvl-${k}`}>{v.label}</span>)}</div>
-          <div className="list">{here.map((r) => <CatchRow key={r.species.id} r={r} onOpen={() => setSheet({ species: r.species })} />)}</div>
+          <CatchList rows={here} onOpen={(sp) => setSheet({ species: sp })} />
         </Sheet>
       ) : null}
       {sheet === "target" ? (
@@ -241,22 +243,6 @@ export default function Home() {
   );
 }
 
-function CatchRow({ r, onOpen }) {
-  return (
-    <button type="button" className="li" onClick={onOpen}>
-      <span className={`fish-ico ${r.species.type === "sea" ? "" : "fresh"}`}><FishArt art={r.species.art} size={40} /></span>
-      <span className="grow">
-        <span className="t">{r.species.name}</span>
-        <span className="s">{r.note || r.reason}</span>
-      </span>
-      <span className="end">
-        <span className={`lvl lvl-${r.level}`}>{LEVELS[r.level].short}</span>
-        <span className={`tiny season-${r.inSeason}`}>{r.inSeason === "peak" ? "Peak now" : r.inSeason === "present" ? "In season" : "Out of season"}</span>
-      </span>
-    </button>
-  );
-}
-
 function ConditionsCard({ place, live, c, manual, onEdit, preview }) {
   const src = live.cond?.source;
   return (
@@ -273,7 +259,7 @@ function ConditionsCard({ place, live, c, manual, onEdit, preview }) {
           {c.label ? <div><span className="k">Your notes</span><span className="v">{c.label}</span></div> : null}
         </div>
       ) : (
-        <p className="small muted">{preview ? "Live weather and sea state connect on the deployed app (Open-Meteo, through FishDock's server). In this preview you can enter what you see." : live.cond?.message || "Loading the forecast…"}</p>
+        <p className="small muted">{preview ? "Live weather and sea state need the full app (Open-Meteo, through FishDock's server). In this preview you can enter what you see." : live.cond?.message || "Loading the forecast…"}</p>
       )}
       {c?.windKph > 45 || c?.gustKph > 65 ? <Notice kind="danger"><b>Storm-force wind.</b> Stay off exposed rocks, piers and steep shingle. Big waves arrive without warning.</Notice> : null}
       {place.kind === "sea" && c?.waveM > 2.5 ? <Notice kind="danger"><b>Big sea.</b> Waves over 2.5 m: rock marks and low breakwaters are dangerous today.</Notice> : null}
