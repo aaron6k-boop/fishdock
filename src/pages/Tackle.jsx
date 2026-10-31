@@ -12,38 +12,58 @@ import { RIGS, rigById } from "../data/rigs.js";
 import { KNOTS } from "../data/knots.js";
 import { BAITS } from "../data/baits.js";
 import { LESSONS } from "../data/lessons.js";
+import { WATERS, waterById } from "../lib/pins.js";
 import { Icon, Tabs, Seg, Sheet, Notice, Sources } from "../components/ui.jsx";
 import { FishArt, HookGlyph, RigDiagram, WaterColumn } from "../components/art.jsx";
 
 const VER = { verified: "Sourced", partial: "Partly sourced", unverified: "General guidance" };
 
 export default function Tackle() {
-  const { nav } = useApp();
+  const { nav, place } = useApp();
   const [tab, setTab] = useState("advisor");
+  // Sea or freshwater for the whole page: starts from the species asked for, else the current place
+  const navType = nav?.species ? SPECIES.find((s) => s.id === nav.species)?.type : null;
+  const [water, setWater] = useState(navType === "sea" || navType === "fresh" ? navType : place.kind === "sea" ? "sea" : "fresh");
   return (
     <main className="col">
       <div className="page-head"><h1>Bait & Rigs</h1></div>
+      <div className="water-switch" role="group" aria-label="Sea or freshwater">
+        {[["sea", "Sea", "wave"], ["fresh", "Freshwater", "river"]].map(([v, l, ic]) => (
+          <button key={v} type="button" aria-pressed={water === v} onClick={() => setWater(v)}><Icon name={ic} />{l}</button>
+        ))}
+      </div>
       <Tabs label="Bait and rigs sections" value={tab} onChange={setTab} options={[{ value: "advisor", label: "Advisor" }, { value: "rigs", label: "Rigs" }, { value: "knots", label: "Knots" }, { value: "baits", label: "Baits" }, { value: "learn", label: "Learn" }]} />
-      {tab === "advisor" ? <Advisor initialSpecies={nav?.species} /> : null}
-      {tab === "rigs" ? <RigLibrary /> : null}
+      {tab === "advisor" ? <Advisor key={water} water={water} initialSpecies={nav?.species} /> : null}
+      {tab === "rigs" ? <RigLibrary water={water} /> : null}
       {tab === "knots" ? <KnotLibrary /> : null}
-      {tab === "baits" ? <BaitLibrary /> : null}
+      {tab === "baits" ? <BaitLibrary water={water} /> : null}
       {tab === "learn" ? <Lessons /> : null}
     </main>
   );
 }
 
 // ---- Advisor ----
-function Advisor({ initialSpecies }) {
-  const { place, nation, tide, live, settings, update, say, openPicker } = useApp();
+function Advisor({ water, initialSpecies }) {
+  const { place: current, nation, tide: currentTide, live: currentLive, settings, update, say, openPicker } = useApp();
   const month = ukMonth(Date.now());
+  // Your place when it matches the switch; otherwise general advice for a chosen water type near you
+  const matches = (current.kind === "sea") === (water === "sea");
+  const [generic, setGeneric] = useState(water === "sea" ? "beach" : "river");
+  const place = useMemo(() => {
+    if (matches) return current;
+    const w = waterById(generic);
+    return { id: `any-${w.id}`, name: `Any ${w.label.toLowerCase()}`, lat: current.lat, lon: current.lon, nation: current.nation, kind: w.kind, subtype: w.id, verified: false, generic: true };
+  }, [matches, current, generic]);
+  const tide = matches ? currentTide : null;
+  const live = matches ? currentLive : {};
   const sea = place.kind === "sea";
   const here = useMemo(() => catchHere(place, month), [place, month]);
   const pool = useMemo(() => {
     const ids = new Set(here.map((r) => r.species.id));
     return [...here.map((r) => r.species), ...SPECIES.filter((s) => !ids.has(s.id) && (sea ? s.type !== "fresh" : s.type !== "sea"))];
   }, [here, sea]);
-  const [sid, setSid] = useState(initialSpecies || (settings.target !== "auto" ? settings.target : autoTarget(place, month)?.id) || pool[0]?.id);
+  const fits = (id) => pool.some((s) => s.id === id);
+  const [sid, setSid] = useState([initialSpecies, settings.target !== "auto" ? settings.target : null, autoTarget(place, month)?.id].find((id) => id && fits(id)) || pool[0]?.id);
   const species = SPECIES.find((s) => s.id === sid) || pool[0];
   const methods = species ? methodsFor(species, place) : [];
   const [method, setMethod] = useState("auto");
@@ -74,11 +94,18 @@ function Advisor({ initialSpecies }) {
   return (
     <>
       <section className="card">
-        <div className="card-h"><h2>Your session</h2><button type="button" className="linkbtn" onClick={openPicker}>Change place</button></div>
-        <button type="button" className="li" onClick={openPicker}><Icon name="pin" /><span className="grow"><span className="t">{place.name}</span><span className="s">{place.region || "Your location"} · {sea ? "Sea" : place.kind}</span></span><Icon name="chevron" className="go" /></button>
+        <div className="card-h"><h2>{matches ? "Your session" : "Where you'll fish"}</h2><button type="button" className="linkbtn" onClick={openPicker}>Change place</button></div>
+        {matches ? (
+          <button type="button" className="li" onClick={openPicker}><Icon name="pin" /><span className="grow"><span className="t">{place.name}</span><span className="s">{place.region || "Your location"} · {sea ? "Sea" : place.kind}</span></span><Icon name="chevron" className="go" /></button>
+        ) : (
+          <>
+            <Seg label="Water type" value={generic} onChange={(v) => setGeneric(v)} options={WATERS.filter((w) => (w.kind === "sea") === sea).map((w) => ({ value: w.id, label: w.label }))} />
+            <p className="tiny">General {sea ? "sea" : "freshwater"} advice. {current.name} is {current.kind === "sea" ? "a sea mark" : "freshwater"}, so pick a {sea ? "sea" : "freshwater"} place for local detail, tides and live conditions.</p>
+          </>
+        )}
         <span className="eyebrow">Target fish</span>
         <div className="species-picker" role="group" aria-label="Target species">
-          {pool.slice(0, 18).map((s) => {
+          {pool.slice(0, 30).map((s) => {
             const r = here.find((x) => x.species.id === s.id);
             return (
               <button type="button" key={s.id} aria-pressed={s.id === species.id} onClick={() => setSid(s.id)} className="sp-chip">
@@ -109,7 +136,8 @@ function Advisor({ initialSpecies }) {
             <FishArt art={species.art} size={110} />
             <div className="stack" style={{ gap: 4, minWidth: 0 }}>
               <h2>{species.name}: {METHODS[a.method]?.label || "set-up"}</h2>
-              {lvl ? <span className={`lvl lvl-${a.here.level}`}>{lvl.label} here</span> : <span className="lvl lvl-possible">No local record found</span>}
+              {place.generic ? <span className="lvl lvl-possible">General advice, any {waterById(generic).label.toLowerCase()}</span>
+                : lvl ? <span className={`lvl lvl-${a.here.level}`}>{lvl.label} here</span> : <span className="lvl lvl-possible">No local record found</span>}
               <span className="tiny">{species.verification === "verified" ? "Built from sourced tackle guides" : species.verification === "partial" ? "Partly sourced: gaps are marked" : "Few sources found: treat as general guidance"}</span>
             </div>
           </div>
@@ -238,15 +266,13 @@ export function ReportSheet({ refText, onClose, kind = "inaccurate-forecast" }) 
 }
 
 // ---- Rig library ----
-function RigLibrary() {
+function RigLibrary({ water }) {
   const [q, setQ] = useState("");
-  const [type, setType] = useState("all");
   const [open, setOpen] = useState(null);
-  const list = RIGS.filter((r) => (type === "all" || r.type === type) && (!q || `${r.name} ${r.best} ${(r.species || []).join(" ")}`.toLowerCase().includes(q.toLowerCase())));
+  const list = RIGS.filter((r) => (r.type === water || r.type === "both") && (!q || `${r.name} ${r.best} ${(r.species || []).join(" ")}`.toLowerCase().includes(q.toLowerCase())));
   return (
     <>
       <div className="search"><Icon name="search" /><input id="rig-q" className="input" placeholder="Search rigs, species or conditions" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-      <Seg value={type} onChange={setType} options={[{ value: "all", label: "All" }, { value: "sea", label: "Sea" }, { value: "fresh", label: "Freshwater" }]} />
       <div className="rig-grid">
         {list.map((r) => (
           <button type="button" key={r.id} className="rig-card" onClick={() => setOpen(r)}>
@@ -322,10 +348,10 @@ function KnotLibrary() {
 }
 
 // ---- Baits ----
-function BaitLibrary() {
+function BaitLibrary({ water }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(null);
-  const list = BAITS.filter((b) => !q || `${b.name} ${(b.species || []).join(" ")}`.toLowerCase().includes(q.toLowerCase()));
+  const list = BAITS.filter((b) => (b.type === water || b.type === "both") && (!q || `${b.name} ${(b.species || []).join(" ")}`.toLowerCase().includes(q.toLowerCase())));
   return (
     <>
       <div className="search"><Icon name="search" /><input id="bait-q" className="input" placeholder="Search baits or species" value={q} onChange={(e) => setQ(e.target.value)} /></div>

@@ -289,3 +289,11 @@ details.conds[open] summary::before { content: "▾ "; }
 .water-card { display: flex; flex-direction: column; gap: 6px; }
 .tips { margin: 2px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .linkbtn { white-space: nowrap; }
+
+/* Bait & Rigs: sea or freshwater for the whole page */
+.water-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--elev); border: 1px solid var(--line); }
+.water-switch button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border-radius: 999px; border: 0; background: transparent; color: var(--text-2); font-weight: 650; font-size: 14.5px; }
+.water-switch button svg { width: 18px; height: 18px; }
+.water-switch button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.water-switch button[aria-pressed="true"]:first-child { color: var(--tide); }
+.water-switch button[aria-pressed="true"]:last-child { color: var(--action); }
