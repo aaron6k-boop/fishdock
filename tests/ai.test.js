@@ -215,3 +215,19 @@ test("without the database AI answers 503", async (t) => {
   assert.equal(r.status, 503);
   assert.equal(r.body.error, "not_configured");
 });
+
+test("cast: each feature lists only fish from the app's own in-season list for the place", async () => {
+  const { buildCast, cleanContext, castPrompt } = await import("../server/ai.js");
+  const raw = { summary: "A surf beach.", scene: "beach", features: [
+    { x: 0.5, y: 0.6, kind: "surf", label: "Second breaker", why: "Waves turn over food.", how: "Cast just beyond it.", for: ["Bass", "flounder", "Great white shark", "Bass"], confidence: "medium" },
+    { x: 0.2, y: 0.4, kind: "gully", label: "Gully", why: "Food collects.", how: "Drop into it.", for: "Cod", confidence: "low" },
+  ] };
+  const out = buildCast(raw, "m", ["Bass", "Flounder", "Whiting"]);
+  assert.deepEqual(out.features[0].for, ["Bass", "Flounder"], "made-up fish are dropped, names matched to the list, no repeats");
+  assert.deepEqual(out.features[1].for, [], "a fish not in season here isn't offered");
+  assert.deepEqual(buildCast(raw, "m").features[0].for, [], "no list, no fish names");
+  const ctx = cleanContext({ likely: ["Bass", "Flounder", "52.57, 1.73", "x".repeat(80)] });
+  assert.deepEqual(ctx.likely.slice(0, 2), ["Bass", "Flounder"]);
+  assert.ok(!ctx.likely.some((v) => /52\.57/.test(v)), "anything like a position is dropped");
+  assert.match(castPrompt(ctx), /"for"/);
+});

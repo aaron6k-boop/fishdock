@@ -67,7 +67,7 @@ globalThis.fetch = async (input, init) => {
     const inland = m && +m[2] < 1.0 && +m[1] < 52.8;
     return J({ elements: inland ? [{ type: "way", id: 1, tags: { waterway: "river", name: "River Test" } }] : [{ type: "way", id: 2, tags: { natural: "coastline" } }, { type: "way", id: 3, tags: { man_made: "pier", name: "Test Pier" } }] });
   }
-  if (url.includes("generativelanguage.googleapis.com")) return J({ candidates: [{ content: { parts: [{ text: JSON.stringify({ summary: "A shingle beach with a gentle swell.", scene: "beach", features: [{ x: 0.55, y: 0.58, kind: "surf", label: "Second breaker line", why: "Waves turn over food here.", how: "Cast just beyond it.", confidence: "medium" }], avoid: [], safety: ["Steep shingle: keep well back from the waterline."], candidates: [{ species: "Bass", id: "bass", confidence: "high", why: "Silver, two dorsal fins, spiny gill cover." }] }) }] } }] });
+  if (url.includes("generativelanguage.googleapis.com")) return J({ candidates: [{ content: { parts: [{ text: JSON.stringify({ summary: "A shingle beach with a gentle swell.", scene: "beach", features: [{ x: 0.55, y: 0.58, kind: "surf", label: "Second breaker line", why: "Waves turn over food here.", how: "Cast just beyond it.", for: ["Bass", "Cod"], confidence: "medium" }], avoid: [], safety: ["Steep shingle: keep well back from the waterline."], candidates: [{ species: "Bass", id: "bass", confidence: "high", why: "Silver, two dorsal fins, spiny gill cover." }] }) }] } }] });
   if (url.includes("googleapis.com/service_accounts") || url.includes("securetoken")) return J({ keys: [] });
   return new Response("not stubbed", { status: 599 });
 };

@@ -5,7 +5,9 @@ import { castAdvice, aiAvailable } from "../lib/ai.js";
 import { shrinkImage } from "../lib/storage.js";
 import { track } from "../lib/api.js";
 import { ukHour } from "../lib/time.js";
-import { autoTarget } from "../lib/catchhere.js";
+import { autoTarget, catchHere } from "../lib/catchhere.js";
+import { SPECIES } from "../data/species.js";
+import AdviceSheet from "../components/AdviceSheet.jsx";
 import { ukMonth } from "../lib/time.js";
 import { Icon, Beta, Notice, Sources } from "../components/ui.jsx";
 
@@ -31,6 +33,7 @@ const READ_WATER = {
 export default function CastAdvisor() {
   const { place, tide, settings, speciesById, preview } = useApp();
   const [can, setCan] = useState(true);
+  const [advice, setAdvice] = useState(null); // a fish tapped under a cast marker: its bait, hook and rig here
   const [img, setImg] = useState(null);
   const [res, setRes] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -77,6 +80,7 @@ export default function CastAdvisor() {
       tide: st ? (st.flooding ? "flooding" : "ebbing") + (st.phase.includes("High") ? " near high water" : st.phase.includes("Low") ? " near low water" : "") : null,
       timeOfDay: h < 6 || h > 20 ? "dark" : h < 9 ? "morning" : h < 17 ? "day" : "evening",
       verified: place.verified && place.best ? [place.best] : [],
+      likely: catchHere(place, ukMonth(Date.now())).filter((r) => r.inSeason !== "out").slice(0, 10).map((r) => r.species.name),
     };
     const r = await castAdvice(s.blob, ctx);
     setRes(r); setBusy(false);
@@ -94,7 +98,12 @@ export default function CastAdvisor() {
         {img && cam !== "on" ? (
           <div className="photo-wrap">
             <img src={img.dataUrl} alt="The water you photographed" />
-            {(res?.features || []).map((f) => <span key={f.n} className={`pin conf-${f.confidence}`} style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%` }}>{f.n}</span>)}
+            {(res?.features || []).map((f) => (
+              <span key={f.n} className={`pin-wrap${f.x > 0.6 ? " left" : ""}`} style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%` }}>
+                <span className={`pin conf-${f.confidence}`} aria-hidden="true">{f.n}</span>
+                <span className="pin-tag">{f.label}{f.for?.length ? <small>{f.for.join(", ")}</small> : null}</span>
+              </span>
+            ))}
             {(res?.avoid || []).map((a, i) => <span key={"a" + i} className="pin avoid" style={{ left: `${a.x * 100}%`, top: `${a.y * 100}%` }}>!</span>)}
             {busy ? <div className="scan-busy"><span className="scanline" /><span>Reading the water… up to a minute</span></div> : null}
           </div>
@@ -119,7 +128,9 @@ export default function CastAdvisor() {
           <div>{res.features.map((f) => (
             <div key={f.n} className="cast">
               <span className="n">{f.n}</span>
-              <div className="body"><b>{f.label} <span className={`conf conf-${f.confidence}`}>{f.confidence}</span></b><p>{f.why}</p>{f.how ? <p><b>How:</b> {f.how}</p> : null}</div>
+              <div className="body"><b>{f.label} <span className={`conf conf-${f.confidence}`}>{f.confidence}</span></b><p>{f.why}</p>{f.how ? <p><b>How:</b> {f.how}</p> : null}
+                {f.for?.length ? <div className="chips cast-for"><span className="tiny">For:</span>{f.for.map((name) => { const sp = SPECIES.find((x) => x.name === name); return sp ? <button key={name} type="button" className="chip" onClick={() => setAdvice(sp)}>{name}</button> : <span key={name} className="chip">{name}</span>; })}</div> : null}
+              </div>
             </div>
           ))}</div>
           {res.avoid?.map((a, i) => <div key={i} className="cast"><span className="n avoid">!</span><div className="body"><b>{a.label}</b><p>{a.why}</p></div></div>)}
@@ -129,6 +140,7 @@ export default function CastAdvisor() {
         </section>
       ) : null}
 
+      {advice ? <AdviceSheet species={advice} spot={place} onClose={() => setAdvice(null)} /> : null}
       {place.verified && place.best ? (
         <section className="card">
           <div className="card-h"><h2>Published notes on {place.name}</h2><span className="tag ok">Sourced</span></div>

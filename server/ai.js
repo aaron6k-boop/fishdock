@@ -119,6 +119,7 @@ export function cleanContext(c = {}) {
     timeOfDay: line(c?.timeOfDay, 20),
     region: line(c?.region, 40),
     verified: (Array.isArray(c?.verified) ? c.verified : []).slice(0, 8).map((v) => line(v, 100)).filter(Boolean),
+    likely: (Array.isArray(c?.likely) ? c.likely : []).slice(0, 10).map((v) => line(v, 40)).filter(Boolean), // fish in season here
   };
 }
 
@@ -130,11 +131,12 @@ Rules:
 - Never claim fish are present. Never state or estimate depths. Never describe structure you cannot see (nothing under the surface unless it is visible). Every feature is only a possibility: use "may", "often holds fish", "worth a cast".
 - Do not invent anything that is not in the photo or the context.
 - Give each feature a position as fractions of image width (x) and height (y), 0 to 1 from the top-left, pointing at where to land the bait or lure on the water.
+- For each feature, "for" lists up to 3 fish from the context's "likely" list that suit that kind of feature (surf and gullies for bass, rough ground for cod and wrasse, sandy channels for flatfish, slack water and weed for coarse fish, and so on). Only use names from "likely"; if it is empty, give "for": [].
 - Flag anything unsafe that is visible (wet or weedy rocks, steep shingle, big swell, fast or flooded water, overhead power lines, cut-off by the tide).
 - UK English, plain sentences, no em dashes, no markdown.
 Reply with JSON only:
 {"summary": "one or two sentences", "scene": one of ${JSON.stringify(SCENES)},
- "features": [{"x": 0.4, "y": 0.6, "kind": one of ${JSON.stringify(CAST_KINDS)}, "label": "short name", "why": "why fish may hold here, one sentence", "how": "cast placement and approach, one sentence", "confidence": "low|medium|high"}],
+ "features": [{"x": 0.4, "y": 0.6, "kind": one of ${JSON.stringify(CAST_KINDS)}, "label": "short name", "why": "why fish may hold here, one sentence", "how": "cast placement and approach, one sentence", "for": ["fish name from likely"], "confidence": "low|medium|high"}],
  "avoid": [{"x": 0.1, "y": 0.8, "label": "short", "why": "one sentence"}],
  "safety": ["short"]}
 Give 0 to 5 features, best first. If the photo doesn't clearly show water, return "features": [] and say so in the summary.`;
@@ -176,7 +178,8 @@ const list = (v, n) => (Array.isArray(v) ? v.slice(0, n * 3) : []);
 
 export const CAST_NOTE = "Possible features read from your photo by AI (Beta). It can't see depth, fish or anything under the surface: check the water and stay safe before you cast.";
 
-export function buildCast(raw, model) {
+export function buildCast(raw, model, likely = []) {
+  const allowed = new Map(likely.map((n) => [String(n).toLowerCase(), n]));
   const r = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   const features = [];
   for (const f of list(r.features, 6)) {
@@ -188,6 +191,8 @@ export function buildCast(raw, model) {
       n: features.length + 1, x, y,
       kind: CAST_KINDS.includes(f?.kind) ? f.kind : "structure",
       label, why: say(f?.why, 240), how: say(f?.how, 240),
+      // only fish from the app's own in-season list for this place, never ones the model makes up
+      for: [...new Set(list(f?.for, 3).map((x) => allowed.get(String(x || "").toLowerCase().trim())).filter(Boolean))],
       confidence: CONF.includes(f?.confidence) ? f.confidence : "low",
       potential: true,
     });
@@ -331,7 +336,7 @@ export async function handleAi(request, env, now = Date.now(), deps = {}) {
       return json({ error: "ai_unavailable", message: e?.unreadable ? AI_WORDS.unreadable : AI_WORDS.failed, quota: await quotaOf(db, who, now) }, 502);
     }
     await count(db, `${route}:${who.day}`, who.day);
-    const out = route === "cast" ? buildCast(raw, model) : buildIdentify(raw, model, ids);
+    const out = route === "cast" ? buildCast(raw, model, ctxIn.likely || []) : buildIdentify(raw, model, ids);
     return json({ ...out, quota: await quotaOf(db, who, now) });
   } catch (e) {
     return toResponse(e, now, "ai");

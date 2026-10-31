@@ -369,3 +369,14 @@ details.conds[open] summary::before { content: "▾ "; }
 }
 /* Long values in key/value grids (line, lead advice) read as text, not as big numbers */
 .kv .v.small { font-size: 13.5px; font-weight: 500; line-height: 1.45; font-variant-numeric: normal; }
+.cast-for { margin-top: 6px; align-items: center; }
+.cast-for .tiny { margin-right: 2px; }
+
+/* Cast Advisor: each marker carries a label bubble with the fish it may suit */
+.pin-wrap { position: absolute; transform: translate(-17px, -50%); display: flex; align-items: center; gap: 10px; pointer-events: none; max-width: 70%; }
+.pin-wrap.left { flex-direction: row-reverse; transform: translate(calc(-100% + 17px), -50%); }
+.pin-wrap .pin { position: relative; transform: none; flex: none; }
+.pin-tag { display: flex; flex-direction: column; gap: 1px; padding: 4px 9px; border-radius: 12px; background: #071014d9; color: #fff; font-size: 12px; font-weight: 700; line-height: 1.25; box-shadow: 0 2px 10px #0008; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); min-width: 0; }
+.pin-tag small { font-size: 11px; font-weight: 600; color: #8ff0e9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pin.conf-low, .pin.conf-medium, .pin.conf-high { color: #032220; }
+.pin.conf-high { background: #5fe3db; } .pin.conf-medium { background: #8ee8c2; } .pin.conf-low { background: #c8d6d4; }

@@ -26,13 +26,14 @@ export async function aiAvailable() {
 export const CAST_PROMPT = (ctx) => `You are FishDock's Cast Advisor (Beta) for UK anglers. Look at the photo of the water the angler is facing.
 Context from the app (may be empty): ${JSON.stringify(ctx)}.
 Rules:
+- For each feature, "for" lists up to 3 fish from the context's "likely" list that suit it; only names from that list.
 - Describe ONLY features you can actually see in the photo: current seams, eddies, slack water behind obstructions, riffles and pool tails, outside bends, overhanging trees, weed beds, lily pads, reeds, rocks and ledges, gullies between rocks, breaking waves and surf tables, rips, visible colour changes, sandbars shown by wave breaks, harbour walls and piers, inflows and outfalls, sheltered corners.
 - Never claim fish are present, never state depths or hidden underwater structure. Use "may", "often holds fish", "worth a cast".
 - Give each feature a position as fractions of image width (x) and height (y), 0..1 from the top-left, pointing at where to land the bait or lure on the water.
 - Flag anything unsafe that is visible (wet rocks, steep shelving shingle, big swell, fast or flooded water, overhead lines).
 Reply with ONLY JSON:
 {"summary": "one or two sentences", "scene": "beach|rocks|harbour|estuary|river|lake|canal|other",
- "features": [{"n": 1, "x": 0.4, "y": 0.6, "kind": "seam|eddy|slack|gully|rocks|weed|colour-change|surf|overhang|drop-off|structure|inflow|reeds", "label": "short name", "why": "why fish may hold here, one sentence", "how": "how to fish it: cast placement and approach, one sentence", "confidence": "low|medium|high"}],
+ "features": [{"n": 1, "x": 0.4, "y": 0.6, "kind": "seam|eddy|slack|gully|rocks|weed|colour-change|surf|overhang|drop-off|structure|inflow|reeds", "label": "short name", "why": "why fish may hold here, one sentence", "how": "how to fish it: cast placement and approach, one sentence", "for": ["fish name from likely"], "confidence": "low|medium|high"}],
  "avoid": [{"x": 0.1, "y": 0.8, "label": "short", "why": "one sentence"}],
  "safety": ["short"]}
 Give 2 to 5 features, best first. If the photo doesn't show water, return features: [] and say so in summary.`;
@@ -58,19 +59,21 @@ async function viaSample(prompt, image) {
 }
 
 const clamp01 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
-function cleanCast(r) {
+function cleanCast(r, likely = []) {
   if (!r || r.error) return r;
+  const allowed = new Map(likely.map((n) => [n.toLowerCase(), n]));
   const features = (Array.isArray(r.features) ? r.features : []).slice(0, 6).map((f, i) => ({
     n: i + 1, x: clamp01(f.x), y: clamp01(f.y), kind: String(f.kind || "structure"), label: String(f.label || "Feature").slice(0, 60),
     why: String(f.why || "").slice(0, 240), how: String(f.how || "").slice(0, 240), confidence: ["low", "medium", "high"].includes(f.confidence) ? f.confidence : "low",
+    for: [...new Set((Array.isArray(f.for) ? f.for : []).slice(0, 3).map((x) => allowed.get(String(x || "").toLowerCase().trim())).filter(Boolean))],
   }));
   const avoid = (Array.isArray(r.avoid) ? r.avoid : []).slice(0, 3).map((a) => ({ x: clamp01(a.x), y: clamp01(a.y), label: String(a.label || "Avoid").slice(0, 60), why: String(a.why || "").slice(0, 200) }));
   return { summary: String(r.summary || "").slice(0, 400), scene: r.scene || "other", features, avoid, safety: (Array.isArray(r.safety) ? r.safety : []).slice(0, 4).map((s) => String(s).slice(0, 160)), model: r.model || (PREVIEW ? "Claude (preview)" : "") };
 }
 
 export async function castAdvice(imageBlob, ctx) {
-  if (PREVIEW) return cleanCast(await viaSample(CAST_PROMPT(ctx), imageBlob));
-  return cleanCast(await postJSON("/api/ai/cast", { image: await blobToBase64(imageBlob), context: ctx }));
+  if (PREVIEW) return cleanCast(await viaSample(CAST_PROMPT(ctx), imageBlob), ctx.likely || []);
+  return cleanCast(await postJSON("/api/ai/cast", { image: await blobToBase64(imageBlob), context: ctx }), ctx.likely || []);
 }
 
 export async function identifyFish(imageBlob, ctx, speciesIds) {
