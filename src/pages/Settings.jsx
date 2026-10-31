@@ -9,6 +9,8 @@ import { RULES_CHECKED } from "../data/rules.js";
 import { areaSize } from "../lib/geo.js";
 import { SPECIES } from "../data/species.js";
 import { PHOTOS, PHOTO_SOURCE, filePage, licenceUrl } from "../data/photos.js";
+import { BAIT_PHOTOS } from "../data/baitphotos.js";
+import { BAITS } from "../data/baits.js";
 import { Icon, Seg, Sheet, Notice, Beta } from "../components/ui.jsx";
 
 const SOURCES = [
@@ -90,6 +92,7 @@ export default function Settings() {
           <div key={what}><b>{what}</b><span>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{who}</a> : who}</span>{note ? <span className="tiny">{note}</span> : null}</div>
         ))}</div>
         <PhotoCredits />
+        <BaitCredits />
         <p className="tiny">Being on a FishDock map never means a place is legal or safe to fish. Always check access, permits, byelaws and conditions.</p>
       </section>
 
@@ -126,6 +129,21 @@ function PhotoCredits() {
         })}
       </ul>
       <p className="tiny">All via <a href={PHOTO_SOURCE.url} target="_blank" rel="noopener noreferrer">{PHOTO_SOURCE.name}</a>, checked {new Date(PHOTO_SOURCE.checked).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}. Photos are shown smaller and cropped; follow a name to see the original.</p>
+    </details>
+  );
+}
+
+function BaitCredits() {
+  const rows = BAITS.filter((b) => BAIT_PHOTOS[b.id]).map((b) => ({ b, p: BAIT_PHOTOS[b.id] }));
+  return (
+    <details className="credits">
+      <summary>Bait photo credits ({rows.length})</summary>
+      <ul className="credit-list">
+        {rows.map(({ b, p }) => {
+          const lic = licenceUrl(p);
+          return <li key={b.id}><b>{b.name}</b>: <a href={filePage(p)} target="_blank" rel="noopener noreferrer">{p.author}</a>, {lic ? <a href={lic} target="_blank" rel="noopener noreferrer">{p.licence}</a> : p.licence}</li>;
+        })}
+      </ul>
     </details>
   );
 }

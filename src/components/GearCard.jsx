@@ -4,6 +4,7 @@ import { BAITS } from "../data/baits.js";
 import { SHOPS, rigQuery, baitQuery } from "../data/shops.js";
 import { gearFor } from "../data/gear.js";
 import { KitIcon } from "./RigScene.jsx";
+import { BaitThumb } from "./BaitPhoto.jsx";
 
 /** Links that open each shop's own search for these words, in a new tab, with no referrer. */
 export function ShopLinks({ q, label }) {
@@ -51,7 +52,7 @@ export default function GearCard({ species, advice, method, title = "Get the gea
           const stock = b.id ? baitById(b.id) : null;
           return (
             <li key={b.name}>
-              <span className="kit-ico"><KitIcon text={/lure|plastic|spinner|fly|flies|jig|shad|feather|sabiki/i.test(b.name) ? "lure" : "bait"} /></span>
+              <BaitThumb bait={b} />
               <span className="grow">
                 <span className="t">{b.name}</span>
                 {b.note ? <span className="s">{b.note}</span> : null}

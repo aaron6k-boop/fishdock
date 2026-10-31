@@ -17,6 +17,7 @@ import { Icon, Tabs, Seg, Sheet, Notice, Sources } from "../components/ui.jsx";
 import { HookGlyph, RigDiagram, WaterColumn } from "../components/art.jsx";
 import { KitIcon } from "../components/RigScene.jsx";
 import GearCard, { ShopLinks } from "../components/GearCard.jsx";
+import BaitPhoto, { BaitThumb } from "../components/BaitPhoto.jsx";
 import { rigQuery, baitQuery } from "../data/shops.js";
 import { FishThumb } from "../components/FishPhoto.jsx";
 
@@ -392,14 +393,15 @@ function BaitLibrary({ water }) {
       <div className="list card">
         {list.map((b) => (
           <button type="button" key={b.id} className="li" onClick={() => setOpen(b)}>
-            <span className={`pill ${b.type === "sea" ? "sea" : "fresh"}`}>{b.type === "sea" ? "Sea" : b.type === "both" ? "Both" : "Fresh"}</span>
-            <span className="grow"><span className="t">{b.name}</span><span className="s">{(b.species || []).slice(0, 5).map((id) => SPECIES.find((s) => s.id === id)?.name || id).join(", ")}</span></span>
+            <BaitThumb bait={b} />
+            <span className="grow"><span className="t">{b.name} <span className={`pill ${b.type === "sea" ? "sea" : "fresh"}`}>{b.type === "sea" ? "Sea" : b.type === "both" ? "Both" : "Fresh"}</span></span><span className="s">{(b.species || []).slice(0, 5).map((id) => SPECIES.find((s) => s.id === id)?.name || id).join(", ")}</span></span>
             <Icon name="chevron" className="go" />
           </button>
         ))}
       </div>
       {open ? (
         <Sheet title={open.name} onClose={() => setOpen(null)}>
+          <BaitPhoto bait={open} />
           {open.hooking ? <p className="small"><b>How to hook it:</b> {open.hooking}</p> : null}
           {open.where ? <p className="small"><b>Where to get it:</b> {open.where}</p> : null}
           {open.storage ? <p className="small"><b>Keeping it fresh:</b> {open.storage}</p> : null}

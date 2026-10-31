@@ -174,6 +174,8 @@ details.conds[open] summary::before { content: "▾ "; }
 .gear-list .grow { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .gear-list .t { font-weight: 650; font-size: 14.5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .gear-list .s { font-size: 13px; color: var(--text-2); line-height: 1.4; }
+.bait-thumb { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; background: var(--elev); display: block; }
+.bait-photo img { max-height: 240px; }
 .shop-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
 .shop-link { display: inline-flex; align-items: center; min-height: 30px; padding: 3px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--action) 45%, transparent); color: var(--action); background: var(--action-soft); font-size: 12px; font-weight: 650; text-decoration: none; white-space: nowrap; }
 .shop-link::after { content: "↗"; margin-left: 4px; font-size: 11px; opacity: 0.8; }
