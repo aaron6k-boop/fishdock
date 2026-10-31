@@ -1,0 +1,155 @@
+// ---- Explore: documented marks on a map (or sonar when maps can't load), and the species guide ----
+import { useEffect, useMemo, useState } from "react";
+import { useApp } from "../lib/store.js";
+import { SPOTS } from "../data/spots.js";
+import { SPECIES } from "../data/species.js";
+import { all } from "../lib/storage.js";
+import { catchHere, LEVELS } from "../lib/catchhere.js";
+import { distanceKm, fmtKm, mapsLink } from "../lib/geo.js";
+import { ukMonth } from "../lib/time.js";
+import { Icon, Tabs, Seg, Sheet, Notice, Sources, Beta, MonthStrip } from "../components/ui.jsx";
+import { FishArt } from "../components/art.jsx";
+import { Sonar } from "../components/charts.jsx";
+import MapView, { OVERLAYS } from "../components/MapView.jsx";
+import SpeciesSheet from "../components/SpeciesSheet.jsx";
+import IdentifySheet from "../components/IdentifySheet.jsx";
+import { ReportSheet } from "./Tackle.jsx";
+
+export default function Explore() {
+  const [tab, setTab] = useState("spots");
+  return (
+    <main className="col">
+      <div className="page-head"><h1>Explore</h1></div>
+      <Tabs label="Explore sections" value={tab} onChange={setTab} options={[{ value: "spots", label: "Fishing spots" }, { value: "species", label: "Fish species" }]} />
+      {tab === "spots" ? <Spots /> : <SpeciesGuide />}
+    </main>
+  );
+}
+
+function Spots() {
+  const { place, settings, preview } = useApp();
+  const [kind, setKind] = useState("all");
+  const [q, setQ] = useState("");
+  const [view, setView] = useState(preview ? "sonar" : "map");
+  const [mapOk, setMapOk] = useState(!preview);
+  const [overlays, setOverlays] = useState([]);
+  const [base, setBase] = useState("map");
+  const [open, setOpen] = useState(null);
+  const [marks, setMarks] = useState([]);
+  const [showMarks, setShowMarks] = useState(false);
+  useEffect(() => {
+    if (!showMarks) { setMarks([]); return; }
+    all("sessions").then((ss) => setMarks(ss.flatMap((s) => s.events.filter((e) => e.type === "mark" && e.pos).map((e) => ({ lat: e.pos.lat, lon: e.pos.lon, label: e.data?.label || e.data?.kind || "Mark" })))));
+  }, [showMarks]);
+  const list = useMemo(() => SPOTS
+    .filter((s) => kind === "all" || (kind === "sea" ? s.kind === "sea" : s.kind !== "sea"))
+    .filter((s) => !q || `${s.name} ${s.region} ${s.nation} ${(s.species || []).map((x) => x.name || x.id).join(" ")}`.toLowerCase().includes(q.toLowerCase()))
+    .map((s) => ({ s, d: distanceKm(place, s) })).sort((a, b) => a.d - b.d), [kind, q, place]);
+  const toggle = (k) => setOverlays((o) => (o.includes(k) ? o.filter((x) => x !== k) : [...o, k]));
+  return (
+    <>
+      <div className="search"><Icon name="search" /><input id="spot-q" className="input" placeholder="Search marks, species or regions" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="row between">
+        <Seg value={kind} onChange={setKind} options={[{ value: "all", label: "All" }, { value: "sea", label: "Sea" }, { value: "fresh", label: "Freshwater" }]} />
+        <Seg value={view} onChange={setView} options={[...(mapOk ? [{ value: "map", label: "Map" }] : []), { value: "sonar", label: "Sonar" }, { value: "list", label: "List" }]} />
+      </div>
+      {view === "map" && mapOk ? (
+        <>
+          <MapView spots={list.map((x) => x.s)} marks={marks} center={place} overlays={overlays} base={base} onPick={setOpen} onFail={() => { setMapOk(false); setView("sonar"); }} />
+          <div className="chips">
+            <button type="button" className="chip" aria-pressed={base === "satellite"} onClick={() => setBase(base === "map" ? "satellite" : "map")}><Icon name="layers" />Satellite</button>
+            {Object.entries(OVERLAYS).map(([k, o]) => <button key={k} type="button" className="chip" aria-pressed={overlays.includes(k)} onClick={() => toggle(k)}>{o.label}</button>)}
+            <button type="button" className="chip" aria-pressed={showMarks} onClick={() => setShowMarks(!showMarks)}><Icon name="lock" />My marks</button>
+          </div>
+          {overlays.map((k) => <p key={k} className="tiny">{OVERLAYS[k].label}: {OVERLAYS[k].note}</p>)}
+        </>
+      ) : null}
+      {view === "sonar" ? (
+        <section className="card sonar-card">
+          <div className="card-h"><h2>Around {place.name}</h2><span className="aside">by direction and distance</span></div>
+          <Sonar center={place} spots={list.map((x) => x.s)} onPick={setOpen} selected={open?.id} />
+          <div className="row tiny"><span className="dotkey sea" /> Sea <span className="dotkey fresh" /> Freshwater{!mapOk ? " · Maps load on the deployed app" : ""}</div>
+        </section>
+      ) : null}
+      <section className="card">
+        <div className="card-h"><h2>{list.length} documented marks</h2><span className="aside">nearest first</span></div>
+        <div className="list">{list.slice(0, view === "list" ? 100 : 12).map(({ s, d }) => (
+          <button key={s.id} type="button" className="li" onClick={() => setOpen(s)}>
+            <span className={`pill ${s.kind === "sea" ? "sea" : "fresh"}`}>{s.kind === "sea" ? (s.subtype || "Sea") : s.kind}</span>
+            <span className="grow"><span className="t">{settings.favourites.includes(s.id) ? "★ " : ""}{s.name}</span><span className="s">{s.region} · {(s.species || []).slice(0, 4).map((x) => x.name || x.id).join(", ")}</span></span>
+            <span className="end tiny num">{fmtKm(d)}</span>
+          </button>
+        ))}</div>
+        <p className="tiny">Marks come from published angling guides, clubs and councils. Being listed doesn't mean you may fish there: check access, permits and byelaws.</p>
+      </section>
+      {open ? <SpotSheet s={open} onClose={() => setOpen(null)} /> : null}
+    </>
+  );
+}
+
+export function SpotSheet({ s, onClose }) {
+  const { update, settings, say, go } = useApp();
+  const [report, setReport] = useState(false);
+  const month = ukMonth(Date.now());
+  const here = catchHere({ ...s, verified: true }, month).filter((r) => r.level !== "possible");
+  const fav = settings.favourites.includes(s.id);
+  return (
+    <Sheet title={s.name} aside={`${s.region}, ${s.nation} · ${s.subtype || s.kind}`} onClose={onClose}>
+      <div className="row">
+        <button type="button" className="btn primary" onClick={() => { update({ placeId: s.id }); say(`Fishing at ${s.name}`); onClose(); go("home"); }}><Icon name="pin" />Fish here</button>
+        <button type="button" className="btn" onClick={() => update((x) => ({ favourites: fav ? x.favourites.filter((i) => i !== s.id) : [...x.favourites, s.id] }))}><Icon name="star" />{fav ? "Saved" : "Save"}</button>
+        <a className="btn" href={mapsLink(s.lat, s.lon)} target="_blank" rel="noopener noreferrer"><Icon name="route" />Directions</a>
+      </div>
+      {s.coordsVerified === false ? <Notice kind="warn">Approximate position. Check the exact access point locally before you travel.</Notice> : null}
+      {s.best ? <section className="card"><h2 className="h2">When it fishes best</h2><p className="small">{s.best}</p>{s.baits?.length ? <div className="chips">{s.baits.map((b) => <span key={b} className="chip">{b}</span>)}</div> : null}</section> : null}
+      <section className="card">
+        <h2 className="h2">What's caught here</h2>
+        <div className="list">{here.map((r) => (
+          <div key={r.species.id} className="li static">
+            <span className="fish-ico"><FishArt art={r.species.art} size={40} /></span>
+            <span className="grow"><span className="t">{r.species.name}</span><span className="s">{r.note || r.reason}</span></span>
+            <span className={`lvl lvl-${r.level}`}>{LEVELS[r.level].short}</span>
+          </div>
+        ))}</div>
+      </section>
+      {s.access ? <section className="card"><h2 className="h2">Access, parking and permits</h2><p className="small">{s.access}</p></section> : null}
+      {s.safety ? <Notice kind="danger"><b>Safety:</b> {s.safety}</Notice> : null}
+      <p className="tiny">{s.verification === "partial" ? "Some details here rest on one or two sources. " : ""}Last checked {s.checked || "October 2026"}.</p>
+      <Sources list={s.sources} />
+      <button type="button" className="btn ghost" onClick={() => setReport(true)}><Icon name="flag" />Report wrong or out-of-date information</button>
+      {report ? <ReportSheet kind="inaccurate-spot" refText={`spot:${s.id}`} onClose={() => setReport(false)} /> : null}
+    </Sheet>
+  );
+}
+
+function SpeciesGuide() {
+  const { place } = useApp();
+  const [type, setType] = useState(place.kind === "sea" ? "sea" : "fresh");
+  const [q, setQ] = useState("");
+  const [season, setSeason] = useState(false);
+  const [open, setOpen] = useState(null);
+  const [idOpen, setIdOpen] = useState(false);
+  const month = ukMonth(Date.now());
+  const list = SPECIES.filter((s) => (type === "all" || s.type === type || s.type === "both") && (!season || s.present?.includes(month)) && (!q || `${s.name} ${s.latin}`.toLowerCase().includes(q.toLowerCase())));
+  return (
+    <>
+      <button type="button" className="li card-like" onClick={() => setIdOpen(true)}><Icon name="camera" /><span className="grow"><span className="t">Identify a fish from a photo <Beta /></span><span className="s">AI suggestions you confirm yourself</span></span><Icon name="chevron" className="go" /></button>
+      <div className="search"><Icon name="search" /><input id="sp-q" className="input" placeholder="Search species" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="row between">
+        <Seg value={type} onChange={setType} options={[{ value: "sea", label: "Sea" }, { value: "fresh", label: "Freshwater" }, { value: "all", label: "All" }]} />
+        <button type="button" className="chip" aria-pressed={season} onClick={() => setSeason(!season)}>In season now</button>
+      </div>
+      <div className="species-grid">
+        {list.map((s) => (
+          <button key={s.id} type="button" className="sp-card" onClick={() => setOpen(s)}>
+            <FishArt art={s.art} size={130} />
+            <span className="t">{s.name}</span>
+            <MonthStrip peak={s.peak} present={s.present} current={month} />
+          </button>
+        ))}
+      </div>
+      {open ? <SpeciesSheet species={open} onClose={() => setOpen(null)} /> : null}
+      {idOpen ? <IdentifySheet onClose={() => setIdOpen(false)} /> : null}
+    </>
+  );
+}

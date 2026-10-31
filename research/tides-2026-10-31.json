@@ -1,0 +1,2733 @@
+[
+ {
+  "port": "Dover",
+  "station": "Dover",
+  "lat": 51.1295,
+  "lon": 1.3089,
+  "coord_source": "dbpedia.org/page/Dover",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:47",
+    "height_m": 6.41
+   },
+   {
+    "time": "14:15",
+    "height_m": 6.2
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:11",
+    "height_m": 1.44
+   },
+   {
+    "time": "21:35",
+    "height_m": 1.74
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/dover-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "Cross-check tide-forecast.com (explicitly GMT, dated Sat 31 Oct 2026): HW 01:49 6.36m, 14:19 6.22m; Sun 1 Nov HW 02:49 5.99m, 15:30 5.81m."
+ },
+ {
+  "port": "Dover",
+  "station": "Dover",
+  "lat": 51.1295,
+  "lon": 1.3089,
+  "coord_source": "dbpedia.org/page/Dover",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:50",
+    "height_m": 6.04
+   },
+   {
+    "time": "15:30",
+    "height_m": 5.79
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "10:05",
+    "height_m": 1.76
+   },
+   {
+    "time": "22:36",
+    "height_m": 2.11
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/dover-tide-times-20261101"
+ },
+ {
+  "port": "Ramsgate",
+  "station": "Ramsgate",
+  "lat": 51.336,
+  "lon": 1.416,
+  "coord_source": "dbpedia.org/page/Ramsgate",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:21",
+    "height_m": 4.87
+   },
+   {
+    "time": "14:54",
+    "height_m": 4.78
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:26",
+    "height_m": 0.93
+   },
+   {
+    "time": "21:51",
+    "height_m": 1.24
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ramsgate-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "31 Oct date confirmed by tidetimes.co.uk ('Saturday 31st October, 2026', identical times). tide-forecast.com (GMT) gives HW 02:20 4.36m, 14:51 4.22m (different height datum)."
+ },
+ {
+  "port": "Ramsgate",
+  "station": "Ramsgate",
+  "lat": 51.336,
+  "lon": 1.416,
+  "coord_source": "dbpedia.org/page/Ramsgate",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:19",
+    "height_m": 4.6
+   },
+   {
+    "time": "16:01",
+    "height_m": 4.47
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "10:22",
+    "height_m": 1.06
+   },
+   {
+    "time": "22:52",
+    "height_m": 1.48
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ramsgate-tide-times-20261101"
+ },
+ {
+  "port": "Southend-on-Sea",
+  "station": "Southend-on-Sea",
+  "lat": 51.55,
+  "lon": 0.71,
+  "coord_source": "dbpedia.org/page/Southend-on-Sea",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:21",
+    "height_m": 5.33
+   },
+   {
+    "time": "15:47",
+    "height_m": 5.63
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:47",
+    "height_m": 0.85
+   },
+   {
+    "time": "21:46",
+    "height_m": 1.31
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/southend-on-sea-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Southend-on-Sea",
+  "station": "Southend-on-Sea",
+  "lat": 51.55,
+  "lon": 0.71,
+  "coord_source": "dbpedia.org/page/Southend-on-Sea",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "04:12",
+    "height_m": 5.06
+   },
+   {
+    "time": "16:47",
+    "height_m": 5.32
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "10:40",
+    "height_m": 0.98
+   },
+   {
+    "time": "22:48",
+    "height_m": 1.59
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/southend-on-sea-tide-times-20261101"
+ },
+ {
+  "port": "Lowestoft",
+  "station": "Lowestoft",
+  "lat": 52.48,
+  "lon": 1.75,
+  "coord_source": "dbpedia.org/page/Lowestoft",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "00:13",
+    "height_m": 2.48
+   },
+   {
+    "time": "12:54",
+    "height_m": 2.46
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "06:39",
+    "height_m": 0.73
+   },
+   {
+    "time": "18:52",
+    "height_m": 1.12
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/lowestoft-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Lowestoft",
+  "station": "Lowestoft",
+  "lat": 52.48,
+  "lon": 1.75,
+  "coord_source": "dbpedia.org/page/Lowestoft",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:04",
+    "height_m": 2.43
+   },
+   {
+    "time": "14:09",
+    "height_m": 2.34
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "07:39",
+    "height_m": 0.77
+   },
+   {
+    "time": "19:48",
+    "height_m": 1.31
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/lowestoft-tide-times-20261101"
+ },
+ {
+  "port": "Cromer",
+  "station": "Cromer",
+  "lat": 52.93,
+  "lon": 1.3,
+  "coord_source": "tide-forecast.com (2 dp only)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:53",
+    "height_m": 4.66
+   },
+   {
+    "time": "21:57",
+    "height_m": 4.56
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:00",
+    "height_m": 1.12
+   },
+   {
+    "time": "16:18",
+    "height_m": 1.6
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/cromer-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "tide-forecast.com 31 Oct (page labelled BST but times ~GMT): HW 09:44 4.57m, 21:51 4.46m. Not used."
+ },
+ {
+  "port": "Cromer",
+  "station": "Cromer",
+  "lat": 52.93,
+  "lon": 1.3,
+  "coord_source": "tide-forecast.com (2 dp only)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "11:05",
+    "height_m": 4.35
+   },
+   {
+    "time": "23:07",
+    "height_m": 4.34
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "05:01",
+    "height_m": 1.31
+   },
+   {
+    "time": "17:18",
+    "height_m": 1.94
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/cromer-tide-times-20261101"
+ },
+ {
+  "port": "Skegness",
+  "station": "Skegness",
+  "lat": 53.1436,
+  "lon": 0.3428,
+  "coord_source": "dbpedia.org/page/Skegness",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:20",
+    "height_m": 6.27
+   },
+   {
+    "time": "21:29",
+    "height_m": 6.09
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:30",
+    "height_m": 1.47
+   },
+   {
+    "time": "15:43",
+    "height_m": 2.01
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/skegness-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Skegness",
+  "station": "Skegness",
+  "lat": 53.1436,
+  "lon": 0.3428,
+  "coord_source": "dbpedia.org/page/Skegness",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:24",
+    "height_m": 5.76
+   },
+   {
+    "time": "22:30",
+    "height_m": 5.7
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:25",
+    "height_m": 1.79
+   },
+   {
+    "time": "16:38",
+    "height_m": 2.46
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/skegness-tide-times-20261101"
+ },
+ {
+  "port": "Bridlington",
+  "station": "Bridlington",
+  "lat": 54.0819,
+  "lon": -0.1923,
+  "coord_source": "dbpedia.org/page/Bridlington",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "07:43",
+    "height_m": 5.5
+   },
+   {
+    "time": "20:01",
+    "height_m": 5.38
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "01:34",
+    "height_m": 1.32
+   },
+   {
+    "time": "13:54",
+    "height_m": 1.94
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/bridlington-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Bridlington",
+  "station": "Bridlington",
+  "lat": 54.0819,
+  "lon": -0.1923,
+  "coord_source": "dbpedia.org/page/Bridlington",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "08:52",
+    "height_m": 5.12
+   },
+   {
+    "time": "21:09",
+    "height_m": 5.1
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:33",
+    "height_m": 1.59
+   },
+   {
+    "time": "14:56",
+    "height_m": 2.35
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/bridlington-tide-times-20261101"
+ },
+ {
+  "port": "Whitby",
+  "station": "Whitby",
+  "lat": 54.489,
+  "lon": -0.614,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "07:13",
+    "height_m": 5.22
+   },
+   {
+    "time": "19:29",
+    "height_m": 5.09
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "00:56",
+    "height_m": 1.36
+   },
+   {
+    "time": "13:18",
+    "height_m": 1.93
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/whitby-tide-times-20261031"
+ },
+ {
+  "port": "Whitby",
+  "station": "Whitby",
+  "lat": 54.489,
+  "lon": -0.614,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "08:18",
+    "height_m": 4.91
+   },
+   {
+    "time": "20:34",
+    "height_m": 4.87
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "01:59",
+    "height_m": 1.59
+   },
+   {
+    "time": "14:24",
+    "height_m": 2.29
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/whitby-tide-times-20261101"
+ },
+ {
+  "port": "Hartlepool",
+  "station": "Hartlepool",
+  "lat": 54.69,
+  "lon": -1.21,
+  "coord_source": "dbpedia.org/page/Hartlepool",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "06:48",
+    "height_m": 4.9
+   },
+   {
+    "time": "19:06",
+    "height_m": 4.8
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "00:34",
+    "height_m": 1.0
+   },
+   {
+    "time": "12:54",
+    "height_m": 1.51
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/hartlepool-tide-times-20261031"
+ },
+ {
+  "port": "Hartlepool",
+  "station": "Hartlepool",
+  "lat": 54.69,
+  "lon": -1.21,
+  "coord_source": "dbpedia.org/page/Hartlepool",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "07:55",
+    "height_m": 4.57
+   },
+   {
+    "time": "20:12",
+    "height_m": 4.56
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "01:34",
+    "height_m": 1.23
+   },
+   {
+    "time": "13:57",
+    "height_m": 1.86
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/hartlepool-tide-times-20261101"
+ },
+ {
+  "port": "North Shields",
+  "station": "River Tyne (North Shields)",
+  "lat": 55.008,
+  "lon": -1.44,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "06:38",
+    "height_m": 4.78
+   },
+   {
+    "time": "18:54",
+    "height_m": 4.65
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "00:29",
+    "height_m": 1.08
+   },
+   {
+    "time": "12:49",
+    "height_m": 1.63
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/river-tyne-north-shields-tide-times-20261031",
+  "notes": "Plain north-shields page returned empty; River Tyne (North Shields) station used."
+ },
+ {
+  "port": "North Shields",
+  "station": "River Tyne (North Shields)",
+  "lat": 55.008,
+  "lon": -1.44,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "07:47",
+    "height_m": 4.48
+   },
+   {
+    "time": "20:02",
+    "height_m": 4.44
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "01:31",
+    "height_m": 1.29
+   },
+   {
+    "time": "13:53",
+    "height_m": 1.97
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/river-tyne-north-shields-tide-times-20261101"
+ },
+ {
+  "port": "Berwick-upon-Tweed",
+  "station": "Berwick",
+  "lat": 55.7692,
+  "lon": -2.0025,
+  "coord_source": "dbpedia.org/page/Berwick-upon-Tweed",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "05:45",
+    "height_m": 4.54
+   },
+   {
+    "time": "18:01",
+    "height_m": 4.43
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "11:40",
+    "height_m": 1.23
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/berwick-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Berwick-upon-Tweed",
+  "station": "Berwick",
+  "lat": 55.7692,
+  "lon": -2.0025,
+  "coord_source": "dbpedia.org/page/Berwick-upon-Tweed",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "06:54",
+    "height_m": 4.3
+   },
+   {
+    "time": "19:09",
+    "height_m": 4.26
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "00:22",
+    "height_m": 1.01
+   },
+   {
+    "time": "12:44",
+    "height_m": 1.44
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/berwick-tide-times-20261101"
+ },
+ {
+  "port": "Leith",
+  "station": "Leith",
+  "lat": 55.98,
+  "lon": -3.17,
+  "coord_source": "dbpedia.org/page/Leith",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "05:47",
+    "height_m": 5.29
+   },
+   {
+    "time": "18:07",
+    "height_m": 5.06
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "11:30",
+    "height_m": 1.77
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/leith-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Leith",
+  "station": "Leith",
+  "lat": 55.98,
+  "lon": -3.17,
+  "coord_source": "dbpedia.org/page/Leith",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "06:49",
+    "height_m": 4.98
+   },
+   {
+    "time": "19:14",
+    "height_m": 4.83
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "00:20",
+    "height_m": 1.44
+   },
+   {
+    "time": "12:41",
+    "height_m": 2.14
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/leith-tide-times-20261101"
+ },
+ {
+  "port": "Aberdeen",
+  "station": "Aberdeen",
+  "lat": 57.144,
+  "lon": -2.078,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "04:34",
+    "height_m": 4.06
+   },
+   {
+    "time": "16:48",
+    "height_m": 3.95
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "10:27",
+    "height_m": 1.5
+   },
+   {
+    "time": "23:10",
+    "height_m": 1.18
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/aberdeen-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Aberdeen",
+  "station": "Aberdeen",
+  "lat": 57.144,
+  "lon": -2.078,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "05:44",
+    "height_m": 3.82
+   },
+   {
+    "time": "17:58",
+    "height_m": 3.78
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "11:34",
+    "height_m": 1.79
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/aberdeen-tide-times-20261101"
+ },
+ {
+  "port": "Wick",
+  "station": "Wick",
+  "lat": 58.441,
+  "lon": -3.086,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:25",
+    "height_m": 3.28
+   },
+   {
+    "time": "14:39",
+    "height_m": 3.26
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:07",
+    "height_m": 1.33
+   },
+   {
+    "time": "20:57",
+    "height_m": 1.05
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/wick-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Wick",
+  "station": "Wick",
+  "lat": 58.441,
+  "lon": -3.086,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:30",
+    "height_m": 3.06
+   },
+   {
+    "time": "15:42",
+    "height_m": 3.12
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:14",
+    "height_m": 1.57
+   },
+   {
+    "time": "22:26",
+    "height_m": 1.13
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/wick-tide-times-20261101"
+ },
+ {
+  "port": "Ullapool",
+  "station": "Ullapool",
+  "lat": 57.895,
+  "lon": -5.158,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:15",
+    "height_m": 4.64
+   },
+   {
+    "time": "23:21",
+    "height_m": 4.35
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:02",
+    "height_m": 1.57
+   },
+   {
+    "time": "16:45",
+    "height_m": 1.6
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ullapool-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Ullapool",
+  "station": "Ullapool",
+  "lat": 57.895,
+  "lon": -5.158,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "11:40",
+    "height_m": 4.41
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:59",
+    "height_m": 1.97
+   },
+   {
+    "time": "18:00",
+    "height_m": 1.87
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ullapool-tide-times-20261101"
+ },
+ {
+  "port": "Oban",
+  "station": "Oban",
+  "lat": 56.415,
+  "lon": -5.473,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "08:37",
+    "height_m": 3.56
+   },
+   {
+    "time": "21:18",
+    "height_m": 3.15
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:49",
+    "height_m": 1.06
+   },
+   {
+    "time": "15:35",
+    "height_m": 1.4
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/oban-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Oban",
+  "station": "Oban",
+  "lat": 56.415,
+  "lon": -5.473,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:41",
+    "height_m": 3.32
+   },
+   {
+    "time": "22:46",
+    "height_m": 2.88
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:48",
+    "height_m": 1.28
+   },
+   {
+    "time": "16:49",
+    "height_m": 1.63
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/oban-tide-times-20261101"
+ },
+ {
+  "port": "Ayr",
+  "station": "Ayr",
+  "lat": 55.469,
+  "lon": -4.639,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:02",
+    "height_m": 3.01
+   },
+   {
+    "time": "15:03",
+    "height_m": 3.2
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:40",
+    "height_m": 0.89
+   },
+   {
+    "time": "21:04",
+    "height_m": 0.75
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ayr-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Ayr",
+  "station": "Ayr",
+  "lat": 55.469,
+  "lon": -4.639,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:54",
+    "height_m": 2.83
+   },
+   {
+    "time": "15:51",
+    "height_m": 3.06
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:42",
+    "height_m": 1.11
+   },
+   {
+    "time": "22:12",
+    "height_m": 0.9
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ayr-tide-times-20261101"
+ },
+ {
+  "port": "Workington",
+  "station": "Workington",
+  "lat": 54.65,
+  "lon": -3.567,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:26",
+    "height_m": 7.74
+   },
+   {
+    "time": "14:47",
+    "height_m": 7.67
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:54",
+    "height_m": 1.94
+   },
+   {
+    "time": "21:33",
+    "height_m": 1.86
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/workington-tide-times-20261031"
+ },
+ {
+  "port": "Workington",
+  "station": "Workington",
+  "lat": 54.65,
+  "lon": -3.567,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:28",
+    "height_m": 7.22
+   },
+   {
+    "time": "15:52",
+    "height_m": 7.25
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:56",
+    "height_m": 2.41
+   },
+   {
+    "time": "22:47",
+    "height_m": 2.15
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/workington-tide-times-20261101"
+ },
+ {
+  "port": "Fleetwood",
+  "station": "Fleetwood",
+  "lat": 53.926,
+  "lon": -3.009,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:07",
+    "height_m": 8.83
+   },
+   {
+    "time": "14:29",
+    "height_m": 8.69
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:34",
+    "height_m": 2.24
+   },
+   {
+    "time": "21:19",
+    "height_m": 2.23
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/fleetwood-tide-times-20261031"
+ },
+ {
+  "port": "Fleetwood",
+  "station": "Fleetwood",
+  "lat": 53.926,
+  "lon": -3.009,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:08",
+    "height_m": 8.2
+   },
+   {
+    "time": "15:35",
+    "height_m": 8.15
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:35",
+    "height_m": 2.78
+   },
+   {
+    "time": "22:33",
+    "height_m": 2.62
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/fleetwood-tide-times-20261101"
+ },
+ {
+  "port": "Liverpool",
+  "station": "Liverpool (Gladstone Dock)",
+  "lat": 53.449,
+  "lon": -3.018,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:02",
+    "height_m": 8.82
+   },
+   {
+    "time": "14:24",
+    "height_m": 8.66
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:43",
+    "height_m": 2.42
+   },
+   {
+    "time": "21:25",
+    "height_m": 2.37
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/liverpool-gladstone-dock-tide-times-20261031",
+  "notes": "Plain Liverpool page returned empty; Gladstone Dock station used."
+ },
+ {
+  "port": "Liverpool",
+  "station": "Liverpool (Gladstone Dock)",
+  "lat": 53.449,
+  "lon": -3.018,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:03",
+    "height_m": 8.27
+   },
+   {
+    "time": "15:32",
+    "height_m": 8.23
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:38",
+    "height_m": 2.95
+   },
+   {
+    "time": "22:36",
+    "height_m": 2.7
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/liverpool-gladstone-dock-tide-times-20261101"
+ },
+ {
+  "port": "Llandudno",
+  "station": "Llandudno",
+  "lat": 53.327,
+  "lon": -3.824,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:39",
+    "height_m": 7.09
+   },
+   {
+    "time": "14:01",
+    "height_m": 7.0
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:08",
+    "height_m": 1.51
+   },
+   {
+    "time": "20:51",
+    "height_m": 1.42
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/llandudno-tide-times-20261031"
+ },
+ {
+  "port": "Llandudno",
+  "station": "Llandudno",
+  "lat": 53.327,
+  "lon": -3.824,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:43",
+    "height_m": 6.6
+   },
+   {
+    "time": "15:09",
+    "height_m": 6.62
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:10",
+    "height_m": 1.98
+   },
+   {
+    "time": "22:06",
+    "height_m": 1.71
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/llandudno-tide-times-20261101"
+ },
+ {
+  "port": "Holyhead",
+  "station": "Holyhead",
+  "lat": 53.314,
+  "lon": -4.62,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:18",
+    "height_m": 5.25
+   },
+   {
+    "time": "13:40",
+    "height_m": 5.26
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "07:22",
+    "height_m": 1.54
+   },
+   {
+    "time": "20:06",
+    "height_m": 1.43
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/holyhead-tide-times-20261031"
+ },
+ {
+  "port": "Holyhead",
+  "station": "Holyhead",
+  "lat": 53.314,
+  "lon": -4.62,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:24",
+    "height_m": 4.91
+   },
+   {
+    "time": "14:48",
+    "height_m": 5.02
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:27",
+    "height_m": 1.89
+   },
+   {
+    "time": "21:22",
+    "height_m": 1.64
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/holyhead-tide-times-20261101"
+ },
+ {
+  "port": "Aberystwyth",
+  "station": "Aberystwyth",
+  "lat": 52.414,
+  "lon": -4.088,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "11:04",
+    "height_m": 4.52
+   },
+   {
+    "time": "23:42",
+    "height_m": 4.05
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "05:45",
+    "height_m": 1.27
+   },
+   {
+    "time": "18:31",
+    "height_m": 1.25
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/aberystwyth-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Aberystwyth",
+  "station": "Aberystwyth",
+  "lat": 52.414,
+  "lon": -4.088,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "12:06",
+    "height_m": 4.23
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "06:43",
+    "height_m": 1.52
+   },
+   {
+    "time": "19:41",
+    "height_m": 1.4
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/aberystwyth-tide-times-20261101"
+ },
+ {
+  "port": "Fishguard",
+  "station": "Fishguard",
+  "lat": 52.011,
+  "lon": -4.984,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:29",
+    "height_m": 4.41
+   },
+   {
+    "time": "23:06",
+    "height_m": 4.0
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:34",
+    "height_m": 1.57
+   },
+   {
+    "time": "17:22",
+    "height_m": 1.56
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/fishguard-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Fishguard",
+  "station": "Fishguard",
+  "lat": 52.011,
+  "lon": -4.984,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "11:32",
+    "height_m": 4.14
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "05:31",
+    "height_m": 1.87
+   },
+   {
+    "time": "18:44",
+    "height_m": 1.77
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/fishguard-tide-times-20261101"
+ },
+ {
+  "port": "Milford Haven",
+  "station": "Milford Haven",
+  "lat": 51.709,
+  "lon": -5.051,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:22",
+    "height_m": 6.5
+   },
+   {
+    "time": "21:57",
+    "height_m": 6.08
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:15",
+    "height_m": 1.75
+   },
+   {
+    "time": "15:48",
+    "height_m": 1.88
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/milford-haven-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Milford Haven",
+  "station": "Milford Haven",
+  "lat": 51.709,
+  "lon": -5.051,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:23",
+    "height_m": 6.1
+   },
+   {
+    "time": "23:05",
+    "height_m": 5.67
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:10",
+    "height_m": 2.19
+   },
+   {
+    "time": "16:56",
+    "height_m": 2.25
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/milford-haven-tide-times-20261101"
+ },
+ {
+  "port": "Swansea",
+  "station": "Swansea",
+  "lat": 51.614,
+  "lon": -3.93,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:27",
+    "height_m": 8.58
+   },
+   {
+    "time": "22:03",
+    "height_m": 8.08
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:03",
+    "height_m": 1.93
+   },
+   {
+    "time": "15:37",
+    "height_m": 2.15
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/swansea-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Swansea",
+  "station": "Swansea",
+  "lat": 51.614,
+  "lon": -3.93,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:29",
+    "height_m": 8.02
+   },
+   {
+    "time": "23:13",
+    "height_m": 7.51
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:01",
+    "height_m": 2.5
+   },
+   {
+    "time": "16:47",
+    "height_m": 2.66
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/swansea-tide-times-20261101"
+ },
+ {
+  "port": "Ilfracombe",
+  "station": "Ilfracombe",
+  "lat": 51.21,
+  "lon": -4.114,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:06",
+    "height_m": 8.37
+   },
+   {
+    "time": "21:41",
+    "height_m": 7.89
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:40",
+    "height_m": 1.96
+   },
+   {
+    "time": "15:12",
+    "height_m": 2.2
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ilfracombe-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Ilfracombe",
+  "station": "Ilfracombe",
+  "lat": 51.21,
+  "lon": -4.114,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:05",
+    "height_m": 7.83
+   },
+   {
+    "time": "22:49",
+    "height_m": 7.37
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:36",
+    "height_m": 2.53
+   },
+   {
+    "time": "16:23",
+    "height_m": 2.7
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/ilfracombe-tide-times-20261101"
+ },
+ {
+  "port": "Padstow",
+  "station": "Padstow",
+  "lat": 50.542,
+  "lon": -4.938,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "08:30",
+    "height_m": 6.66
+   },
+   {
+    "time": "21:04",
+    "height_m": 6.22
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:31",
+    "height_m": 1.75
+   },
+   {
+    "time": "15:03",
+    "height_m": 1.89
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/padstow-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Padstow",
+  "station": "Padstow",
+  "lat": 50.542,
+  "lon": -4.938,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:30",
+    "height_m": 6.23
+   },
+   {
+    "time": "22:11",
+    "height_m": 5.78
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:24",
+    "height_m": 2.23
+   },
+   {
+    "time": "16:09",
+    "height_m": 2.31
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/padstow-tide-times-20261101"
+ },
+ {
+  "port": "Newlyn",
+  "station": "Penzance (Newlyn)",
+  "lat": 50.103,
+  "lon": -5.543,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "07:49",
+    "height_m": 5.18
+   },
+   {
+    "time": "20:20",
+    "height_m": 4.8
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:05",
+    "height_m": 1.46
+   },
+   {
+    "time": "14:40",
+    "height_m": 1.49
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/penzance-newlyn-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "Plain newlyn page returned empty; Penzance (Newlyn) station used."
+ },
+ {
+  "port": "Newlyn",
+  "station": "Penzance (Newlyn)",
+  "lat": 50.103,
+  "lon": -5.543,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "08:50",
+    "height_m": 4.9
+   },
+   {
+    "time": "21:31",
+    "height_m": 4.51
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:01",
+    "height_m": 1.75
+   },
+   {
+    "time": "15:44",
+    "height_m": 1.75
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/penzance-newlyn-tide-times-20261101"
+ },
+ {
+  "port": "Falmouth",
+  "station": "Falmouth",
+  "lat": 50.15,
+  "lon": -5.055,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "08:25",
+    "height_m": 4.83
+   },
+   {
+    "time": "20:59",
+    "height_m": 4.39
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:28",
+    "height_m": 1.12
+   },
+   {
+    "time": "14:58",
+    "height_m": 1.18
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/falmouth-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Falmouth",
+  "station": "Falmouth",
+  "lat": 50.15,
+  "lon": -5.055,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:25",
+    "height_m": 4.56
+   },
+   {
+    "time": "22:13",
+    "height_m": 4.1
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:18",
+    "height_m": 1.47
+   },
+   {
+    "time": "15:59",
+    "height_m": 1.5
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/falmouth-tide-times-20261101"
+ },
+ {
+  "port": "Plymouth",
+  "station": "Plymouth (Devonport)",
+  "lat": 50.368,
+  "lon": -4.185,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "08:55",
+    "height_m": 5.19
+   },
+   {
+    "time": "21:28",
+    "height_m": 4.79
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:40",
+    "height_m": 1.5
+   },
+   {
+    "time": "15:10",
+    "height_m": 1.57
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/plymouth-devonport-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "Plain plymouth page returned empty; Devonport station used."
+ },
+ {
+  "port": "Plymouth",
+  "station": "Plymouth (Devonport)",
+  "lat": 50.368,
+  "lon": -4.185,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:49",
+    "height_m": 4.93
+   },
+   {
+    "time": "22:33",
+    "height_m": 4.51
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:30",
+    "height_m": 1.87
+   },
+   {
+    "time": "16:09",
+    "height_m": 1.91
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/plymouth-devonport-tide-times-20261101"
+ },
+ {
+  "port": "Torquay",
+  "station": "Torquay",
+  "lat": 50.46,
+  "lon": -3.525,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:27",
+    "height_m": 4.69
+   },
+   {
+    "time": "22:00",
+    "height_m": 4.29
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:45",
+    "height_m": 1.55
+   },
+   {
+    "time": "15:16",
+    "height_m": 1.61
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/torquay-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Torquay",
+  "station": "Torquay",
+  "lat": 50.46,
+  "lon": -3.525,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:21",
+    "height_m": 4.43
+   },
+   {
+    "time": "23:06",
+    "height_m": 4.01
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:37",
+    "height_m": 1.89
+   },
+   {
+    "time": "16:18",
+    "height_m": 1.93
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/torquay-tide-times-20261101"
+ },
+ {
+  "port": "Weymouth (Portland)",
+  "station": "Portland",
+  "lat": 50.565,
+  "lon": -2.438,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "09:36",
+    "height_m": 1.95
+   },
+   {
+    "time": "22:24",
+    "height_m": 1.63
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "02:17",
+    "height_m": 0.57
+   },
+   {
+    "time": "14:48",
+    "height_m": 0.58
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/portland-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "Weymouth page returned empty; Portland station used."
+ },
+ {
+  "port": "Weymouth (Portland)",
+  "station": "Portland",
+  "lat": 50.565,
+  "lon": -2.438,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:33",
+    "height_m": 1.76
+   },
+   {
+    "time": "23:42",
+    "height_m": 1.46
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:05",
+    "height_m": 0.75
+   },
+   {
+    "time": "15:56",
+    "height_m": 0.72
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/portland-tide-times-20261101"
+ },
+ {
+  "port": "Poole",
+  "station": "Poole (Entrance)",
+  "lat": 50.682,
+  "lon": -1.947,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "11:31",
+    "height_m": 2.09
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "06:52",
+    "height_m": 1.11
+   },
+   {
+    "time": "19:21",
+    "height_m": 0.95
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/poole-entrance-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "Poole (Entrance) has long stand / double HW; source lists only one HW on 31 Oct."
+ },
+ {
+  "port": "Poole",
+  "station": "Poole (Entrance)",
+  "lat": 50.682,
+  "lon": -1.947,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:18",
+    "height_m": 1.91
+   },
+   {
+    "time": "12:20",
+    "height_m": 1.96
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "07:55",
+    "height_m": 1.32
+   },
+   {
+    "time": "20:32",
+    "height_m": 1.09
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/poole-entrance-tide-times-20261101"
+ },
+ {
+  "port": "Southampton",
+  "station": "Southampton",
+  "lat": 50.897,
+  "lon": -1.41,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:00",
+    "height_m": 4.43
+   },
+   {
+    "time": "03:58",
+    "height_m": 4.33
+   },
+   {
+    "time": "13:51",
+    "height_m": 4.23
+   },
+   {
+    "time": "16:51",
+    "height_m": 4.09
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "07:31",
+    "height_m": 1.4
+   },
+   {
+    "time": "19:58",
+    "height_m": 1.43
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/southampton-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used",
+  "notes": "Double high water: source lists two HW per tide."
+ },
+ {
+  "port": "Southampton",
+  "station": "Southampton",
+  "lat": 50.897,
+  "lon": -1.41,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:20",
+    "height_m": 4.22
+   },
+   {
+    "time": "04:39",
+    "height_m": 4.22
+   },
+   {
+    "time": "14:49",
+    "height_m": 3.94
+   },
+   {
+    "time": "17:44",
+    "height_m": 3.93
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:32",
+    "height_m": 1.8
+   },
+   {
+    "time": "21:13",
+    "height_m": 1.76
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/southampton-tide-times-20261101"
+ },
+ {
+  "port": "Portsmouth",
+  "station": "Portsmouth",
+  "lat": 50.802,
+  "lon": -1.111,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:30",
+    "height_m": 4.56
+   },
+   {
+    "time": "14:50",
+    "height_m": 4.42
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "07:41",
+    "height_m": 1.45
+   },
+   {
+    "time": "20:11",
+    "height_m": 1.42
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/portsmouth-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Portsmouth",
+  "station": "Portsmouth",
+  "lat": 50.802,
+  "lon": -1.111,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:45",
+    "height_m": 4.37
+   },
+   {
+    "time": "16:01",
+    "height_m": 4.18
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:46",
+    "height_m": 1.81
+   },
+   {
+    "time": "21:32",
+    "height_m": 1.71
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/portsmouth-tide-times-20261101"
+ },
+ {
+  "port": "Shoreham",
+  "station": "Shoreham",
+  "lat": 50.829,
+  "lon": -0.248,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:04",
+    "height_m": 5.9
+   },
+   {
+    "time": "14:23",
+    "height_m": 5.69
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:24",
+    "height_m": 1.33
+   },
+   {
+    "time": "20:54",
+    "height_m": 1.38
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/shoreham-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Shoreham",
+  "station": "Shoreham",
+  "lat": 50.829,
+  "lon": -0.248,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:04",
+    "height_m": 5.53
+   },
+   {
+    "time": "15:28",
+    "height_m": 5.28
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:26",
+    "height_m": 1.66
+   },
+   {
+    "time": "22:02",
+    "height_m": 1.69
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/shoreham-tide-times-20261101"
+ },
+ {
+  "port": "Newhaven",
+  "station": "Newhaven",
+  "lat": 50.782,
+  "lon": 0.057,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:03",
+    "height_m": 6.31
+   },
+   {
+    "time": "14:21",
+    "height_m": 6.14
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:26",
+    "height_m": 1.41
+   },
+   {
+    "time": "20:55",
+    "height_m": 1.45
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/newhaven-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Newhaven",
+  "station": "Newhaven",
+  "lat": 50.782,
+  "lon": 0.057,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:02",
+    "height_m": 5.95
+   },
+   {
+    "time": "15:24",
+    "height_m": 5.71
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:23",
+    "height_m": 1.75
+   },
+   {
+    "time": "22:00",
+    "height_m": 1.77
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/newhaven-tide-times-20261101"
+ },
+ {
+  "port": "Hastings",
+  "station": "Hastings",
+  "lat": 50.855,
+  "lon": 0.585,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:44",
+    "height_m": 7.13
+   },
+   {
+    "time": "14:11",
+    "height_m": 6.88
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:41",
+    "height_m": 1.44
+   },
+   {
+    "time": "21:05",
+    "height_m": 1.78
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/hastings-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Hastings",
+  "station": "Hastings",
+  "lat": 50.855,
+  "lon": 0.585,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:45",
+    "height_m": 6.69
+   },
+   {
+    "time": "15:24",
+    "height_m": 6.39
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:35",
+    "height_m": 1.81
+   },
+   {
+    "time": "22:06",
+    "height_m": 2.21
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/hastings-tide-times-20261101"
+ },
+ {
+  "port": "Dungeness",
+  "station": "Dungeness",
+  "lat": 50.913,
+  "lon": 0.976,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:35",
+    "height_m": 7.31
+   },
+   {
+    "time": "14:03",
+    "height_m": 7.04
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:57",
+    "height_m": 1.69
+   },
+   {
+    "time": "21:20",
+    "height_m": 2.05
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/dungeness-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Dungeness",
+  "station": "Dungeness",
+  "lat": 50.913,
+  "lon": 0.976,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:37",
+    "height_m": 6.84
+   },
+   {
+    "time": "15:17",
+    "height_m": 6.52
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:49",
+    "height_m": 2.09
+   },
+   {
+    "time": "22:20",
+    "height_m": 2.51
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/dungeness-tide-times-20261101"
+ },
+ {
+  "port": "Folkestone",
+  "station": "Folkestone",
+  "lat": 51.078,
+  "lon": 1.188,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "01:31",
+    "height_m": 6.81
+   },
+   {
+    "time": "14:00",
+    "height_m": 6.6
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:01",
+    "height_m": 1.39
+   },
+   {
+    "time": "21:25",
+    "height_m": 1.71
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/folkestone-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Folkestone",
+  "station": "Folkestone",
+  "lat": 51.078,
+  "lon": 1.188,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:37",
+    "height_m": 6.44
+   },
+   {
+    "time": "15:18",
+    "height_m": 6.19
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:55",
+    "height_m": 1.74
+   },
+   {
+    "time": "22:26",
+    "height_m": 2.11
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/folkestone-tide-times-20261101"
+ },
+ {
+  "port": "Belfast",
+  "station": "Belfast",
+  "lat": 54.605,
+  "lon": -5.918,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:11",
+    "height_m": 3.34
+   },
+   {
+    "time": "14:32",
+    "height_m": 3.52
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:10",
+    "height_m": 1.01
+   },
+   {
+    "time": "20:40",
+    "height_m": 0.76
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/belfast-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Belfast",
+  "station": "Belfast",
+  "lat": 54.605,
+  "lon": -5.918,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:18",
+    "height_m": 3.16
+   },
+   {
+    "time": "15:35",
+    "height_m": 3.41
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:14",
+    "height_m": 1.19
+   },
+   {
+    "time": "21:52",
+    "height_m": 0.86
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/belfast-tide-times-20261101"
+ },
+ {
+  "port": "Portrush",
+  "station": "Portrush",
+  "lat": 55.207,
+  "lon": -6.656,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "10:02",
+    "height_m": 1.93
+   },
+   {
+    "time": "23:26",
+    "height_m": 1.67
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "03:13",
+    "height_m": 0.83
+   },
+   {
+    "time": "17:38",
+    "height_m": 0.91
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/portrush-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Portrush",
+  "station": "Portrush",
+  "lat": 55.207,
+  "lon": -6.656,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "12:26",
+    "height_m": 1.9
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "04:15",
+    "height_m": 0.97
+   },
+   {
+    "time": "19:22",
+    "height_m": 0.88
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/portrush-tide-times-20261101"
+ },
+ {
+  "port": "Kilkeel",
+  "station": "Kilkeel",
+  "lat": 54.059,
+  "lon": -5.994,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:49",
+    "height_m": 4.49
+   },
+   {
+    "time": "15:09",
+    "height_m": 4.7
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:20",
+    "height_m": 1.41
+   },
+   {
+    "time": "20:50",
+    "height_m": 1.16
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/kilkeel-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Kilkeel",
+  "station": "Kilkeel",
+  "lat": 54.059,
+  "lon": -5.994,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:54",
+    "height_m": 4.27
+   },
+   {
+    "time": "16:10",
+    "height_m": 4.58
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:24",
+    "height_m": 1.59
+   },
+   {
+    "time": "22:02",
+    "height_m": 1.26
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/kilkeel-tide-times-20261101"
+ },
+ {
+  "port": "Larne",
+  "station": "Larne",
+  "lat": 54.854,
+  "lon": -5.8,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-10-31",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "02:07",
+    "height_m": 2.85
+   },
+   {
+    "time": "14:23",
+    "height_m": 3.09
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "08:03",
+    "height_m": 0.97
+   },
+   {
+    "time": "20:35",
+    "height_m": 0.7
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/larne-tide-times-20261031",
+  "date_note": "Page heading showed no date (site's current-day view, fetched on 31 Oct 2026); URL date used"
+ },
+ {
+  "port": "Larne",
+  "station": "Larne",
+  "lat": 54.854,
+  "lon": -5.8,
+  "coord_source": "approximate town/harbour position (FishDock)",
+  "date": "2026-11-01",
+  "tz": "GMT (UTC+0) - source table labelled UTC; BST adjustment applies only during BST, which ended 25 Oct 2026",
+  "high_waters": [
+   {
+    "time": "03:10",
+    "height_m": 2.7
+   },
+   {
+    "time": "15:23",
+    "height_m": 3.01
+   }
+  ],
+  "low_waters": [
+   {
+    "time": "09:08",
+    "height_m": 1.12
+   },
+   {
+    "time": "21:48",
+    "height_m": 0.77
+   }
+  ],
+  "source_url": "https://www.tidetimes.org.uk/larne-tide-times-20261101"
+ }
+]

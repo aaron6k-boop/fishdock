@@ -1,0 +1,26 @@
+{
+  "name": "fishdock",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "FishDock: the UK fishing companion for sea, beach, rock, river, canal, lake and commercial fishery anglers. Sibling of DetectDock.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:preview-artifact": "node tools/build-preview.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "firebase": "^13.0.0",
+    "leaflet": "^1.9.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
+  }
+}

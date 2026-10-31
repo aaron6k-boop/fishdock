@@ -1,0 +1,16 @@
+{
+  "name": "FishDock",
+  "short_name": "FishDock",
+  "description": "The UK fishing companion: BiteScore, tides, bait and rigs, catch log and Live Fishing Mode.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070c10",
+  "theme_color": "#070c10",
+  "lang": "en-GB",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
