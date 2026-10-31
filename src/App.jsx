@@ -99,7 +99,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    setLive((l) => ({ ...l, loading: true }));
+    setLive({ cond: null, tides: null, river: null, loading: true }); // never show the last place's weather for this one
     (async () => {
       const [cond, tides, river] = await Promise.all([
         getConditions(place.lat, place.lon),

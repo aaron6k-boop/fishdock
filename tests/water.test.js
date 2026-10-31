@@ -120,3 +120,15 @@ test("water: a refusing main instance falls back to the next one, with a proper 
   assert.equal(r2.status, 200);
   assert.equal(r2.body.kind, null);
 });
+
+test("water: an Overpass timeout remark with no elements is retried on the next instance", async (t) => {
+  const s = setup();
+  const net = stubFetch(t, [
+    [(url) => url === OVERPASS_URLS[0][1], () => ({ elements: [], remark: "runtime error: Query timed out in \"query\" at line 9 after 6 seconds." })],
+    [(url) => url === OVERPASS_URLS[1][1], () => ({ elements: [{ type: "area", tags: { natural: "water", water: "reservoir", name: "Grafham Water" } }] })],
+  ]);
+  const r = await s.call(handleWater, "/api/water")("GET", "?lat=52.29&lon=-0.32");
+  assert.equal(r.status, 200);
+  assert.equal(r.body.subtype, "reservoir");
+  assert.equal(net.calls.length, 2);
+});

@@ -5,7 +5,7 @@ import ASTRO from "../lib/astro.js";
 import { biteDay, band, explain, conditionsAt } from "../lib/bitescore.js";
 import { catchHere, LEVELS, autoTarget } from "../lib/catchhere.js";
 import { rulesFor } from "../lib/rules.js";
-import { ukDayStart, fmtTime, fmtDay, ukMonth, hoursUntil, fmtShortDay } from "../lib/time.js";
+import { ukDayStart, fmtTime, fmtDay, ukMonth, hoursUntil, fmtShortDay, addUkDays } from "../lib/time.js";
 import { compass, fmtKm, mapsLink } from "../lib/geo.js";
 import { waterById } from "../lib/pins.js";
 import { Icon, Notice, Sheet, Beta, Seg, Sources } from "../components/ui.jsx";
@@ -25,7 +25,7 @@ export default function Home() {
   const [pick, setPick] = useState(null);
   const [sheet, setSheet] = useState(null); // "how" | "catch" | {species} | "identify" | "checklist" | "conditions"
   const now = Date.now();
-  const dayStart = ukDayStart(now) + dayOffset * 864e5;
+  const dayStart = addUkDays(ukDayStart(now), dayOffset);
   const month = ukMonth(dayStart + 12 * 3600e3);
   const here = useMemo(() => catchHere(place, month), [place, month]);
   const target = settings.target !== "auto" ? app.speciesById(settings.target) : autoTarget(place, month);
@@ -36,9 +36,9 @@ export default function Home() {
   const cond = live.cond?.hourly?.length ? live.cond : manual ? { manual } : null;
   const day = useMemo(() => target ? biteDay({ place, species: target, dayStart, tide, cond, river: live.river?.source ? live.river : null, now }) : null, [place, target, dayStart, tide, cond, live.river, now]);
   const sun = useMemo(() => ASTRO.sunDay(dayStart, place.lat, place.lon), [dayStart, place.lat, place.lon]);
-  const moon = useMemo(() => ({ ill: ASTRO.moonIllum(dayStart + 12 * 3600e3), ev: ASTRO.moonEvents(dayStart, dayStart + 864e5, place.lat, place.lon) }), [dayStart, place.lat, place.lon]);
+  const moon = useMemo(() => ({ ill: ASTRO.moonIllum(dayStart + 12 * 3600e3), ev: ASTRO.moonEvents(dayStart, addUkDays(dayStart, 1), place.lat, place.lon) }), [dayStart, place.lat, place.lon]);
   const week = useMemo(() => target ? Array.from({ length: 7 }, (_, i) => {
-    const ds = ukDayStart(now) + i * 864e5;
+    const ds = addUkDays(ukDayStart(now), i);
     const d = biteDay({ place, species: target, dayStart: ds, tide, cond, river: live.river?.source ? live.river : null, now });
     const best = d.windows[0] || null;
     return { ds, peak: Math.max(...d.slots.map((x) => x.score)), best };
@@ -86,7 +86,7 @@ export default function Home() {
       <main className="col" style={{ marginTop: -6 }}>
         <section className="card">
           <div className="card-h"><h2>BiteScore for {target?.name || "your target"}</h2><button type="button" className="linkbtn" onClick={() => setSheet("how")}>How it works</button></div>
-          <Seg label="Day" value={dayOffset} onChange={(v) => { setDayOffset(v); setPick(null); }} options={[0, 1, 2].map((d) => ({ value: d, label: d === 0 ? "Today" : d === 1 ? "Tomorrow" : fmtShortDay(ukDayStart(now) + d * 864e5).split(" ")[0] }))} />
+          <Seg label="Day" value={dayOffset} onChange={(v) => { setDayOffset(v); setPick(null); }} options={[0, 1, 2].map((d) => ({ value: d, label: d === 0 ? "Today" : d === 1 ? "Tomorrow" : fmtShortDay(addUkDays(ukDayStart(now), d)).split(" ")[0] }))} />
           <div className="chips scroll" role="group" aria-label="Species forecast">
             {candidates.map((r) => (
               <button type="button" key={r.species.id} className="chip" aria-pressed={target?.id === r.species.id} onClick={() => { update({ target: r.species.id }); setPick(null); }}>{r.species.name}</button>

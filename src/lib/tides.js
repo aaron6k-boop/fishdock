@@ -44,7 +44,7 @@ export function tideModel(place, api, now = Date.now()) {
   } else {
     const port = nearestPort(place.lat, place.lon);
     if (!port) return null;
-    const start = now - 2 * 864e5, end = now + 4 * 864e5;
+    const start = now - 2 * 864e5, end = now + 9 * 864e5; // the week ahead plus a margin
     const hws = ASTRO.highWaters(start, end, port.lon, port.li);
     for (let i = 0; i < hws.length; i++) {
       events.push({ type: "HW", t: hws[i], h: null });

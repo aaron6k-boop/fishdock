@@ -124,7 +124,8 @@ export async function handleWater(request, env, now = Date.now(), deps = {}) {
           body,
           timeoutMs: WATER.tryMs,
         });
-        if (!Array.isArray(raw?.elements)) continue; // an Overpass error page or a timeout remark: try the next one
+        // An error page, or a timeout or runtime error noted in "remark" (sometimes with an empty elements list): try the next one
+        if (!Array.isArray(raw?.elements) || /error|timed out|timeout/i.test(String(raw?.remark || ""))) continue;
         return json({ ...classifyWater(raw.elements), source: "openstreetmap", attribution: ATTRIBUTION });
       } catch (e) {
         if (!(e instanceof UpstreamError)) throw e;

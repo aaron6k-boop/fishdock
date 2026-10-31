@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../lib/store.js";
 import { SPOTS } from "../data/spots.js";
-import { WATERS, waterById, parseCoords, inUk, makePin, savePin, removePin, placeFromPin, nearestSpot, defaultPinName } from "../lib/pins.js";
+import { WATERS, waterById, waterFor, MAX_PINS, parseCoords, inUk, makePin, savePin, removePin, placeFromPin, nearestSpot, defaultPinName } from "../lib/pins.js";
 import { catchHere } from "../lib/catchhere.js";
 import { getWater } from "../lib/api.js";
 import { ukMonth } from "../lib/time.js";
@@ -32,6 +32,7 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
   const [mapOk, setMapOk] = useState(withMap && !preview);
   const [base, setBase] = useState("map");
   const [species, setSpecies] = useState(null);
+  const [allFish, setAllFish] = useState(false);
   const others = useMemo(() => (settings.pins || []).filter((p) => p.id !== pin?.id), [settings.pins, pin?.id]);
   const near = useMemo(() => (pos ? nearestSpot(pos.lat, pos.lon) : null), [pos]);
   const outside = pos && !inUk(pos.lat, pos.lon);
@@ -46,10 +47,10 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
     getWater(pos.lat, pos.lon).then((r) => {
       if (gone) return;
       setChecking(false);
-      if (r?.kind && waterById(r.subtype)) { setFound(r); setWater(r.subtype); setShowTypes(false); return; }
+      if (r?.kind && waterFor(r.subtype)) { const id = waterFor(r.subtype).id; setFound({ ...r, subtype: id }); setWater(id); setShowTypes(false); return; }
       // The map lookup failed or found nothing: within 3 km of a documented mark, start from that mark's water type.
       const n = nearestSpot(pos.lat, pos.lon);
-      const guess = n && n.d <= 3 && waterById(n.spot.subtype === "breakwater" || n.spot.subtype === "harbour" ? "pier" : n.spot.subtype === "reservoir" ? "lake" : n.spot.subtype);
+      const guess = n && n.d <= 3 && waterFor(n.spot.subtype);
       setFound({ error: r?.preview ? "preview" : r?.error || "none", message: r?.message, guess: guess ? n.spot : null });
       setWater(guess ? guess.id : null);
       setShowTypes(!guess);
@@ -80,19 +81,23 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
   const record = () => makePin({ ...pos, water, name: label, id: pin?.id, createdAt: pin?.createdAt });
   function forecast() {
     const p = record(); if (!p) return;
+    if (!pin && keep && (settings.pins || []).length >= MAX_PINS) say(`You can keep ${MAX_PINS} pins, so the oldest was removed`);
     update((s) => ({ placeId: "custom", custom: placeFromPin(p), ...(keep || pin ? { pins: savePin(s.pins, p) } : {}) }));
     say(`Forecast for ${p.name}${keep || pin ? ". Pin saved on this phone" : ""}`);
     onDone?.(); onClose(); go("home");
   }
   function savePinOnly() {
     const p = record(); if (!p) return;
-    update((s) => ({ pins: savePin(s.pins, p) }));
-    say(pin ? "Pin updated" : "Pin saved on this phone");
+    update((s) => ({ pins: savePin(s.pins, p), ...(s.placeId === "custom" && s.custom?.pinId === p.id ? { custom: placeFromPin(p) } : {}) }));
+    say(pin ? "Pin updated" : (settings.pins || []).length >= MAX_PINS ? `Pin saved. You can keep ${MAX_PINS}, so the oldest was removed` : "Pin saved on this phone");
     onDone?.(); onClose();
   }
   function del() {
-    update((s) => ({ pins: removePin(s.pins, pin.id) }));
-    say("Pin deleted");
+    // If you were fishing at this pin, move to the nearest documented mark rather than keep a deleted pin.
+    const n = nearestSpot(pin.lat, pin.lon);
+    const wasCurrent = settings.placeId === "custom" && settings.custom?.pinId === pin.id;
+    update((s) => ({ pins: removePin(s.pins, pin.id), ...(wasCurrent && n ? { placeId: n.spot.id, custom: null } : {}) }));
+    say(wasCurrent && n ? `Pin deleted. Now showing ${n.spot.name}` : "Pin deleted");
     onDone?.(); onClose();
   }
 
@@ -146,18 +151,20 @@ export default function PinSheet({ at = null, pin = null, withMap = true, onClos
         <>
           <section className="card">
             <div className="card-h"><h2>Likely to catch here</h2><span className="aside">{here.filter((r) => r.inSeason !== "out").length} in season</span></div>
-            {here.length ? <CatchList rows={here} onOpen={setSpecies} limit={10} /> : <p className="small muted">No species profile matches this water type here.</p>}
+            {here.length ? <CatchList rows={here} onOpen={setSpecies} limit={allFish ? 100 : 10} /> : <p className="small muted">No species profile matches this water type here.</p>}
+            {here.length > 10 && !allFish ? <button type="button" className="linkbtn" onClick={() => setAllFish(true)}>Show all {here.length}</button> : null}
             <p className="tiny">From documented marks within {fmtKm(25)} and each species' habitat and UK range: a guide to the area, not a record of this exact spot.</p>
           </section>
 
-          <TodayCard key={`${spot.lat},${spot.lon},${spot.subtype}`} spot={{ ...spot, tidePref: near && near.d < 3 && near.spot.kind === "sea" ? near.spot.tidePref : null }} here={here} />
+          <TodayCard key={`${spot.lat},${spot.lon},${spot.subtype}`} spot={spot} here={here}
+            borrowed={near && near.d < 3 && near.spot.kind === "sea" && spot.kind === "sea" && near.spot.tidePref ? { pref: near.spot.tidePref, name: near.spot.name } : null} />
 
           <section className="card">
             <div className="field">
               <label htmlFor="pin-name">Name</label>
               <input className="input" id="pin-name" maxLength={40} placeholder={found?.name || defaultPinName(pos.lat, pos.lon)} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            {!pin ? <label className="toggle" htmlFor="pin-keep"><span>Save to My pins<br /><span className="tiny">On this phone only. Never shared or backed up.</span></span><input id="pin-keep" type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /></label> : null}
+            {!pin ? <label className="toggle" htmlFor="pin-keep"><span>Save to My pins<br /><span className="tiny">Kept on this phone and never shared.</span></span><input id="pin-keep" type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} /></label> : null}
             <button type="button" className="btn primary block" onClick={forecast}><Icon name="fish" />Full forecast here</button>
             <div className="row">
               <button type="button" className="btn" onClick={savePinOnly}><Icon name="pin" />{pin ? "Save changes" : "Just save the pin"}</button>

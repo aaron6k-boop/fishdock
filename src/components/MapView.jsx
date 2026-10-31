@@ -27,6 +27,7 @@ export default function MapView({ spots = [], marks = [], pins = [], dropped = n
   const [locating, setLocating] = useState(false);
   const cb = useRef({});
   cb.current = { onPick, onPickPin, onTap, onDrag };
+  const draw = useRef({}); // this render's draw functions, so the first draw after Leaflet loads uses the latest props
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let L, cancelled = false, tapTimer = 0;
@@ -47,7 +48,7 @@ export default function MapView({ spots = [], marks = [], pins = [], dropped = n
         tapTimer = setTimeout(() => cb.current.onTap?.({ lat: +e.latlng.lat.toFixed(5), lon: +e.latlng.lng.toFixed(5) }), 280);
       });
       m.on("dblclick", () => clearTimeout(tapTimer));
-      drawTiles(); drawPins();
+      draw.current.tiles(); draw.current.pins();
     })();
     return () => { cancelled = true; clearTimeout(tapTimer); map.current?.m.remove(); map.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -123,6 +124,7 @@ export default function MapView({ spots = [], marks = [], pins = [], dropped = n
     g.addLayer(dot);
     meLayer.current = g.addTo(m);
   }, [me]);
+  draw.current = { tiles: drawTiles, pins: drawPins };
   useEffect(() => { drawTiles(); }, [overlays, base]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { drawPins(); }, [spots, marks, pins, dropped?.lat, dropped?.lon]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { map.current?.m.setView([center.lat, center.lon], map.current.m.getZoom()); }, [center.lat, center.lon]);

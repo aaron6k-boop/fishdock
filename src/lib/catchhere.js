@@ -42,21 +42,22 @@ export function catchHere(place, month) {
   if (place.verified && place.species) {
     for (const s of place.species) add(s.id, s.level || "common", `Listed for ${place.name}`, s.note);
   }
-  // 2. documented marks nearby of the same kind
+  // Does this species live in this kind of water? ("sea" alone, an older "My location" choice, says nothing more.)
+  const water = place.subtype || place.kind;
+  const suits = (sp) => kindMatches(sp, place.kind) && (!sp.waters || !water || water === "sea" || sp.waters.some((w) => w === water || (water === "fishery" && w === "lake") || (water === "reservoir" && w === "lake") || (water === "lake" && w === "reservoir")));
+  // 2. documented marks nearby of the same kind, for species that suit this water (a lake beside a river
+  //    doesn't get the river's salmon and barbel)
   for (const s of SPOTS) {
     if (s.id === place.id || (s.kind === "sea") !== (place.kind === "sea")) continue;
     const d = distanceKm(place, s);
     if (d > 25) continue;
-    for (const x of s.species || []) add(x.id, "occasional", `Recorded at ${s.name}, ${fmtKm(d, true)} away`);
+    for (const x of s.species || []) { const sp = speciesById(x.id); if (sp && suits(sp)) add(x.id, "occasional", `Recorded at ${s.name}, ${fmtKm(d, true)} away`); }
   }
   // 3. habitat and range only
   const coast = coastOf(place.lat, place.lon);
-  const water = place.subtype || place.kind;
   for (const sp of SPECIES) {
-    if (!kindMatches(sp, place.kind)) continue;
+    if (!suits(sp)) continue;
     if (sp.range && !sp.range.includes(coast) && !sp.range.includes("uk")) continue;
-    // "sea" alone (an older "My location" choice) says nothing about the habitat, so it doesn't narrow the list
-    if (sp.waters && water && water !== "sea" && !sp.waters.some((w) => w === water || (water === "fishery" && w === "lake"))) continue;
     add(sp.id, "possible", "Suitable habitat within its UK range");
   }
   const list = [...out.values()].map((r) => {

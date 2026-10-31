@@ -15,6 +15,7 @@ const exe = process.env.CHROME || "/usr/bin/google-chrome";
 const browser = await chromium.launch({ executablePath: exe, args: ["--no-sandbox"] });
 let failures = 0;
 
+const outside = new Set();
 for (const size of sizes) {
   for (const theme of ["dark", "light"]) {
     const ctx = await browser.newContext({ viewport: { width: size.width, height: size.height }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -22,6 +23,9 @@ for (const size of sizes) {
     const problems = [];
     page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
     page.on("console", (m) => { if (m.type() === "error") problems.push(`console: ${m.text()}`); });
+    // Outside hosts (map tiles, depth shading) are answered empty, so a machine with no internet gives the same result.
+    // The hosts asked for are listed once at the end, to spot anything unexpected.
+    await page.route((url) => /^https?:/.test(url.href) && !/^(localhost|127\.0\.0\.1)$/.test(url.hostname), (r) => { outside.add(new URL(r.request().url()).hostname); r.fulfill({ status: 204, body: "" }); });
     const html = target;
     await page.addInitScript((t) => { try { localStorage.setItem("fishdock.settings.v1", JSON.stringify({ onboarded: true, theme: t })); } catch {} }, theme);
     await page.goto(html);
@@ -67,4 +71,5 @@ for (const size of sizes) {
   }
 }
 await browser.close();
+if (outside.size) console.log(`outside hosts asked for (answered empty): ${[...outside].sort().join(", ")}`);
 process.exit(failures ? 1 : 0);

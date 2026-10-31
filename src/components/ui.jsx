@@ -102,6 +102,17 @@ export function Tabs({ value, options, onChange, label }) {
   );
 }
 
+// Sheets can open on top of sheets (a species from a spot, say). The page behind stays locked until the last one
+// closes, whatever order React runs their clean-ups in.
+let openSheets = 0, savedOverflow = "";
+function lockPage() {
+  if (openSheets++ === 0) { savedOverflow = document.body.style.overflow; document.body.style.overflow = "hidden"; }
+}
+function unlockPage() {
+  openSheets = Math.max(0, openSheets - 1);
+  if (openSheets === 0) document.body.style.overflow = savedOverflow === "hidden" ? "" : savedOverflow;
+}
+
 export function Sheet({ title, onClose, children, wide, aside }) {
   const ref = useRef(null);
   // The latest onClose, read through a ref so a parent re-render (live data, the clock) doesn't re-run this
@@ -113,8 +124,8 @@ export function Sheet({ title, onClose, children, wide, aside }) {
     document.addEventListener("keydown", onKey);
     const prev = document.activeElement;
     ref.current?.focus();
-    const body = document.body; const ov = body.style.overflow; body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", onKey); body.style.overflow = ov; prev?.focus?.(); };
+    lockPage();
+    return () => { document.removeEventListener("keydown", onKey); unlockPage(); prev?.focus?.(); };
   }, []);
   return (
     <div className="scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>

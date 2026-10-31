@@ -17,6 +17,9 @@ export const WATERS = [
   { id: "fishery", kind: "fishery", label: "Day-ticket fishery", hint: "Stocked lakes" },
 ];
 export const waterById = (id) => WATERS.find((w) => w.id === id) || null;
+/** Subtypes the map lookup and the documented marks use that fold into a water type here. */
+const FOLD = { reservoir: "lake", breakwater: "pier", harbour: "pier" };
+export const waterFor = (subtype) => waterById(FOLD[subtype] || subtype);
 
 export const MAX_PINS = 50;
 

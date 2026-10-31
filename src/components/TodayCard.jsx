@@ -7,14 +7,14 @@ import { tideModel, tideWindows } from "../lib/tides.js";
 import { autoTarget } from "../lib/catchhere.js";
 import { getConditions, getTides } from "../lib/api.js";
 import RemindButton from "./RemindButton.jsx";
-import { ukDayStart, ukMonth, fmtTime, fmtShortDay, monthsText } from "../lib/time.js";
+import { ukDayStart, ukMonth, fmtTime, fmtShortDay, monthsText, addUkDays } from "../lib/time.js";
 
 const PREF_WORDS = { flood: "on the flood (low to high water)", ebb: "on the ebb (high to low water)", high: "around high water", low: "around low water", moving: "while the tide is moving" };
 const range = (w) => `${fmtTime(w.start)} to ${fmtTime(w.end)}`;
-const dayTag = (t, dayStart) => (t >= dayStart + 864e5 ? ` ${fmtShortDay(t).split(" ")[0]}` : "");
+const dayTag = (t, dayStart) => (t >= addUkDays(dayStart, 1) ? ` ${fmtShortDay(t).split(" ")[0]}` : "");
 
 /** spot: { lat, lon, kind, subtype, tidePref?, name }. here: catchHere(spot) for the species chips. */
-export default function TodayCard({ spot, here }) {
+export default function TodayCard({ spot, here, borrowed = null }) {
   const [live, setLive] = useState({ cond: null, tides: null });
   const [targetId, setTargetId] = useState(null);
   const sea = spot.kind === "sea";
@@ -34,7 +34,7 @@ export default function TodayCard({ spot, here }) {
   const cond = live.cond?.hourly?.length ? live.cond : null;
   const sun = useMemo(() => ASTRO.sunDay(dayStart, spot.lat, spot.lon), [dayStart, spot.lat, spot.lon]);
   const days = useMemo(() => (target ? [0, 1, 2, 3, 4, 5, 6].map((i) => {
-    const ds = dayStart + i * 864e5;
+    const ds = addUkDays(dayStart, i);
     const d = biteDay({ place: spot, species: target, dayStart: ds, tide, cond, river: null, now });
     const windows = i === 0 ? d.windows.filter((x) => x.end > now) : d.windows;
     return { ds, i, windows, d, best: [...windows].sort((a, b) => b.peak - a.peak)[0] || null };
@@ -44,7 +44,7 @@ export default function TodayCard({ spot, here }) {
   const showDay = today?.windows.length ? today : days[1];
   const bestDay = days.filter((x) => x.best).sort((a, b) => b.best.peak - a.best.peak)[0];
   const next24 = tide ? tide.events.filter((e) => e.t > now - 1800e3 && e.t < now + 24 * 3600e3).slice(0, 4) : [];
-  const pref = spot.tidePref || null;
+  const pref = spot.tidePref || borrowed?.pref || null;
   const prefWins = sea && pref ? tideWindows(tide, pref, now, now + 24 * 3600e3).slice(0, 2) : [];
   const fishPref = sea ? biteProfile(target).tide : null;
   const peakSlot = showDay?.best ? showDay.d.slots.filter((s) => s.t >= showDay.best.start && s.t <= showDay.best.end).sort((a, b) => b.score - a.score)[0] : null;
@@ -69,7 +69,7 @@ export default function TodayCard({ spot, here }) {
         <div><span className="k">Last light</span><span className="v">{fmtTime(sun.dusk)}</span></div>
       </div>
       <ul className="small tips">
-        {prefWins.length ? <li><b>This mark fishes {PREF_WORDS[pref]}:</b> {prefWins.map((w) => `${range(w)}${dayTag(w.start, dayStart)}`).join(" and ")}.</li> : null}
+        {prefWins.length ? <li><b>{spot.tidePref ? "This mark fishes" : `${borrowed.name}, nearby, fishes`} {PREF_WORDS[pref]}:</b> {prefWins.map((w) => `${range(w)}${dayTag(w.start, dayStart)}`).join(" and ")}.</li> : null}
         {sea && fishPref && fishPref !== pref ? <li>{target.name} usually feed best {PREF_WORDS[fishPref] || fishPref}.</li> : null}
         {peakSlot?.f.tideState ? <li>Tide in the best window: {peakSlot.f.tideState.toLowerCase()}.</li> : null}
         {bestDay?.best ? <li>Best day this week: {bestDay.i === 0 ? "today" : fmtShortDay(bestDay.ds)}, {range(bestDay.best)} (peak {bestDay.best.peak}).</li> : null}

@@ -47,6 +47,9 @@ export function hoursUntil(ms, now = Date.now()) {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
+/** The start of the UK day `n` days after the day starting at `dayStart` (right across the clock changes). */
+export const addUkDays = (dayStart, n) => ukDayStart(dayStart + n * 864e5 + 12 * 3600e3);
+
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** A list of months (1..12) as words: "all year", "Oct to Feb", "Jun to Aug and Dec". */

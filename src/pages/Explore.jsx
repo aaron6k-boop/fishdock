@@ -134,7 +134,7 @@ export function SpotSheet({ s, onClose }) {
       <button type="button" className="linkbtn share-link" onClick={() => shareSpot(s, say)}><Icon name="share" size={15} /> Share this mark</button>
       {s.coordsVerified === false ? <Notice kind="warn">Approximate position. Check the exact access point locally before you travel.</Notice> : null}
       {s.best ? <section className="card"><h2 className="h2">When it fishes best</h2><p className="small">{s.best}</p>{s.baits?.length ? <div className="chips">{s.baits.map((b) => <span key={b} className="chip">{b}</span>)}</div> : null}</section> : null}
-      <TodayCard spot={s} here={here} />
+      <TodayCard spot={{ ...s, verified: true }} here={here} />
       <section className="card">
         <h2 className="h2">What's caught here</h2>
         <CatchList rows={here} onOpen={setSpecies} />
