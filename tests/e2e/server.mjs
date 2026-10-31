@@ -16,7 +16,18 @@ import { handleMetrics } from "../../server/metrics.js";
 import { handleAdmin } from "../../server/admin.js";
 
 const port = Number(process.argv[2] || 8792);
-const html = readFileSync(new URL("../../dist-preview/fishdock-e2e.html", import.meta.url));
+// --dist serves the production build (dist/, as Cloudflare Pages would); otherwise the single-file e2e build.
+const DIST = process.argv.includes("--dist") ? new URL("../../dist/", import.meta.url) : null;
+const html = DIST ? null : readFileSync(new URL("../../dist-preview/fishdock-e2e.html", import.meta.url));
+const TYPES = { ".js": "text/javascript", ".css": "text/css", ".html": "text/html; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json" };
+function staticFile(pathname) {
+  if (!DIST) return { type: "text/html; charset=utf-8", body: html };
+  const clean = pathname.replace(/\.\.+/g, "").replace(/^\/+/, "") || "index.html";
+  for (const f of [clean, "index.html"]) {
+    try { return { type: TYPES[f.slice(f.lastIndexOf("."))] || "application/octet-stream", body: readFileSync(new URL(f, DIST)) }; } catch { /* next */ }
+  }
+  return { type: "text/plain", body: "not found" };
+}
 const env = { DB: createD1(":memory:"), ADMIRALTY_API_KEY: "test-key", GEMINI_API_KEY: "test-key", ADMIN_EMAILS: "admin@fishdock.example" };
 const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin };
 
@@ -48,7 +59,7 @@ globalThis.fetch = async (input) => {
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   const m = url.pathname.match(/^\/api\/([a-z]+)/);
-  if (!m) { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); return; }
+  if (!m) { const f = staticFile(url.pathname); res.writeHead(200, { "content-type": f.type }); res.end(f.body); return; }
   const h = HANDLERS[m[1]];
   if (!h) { res.writeHead(404); res.end("{}"); return; }
   const chunks = [];

@@ -17,6 +17,7 @@ const stubs = {
     b.onResolve({ filter: /leafletLoader\.js$/ }, () => (server ? undefined : { path: join(root, "tools/stubs/leaflet.js") }));
     b.onResolve({ filter: /^firebase\// }, () => ({ path: join(root, "tools/stubs/firebase.js") }));
     b.onResolve({ filter: /^leaflet/ }, () => ({ path: join(root, "tools/stubs/leaflet.js") }));
+    b.onResolve({ filter: /^leaflet\/dist\/leaflet\.css$/ }, () => ({ path: join(root, "tools/stubs/leaflet.js") }));
   },
 };
 const res = await build({

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import { PREVIEW } from "./lib/api.js";
+import "leaflet/dist/leaflet.css";
 import "./styles/base.css";
 import "./styles/app.css";
 
