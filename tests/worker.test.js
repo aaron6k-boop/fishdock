@@ -23,3 +23,15 @@ test("only the Firebase helper paths under /__/ are proxied", async () => {
   const res = await call("/__/other/thing");
   assert.equal(res.status, 404);
 });
+
+test("the public health check needs no header, reports configuration and never leaks keys", async () => {
+  const { createD1 } = await import("./helpers/d1.js");
+  const res = await worker.fetch(new Request("https://fishdock.example/api/health"), { ASSETS: assets, DB: createD1(":memory:"), GEMINI_API_KEY: "secret-key-123" });
+  assert.equal(res.status, 200);
+  const text = await res.text();
+  const body = JSON.parse(text);
+  assert.equal(body.database, "connected");
+  assert.equal(body.sources.ai, "gemini");
+  assert.match(body.sources.tides, /estimate/);
+  assert.ok(!text.includes("secret-key-123"));
+});

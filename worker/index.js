@@ -11,11 +11,12 @@ import { handleCommunity } from "../server/community.js";
 import { handleFeedback } from "../server/feedback.js";
 import { handleMetrics } from "../server/metrics.js";
 import { handleAdmin } from "../server/admin.js";
+import { handleHealth } from "../server/health.js";
 import { onRequest as authHelper } from "../functions/_middleware.js";
 
 const API = {
   conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync,
-  community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin,
+  community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, health: handleHealth,
 };
 
 const notFound = () => new Response(JSON.stringify({ error: "not_found", message: "There's nothing here." }), {
