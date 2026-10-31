@@ -65,12 +65,13 @@ export default function Community() {
   );
 }
 
-function Compose({ place, onClose, onPosted }) {
-  const [kind, setKind] = useState("catch");
-  const [text, setText] = useState("");
-  const [species, setSpecies] = useState("");
+/** The new-post sheet. `initial` prefills it (Share to Community from a fishing session); nothing posts until Post. */
+export function Compose({ place, onClose, onPosted, initial = null }) {
+  const [kind, setKind] = useState(initial?.kind || "catch");
+  const [text, setText] = useState(initial?.text || "");
+  const [species, setSpecies] = useState(initial?.species || "");
   const [area, setArea] = useState(place.region || "");
-  const [photo, setPhoto] = useState(null);
+  const [photo, setPhoto] = useState(initial?.photo ? { dataUrl: initial.photo } : null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const fileRef = useRef(null);

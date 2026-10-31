@@ -22,6 +22,7 @@ const Live = lazy(() => import("./pages/Live.jsx"));
 const CastAdvisor = lazy(() => import("./pages/CastAdvisor.jsx"));
 const Settings = lazy(() => import("./pages/Settings.jsx"));
 const Admin = lazy(() => import("./pages/Admin.jsx"));
+const Watch = lazy(() => import("./pages/Watch.jsx"));
 
 const TABS = [
   { id: "home", label: "Home", icon: "home" },
@@ -61,7 +62,17 @@ function navFromHash() {
   return m && spotById(m[1]) ? { spot: m[1] } : null;
 }
 
-export default function App() {
+/** A private Live Fishing View link (#watch/<token>) opens the viewer on its own: no onboarding, no tabs. */
+const watchToken = () => (location.hash.match(/^#\/?watch\/([A-Za-z0-9_-]{30,64})$/) || [])[1] || null;
+export default function Root() {
+  const [token, setToken] = useState(watchToken);
+  useEffect(() => { const on = () => setToken(watchToken()); addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
+  useEffect(() => { if (token) applyTheme(loadSettings().theme); }, [token]);
+  if (!token) return <App />;
+  return <Suspense fallback={<div className="watch-shell"><div className="watch-msg"><span className="loading-dots" aria-label="Loading" /></div></div>}><Watch token={token} /></Suspense>;
+}
+
+function App() {
   const [settings, setSettings] = useState(loadSettings);
   setDistanceUnit(settings.units?.distance); // before any child formats a distance this render
   const [tab, setTab] = useState(routeFromHash);

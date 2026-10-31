@@ -1,7 +1,7 @@
 // ---- Live Fishing Mode: timer, bites, catches, marks, conditions snapshots, Smart Bite (Beta), history and replay ----
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../lib/store.js";
-import { startSession, addEvent, undoLast, pauseSession, resumeSession, endSession, elapsed, recoverSession, setGpsAllowed, positionAt, eventsUntil, trackLengthM } from "../lib/session.js";
+import { startSession, addEvent, undoLast, pauseSession, resumeSession, endSession, elapsed, recoverSession, setGpsAllowed, positionAt, eventsUntil, trackLengthM, onSessionChange, setSessionScene } from "../lib/session.js";
 import { all, onChange, remove } from "../lib/storage.js";
 import { biteDay, conditionsAt } from "../lib/bitescore.js";
 import { autoTarget } from "../lib/catchhere.js";
@@ -11,6 +11,16 @@ import { createMotionWatch, createAlarmListen, alertAngler } from "../lib/smartb
 import { SPECIES, speciesById } from "../data/species.js";
 import { Icon, Beta, Notice, Sheet, Seg, Empty } from "../components/ui.jsx";
 import CatchForm from "../components/CatchForm.jsx";
+import FishingScene from "../components/FishingScene.jsx";
+import SceneEditor from "../components/SceneEditor.jsx";
+import ShareSheet from "../components/ShareSheet.jsx";
+import { Compose } from "./Community.jsx";
+import { EV_INFO, phaseAt, sceneEvents, catchesOf, notable, countsAt } from "../lib/liveEvents.js";
+import { onShare, shareInfo, setShareContext, sessionChanged, sessionEnded, stopSharing } from "../lib/liveShare.js";
+import { resolveScene, loadChoice, scenePhotoKey } from "../lib/scene.js";
+import { accountsEnabled, onUser } from "../lib/account.js";
+import { hasArt, artUrl } from "../data/fishart.js";
+import ASTRO from "../lib/astro.js";
 
 export default function Live() {
   const { session } = useApp();
@@ -35,6 +45,12 @@ function StartAndHistory() {
   const [gps, setGps] = useState(settings.privacy.saveGps);
   const [history, setHistory] = useState([]);
   const [replay, setReplay] = useState(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [choice, setChoice] = useState(() => loadChoice(place));
+  const [share, setShare] = useState(null);
+  useEffect(() => onShare(setShare), []);
+  useEffect(() => { setChoice(loadChoice(place)); }, [place.id, place.lat, place.lon]);
+  const sceneFor = () => { const c = loadChoice(place); return c ? { kind: c.kind, view: c.view, commons: c.commons || null, photoKey: c.kind === "own" ? scenePhotoKey(place) : null, photoV: c.at || 0 } : null; };
   useEffect(() => { const load = () => all("sessions").then((l) => setHistory(l.filter((s) => s.status === "ended").sort((a, b) => b.startedAt - a.startedAt))); load(); return onChange((st) => st === "sessions" && load()); }, []);
   return (
     <main className="col">
@@ -49,9 +65,22 @@ function StartAndHistory() {
         </div>
         <label className="toggle" htmlFor="ls-gps"><span><b>Record where I fish</b><br /><span className="tiny">GPS track and marked positions, kept on this phone. You can turn it off any time.</span></span><input id="ls-gps" type="checkbox" checked={gps} onChange={(e) => setGps(e.target.checked)} /></label>
         {preview && gps ? <Notice kind="warn">This preview can't use GPS. The timer, bites, catches and marks still work; positions record in the installed app.</Notice> : null}
-        <button type="button" className="btn primary block big-btn" onClick={() => startSession({ place, species: species || null, gpsAllowed: gps, conditions: snapshot(app) })}><Icon name="play" />Start fishing</button>
+        <button type="button" className="li view-pick" onClick={() => setViewOpen(true)}>
+          <span className="fish-ico"><Icon name="camera" /></span>
+          <span className="grow"><span className="t">Your view: {choice?.kind === "own" ? "your photo" : choice?.kind === "commons" ? "a photo near here" : "representative scene"}</span><span className="s">{choice?.kind === "own" ? "Lined up for this place" : "Take a photo of where your rod points for the best view"}</span></span>
+          <Icon name="chevron" className="go" />
+        </button>
+        <button type="button" className="btn primary block big-btn" onClick={() => startSession({ place, species: species || null, gpsAllowed: gps, conditions: snapshot(app), scene: sceneFor() })}><Icon name="play" />Start fishing</button>
         <p className="tiny">Keep FishDock open on screen for the best record. Phones pause web apps in the background, so FishDock notes any gaps rather than guessing.</p>
       </section>
+      {share && !share.ended ? (
+        <section className="card">
+          <div className="card-h"><h2>Still sharing</h2><span className="aside">{share.watching || 0} watching</span></div>
+          <p className="small muted">Your last session is still on its private links, so people can watch it back until the links end.</p>
+          <button type="button" className="btn danger" onClick={async () => { await stopSharing(); }}><Icon name="eyeoff" />Stop sharing now</button>
+        </section>
+      ) : null}
+      {viewOpen ? <SceneEditor place={place} quality={settings.liveQuality || "auto"} onQuality={(q) => app.update({ liveQuality: q })} onClose={() => setViewOpen(false)} onSaved={() => setChoice(loadChoice(place))} /> : null}
       <section className="card">
         <div className="card-h"><h2>Past sessions</h2><span className="aside">{history.length}</span></div>
         {history.length ? <div className="list">{history.map((s) => (
@@ -68,14 +97,39 @@ function StartAndHistory() {
   );
 }
 
+function lightAt(place, t) {
+  try {
+    const sun = ASTRO.sunPos(t, place.lat, place.lon), moon = ASTRO.moonPos(t, place.lat, place.lon);
+    return { sunAlt: Math.round(sun.alt), sunAz: Math.round(sun.az), moonAlt: Math.round(moon.alt), moonAz: Math.round(moon.az), moonIllum: Math.round(ASTRO.moonIllum(t).fraction * 100) / 100 };
+  } catch { return null; }
+}
+function condAt(live, tide, t) {
+  const c = conditionsAt(live.cond?.hourly?.length ? live.cond : null, t);
+  const st = tide?.stateAt(t);
+  return {
+    windKph: c?.windKph ?? null, gustKph: c?.gustKph ?? null, windDir: c?.windDir ?? null, waveM: c?.waveM ?? null, tempC: c?.tempC ?? null,
+    precipMm: c?.precipMm ?? null, cloudPct: c?.cloudPct ?? null, isDay: c?.isDay ?? null,
+    tide: st?.phase || null, tideNext: st?.next ? { type: st.next.type === "HW" ? "High" : "Low", t: st.next.t } : null, tideApprox: !!tide && tide.source !== "admiralty",
+    river: live.river?.state ? `${live.river.state}, ${live.river.trend}` : null,
+  };
+}
+const FLOAT_METHODS = /float|waggler|stick|pole/i;
+
 function Running({ s }) {
   const app = useApp();
-  const { place, tide, live, say } = app;
+  const { place, tide, live, say, settings, update } = app;
   const [, tick] = useState(0);
   const [catchOpen, setCatchOpen] = useState(false);
   const [markOpen, setMarkOpen] = useState(false);
   const [endOpen, setEndOpen] = useState(false);
   const [smart, setSmart] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [commOpen, setCommOpen] = useState(false);
+  const [scene, setScene] = useState(null);
+  const [share, setShare] = useState(shareInfo());
+  const [myCatches, setMyCatches] = useState([]);
+  const sceneRef = useRef(null);
   useEffect(() => { const iv = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(iv); }, []);
   useEffect(() => { // hourly conditions snapshot, as DetectDock snapshots weather in Field Mode
     const last = [...s.events].reverse().find((e) => e.type === "conditions");
@@ -85,36 +139,108 @@ function Running({ s }) {
   const day = useMemo(() => sp ? biteDay({ place, species: sp, dayStart: ukDayStart(Date.now()), tide, cond: live.cond?.hourly?.length ? live.cond : null, river: live.river?.source ? live.river : null }) : null, [place, sp, tide, live.cond, live.river]);
   const st = tide?.stateAt(Date.now());
   const gpsLabel = { ok: `GPS ±${s.gps.acc} m`, weak: `Weak GPS ±${s.gps.acc} m`, starting: "Finding GPS…", denied: "Location blocked", unavailable: "No GPS here", off: "Not recording position" }[s.gps.state] || "";
+
+  // the backdrop: what this session was started with, or the place's saved view
+  useEffect(() => { let gone = false; resolveScene(s.place || place, s.scene || loadChoice(s.place || place)).then((r) => { if (!gone) setScene(r); }); return () => { gone = true; }; }, [s.scene?.kind, s.scene?.photoV, JSON.stringify(s.scene?.view), s.scene?.commons?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+  // sharing: what the share needs that the session doesn't hold, and every change sent on
+  setShareContext(() => ({ name: settings.liveName || null, target: sp ? { id: sp.id, name: sp.name } : null, cond: condAt(live, tide, Date.now()), light: lightAt(place, Date.now()), area: place.region || null }));
+  useEffect(() => onShare(setShare), []);
+  useEffect(() => onSessionChange((c) => { if (c) sessionChanged(c); }), []);
+  useEffect(() => { sessionChanged(s); }, [s.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // this session's catches (for their photos)
+  useEffect(() => { const load = () => all("catches").then((l) => setMyCatches(l.filter((c) => c.sessionId === s.id))); load(); return onChange((x) => x === "catches" && load()); }, [s.id]);
+  const photoOf = (ev) => myCatches.find((c) => c.id === ev?.data?.catchId)?.photo || null;
+
+  const evs = sceneEvents(s);
+  const ph = phaseAt(evs, Date.now(), { status: s.status });
+  const hooked = !!ph.hooked;
   const press = (type, label) => { addEvent(type); try { navigator.vibrate?.(30); } catch { /* ignore */ } say(label); };
+  const sharing = share && share.sessionId === s.id && !share.ended ? share : null;
+  const catches = catchesOf(evs).reverse();
+  const counts = countsAt(s.events);
+  const floatRig = place.kind !== "sea" ? !/feeder|ledger|carp|lure|fly/i.test(s.method || "") : FLOAT_METHODS.test(s.method || "");
+
   return (
     <main className="col live-col">
-      <div className="live-top">
-        <span className={`rec ${s.status}`}><span className="rec-dot" />{s.status === "paused" ? "Paused" : "Fishing"}</span>
-        <span className="tiny">{s.place.name}{sp ? ` · ${sp.name}` : ""}</span>
+      <div className="live-stage">
+        <FishingScene ref={sceneRef} scene={scene} events={evs} status={s.status} now={Date.now}
+          env={{ cond: condAt(live, tide, Date.now()), light: lightAt(place, Date.now()), kind: place.kind }}
+          quality={settings.liveQuality || "auto"} sound={!!settings.liveSound} floatRig={floatRig} catchPhoto={photoOf}>
+          <div className="fs-top">
+            <span className={`live-badge s-${s.status === "paused" ? "paused" : "live"}`}><span className="rec-dot" />{s.status === "paused" ? "Paused" : "Fishing"}</span>
+            <span className="fs-chip num" aria-label={`Fishing for ${fmtDuration(elapsed(s))}`}>{fmtClock(elapsed(s))}</span>
+            {st ? <span className="fs-chip"><Icon name="wave" />{st.phase}</span> : null}
+            {day?.nowSlot ? <span className="fs-chip">BiteScore {day.nowSlot.score}</span> : null}
+            <span className="grow" />
+            {sharing ? <button type="button" className="fs-chip share-on" onClick={() => setShareOpen(true)}><Icon name="eye" />{sharing.watching || 0} watching</button> : null}
+            <button type="button" className="fs-chip" onClick={() => setViewOpen(true)} aria-label="Change your view"><Icon name="camera" />View</button>
+          </div>
+          <div className="fs-who"><b>{s.place.name}</b>{sp ? <span> · {sp.name}</span> : null}</div>
+        </FishingScene>
       </div>
-      <div className="timer num" aria-live="off" aria-label={`Fishing for ${fmtDuration(elapsed(s))}`}>{fmtClock(elapsed(s))}</div>
-      <div className="live-meta">
-        <span className={`chip ${s.gps.state === "ok" ? "tide" : s.gps.state === "off" ? "" : "warn"}`}><Icon name="locate" />{gpsLabel}</span>
-        {st ? <span className="chip tide"><Icon name="wave" />{st.phase}</span> : null}
-        {day?.nowSlot ? <span className="chip">BiteScore {day.nowSlot.score}</span> : null}
-      </div>
-      {s.backgroundMs > 60000 ? <Notice kind="warn">FishDock was in the background for {fmtDuration(s.backgroundMs)}. Phones stop web apps recording there, so your track has gaps.</Notice> : null}
 
-      <div className="counter-grid">
-        <button type="button" className="counter bite" onClick={() => press("bite", "Bite logged")}><b className="num">{s.counts.bites}</b><span>Bite</span></button>
-        <button type="button" className="counter miss" onClick={() => press("missed", "Missed bite logged")}><b className="num">{s.counts.missed}</b><span>Missed</span></button>
-        <button type="button" className="counter catch" onClick={() => setCatchOpen(true)}><b className="num">{s.counts.catches}</b><span>Catch</span></button>
-        <button type="button" className="counter cast" onClick={() => press("cast", "Cast")}><b className="num">{s.counts.casts}</b><span>Cast</span></button>
+      <div className="stat-line" aria-label="This session">
+        <div><b className="num">{counts.casts}</b><span>Casts</span></div>
+        <div><b className="num">{counts.bites}</b><span>Bites</span></div>
+        <div><b className="num">{counts.missed}</b><span>Missed</span></div>
+        <div className="hl"><b className="num">{counts.catches}</b><span>Caught</span></div>
       </div>
-      <div className="row">
-        <button type="button" className="btn" onClick={() => setMarkOpen(true)}><Icon name="flag" />Mark this spot</button>
-        <button type="button" className="btn" onClick={() => setSmart(true)}><Icon name="bell" />Smart Bite <Beta /></button>
-        <button type="button" className="btn ghost small" onClick={() => undoLast([...s.events].reverse().find((e) => ["bite", "missed", "cast", "mark", "note"].includes(e.type))?.type)}>Undo</button>
+      {counts.alerts ? <p className="tiny center-text">Plus {counts.alerts} Smart Bite alert{counts.alerts === 1 ? "" : "s"} <Beta />, not counted as bites.</p> : null}
+
+      {hooked ? (
+        <div className="ctl-grid hooked">
+          <button type="button" className="ctl catch" onClick={() => setCatchOpen(true)}><Icon name="fish" /><span>Landed</span></button>
+          <button type="button" className="ctl" onClick={() => press("lost", "Fish lost")}><Icon name="close" /><span>Lost it</span></button>
+          <button type="button" className="ctl" onClick={() => press("snag", "Snag or weed")}><Icon name="rig" /><span>Snag or weed</span></button>
+        </div>
+      ) : (
+        <div className="ctl-grid">
+          <button type="button" className="ctl cast" onClick={() => press("cast", "Cast")}><Icon name="target" /><span>Cast</span></button>
+          <button type="button" className="ctl bite" onClick={() => press("bite", "Bite logged")}><Icon name="bell" /><span>Bite</span></button>
+          <button type="button" className="ctl hook" onClick={() => press("hooked", "Fish on!")}><Icon name="hook" /><span>Fish on</span></button>
+          <button type="button" className="ctl catch" onClick={() => setCatchOpen(true)}><Icon name="fish" /><span>Catch</span></button>
+        </div>
+      )}
+      <div className="row ctl-more">
+        <button type="button" className="btn small" onClick={() => press("missed", "Missed bite logged")}><Icon name="close" />Missed</button>
+        <button type="button" className="btn small" onClick={() => setMarkOpen(true)}><Icon name="flag" />Mark spot</button>
+        <button type="button" className="btn small" onClick={() => setSmart(true)}><Icon name="bell" />Smart Bite <Beta /></button>
+        <button type="button" className="btn ghost small" onClick={() => undoLast([...s.events].reverse().find((e) => ["bite", "missed", "cast", "mark", "note", "hooked", "lost", "snag"].includes(e.type))?.type)}>Undo</button>
       </div>
+      {s.backgroundMs > 60000 ? <Notice kind="warn">FishDock was in the background for {fmtDuration(s.backgroundMs)}. Phones stop web apps recording there, so your track has gaps{sharing ? " and viewers saw your phone go quiet" : ""}.</Notice> : null}
 
       <section className="card">
-        <div className="card-h"><h2>Your session</h2><span className="aside">{s.track.length ? `${Math.round(trackLengthM(s.track))} m walked` : ""}</span></div>
+        <div className="card-h"><h2>Catches this session</h2><span className="aside">{catches.length}</span></div>
+        {catches.length ? <div className="catch-strip">{catches.map((e) => {
+          const csp = speciesById(e.data?.species);
+          const photo = photoOf(e);
+          return (
+            <button key={e.id} type="button" className="catch-tile" onClick={() => { scrollTo({ top: 0, behavior: "smooth" }); sceneRef.current?.replayCatch(e); }}>
+              {photo ? <img src={photo} alt="" /> : csp && hasArt(csp.id) ? <img src={artUrl(csp.id, "s")} alt="" className="art" /> : <span className="ct-ph"><Icon name="fish" /></span>}
+              <span className="t">{e.data?.name || "Fish"}</span>
+              <span className="s">{[e.data?.lengthCm ? `${e.data.lengthCm} cm` : null, fmtTime(e.t)].filter(Boolean).join(" · ")}</span>
+            </button>
+          );
+        })}</div> : <p className="tiny">Tap Catch when you land one. It's saved to your diary and plays in the view.</p>}
+      </section>
+
+      <section className="card">
+        <div className="card-h"><h2>Share this session</h2><span className="aside">{sharing ? `${(sharing.links || []).filter((l) => l.active).length} link${(sharing.links || []).filter((l) => l.active).length === 1 ? "" : "s"}` : "Private"}</span></div>
+        <p className="small muted">{sharing ? (sharing.error ? sharing.error : `${sharing.watching || 0} watching now. They see the view above, your catches and the weather, never your track.`) : "Let family and friends watch on a private link: no camera, no account needed. You choose what they see."}</p>
+        <div className="row">
+          <button type="button" className="btn primary" onClick={() => setShareOpen(true)}><Icon name="share" />{sharing ? "Manage sharing" : "Share fishing session"}</button>
+          <button type="button" className="btn" onClick={() => setCommOpen(true)}><Icon name="users" />Share to Community</button>
+        </div>
+      </section>
+
+      <details className="card fold">
+        <summary><span className="grow"><b>Session map</b><span className="tiny"> · {s.track.length ? `${Math.round(trackLengthM(s.track))} m walked` : gpsLabel}</span></span><Icon name="down" /></summary>
+        <div className="live-meta"><span className={`chip ${s.gps.state === "ok" ? "tide" : s.gps.state === "off" ? "" : "warn"}`}><Icon name="locate" />{gpsLabel}</span></div>
         <SessionPlot track={s.track} events={s.events} />
+      </details>
+
+      <section className="card">
+        <div className="card-h"><h2>Activity</h2></div>
         <Timeline events={s.events} />
       </section>
 
@@ -124,18 +250,52 @@ function Running({ s }) {
         <button type="button" className="btn danger" onClick={() => setEndOpen(true)}><Icon name="stop" />End</button>
       </div>
 
-      {catchOpen ? <CatchForm session={s} gps={s.lastFix && s.gpsAllowed ? { lat: s.lastFix.lat, lon: s.lastFix.lon, acc: s.lastFix.acc } : null} onClose={() => setCatchOpen(false)} onSaved={(rec) => addEvent("catch", { catchId: rec.id, species: rec.speciesName, lengthCm: rec.lengthCm, released: rec.released })} /> : null}
+      {catchOpen ? <CatchForm session={s} gps={s.lastFix && s.gpsAllowed ? { lat: s.lastFix.lat, lon: s.lastFix.lon, acc: s.lastFix.acc } : null} onClose={() => setCatchOpen(false)} onSaved={(rec) => addEvent("catch", { catchId: rec.id, species: rec.speciesName, speciesId: rec.species || null, lengthCm: rec.lengthCm, weightKg: rec.weightKg ?? null, released: rec.released, bait: rec.bait || null, photo: !!rec.photo })} /> : null}
       {markOpen ? <MarkSheet onClose={() => setMarkOpen(false)} /> : null}
       {smart ? <SmartBite onClose={() => setSmart(false)} /> : null}
+      {viewOpen ? <SceneEditor place={place} quality={settings.liveQuality || "auto"} onQuality={(q) => update({ liveQuality: q })} onClose={() => setViewOpen(false)} onSaved={(c) => setSessionScene(c)} /> : null}
+      {shareOpen ? <ShareSheet session={s} onClose={() => setShareOpen(false)} /> : null}
+      {commOpen ? <CommunityShare s={s} catches={catches} photoOf={photoOf} onClose={() => setCommOpen(false)} /> : null}
       {endOpen ? (
         <Sheet title="End this session?" onClose={() => setEndOpen(false)}>
           <p className="small">{fmtDuration(elapsed(s))} · {s.counts.bites} bites · {s.counts.catches} caught · {s.counts.missed} missed.</p>
-          <p className="small muted">It's saved on this phone with its timeline{s.track.length ? " and track" : ""}. Nothing is shared.</p>
-          <button type="button" className="btn primary block" onClick={async () => { await endSession({ endSnapshot: snapshot(app) }); say("Session saved"); }}>End and save</button>
+          <p className="small muted">It's saved on this phone with its timeline{s.track.length ? " and track" : ""}. {sharing ? "People with a link see that you've finished, and can replay it until their link ends. Stop sharing any time from the session's replay." : "Nothing is shared."}</p>
+          <button type="button" className="btn primary block" onClick={async () => { const done = await endSession({ endSnapshot: snapshot(app) }); sessionEnded(done); say("Session saved"); }}>End and save</button>
           <button type="button" className="btn ghost block" onClick={() => setEndOpen(false)}>Keep fishing</button>
         </Sheet>
       ) : null}
+      <div className="tiny live-sound">
+        <label className="toggle-inline" htmlFor="lv-sound"><input id="lv-sound" type="checkbox" checked={!!settings.liveSound} onChange={(e) => update({ liveSound: e.target.checked })} /> Sound in the view</label>
+        <span>The view is animated from what you log. It isn't a camera.</span>
+      </div>
     </main>
+  );
+}
+
+/** Share to Community: a catch or a summary, through the normal post sheet. Never automatic, never the live session. */
+function CommunityShare({ s, catches, photoOf, onClose }) {
+  const { place } = useApp();
+  const [user, setUser] = useState(null);
+  const [pick, setPick] = useState(null);
+  useEffect(() => onUser(setUser), []);
+  if (pick) return <Compose place={place} initial={pick} onClose={onClose} onPosted={onClose} />;
+  const summary = `${fmtDuration(elapsed(s))} at ${place.region || "the coast"}: ${s.counts.casts} casts, ${s.counts.bites} bites, ${s.counts.catches} caught${catches.length ? ` (${[...new Set(catches.map((e) => e.data?.name).filter(Boolean))].join(", ")})` : ""}.`;
+  return (
+    <Sheet title="Share to Community" aside="Public. Only what you choose, after you check it." onClose={onClose}>
+      {!accountsEnabled() ? <Notice kind="warn">Posting to Community needs a FishDock account, and accounts aren't switched on yet. Private links to family and friends work without one.</Notice> : !user ? <Notice>Sign in on the Community tab first, then come back here.</Notice> : null}
+      <p className="small muted">Your private live link stays private: nothing from it goes to Community. A post shows an area at most, never your mark.</p>
+      <div className="list">
+        {catches.map((e) => (
+          <button key={e.id} type="button" className="li" disabled={!accountsEnabled() || !user} onClick={() => setPick({ kind: "catch", species: e.data?.species || "", text: `${e.data?.name || "Fish"}${e.data?.lengthCm ? `, ${e.data.lengthCm} cm` : ""}${e.data?.bait ? ` on ${e.data.bait}` : ""}${e.data?.released ? ". Released" : ""}.`, photo: photoOf(e) })}>
+            <span className="fish-ico"><Icon name="fish" /></span><span className="grow"><span className="t">A catch: {e.data?.name || "fish"}</span><span className="s">{fmtTime(e.t)}{photoOf(e) ? " · with photo" : ""}</span></span><Icon name="chevron" className="go" />
+          </button>
+        ))}
+        <button type="button" className="li" disabled={!accountsEnabled() || !user} onClick={() => setPick({ kind: "report", text: summary })}>
+          <span className="fish-ico"><Icon name="route" /></span><span className="grow"><span className="t">A session summary</span><span className="s">{summary}</span></span><Icon name="chevron" className="go" />
+        </button>
+      </div>
+      <p className="tiny">Replays of a moment or a whole session can't be posted to Community yet. You can watch them back from Past sessions.</p>
+    </Sheet>
   );
 }
 
@@ -152,7 +312,7 @@ function MarkSheet({ onClose }) {
   );
 }
 
-const EV = { bite: ["bell", "Bite"], smartbite: ["bell", "Smart Bite alert"], missed: ["close", "Missed bite"], catch: ["fish", "Catch"], mark: ["flag", "Mark"], note: ["edit", "Note"], conditions: ["wind", "Conditions"], cast: ["target", "Cast"] };
+const EV = { ...EV_INFO, catch: ["fish", "Catch"] };
 function Timeline({ events, upTo }) {
   const list = (events || []).filter((e) => e.type !== "cast" && (upTo == null || e.t <= upTo)).slice(-40).reverse();
   if (!list.length) return <p className="tiny">Bites, catches and marks appear here as you log them.</p>;
@@ -201,35 +361,53 @@ function SessionPlot({ track, events, at }) {
 
 function Replay({ s, onClose }) {
   const start = s.startedAt, end = s.endedAt || Date.now();
-  const [t, setT] = useState(end);
+  const [t, setT] = useState(start);
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(30);
+  const [scene, setScene] = useState(null);
+  const [photos, setPhotos] = useState([]);
   const raf = useRef(0);
+  const tRef = useRef(t);
+  tRef.current = t;
+  useEffect(() => { resolveScene(s.place, s.scene || loadChoice(s.place)).then(setScene); }, [s.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { all("catches").then((l) => setPhotos(l.filter((c) => c.sessionId === s.id))); }, [s.id]);
   useEffect(() => {
     if (!playing) return;
     let last = performance.now();
     const step = (now) => {
       const dt = now - last; last = now;
-      setT((x) => { const nx = x + dt * ((end - start) / 20000); if (nx >= end) { setPlaying(false); return end; } return nx; });
+      setT((x) => { const nx = x + dt * speed; if (nx >= end) { setPlaying(false); return end; } return nx; });
       raf.current = requestAnimationFrame(step);
     };
     raf.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf.current);
-  }, [playing, start, end]);
+  }, [playing, start, end, speed]);
+  const evs = sceneEvents(s);
   const until = eventsUntil(s.events, t);
+  const cond = [...(s.events || [])].reverse().find((e) => e.type === "conditions" && e.t <= Math.max(t, start + 1))?.data || s.events.find((e) => e.type === "conditions")?.data || null;
+  const jump = (to) => { setPlaying(false); setT(Math.max(start, to)); setSpeed(1); setTimeout(() => setPlaying(true), 30); };
+  const photoOf = (ev) => photos.find((c) => c.id === ev?.data?.catchId)?.photo || null;
   return (
-    <Sheet title={`${s.place?.name}`} aside={`${fmtDateTime(start)} · ${fmtDuration(elapsed(s))}`} onClose={onClose}>
-      <SessionPlot track={s.track} events={s.events} at={t} />
+    <Sheet title={`${s.place?.name}`} aside={`${fmtDateTime(start)} · ${fmtDuration(elapsed(s))}`} onClose={onClose} wide>
+      <div className="replay-stage">
+        <FishingScene scene={scene} events={evs} status="running" now={() => tRef.current} env={{ cond, light: lightAt(s.place, t), kind: s.place?.kind }} quality="auto" catchPhoto={photoOf}>
+          <div className="fs-top"><span className="live-badge s-replay">Replay</span><span className="fs-chip num">{fmtTime(t)}</span></div>
+        </FishingScene>
+      </div>
       <div className="replay-bar">
-        <button type="button" className="xbtn" onClick={() => { if (t >= end) setT(start); setPlaying(!playing); }} aria-label={playing ? "Pause replay" : "Play replay"}><Icon name={playing ? "pause" : "play"} /></button>
+        <button type="button" className="xbtn" onClick={() => { if (t >= end) setT(start); setSpeed(30); setPlaying(!playing); }} aria-label={playing ? "Pause replay" : "Play replay"}><Icon name={playing ? "pause" : "play"} /></button>
         <input type="range" min={start} max={end} step={1000} value={t} onChange={(e) => { setPlaying(false); setT(Number(e.target.value)); }} aria-label="Replay time" id="replay-t" />
         <span className="num tiny">{fmtTime(t)}</span>
       </div>
+      <div className="moments">{notable(evs).map((m) => <button key={m.id || m.t} type="button" className="chip" onClick={() => jump(m.t - 2500)}>{fmtTime(m.t)} {m.label}{m.type === "catch" && m.data?.name ? `: ${m.data.name}` : ""}</button>)}</div>
+      <p className="tiny">Tap a moment to watch it at real speed. The replay is animated from what you logged; it isn't video.</p>
       <div className="kv">
         <div><span className="k">Bites</span><span className="v">{until.filter((e) => e.type === "bite" || e.type === "smartbite").length}</span></div>
         <div><span className="k">Missed</span><span className="v">{until.filter((e) => e.type === "missed").length}</span></div>
         <div><span className="k">Caught</span><span className="v">{until.filter((e) => e.type === "catch").length}</span></div>
         <div><span className="k">Walked</span><span className="v">{Math.round(trackLengthM((s.track || []).filter((p) => p.t <= t)))} m</span></div>
       </div>
+      <details className="fold-plain"><summary>Session map</summary><SessionPlot track={s.track} events={s.events} at={t} /></details>
       <Timeline events={s.events} upTo={t} />
       <button type="button" className="btn ghost danger-text" onClick={async () => { await remove("sessions", s.id); onClose(); }}><Icon name="trash" />Delete this session</button>
     </Sheet>

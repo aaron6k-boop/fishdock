@@ -16,7 +16,7 @@
 //   GET  /api/admin/reports     { items: [{ postId, text, reports, reasons, author, authorUid, hidden, createdAt }] }
 //   POST /api/admin/posts/:id/hide     { hidden?: boolean (default true) } and clears its reports (reviewed)
 //   POST /api/admin/users/:uid/ban     { banned?: boolean (default true) }
-//   GET  /api/admin/flags  PUT /api/admin/flags { flags: { castAdvisor, identify, smartBite, community } }
+//   GET  /api/admin/flags  PUT /api/admin/flags { flags: { castAdvisor, identify, smartBite, community, liveShare } }
 
 import { json, err, readJson, toResponse, sameOrigin, isWrite, randomId, fail } from "./http.js";
 import { ensureSchema, maybeSweep, enforce } from "./db.js";

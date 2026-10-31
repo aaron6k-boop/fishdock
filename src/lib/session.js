@@ -75,13 +75,14 @@ if (typeof document !== "undefined") {
   addEventListener("pagehide", () => scheduleSave(true));
 }
 
-export async function startSession({ place, species, method, gpsAllowed, conditions }) {
+export async function startSession({ place, species, method, gpsAllowed, conditions, scene }) {
   if (activeSession()) return cur;
   cur = {
     id: newId("ses"), status: "running", startedAt: Date.now(), endedAt: null, pausedMs: 0, pausedAt: null,
     place: { id: place.id, name: place.name, kind: place.kind, lat: place.lat, lon: place.lon, region: place.region || null },
     species: species || null, method: method || null, gpsAllowed: !!gpsAllowed, gps: { state: gpsAllowed ? "starting" : "off" },
-    track: [], events: [], counts: { bites: 0, missed: 0, catches: 0, casts: 0 }, backgroundMs: 0, private: true,
+    track: [], events: [], counts: { bites: 0, missed: 0, catches: 0, casts: 0, hooked: 0, lost: 0 }, backgroundMs: 0, private: true,
+    scene: scene || null, // the Live Fishing View backdrop chosen for this session (kind and viewpoint; photos stay in their own store)
   };
   if (conditions) cur.events.push({ t: Date.now(), type: "conditions", data: conditions });
   try { localStorage.setItem(POINTER, cur.id); } catch { /* ignore */ }
@@ -102,6 +103,8 @@ export function addEvent(type, data = {}) {
   if (type === "missed") cur.counts.missed++;
   if (type === "catch") cur.counts.catches++;
   if (type === "cast") cur.counts.casts++;
+  if (type === "hooked") cur.counts.hooked = (cur.counts.hooked || 0) + 1;
+  if (type === "lost") cur.counts.lost = (cur.counts.lost || 0) + 1;
   scheduleSave(type !== "cast");
   emit();
   return ev;
@@ -112,7 +115,7 @@ export function undoLast(type) {
   for (let i = cur.events.length - 1; i >= 0; i--) {
     if (cur.events[i].type === type) {
       cur.events.splice(i, 1);
-      const k = { bite: "bites", smartbite: "bites", missed: "missed", catch: "catches", cast: "casts" }[type];
+      const k = { bite: "bites", smartbite: "bites", missed: "missed", catch: "catches", cast: "casts", hooked: "hooked", lost: "lost" }[type];
       if (k) cur.counts[k] = Math.max(0, cur.counts[k] - 1);
       break;
     }
@@ -123,23 +126,32 @@ export function undoLast(type) {
 export function pauseSession() {
   if (!cur || cur.status !== "running") return;
   cur.status = "paused"; cur.pausedAt = Date.now();
+  cur.events.push({ id: newId("ev"), t: cur.pausedAt, type: "pause", data: {} }); // for the Live Fishing View and replays
   stopGps(); unlockScreen(); scheduleSave(true); emit();
 }
 export function resumeSession() {
   if (!cur || cur.status !== "paused") return;
   cur.pausedMs += Date.now() - (cur.pausedAt || Date.now()); cur.pausedAt = null; cur.status = "running";
+  cur.events.push({ id: newId("ev"), t: Date.now(), type: "resume", data: {} });
   startGps(); lockScreen(); scheduleSave(true); emit();
 }
 export async function endSession(summary = {}) {
   if (!cur) return null;
   if (cur.status === "paused") cur.pausedMs += Date.now() - (cur.pausedAt || Date.now());
   cur.status = "ended"; cur.endedAt = Date.now(); Object.assign(cur, summary);
+  cur.events.push({ id: newId("ev"), t: cur.endedAt, type: "end", data: {} });
   stopGps(); unlockScreen();
   const done = cur;
   await put("sessions", done).catch(() => {});
   try { localStorage.removeItem(POINTER); } catch { /* ignore */ }
   cur = null; emit();
   return done;
+}
+
+/** Keeps the Live Fishing View's backdrop with the session, so its replay shows the same view. */
+export function setSessionScene(scene) {
+  if (!cur) return;
+  cur.scene = scene; scheduleSave(true); emit();
 }
 
 export function setGpsAllowed(on) {

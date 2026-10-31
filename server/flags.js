@@ -1,7 +1,7 @@
 // Feature flags, switched from the admin panel (GET/PUT /api/admin/flags) and read by the routes they control.
 // Only the names below exist; each is on or off. Without the database every flag is at its default.
 
-export const DEFAULT_FLAGS = { castAdvisor: true, identify: true, smartBite: true, community: true };
+export const DEFAULT_FLAGS = { castAdvisor: true, identify: true, smartBite: true, community: true, liveShare: true };
 export const FLAG_NAMES = Object.keys(DEFAULT_FLAGS);
 
 export async function getFlags(db) {

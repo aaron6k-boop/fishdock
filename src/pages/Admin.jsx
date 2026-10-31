@@ -65,7 +65,7 @@ export default function Admin() {
       ) : null}
       {tab === "flags" ? (
         <section className="card"><h2 className="h2">Feature switches</h2>
-          {["castAdvisor", "identify", "smartBite", "community"].map((k) => <label key={k} className="toggle" htmlFor={`fl-${k}`}><span>{k}</span><input id={`fl-${k}`} type="checkbox" checked={flags?.flags?.[k] !== false} onChange={() => toggleFlag(k)} /></label>)}
+          {["castAdvisor", "identify", "smartBite", "community", "liveShare"].map((k) => <label key={k} className="toggle" htmlFor={`fl-${k}`}><span>{k}</span><input id={`fl-${k}`} type="checkbox" checked={flags?.flags?.[k] !== false} onChange={() => toggleFlag(k)} /></label>)}
         </section>
       ) : null}
       <button type="button" className="btn ghost" onClick={() => go("settings")}><Icon name="back" />Back</button>

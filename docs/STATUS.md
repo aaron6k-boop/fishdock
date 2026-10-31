@@ -33,6 +33,7 @@ but not field-tested, labelled Beta in the app. Not built = not started.
 | AI fish identification | Beta, needs deployment + `GEMINI_API_KEY` | Same |
 | Live Fishing Mode | Working | GPS needs the deployed site or app (blocked in the preview) |
 | Smart Bite (camera rod tip, bite-alarm listen) | Beta, experimental | Needs camera/microphone: deployed site or app |
+| Live Fishing View (private links, animated scene, replay, highlight clips) | Working, needs deployment for sharing | Events and a state summary through D1, polled by sequence number; your photo, a free-licensed photo near the place, or a labelled representative scene; see docs/LIVE-VIEW.md |
 | Personal recommendations | Working | From the angler's own log |
 
 ## Stage 4: community and polish

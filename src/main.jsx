@@ -4,6 +4,7 @@ import { PREVIEW } from "./lib/api.js";
 import "leaflet/dist/leaflet.css";
 import "./styles/base.css";
 import "./styles/app.css";
+import "./styles/livefishing.css";
 
 /* global __BUILD_ID__ */
 createRoot(document.getElementById("root")).render(<App />);

@@ -61,6 +61,25 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS admin_audit (
      id TEXT PRIMARY KEY, at INTEGER NOT NULL, admin_uid TEXT NOT NULL, action TEXT NOT NULL, target TEXT, detail TEXT)`,
   `CREATE INDEX IF NOT EXISTS admin_audit_at ON admin_audit(at)`,
+  // Live Fishing View shares (see live.js): a whitelisted state summary and activity events, never a GPS track.
+  // Owner keys, link tokens and passcode grants are stored only as SHA-256 hashes. Deleted a day after the last link
+  // ends, or at once when the angler stops sharing. `pos` is set only while a link allows the exact location.
+  `CREATE TABLE IF NOT EXISTS live_shares (
+     id TEXT PRIMARY KEY, owner_hash TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, seen_at INTEGER,
+     last_seq INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL, pos TEXT, scene BLOB, scene_v INTEGER NOT NULL DEFAULT 0,
+     keep_until INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS live_shares_keep ON live_shares(keep_until)`,
+  `CREATE TABLE IF NOT EXISTS live_events (
+     share_id TEXT NOT NULL, seq INTEGER NOT NULL, eid TEXT NOT NULL, at INTEGER NOT NULL, t INTEGER NOT NULL, type TEXT NOT NULL,
+     data TEXT, PRIMARY KEY (share_id, seq))`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS live_events_eid ON live_events(share_id, eid)`,
+  `CREATE TABLE IF NOT EXISTS live_links (
+     id TEXT PRIMARY KEY, share_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, label TEXT NOT NULL, perms TEXT NOT NULL, pass TEXT,
+     created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, revoked_at INTEGER)`,
+  `CREATE INDEX IF NOT EXISTS live_links_share ON live_links(share_id)`,
+  `CREATE TABLE IF NOT EXISTS live_grants (hash TEXT PRIMARY KEY, link_id TEXT NOT NULL, expires_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS live_viewers (link_id TEXT NOT NULL, vkey TEXT NOT NULL, seen_at INTEGER NOT NULL, PRIMARY KEY (link_id, vkey))`,
+  `CREATE TABLE IF NOT EXISTS live_photos (share_id TEXT NOT NULL, pid TEXT NOT NULL, data BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (share_id, pid))`,
 ];
 // Columns added after the first release go here, one ALTER each. "duplicate column" (already migrated) is expected.
 const MIGRATIONS = [];

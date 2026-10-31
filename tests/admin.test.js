@@ -98,9 +98,9 @@ test("feedback list, flags GET/PUT (known booleans only) and audit", async (t) =
   assert.ok(list.body.items[0].createdAt > list.body.items[1].createdAt);
   assert.deepEqual(Object.keys(list.body.items[0]).sort(), ["createdAt", "fromAccount", "id", "kind", "ref", "text"]);
 
-  assert.deepEqual((await a("GET", "flags", { tok: "tok-admin" })).body, { flags: { castAdvisor: true, identify: true, smartBite: true, community: true } });
+  assert.deepEqual((await a("GET", "flags", { tok: "tok-admin" })).body, { flags: { castAdvisor: true, identify: true, smartBite: true, community: true, liveShare: true } });
   const put = await a("PUT", "flags", { tok: "tok-admin", body: { flags: { smartBite: false, community: "no", hacker: true } } });
-  assert.deepEqual(put.body.flags, { castAdvisor: true, identify: true, smartBite: false, community: true });
+  assert.deepEqual(put.body.flags, { castAdvisor: true, identify: true, smartBite: false, community: true, liveShare: true });
   assert.equal((await a("PUT", "flags", { tok: "tok-admin", body: { nope: 1 } })).status, 400);
   const audit = (await s.db.prepare(`SELECT action, detail FROM admin_audit`).all()).results;
   assert.equal(audit.length, 1);

@@ -94,6 +94,19 @@ Everything stored for the account as one JSON document.
 - `POST /api/community/posts/:id/report`, `POST /api/community/block/:uid`, `POST /api/community/follow/:uid`.
 - Moderation (admins): `GET /api/admin/reports`, `POST /api/admin/posts/:id/hide`, `POST /api/admin/users/:uid/ban`.
 
+## Live Fishing View sharing (no account; see docs/LIVE-VIEW.md)
+
+Angler (owner key from creation, sent as `X-FishDock-Owner`): `POST /api/live/shares`, `POST /api/live/shares/:id/push`,
+`GET|DELETE /api/live/shares/:id`, `PUT /api/live/shares/:id/scene`, `PUT /api/live/shares/:id/photos/:pid`,
+`POST /api/live/shares/:id/links`, `PUT|DELETE /api/live/shares/:id/links/:lid`.
+Viewer (link token as `X-FishDock-Link`, passcode grant as `X-FishDock-Grant`): `GET /api/live/view?after=<seq>`,
+`POST /api/live/unlock`, `GET /api/live/scene`, `GET /api/live/photo/:pid`. A link that has ended, been revoked or
+never existed is always the same 404 (`link_ended`). The `liveShare` admin flag switches sharing off.
+
+### `GET /api/scene?lat=&lon=`
+Free-licensed Wikimedia Commons photos taken within 4 km (10 km if few) of a 1 km square, landscape views of water
+first, each with author, licence and file page. Kept for a week per square.
+
 ## Feedback and metrics
 
 - `POST /api/feedback` `{ kind: "bug"|"idea"|"inaccurate-spot"|"inaccurate-forecast"|"other", text, ref? }` (guests allowed, rate-limited).
