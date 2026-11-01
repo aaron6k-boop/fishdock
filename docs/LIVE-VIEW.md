@@ -64,15 +64,35 @@ push route forward each stored event to the share's object.
 
 ## Rendering
 
-- `src/lib/sceneGL.js`: one WebGL shader (no libraries). Inside the water area the photo's own pixels flow towards
-  the shore (sea) or across (river) and are refracted by animated wave slopes; wind drives speed, chop and
-  whitecaps; rings spread where the line enters, where the lead lands and where a fish breaks the surface; glitter
-  under the sun or moon; cloud shadows, mist, rain dulling; the light of the hour graded over the photo. Without a
-  photo it draws a representative sea, river or lake (tree line and reflections) with the same light and weather.
-- `src/lib/sceneActors.js`: the rod (bending from the tip under load), guides, reel (handle turns while playing a
-  fish), line (slack or taut), float, lead in flight, splashes, drips and rain, on a 2D canvas over the water. The
-  fish is FishDock's own cut-out species picture, bent along its body as it wriggles, scaled to the logged length
-  (or a typical length, with no number shown). Species without a cut-out get the splash and the close-up only.
+- `src/lib/sceneGL.js`: one WebGL shader (no libraries). The water area is found in the photo itself (from the
+  bottom of each column up while it stays water-coloured, then the far water beyond a pier end; piers, walls and rocks
+  stay still) and replaced by a moving surface worked out in perspective on the water plane: long swells in drifting
+  groups (bigger with the forecast wave height), wind waves from several directions and fine ripples riding on them,
+  so nothing repeats. Each facet reflects the photo above it mirrored about the real waterline, sharp in a calm and
+  smeared in a blow; the body colour is the photo's own water. A darker contact line and working foam where it meets
+  walls and rocks, whitecaps in a blow, sun and moon paths, haze along the horizon. Rings spread where the lead lands,
+  at a bite, where a fish rolls or breaks the surface and under drips; broken water and foam where a hooked fish
+  thrashes. Without a photo it draws a representative sea, river or lake with the same light and weather.
+- `src/lib/sceneActors.js`: the rod, line, reel, float, lead, splashes, drips and rain on a 2D canvas over the water.
+  - The rod is a chain of segments bent progressively towards the tip, with three springs (blank, soft tip, angle),
+    so it overshoots and settles: a hand's small movements and the wind at idle; back, forward and a tip whip on the
+    cast; tip taps for a light bite and a pull-over for a proper take; a load that follows the fish's pull in a
+    fight (and its weight when lifted), then springs back when a fish is lost.
+  - Each species has a fight profile (pull, tempo, darting, splashing, body flex, fight length, flat or eel body):
+    cod heavy and slow, bass lively and splashy, whiting and mackerel quick and erratic, flatfish and rays flat,
+    conger and eels sinuous. Weight is the logged one or estimated from length (for the animation only, never shown).
+  - The fish is FishDock's own cut-out species picture drawn as a bent strip of slices along a curved spine, so it
+    flexes head to tail with a travelling wave, rolls about its spine (showing its edge, then its other flank), is
+    lit for the hour and tinted by the water below the surface. Sizes follow the logged length: about a ninth of the
+    view's height for a 55 cm cod hanging near the angler, smaller further out.
+  - The landing is one sequence: up from where the fight had got to, through the surface rolling and splashing,
+    lifted head first with the tail leaving the water last, hanging under the rod tip as a damped pendulum with a few
+    weakening kicks and drips, then swung in to the angler; the camera eases in, and the catch card follows. Timings
+    grow a little with the fish's weight (`landingTimes`), and each event's variation is seeded, so a replay or a
+    clip plays the same while the next cast differs.
+  - The camera: a small shake on strong pulls and a slow push in on the landed fish (none with reduced motion).
+  - In the demo the fish can show during the fight; in a real session the species isn't known until the catch is
+    logged, so the fight shows the rod and the water, not a guessed fish.
 - `src/components/FishingScene.jsx`: puts them together, with quality Auto / Battery Saver / Balanced / High. Auto
   picks from the phone's memory and cores, drops to Battery Saver below 30% battery when unplugged, and steps down if
   frames run slow. Nothing is drawn while the scene is off screen or the page is in the background. Browsers without
@@ -91,6 +111,8 @@ catches up the moment FishDock is open again, and viewers are told the phone has
 - `tests/live.test.js`: the whitelist, owner keys, sequence numbers and retries, permissions per link, passcodes,
   expiry, revoking, stopping, clean-up, throttles, the feature flag, nearby photo selection.
 - `tests/liveEvents.test.js`: phases, counts (Smart Bite apart), what leaves the phone.
+- `tests/sceneMotion.test.js`: every pictured species has a fight profile; rod load by size and weight; demo fight
+  lengths; the landing's beats in order and always within the landing phase.
 - Browser flows (Playwright, against `tests/e2e/server.mjs --dist`): angler and viewer together, passcode, the
   angler offline then back (each event arrives once), phone portrait and landscape, tablet, a highlight clip.
 
@@ -98,5 +120,7 @@ catches up the moment FishDock is open again, and viewers are told the phone has
 
 - A Durable Object transport for instant updates (above).
 - Cut-out pictures for the freshwater species, so pike, carp and the rest lift out of the water too.
+- Layered or 3D fish (separate tail, fins and body, or rigged glTF models) for independent fin movement and true
+  side-to-side turning; today's cut-outs bend as one picture and show a mirrored flank when they roll.
 - Panoramas: a wider photo the view can pan across as the angler changes where they cast.
 - Posting a replay moment to Community (needs accounts, and a public replay format with its own privacy review).

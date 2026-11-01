@@ -9,19 +9,75 @@ const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, f) => a + (b - a) * f;
 const ease = (f) => (f <= 0 ? 0 : f >= 1 ? 1 : f * f * (3 - 2 * f));
-const damp = (t, k, w) => Math.exp(-t * k) * Math.cos(t * w);
 // smooth pseudo-random wobble
 const wob = (t, s = 0) => Math.sin(t * 1.3 + s) * 0.5 + Math.sin(t * 2.7 + s * 1.7) * 0.3 + Math.sin(t * 4.9 + s * 3.1) * 0.2;
 
 const GUIDES = [0.42, 0.54, 0.64, 0.72, 0.79, 0.85, 0.9, 0.94, 0.975];
 
+// repeatable randomness per event (a replay looks the same; the next cast or splash doesn't)
+function hashSeed(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rng(seed) { let a = seed || 1; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+// smooth 1D noise in -1..1 (for runs, dives and thrashing that never repeat)
+function noise1(x) { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); const h = (n) => { const s = Math.sin(n * 127.1) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }; return h(i) * (1 - u) + h(i + 1) * u; }
+
+/** How each kind of fish fights: pull (rod load), tempo (tail beat and runs), erratic (darting), splashy (at the
+ *  surface), flex (body bend), long (fight length), and body plan. A description of typical behaviour for the
+ *  animation only; it isn't data shown to anglers. */
+const FIGHT = {
+  cod: { pull: 1.25, tempo: 0.75, erratic: 0.25, splashy: 0.2, flex: 0.85, long: 1.3 },
+  bass: { pull: 1.1, tempo: 1.35, erratic: 0.55, splashy: 0.85, flex: 1.1, long: 1.1 },
+  whiting: { pull: 0.55, tempo: 1.8, erratic: 0.85, splashy: 0.3, flex: 1.15, long: 0.6 },
+  pouting: { pull: 0.55, tempo: 1.7, erratic: 0.8, splashy: 0.25, flex: 1.1, long: 0.6 },
+  mackerel: { pull: 0.7, tempo: 2.1, erratic: 0.95, splashy: 0.55, flex: 1.2, long: 0.7 },
+  garfish: { pull: 0.65, tempo: 2.0, erratic: 0.9, splashy: 0.9, flex: 1.3, long: 0.7 },
+  pollack: { pull: 1.25, tempo: 1.1, erratic: 0.35, splashy: 0.25, flex: 1.0, long: 1.1 },
+  coalfish: { pull: 1.2, tempo: 1.15, erratic: 0.4, splashy: 0.25, flex: 1.0, long: 1.1 },
+  "ballan-wrasse": { pull: 1.15, tempo: 0.95, erratic: 0.3, splashy: 0.15, flex: 0.8, long: 0.9 },
+  "black-bream": { pull: 0.9, tempo: 1.4, erratic: 0.6, splashy: 0.3, flex: 0.9, long: 0.8 },
+  "thick-lipped-mullet": { pull: 1.1, tempo: 1.3, erratic: 0.6, splashy: 0.7, flex: 1.0, long: 1.1 },
+  gurnard: { pull: 0.7, tempo: 1.2, erratic: 0.5, splashy: 0.2, flex: 0.8, long: 0.7 },
+  plaice: { flat: true, headRight: true, pull: 0.8, tempo: 0.8, erratic: 0.3, splashy: 0.15, flex: 0.35, long: 0.8 },
+  flounder: { flat: true, pull: 0.75, tempo: 0.85, erratic: 0.3, splashy: 0.15, flex: 0.35, long: 0.8 },
+  dab: { flat: true, headRight: true, pull: 0.55, tempo: 1.0, erratic: 0.4, splashy: 0.1, flex: 0.3, long: 0.6 },
+  sole: { flat: true, headRight: true, pull: 0.65, tempo: 0.9, erratic: 0.35, splashy: 0.1, flex: 0.4, long: 0.7 },
+  "thornback-ray": { flat: true, ray: true, pull: 1.35, tempo: 0.5, erratic: 0.15, splashy: 0.1, flex: 0.2, long: 1.3 },
+  conger: { eel: true, pull: 1.5, tempo: 0.85, erratic: 0.35, splashy: 0.35, flex: 2.0, long: 1.5 },
+  eel: { eel: true, pull: 0.9, tempo: 1.1, erratic: 0.5, splashy: 0.3, flex: 2.2, long: 0.9 },
+  "lesser-spotted-dogfish": { pull: 0.9, tempo: 0.8, erratic: 0.3, splashy: 0.15, flex: 1.5, long: 0.8 },
+  smoothhound: { pull: 1.35, tempo: 1.0, erratic: 0.35, splashy: 0.2, flex: 1.4, long: 1.4 },
+  tope: { pull: 1.6, tempo: 1.05, erratic: 0.3, splashy: 0.2, flex: 1.4, long: 1.7 },
+  perch: { pull: 0.7, tempo: 1.5, erratic: 0.6, splashy: 0.4, flex: 1.0, long: 0.7 },
+};
+const FIGHT_BASE = { pull: 1, tempo: 1, erratic: 0.4, splashy: 0.3, flex: 1, long: 1, flat: false, ray: false, eel: false, headRight: false };
+export const fightProfile = (species) => ({ ...FIGHT_BASE, ...(FIGHT[species] || {}) });
+/** Seconds a fight with this fish typically lasts in the demo (longer for bigger, stronger fish). */
+/** How hard this fish loads the rod (about 0.45 for a small whiting to 1.7 for a big tope or conger). Weight is the
+ *  logged one, or estimated from length with a typical round-fish length-weight curve (for the animation only). */
+export function fishLoad(species, lengthCm, weightKg) {
+  const p = fightProfile(species), cm = clamp(lengthCm || 45, 8, 200);
+  const kg = weightKg || 0.0000105 * cm ** 3.02;
+  return clamp((0.5 + Math.sqrt(kg) * 0.45) * p.pull, 0.45, 1.7);
+}
+/** The landing's beats in seconds: up from below (T1), through the surface (T2), lifted clear (T3), the camera's close
+ *  look (T4), swung in onto the pier (swingIn to end), then the catch card. Heavier fish take a little longer. */
+export function landingTimes(species, lengthCm, weightKg) {
+  const ts = clamp(0.85 + 0.15 * fishLoad(species, lengthCm, weightKg), 0.9, 1.12);
+  const end = 7 * ts + 3;
+  return { ts, T1: 1.6 * ts, T2: 2.9 * ts, T3: 4.7 * ts, T4: 7 * ts, swingIn: end - 1.1, end, card: end - 0.2 };
+}
+export function fightSeconds(species, lengthCm) {
+  const p = fightProfile(species);
+  return clamp(4 + 6 * p.long * p.pull * Math.sqrt((lengthCm || 40) / 45), 4, 18);
+}
+
 export function createActors(canvas, { onSound } = {}) {
   const ctx = canvas.getContext("2d");
   let W = 1, H = 1, k = 1, map = [1, 1, 0, 0];
   let castRef = [0.5, 0.62], horizon = 0.42, floatRig = false, night = 0, windN = 0.3, windDir = 1, rain = 0;
-  let fishImg = null, fishCut = false, fishLenPx = 0, particles = [], ripples = [], streaks = [];
-  let reelA = 0, lastPhaseKey = "", prevAge = -1, lastT = 0, nextBoil = 0, nextDrip = 0, quality = 1, dusk = 0;
+  let fishImg = null, fishCut = false, particles = [], ripples = [], streaks = [];
+  let reelA = 0, lastPhaseKey = "", prevAge = -1, lastT = 0, quality = 1, dusk = 0;
   let birds = [], nextFlock = 6 + Math.random() * 10;
+  let prof = fightProfile(null), fishCm = 45, load = 1, waterTint = [0.12, 0.22, 0.25], rings = [];
   const fishCanvas = document.createElement("canvas");
   const fctx = fishCanvas.getContext("2d");
 
@@ -30,15 +86,18 @@ export function createActors(canvas, { onSound } = {}) {
   const depthAt = (y) => clamp((toRef(0, y)[1] - horizon) / Math.max(0.05, 1 - horizon), 0, 1);
 
   function addRipple(x, y, s = 1) { const [rx, ry] = toRef(x, y); ripples.push({ x: rx, y: ry, born: lastT, s }); if (ripples.length > 6) ripples.shift(); }
-  function splash(x, y, size = 1, n = 22) {
+  /** A splash: a crown of droplets thrown up and out (biased to one side when the fish moves that way), a little
+   *  mist, and a ring on the water. Every splash differs a little: size, spread, lean and drops. */
+  function splash(x, y, size = 1, n = 22, { rnd = Math.random, dir = 0 } = {}) {
     const d = depthAt(y), sc = (0.35 + d) * k * size;
-    n = Math.round(n * quality);
+    n = Math.max(4, Math.round(n * quality * (0.8 + rnd() * 0.4)));
+    const spread = 1.4 + rnd() * 0.9, lean = dir * (0.25 + rnd() * 0.35) + (rnd() - 0.5) * 0.3;
     for (let i = 0; i < n; i++) {
-      const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.9;
-      const v = (60 + Math.random() * 170) * sc;
-      particles.push({ x: x + (Math.random() - 0.5) * 10 * sc, y, vx: Math.cos(a) * v * 0.7, vy: Math.sin(a) * v, life: 0, max: 0.5 + Math.random() * 0.7, r: (0.8 + Math.random() * 2.2) * sc, kind: "drop", floor: y + 4 * sc });
+      const a = -Math.PI / 2 + lean + (rnd() - 0.5) * spread;
+      const v = (50 + rnd() * 190) * sc;
+      particles.push({ x: x + (rnd() - 0.5) * 12 * sc, y, vx: Math.cos(a) * v * 0.75, vy: Math.sin(a) * v, life: 0, max: 0.45 + rnd() * 0.8, r: (0.7 + rnd() * 2.4) * sc, kind: "drop", floor: y + 4 * sc });
     }
-    for (let i = 0; i < Math.round(5 * quality); i++) particles.push({ x: x + (Math.random() - 0.5) * 24 * sc, y: y - Math.random() * 8 * sc, vx: (Math.random() - 0.5) * 20 * sc, vy: -10 * sc, life: 0, max: 0.9 + Math.random() * 0.5, r: (8 + Math.random() * 10) * sc, kind: "mist", floor: 1e9 });
+    for (let i = 0; i < Math.round(4 * quality); i++) particles.push({ x: x + (rnd() - 0.5) * 26 * sc, y: y - rnd() * 8 * sc, vx: (rnd() - 0.5) * 22 * sc + dir * 8 * sc, vy: -9 * sc, life: 0, max: 0.8 + rnd() * 0.6, r: (7 + rnd() * 11) * sc, kind: "mist", floor: 1e9 });
     addRipple(x, y, Math.min(1.4, size));
   }
 
@@ -50,12 +109,14 @@ export function createActors(canvas, { onSound } = {}) {
     return { B, T, L: Math.hypot(T[0] - B[0], T[1] - B[1]), th0: Math.atan2(T[1] - B[1], T[0] - B[0]) };
   }
 
-  function rodPoints(B, L, th, kappa) {
+  /** The blank as a chain of short segments: the whole rod bends progressively (more towards the tip) under load,
+   *  and the soft tip has its own quicker flex. */
+  function rodPoints(B, L, th, kappa, tipFlex = 0) {
     const N = 30, pts = [B.slice()], ang = [];
     let x = B[0], y = B[1];
     for (let i = 0; i < N; i++) {
       const s = (i + 0.5) / N;
-      const a = th - kappa * s * s * 1.15;
+      const a = th - kappa * s * s * 1.15 - tipFlex * Math.pow(s, 6) * 2;
       ang.push(a);
       x += (Math.cos(a) * L) / N; y += (Math.sin(a) * L) / N;
       pts.push([x, y]);
@@ -185,10 +246,11 @@ export function createActors(canvas, { onSound } = {}) {
     ctx.lineTo(tip[0], tip[1]);
     ctx.stroke();
   }
-  function drawLineOut(tip, end, slack, t) {
+  function drawLineOut(tip, end, slack, t, hum = 0) {
     lineStroke(0.6);
-    const mx = (tip[0] + end[0]) / 2 + windDir * windN * 22 * k * slack + Math.sin(t * 1.7) * 2 * k * slack;
-    const my = (tip[1] + end[1]) / 2 + slack * Math.hypot(end[0] - tip[0], end[1] - tip[1]) * 0.18;
+    // slack line sags and blows with the wind; tight line hums with a tiny fast vibration
+    const mx = (tip[0] + end[0]) / 2 + windDir * windN * 22 * k * slack + Math.sin(t * 1.7) * 2 * k * slack + Math.sin(t * 61) * hum * 0.8 * k;
+    const my = (tip[1] + end[1]) / 2 + slack * Math.hypot(end[0] - tip[0], end[1] - tip[1]) * 0.18 + Math.sin(t * 53) * hum * 0.6 * k;
     ctx.beginPath(); ctx.moveTo(tip[0], tip[1]); ctx.quadraticCurveTo(mx, my, end[0], end[1]); ctx.stroke();
   }
   function drawTipLight(tip) {
@@ -210,39 +272,117 @@ export function createActors(canvas, { onSound } = {}) {
     return [x, y + bob - 10 * s * (1 - dip)];
   }
 
-  /** The fish, bent along its body (head left in the picture), into its own canvas so a wet sheen stays on it. */
-  function drawFish(cx, cy, rot, lenPx, wag, amp, alpha = 1) {
-    if (!fishImg || !fishCut || alpha <= 0) return null;
-    const iw = fishImg.naturalWidth, ih = fishImg.naturalHeight;
-    const s = lenPx / (iw * 0.9);
-    const fw = Math.ceil(iw * s * 1.1), fh = Math.ceil(ih * s * 1.5);
-    if (fishCanvas.width !== fw || fishCanvas.height !== fh) { fishCanvas.width = fw; fishCanvas.height = fh; } else fctx.clearRect(0, 0, fw, fh);
-    const N = 26;
-    for (let j = 0; j < N; j++) {
-      const u = j / N;
-      const dy = Math.sin(u * 3.2 - wag) * amp * Math.pow(u, 1.6) * ih * 0.12;
-      fctx.drawImage(fishImg, u * iw, 0, iw / N + 1, ih, (fw - iw * s) / 2 + u * iw * s, (fh - ih * s) / 2 + dy * s, (iw / N + 1) * s, ih * s);
+  /** A bend for the fish's body: a curl plus a travelling wave that grows towards the tail (radians along u). */
+  function bendFn(curl, amp, phase) {
+    const lam = prof.eel ? 1.6 : 0.85;
+    return (u) => curl * u * u + amp * Math.sin(TAU * u * lam - phase) * Math.pow(0.12 + u, 1.5);
+  }
+  /** The fish as a bent strip of its own picture: slices laid along a curved spine, so it flexes from head to tail
+   *  rather than sliding as a flat picture. Drawn into its own canvas; the part under the waterline is tinted and
+   *  faded by the water. Returns where the mouth (the hook) is. */
+  function renderFish(st) {
+    if (!fishImg || !fishCut || st.alpha <= 0) return null;
+    const img = fishImg, iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const u0 = 0.02, u1 = 0.985, N = 24, AX = 0.52;
+    const s = st.len / (iw * 0.9);
+    const flat = prof.flat ? 1 + 0.12 * Math.sin(lastT * (prof.ray ? 4.5 : 7)) : 1; // a ray's wings, a flatfish's flutter
+    // rolling about its own spine: the body narrows to its edge and shows the other flank (mirrored) as it turns
+    const cr = Math.cos(st.twist || 0), sy = (st.flip ? -1 : 1) * Math.sign(cr || 1) * Math.max(0.14, Math.abs(cr));
+    const pts = [];
+    let x = 0, y = 0;
+    for (let i = 0; i <= N; i++) {
+      const u = u0 + ((u1 - u0) * i) / N, ang = st.rot + st.bend(u);
+      pts.push([x, y, ang, u]);
+      x += (Math.cos(ang) * (u1 - u0) * iw * s) / N; y += (Math.sin(ang) * (u1 - u0) * iw * s) / N;
     }
+    const mi = ((0.06 - u0) / (u1 - u0)) * N, j = Math.floor(mi), fr = mi - j;
+    const mx0 = lerp(pts[j][0], pts[j + 1][0], fr), my0 = lerp(pts[j][1], pts[j + 1][1], fr);
+    const ox = st.anchor[0] - mx0, oy = st.anchor[1] - my0;
+    const half = ih * s * 0.62 * flat * Math.abs(sy);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, low = null;
+    for (const p of pts) { const px = p[0] + ox, py = p[1] + oy; x0 = Math.min(x0, px - half); y0 = Math.min(y0, py - half); x1 = Math.max(x1, px + half); y1 = Math.max(y1, py + half); if (!low || py > low[1]) low = [px, py]; }
+    x0 = Math.floor(x0); y0 = Math.floor(y0);
+    const fw = Math.ceil(x1 - x0) + 2, fh = Math.ceil(y1 - y0) + 2;
+    if (fw < 2 || fh < 2 || fw > 4096 || fh > 4096) return [st.anchor[0], st.anchor[1]];
+    if (fishCanvas.width < fw || fishCanvas.height < fh) { fishCanvas.width = Math.max(fw, fishCanvas.width); fishCanvas.height = Math.max(fh, fishCanvas.height); }
+    fctx.setTransform(1, 0, 0, 1, 0, 0);
+    fctx.clearRect(0, 0, fw, fh);
+    for (let i = 0; i < N; i++) {
+      const p = pts[i], du = (u1 - u0) / N;
+      fctx.save();
+      fctx.translate(p[0] + ox - x0, p[1] + oy - y0); fctx.rotate(p[2]);
+      fctx.scale(1, sy); // facing the other way (mirrored so its back stays up), or rolling
+      fctx.drawImage(img, p[3] * iw, 0, du * iw + 1, ih, 0, -AX * ih * s * flat, du * iw * s + 0.9, ih * s * flat);
+      fctx.restore();
+    }
+    // wet: a soft sheen across the body, darker in the dark
     fctx.globalCompositeOperation = "source-atop";
-    const sh = fctx.createLinearGradient(0, fh * 0.3, 0, fh * 0.6);
-    sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.45, `rgba(255,255,255,${0.2 - night * 0.12})`); sh.addColorStop(1, "rgba(255,255,255,0)");
+    const sh = fctx.createLinearGradient(0, 0, fw * 0.3, fh);
+    sh.addColorStop(0, "rgba(255,255,255,0)"); sh.addColorStop(0.42, `rgba(255,255,255,${0.16 - night * 0.1})`); sh.addColorStop(0.55, "rgba(255,255,255,0)");
     fctx.fillStyle = sh; fctx.fillRect(0, 0, fw, fh);
-    if (night > 0.2) { fctx.fillStyle = `rgba(10,20,40,${night * 0.55})`; fctx.fillRect(0, 0, fw, fh); }
+    // the light of the hour: a painted picture would glow at dusk, a real fish goes dim with a warm edge from the sky
+    const day = clamp(1 - night - dusk, 0, 1), edge = 1 - Math.abs(cr);
+    fctx.fillStyle = `rgba(${Math.round(18 * day + 38 * dusk + 8 * night)},${Math.round(26 * day + 28 * dusk + 14 * night)},${Math.round(34 * day + 36 * dusk + 30 * night)},${0.1 * day + 0.42 * dusk + 0.7 * night + 0.22 * edge})`;
+    fctx.fillRect(0, 0, fw, fh);
+    if (dusk > 0.1) {
+      const rim = fctx.createLinearGradient(0, 0, 0, fh);
+      rim.addColorStop(0, `rgba(255,170,110,${0.2 * dusk})`); rim.addColorStop(0.5, "rgba(255,170,110,0)");
+      fctx.fillStyle = rim; fctx.fillRect(0, 0, fw, fh);
+    }
     fctx.globalCompositeOperation = "source-over";
-    ctx.save(); ctx.globalAlpha = alpha; ctx.translate(cx, cy); ctx.rotate(rot);
-    ctx.drawImage(fishCanvas, -fw / 2, -fh / 2);
-    ctx.restore();
-    // the mouth (where the hook is) in stage coordinates
-    const mx = -iw * 0.44 * s, my = ih * 0.04 * s;
-    return [cx + mx * Math.cos(rot) - my * Math.sin(rot), cy + mx * Math.sin(rot) + my * Math.cos(rot), s, iw, ih];
+    const wY = st.waterY;
+    // above the water: as it is
+    if (wY == null || wY > y0) {
+      ctx.save(); ctx.globalAlpha = st.alpha;
+      if (wY != null && wY >= 0) { ctx.beginPath(); ctx.rect(0, 0, W, wY); ctx.clip(); }
+      if (wY == null || wY >= 0) ctx.drawImage(fishCanvas, 0, 0, fw, fh, x0, y0, fw, fh);
+      ctx.restore();
+    }
+    // below the water: tinted by it and fading with depth
+    if (wY != null && (wY < 0 || wY < y1)) {
+      fctx.globalCompositeOperation = "source-atop";
+      fctx.fillStyle = `rgba(${Math.round(waterTint[0] * 255)},${Math.round(waterTint[1] * 255)},${Math.round(waterTint[2] * 255)},0.62)`;
+      fctx.fillRect(0, 0, fw, fh);
+      fctx.globalCompositeOperation = "source-over";
+      ctx.save(); ctx.globalAlpha = st.alpha * st.under;
+      if (wY >= 0) { ctx.beginPath(); ctx.rect(0, wY, W, H - wY); ctx.clip(); }
+      ctx.drawImage(fishCanvas, 0, 0, fw, fh, x0, y0, fw, fh);
+      ctx.restore();
+      // where the body cuts the surface: a bright, broken waterline
+      if (wY >= 0 && y0 < wY && y1 > wY) {
+        let cx = null; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1][1] + oy, b = pts[i][1] + oy; if ((a - wY) * (b - wY) <= 0) { cx = pts[i][0] + ox; break; } }
+        if (cx != null) { ctx.strokeStyle = `rgba(235,242,248,${0.45 - night * 0.25})`; ctx.lineWidth = Math.max(1, 1.6 * k); ctx.beginPath(); ctx.ellipse(cx, wY, half * 0.9, half * 0.22, 0, 0, TAU); ctx.stroke(); }
+      }
+    }
+    // water running off: drips from the lowest point and along the body while it's wet
+    const fl = st.floor ?? wY;
+    if (st.drip && fl != null && fl >= 0 && low && low[1] < fl && seedR() < st.drip * 0.9) {
+      const q = pts[Math.floor(seedR() * pts.length)];
+      const src = seedR() < 0.55 ? low : [q[0] + ox, q[1] + oy];
+      particles.push({ x: src[0] + (seedR() - 0.5) * 4 * k, y: src[1], vx: (seedR() - 0.5) * 18 * k, vy: 10 * k, life: 0, max: 1.1, r: (0.7 + seedR() * 1.5) * k, kind: "drop", floor: fl, ring: true });
+    }
+    return [st.anchor[0], st.anchor[1]];
   }
 
   function stepParticles(dt) {
     const g = H * 1.6;
     particles = particles.filter((p) => (p.life += dt) < p.max);
     for (const p of particles) {
-      if (p.kind === "drop") { p.vy += g * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.y > p.floor && p.vy > 0) p.life = p.max; }
-      else { p.x += p.vx * dt; p.y += p.vy * dt; p.r *= 1 + dt * 0.6; }
+      if (p.kind === "drop") {
+        p.vy += g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        // a drop meeting the water leaves a tiny ring
+        if (p.y > p.floor && p.vy > 0) { p.life = p.max; if (p.ring && rings.length < 24) rings.push({ x: p.x, y: p.floor, life: 0, max: 0.9 + Math.random() * 0.5, r: p.r }); }
+      } else { p.x += p.vx * dt; p.y += p.vy * dt; p.r *= 1 + dt * 0.6; }
+    }
+    rings = rings.filter((q) => (q.life += dt) < q.max);
+  }
+  function drawRings() {
+    if (!rings.length) return;
+    ctx.lineWidth = Math.max(0.6, 0.8 * k);
+    for (const q of rings) {
+      const f = q.life / q.max, rr = q.r * (2 + f * 9);
+      ctx.strokeStyle = `rgba(225,236,244,${(1 - f) * (0.4 - night * 0.2)})`;
+      ctx.beginPath(); ctx.ellipse(q.x, q.y, rr, rr * 0.28, 0, 0, TAU); ctx.stroke();
     }
   }
   function drawParticles() {
@@ -295,6 +435,14 @@ export function createActors(canvas, { onSound } = {}) {
     ctx.stroke();
   }
 
+  // ---- the rod's springiness: it follows where it's pulled, with a natural overshoot ----
+  const rodS = { k: 0.04, kv: 0, tip: 0, tipv: 0, th: null, thv: 0 };
+  function springTo(o, key, vkey, target, w, zeta, dt) {
+    const n = Math.max(1, Math.ceil(dt / 0.006)), h = dt / n;
+    for (let i = 0; i < n; i++) { const a = w * w * (target - o[key]) - 2 * zeta * w * o[vkey]; o[vkey] += a * h; o[key] += o[vkey] * h; }
+  }
+  let lastTip = null, seedR = Math.random, P = {}, roll = null, nextRollT = 0, lastPhase = "", fightPos = null, fromPos = null, LT = landingTimes(null, 45);
+
   // ---- one frame ----
   function frame(t, info) {
     const dt = clamp(t - lastT, 0, 0.1);
@@ -302,105 +450,143 @@ export function createActors(canvas, { onSound } = {}) {
     ctx.clearRect(0, 0, W, H);
     const { phase = "idle", age = 0, ev = null } = info || {};
     const key = `${phase}|${info?.since || 0}`;
-    if (key !== lastPhaseKey) { lastPhaseKey = key; prevAge = age > 1.2 ? age : -1; }
+    if (key !== lastPhaseKey) {
+      lastPhaseKey = key; prevAge = age > 1.2 ? age : -1;
+      // each event gets its own, repeatable variation (a replay looks the same; the next cast doesn't)
+      seedR = rng(hashSeed(`${info?.since || 0}|${ev?.id || ev?.seq || ""}|${phase}`));
+      P = { strong: seedR() < 0.35 + 0.3 * prof.pull, s1: seedR() * 10, s2: seedR() * 10, s3: seedR() * 10, size: 0.85 + seedR() * 0.4, side: seedR() < 0.5 ? -1 : 1 };
+      // when a lifted fish kicks: a few times, sooner and more often for lively fish
+      P.kicks = [0, 1, 2, 3].map((i) => LT.T3 - 0.6 + i * (0.9 + seedR() * 0.8) / prof.tempo + seedR() * 0.3).slice(0, prof.erratic > 0.5 ? 4 : 3);
+      roll = null; nextRollT = t + 2 + seedR() * 3;
+      // the landing carries on from wherever the fight had got to (a replay starts from the cast)
+      fromPos = phase === "landing" && lastPhase === "hooked" ? fightPos : null;
+      lastPhase = phase;
+    }
     const crossed = (m) => prevAge < m && age >= m;
     const { B, L, th0 } = layout();
+    if (rodS.th == null) rodS.th = th0;
     const E0 = toStage(castRef);
-    const near = [W * (W / H > 1.05 ? 0.46 : 0.42), lerp(E0[1], H * 0.96, 0.75)];
-    let th = th0, kappa = 0.04, slack = 1, end = E0, showLine = phase !== "ended" && phase !== "idle", lead = null, spinning = false, floatDip = 0;
-    const sway = wob(t * 0.8) * 0.006 * (0.4 + windN) + (phase === "waiting" && !floatRig ? Math.max(0, Math.sin(t * 0.78)) * 0.012 * (0.5 + windN) : 0);
-    kappa += sway;
+    const land = W / H >= 1.05;
+    const near = [W * (land ? 0.47 : 0.45), lerp(E0[1], H * 0.92, 0.48)];
+    // how big a fish looks: about H/640 per cm at the surface below the pier, smaller further out (so a 55 cm cod
+    // there is under a tenth of the height); about H/400 when it's lifted up towards the angler
+    const pxPerCm = H / 640;
+    let thT = th0, kT = 0.035, tipT = 0, slack = 1, end = E0, showLine = phase !== "ended" && phase !== "idle", lead = null, spinning = false, floatDip = 0;
+    let fishSt = null, turb = [], shake = 0, push = 0, focus = null, thW = 9;
+    // a hand on the rod and the wind on the tip: small, never still, never repeating
+    thT += wob(t * 0.55, 2) * 0.0035 + wob(t * 0.21, 5) * 0.003;
+    tipT += wob(t * 2.4, 1) * 0.012 * (0.25 + windN);
 
+    if (phase === "waiting" && !floatRig) kT += Math.max(0, Math.sin(t * 0.78)) * 0.012 * (0.5 + windN); // the swell nodding the tip
     if (phase === "cast") {
-      if (age < 0.75) { const f = ease(age / 0.75); th = th0 + 0.72 * f; kappa = -0.05 * f; showLine = false; }
-      else if (age < 1.05) { const f = ease((age - 0.75) / 0.3); th = th0 + 0.72 - 1.0 * f; kappa = -0.05 + 0.32 * Math.sin(f * Math.PI); showLine = false; }
-      else { const f = age - 1.05; th = th0 - 0.28 * damp(f, 3.2, 9); kappa = 0.06 * damp(f, 4, 14); }
+      thW = 24;
+      if (age < 0.7) { const f = ease(age / 0.7); thT = th0 + 0.75 * f; kT = -0.12 * f; showLine = false; }
+      else if (age < 1.0) { const f = ease((age - 0.7) / 0.3); thT = th0 + 0.75 - 1.05 * f; kT = 0.4 * Math.sin(f * Math.PI * 0.9); showLine = false; }
+      else { thT = th0 - 0.3 * Math.max(0, 1 - (age - 1.0) / 1.1); kT = 0.03; }
       if (age >= 0.95 && age < 2.15) {
         const f = (age - 0.95) / 1.2;
-        const tipNow = rodPoints(B, L, th, kappa).pts.at(-1);
+        const tipNow = lastTip || [W * 0.6, H * 0.2];
         const x = lerp(tipNow[0], E0[0], ease(f)), y = lerp(tipNow[1], E0[1], f) - Math.sin(f * Math.PI) * H * 0.22;
         lead = [x, y, 1 - f * 0.7];
         end = [x, y]; slack = 0.05; showLine = true;
-      } else if (age >= 2.15) { slack = clamp((age - 2.15) / 0.7, 0.05, 1); }
+      } else if (age >= 2.15) slack = clamp((age - 2.15) / 0.8, 0.05, 1);
       if (crossed(0.8)) onSound?.("whoosh");
-      if (crossed(2.15)) { splash(E0[0], E0[1], 0.8, 16); onSound?.("plop"); }
+      if (crossed(2.15)) { splash(E0[0], E0[1], 0.7 * P.size, 14, { rnd: seedR }); onSound?.("plop"); }
     } else if (phase === "bite") {
-      const pulls = [[0, 0.07], [0.55, 0.12], [1.15, 0.08], [2.1, 0.16], [3.2, 0.06]];
-      for (const [p0, a] of pulls) if (age > p0) kappa += a * Math.exp(-(age - p0) * 5) * Math.abs(Math.sin((age - p0) * 26));
-      slack = 0.55;
+      // a light bite is a couple of taps at the tip; a proper take pulls the rod over
+      const taps = P.strong ? [[0, 0.07, 0.1], [0.35, 0.05, 0.24], [1.0, 0.06, 0.14], [1.9, 0.04, 0.3]] : [[0, 0.05, 0], [0.55, 0.07, 0.02], [1.3, 0.04, 0]];
+      for (const [p0, a, b] of taps) if (age > p0) { const e = Math.exp(-(age - p0) * 5.5); tipT += a * e * prof.pull * 1.4; kT += b * e * prof.pull; }
+      slack = P.strong ? 0.3 : 0.55;
       if (floatRig) floatDip = clamp(Math.max(0, Math.sin(age * 5)) * (age < 3 ? 0.8 : 0.2), 0, 1);
-      if (crossed(0.02)) { onSound?.("bell"); addRipple(E0[0], E0[1], 0.5); }
-      if (crossed(2.1)) { onSound?.("bell"); addRipple(E0[0], E0[1], 0.6); }
+      if (crossed(0.02)) { onSound?.("bell"); addRipple(E0[0], E0[1], P.strong ? 0.6 : 0.35); turb.push(); }
+      if (P.strong && age < 2.4) turb.push({ x: toRef(E0[0], E0[1])[0], y: toRef(E0[0], E0[1])[1], r: 0.02, s: 0.3 * Math.exp(-age) });
+      if (crossed(1.9) && P.strong) { onSound?.("bell"); addRipple(E0[0], E0[1], 0.5); }
     } else if (phase === "hooked") {
-      const pr = 1 - Math.exp(-age / 55);
-      end = [lerp(E0[0], near[0], pr * 0.8) + Math.sin(age * 0.45) * W * 0.06 * (1 - pr * 0.6), lerp(E0[1], near[1], pr * 0.85) + Math.sin(age * 0.8) * 4 * k];
-      const lunge = Math.max(0, Math.sin(age * 0.9 + Math.sin(age * 0.37) * 2)) ** 6;
-      kappa = 0.34 + 0.06 * wob(age * 2.2, 1) + 0.16 * lunge;
-      th = th0 - 0.05 - 0.04 * lunge;
-      slack = 0;
-      spinning = lunge < 0.4;
-      if (t > nextBoil) { nextBoil = t + 3 + Math.random() * 5; if (age > 0.5) { splash(end[0], end[1], 0.45 + lunge * 0.5, 10); onSound?.("splash"); } }
+      // the fish fights its own way: runs to the side, dives, lunges, rests; bigger fish pull harder, small fish dart
+      const pr = 1 - Math.exp(-age / (16 * prof.long));
+      const run = noise1(age * 0.22 * prof.tempo + P.s1), dive = Math.max(0, noise1(age * 0.17 + P.s2)) ** 2;
+      const surge = Math.max(0, Math.sin(age * 0.95 * prof.tempo + noise1(age * 0.3 + P.s3) * 2.2)) ** 6;
+      const jit = noise1(age * 3.1 * prof.tempo + P.s1) * prof.erratic;
+      const fx = lerp(E0[0], near[0], pr * 0.82) + (run * 0.09 + jit * 0.015) * W * (1 - pr * 0.5);
+      const fy = lerp(E0[1], near[1], pr * 0.86) - dive * H * 0.025 * (1 - pr);
+      end = [fx, fy]; fightPos = [fx, fy];
+      const tension = load * (0.72 + 0.4 * surge + 0.25 * dive + 0.08 * Math.abs(jit));
+      kT = 0.16 + 0.24 * tension; tipT += 0.06 * surge + jit * 0.02;
+      thT = th0 - 0.04 * tension + clamp((fx - E0[0]) / W, -0.25, 0.25) * 0.22; thW = 7;
+      slack = 0; spinning = surge < 0.35 && dive < 0.3;
+      shake = surge * 0.7 * load;
+      const [rx, ry] = toRef(fx, fy);
+      turb.push({ x: rx, y: ry, r: 0.025 + 0.03 * surge, s: (0.15 + 0.6 * surge) * (0.4 + prof.splashy) });
       if (crossed(0.02)) onSound?.("reelOn");
+      const persp = lerp(0.4, 1, depthAt(fy)), lenHere = fishCm * pxPerCm * persp;
+      const heading = Math.sign(noise1((age + 0.05) * 0.22 * prof.tempo + P.s1) - run) || 1; // which way it's running
+      // now and then the fish rolls on its side or slaps its tail at the surface (more often for lively fish)
+      if (!roll && t > nextRollT && surge > 0.6 && seedR() < 0.25 + prof.splashy * 0.6) {
+        roll = { t0: t, side: heading, tail: seedR() < 0.45 };
+        splash(fx, fy, (0.45 + prof.splashy * 0.6) * P.size * persp, 14, { rnd: seedR, dir: heading });
+        onSound?.("splash");
+      }
+      if (roll) {
+        const ra = t - roll.t0, dur = roll.tail ? 0.6 : 0.9;
+        if (ra > dur) { roll = null; nextRollT = t + 3 + (seedR() * 6) / (0.4 + prof.splashy); splash(fx, fy, 0.3 * persp, 8, { rnd: seedR }); addRipple(fx, fy, 0.5); }
+        else if (fishImg && fishCut) {
+          const out = Math.sin((ra / dur) * Math.PI);
+          if (roll.tail) {
+            // head down, the tail kicks up out of the water and slaps back
+            fishSt = { anchor: [fx, fy + lenHere * 0.62], rot: -Math.PI / 2 + roll.side * (0.75 - out * 0.35), len: lenHere, bend: bendFn(0.35 * roll.side * out, 0.5 * prof.flex, ra * 16), waterY: fy, under: 0.5, alpha: 1, flip: roll.side > 0 };
+          } else {
+            // on its side at the surface, the flank showing for a moment
+            const hz = roll.side > 0 ? Math.PI : 0;
+            fishSt = { anchor: [fx + roll.side * lenHere * 0.45, fy + lenHere * 0.07 * (1 - out)], rot: hz - roll.side * 0.12 * out, len: lenHere, bend: bendFn(-0.3 * roll.side * out, 0.35 * prof.flex, ra * 13 * prof.tempo), waterY: fy, under: 0.6, alpha: 1, flip: roll.side > 0 };
+          }
+        }
+      } else if (pr > 0.4 && fishImg && fishCut) {
+        // closer in, the fish shows as a shape under the surface now and then, side-on as it runs
+        const glimpse = clamp((Math.sin(age * 0.7 + P.s2) - 0.2) * 1.4, 0, 1) * clamp((pr - 0.4) * 4, 0, 1);
+        if (glimpse > 0.02) {
+          const hz = heading > 0 ? Math.PI : 0;
+          fishSt = { anchor: [fx, fy + lenHere * 0.12], rot: hz + dive * 0.3 * -heading + jit * 0.1, len: lenHere * 0.92, bend: bendFn(run * 0.25, 0.32 * prof.flex * (0.6 + surge), age * 9 * prof.tempo), waterY: -1, under: 0.42 * glimpse, alpha: 1, flip: heading > 0 };
+        }
+      }
     } else if (phase === "landing") {
-      // the last pull, the fish breaking the surface, then lifted close
-      const E = near;
-      if (age < 0.9) { kappa = 0.42 + 0.08 * Math.sin(age * 18); slack = 0; end = [lerp(E0[0], E[0], ease(age / 0.9)), lerp(E0[1], E[1], ease(age / 0.9))]; spinning = true; }
-      else { kappa = 0.3 + 0.05 * Math.sin(age * 3); slack = 0; spinning = age < 2.4; }
-      if (crossed(0.85)) { splash(E[0], E[1], 1.5, 46); onSound?.("bigsplash"); }
+      let hideLine;
+      ({ thT, kT, tipT, end, spinning, fishSt, shake, push, focus, hideLine } = landing(age, t, { E0, near, pxPerCm, crossed, turb, th0 }));
+      slack = 0; thW = 7;
+      if (hideLine) showLine = false;
       if (crossed(0.02)) onSound?.("reelOn");
-      if (crossed(2.4)) onSound?.("reelOff");
+      if (crossed(LT.T3 - 0.3)) onSound?.("reelOff");
     } else if (phase === "lost" || phase === "missed") {
-      kappa = 0.3 * damp(age, 3.5, 11) * (phase === "lost" ? 1 : 0.4);
+      // the tension goes: the spring of the rod throws the tip back
+      kT = 0; tipT = 0;
       slack = clamp(age / 0.6, 0.2, 1);
-      if (crossed(0.02)) { addRipple(E0[0], E0[1], 0.7); if (phase === "lost") onSound?.("reelOff"); }
+      if (crossed(0.02)) { addRipple(E0[0], E0[1], 0.7); if (phase === "lost") { rodS.kv -= 1.6 * load; onSound?.("reelOff"); } }
     } else if (phase === "paused") {
-      th = th0 + 0.04; slack = 1;
+      thT = th0 + 0.04; slack = 1;
     }
-    if (phase !== "hooked" && phase !== "landing" && info?.prevPhase === "hooked") onSound?.("reelOff");
     prevAge = age;
 
+    // the rod: the whole blank, the tip, and its angle, each with its own spring
+    springTo(rodS, "k", "kv", kT, 12, 0.28, dt);
+    springTo(rodS, "tip", "tipv", tipT, 26, 0.2, dt);
+    springTo(rodS, "th", "thv", thT, thW, 0.55, dt);
     reelA += dt * (spinning ? 9 : 0);
-    const rod = rodPoints(B, L, th, kappa);
+    const rod = rodPoints(B, L, rodS.th, rodS.k, rodS.tip);
     const tip = rod.pts.at(-1);
+    lastTip = tip;
     const gs = guidePoints(rod);
 
     stepBirds(t, dt);
     // things in the water first (behind the rod)
-    let fishMouth = null;
-    if (phase === "landing" && age >= 0.85 && age < 9) {
-      const f = clamp((age - 0.85) / 1.8, 0, 1), close = clamp((age - 2.6) / 1.6, 0, 1);
-      const lift = [lerp(near[0], W * 0.5, ease(f)), lerp(near[1], H * 0.44, ease(f)) + Math.sin(age * 2.4) * 6 * k * f];
-      const swing = Math.sin(age * 2.1) * 0.12 * (1 - close * 0.5);
-      const rot = lerp(Math.PI / 2 + 0.35, Math.PI / 2 - 0.15, ease(f)) + swing;
-      const scale = lerp(1, 1.35, ease(close));
-      const fade = age > 4.4 ? clamp(1 - (age - 4.4) / 0.8, 0, 1) : 1;
-      const len = fishLenPx * lerp(0.6, 1, ease(f)) * scale;
-      // place it so the mouth hangs on the line
-      const s = fishImg ? len / (fishImg.naturalWidth * 0.9) : 1;
-      const mxL = fishImg ? -fishImg.naturalWidth * 0.44 * s : 0, myL = fishImg ? fishImg.naturalHeight * 0.04 * s : 0;
-      const cx = lift[0] - (mxL * Math.cos(rot) - myL * Math.sin(rot)), cy = lift[1] - (mxL * Math.sin(rot) + myL * Math.cos(rot));
-      const amp = (age < 2.6 ? 1.1 : 0.55) * (0.6 + 0.4 * Math.abs(Math.sin(age * 1.3)));
-      fishMouth = drawFish(cx, cy, rot, len, age * 13, amp, fade);
-      if (fishMouth && fade > 0) {
-        end = [fishMouth[0], fishMouth[1]];
-        if (t > nextDrip && f > 0.1 && age < 4.4) {
-          nextDrip = t + 0.05;
-          const u = Math.random();
-          const bx = cx + Math.cos(rot) * (u - 0.5) * len * 0.9, by = cy + Math.sin(rot) * (u - 0.5) * len * 0.9;
-          particles.push({ x: bx, y: by, vx: (Math.random() - 0.5) * 30 * k, vy: 20 * k, life: 0, max: 0.9, r: (0.8 + Math.random() * 1.6) * k, kind: "drop", floor: near[1] });
-        }
-      }
-      if (!fishMouth && age < 2.6) end = lift;
-      if (!fishCut && crossed(1.2)) splash(near[0], near[1], 0.8, 18);
-    }
+    let mouth = null;
+    if (fishSt) { mouth = renderFish(fishSt); if (mouth && (phase === "landing")) end = mouth; }
+    if (phase === "landing" && !fishCut && age < 4.6) end = [near[0], near[1] - clamp((age - 1.6) / 2, 0, 1) * H * 0.2];
     // a gentle ring now and then where the line goes in
-    if (showLine && (phase === "waiting" || phase === "bite") && Math.random() < dt * 0.35) addRipple(E0[0], E0[1], 0.25);
+    if (showLine && (phase === "waiting" || phase === "bite") && seedR() < dt * 0.35) addRipple(E0[0], E0[1], 0.22);
     let lineEnd = end;
     if (floatRig && showLine && !lead && phase !== "hooked" && phase !== "landing") lineEnd = drawFloat(E0[0], E0[1], floatDip, t);
-    if (lead) {
-      ctx.fillStyle = "rgba(30,34,38,0.9)"; ctx.beginPath(); ctx.arc(lead[0], lead[1], Math.max(1.2, 3.2 * k * lead[2]), 0, TAU); ctx.fill();
-    }
+    if (lead) { ctx.fillStyle = "rgba(30,34,38,0.9)"; ctx.beginPath(); ctx.arc(lead[0], lead[1], Math.max(1.2, 3.2 * k * lead[2]), 0, TAU); ctx.fill(); }
     stepParticles(dt);
+    drawRings();
     drawParticles();
 
     // the rod, reel and line
@@ -408,16 +594,96 @@ export function createActors(canvas, { onSound } = {}) {
     drawGuides(gs);
     const spoolExit = drawReel(seat, rod.ang[9], reelA);
     if (phase !== "ended") drawLineThroughRod(spoolExit, gs, tip);
-    if (showLine) drawLineOut(tip, lineEnd, slack, t);
+    if (showLine) drawLineOut(tip, lineEnd, slack, t, slack === 0 ? 0.6 + 0.4 * shake : 0);
     drawTipLight(tip);
     drawRain(dt);
 
-    // ripple list for the water shader (ref coords, age in seconds)
+    // for the water shader: rings (ref coords, age in seconds) and patches of broken water
     ripples = ripples.filter((r) => t - r.born < 5);
     const out = ripples.map((r) => ({ x: r.x, y: r.y, age: t - r.born, s: r.s }));
-    if (showLine && phase === "hooked") { const [rx, ry] = toRef(end[0], end[1]); out.push({ x: rx, y: ry, age: (t * 0.9) % 1.6, s: 0.5 }); }
-    if (showLine && floatRig && phase !== "hooked") { const [rx, ry] = toRef(E0[0], E0[1]); out.push({ x: rx, y: ry, age: (t * 0.6) % 3, s: 0.18 + floatDip * 0.6 }); }
-    return out;
+    if (showLine && phase === "hooked") { const [rx, ry] = toRef(end[0], end[1]); out.push({ x: rx, y: ry, age: (t * 0.9) % 1.6, s: 0.45 }); }
+    if (showLine && floatRig && phase !== "hooked" && phase !== "landing") { const [rx, ry] = toRef(E0[0], E0[1]); out.push({ x: rx, y: ry, age: (t * 0.6) % 3, s: 0.18 + floatDip * 0.6 }); }
+    // a little camera life: a nudge on strong pulls, a slow push towards a landed fish
+    // (as fractions of the stage, so it applies at any size)
+    const sh = (shake * k * 1.2) / W;
+    const cam = { dx: (Math.sin(t * 31) * 0.6 + Math.sin(t * 47 + 1) * 0.4) * sh, dy: ((Math.sin(t * 37 + 2) * 0.6 + Math.sin(t * 53) * 0.4) * sh * W) / H, s: 1 + push * 0.07, ox: focus ? focus[0] / W : 0.5, oy: focus ? focus[1] / H : 0.5 };
+    return { ripples: out, dists: turb.filter(Boolean).slice(0, 2), cam };
+  }
+
+  /** A pose from which way the head faces (dir: -1 left, 1 right) and how far the tail hangs below the head (a, radians:
+   *  0 lying level, PI/2 hanging straight down). Keeping dir fixed while a changes turns the fish without it flipping over. */
+  const pose = (dir, a) => (dir > 0 ? { rot: Math.PI - a, flip: true } : { rot: a, flip: false });
+
+  /** The landing, as one continuous sequence: up from below, through the surface thrashing and rolling, lifted clear on
+   *  the line head first with the tail leaving the water last, then hanging under the rod tip, swinging, kicking and
+   *  settling while the camera eases in. Timings follow the species and its size (landingTimes). */
+  function landing(age, t, { E0, near, pxPerCm, crossed, turb, th0 }) {
+    const S = near, waterY = near[1], F = fromPos || E0;
+    const tip = lastTip || [W * 0.6, H * 0.2];
+    const lenS = fishCm * pxPerCm, lenH = (fishCm * H) / 400;
+    const R = H * 0.36; // line from the rod tip to the fish's mouth once it's lifted (it hangs against the water, near)
+    let thT = th0, kT, tipT = 0, end, spinning = false, fishSt = null, shake = 0, push = 0, focus = null;
+    const { T1, T2, T3, T4 } = LT;
+    const dir = P.side; // which way the fish faces as it comes in
+    const thrash = (a) => noise1(a * 2.2 * prof.tempo + P.s1);
+    const hasFish = fishImg && fishCut;
+    if (age < T1) {
+      // coming up from below, still fighting: a dark shape growing clearer, swimming against the line
+      const f = ease(age / T1);
+      const ax = lerp(F[0], S[0], f) + thrash(age) * W * 0.02 * f, ay = lerp(F[1], S[1] + H * 0.012, f);
+      end = [ax, ay];
+      kT = 0.2 + 0.24 * load * (0.9 + 0.3 * Math.max(0, thrash(age))); tipT = 0.03 * thrash(age * 3); spinning = true;
+      shake = 0.4 * load * f;
+      const ps = pose(dir, 0.35 + thrash(age * 0.8) * 0.3);
+      if (hasFish) fishSt = { anchor: [ax, ay], ...ps, twist: thrash(age * 0.6) * 0.5, len: lenS * lerp(lerp(0.4, 1, depthAt(F[1])), 1, f), bend: bendFn(thrash(age * 1.3) * 0.3, 0.34 * prof.flex, age * 12 * prof.tempo), waterY: -1, under: 0.12 + 0.5 * f, alpha: 1 };
+      const [rx, ry] = toRef(ax, waterY); turb.push({ x: rx, y: ry, r: 0.03 + 0.03 * f, s: 0.25 + 0.6 * f });
+      if (crossed(T1 * 0.6)) addRipple(ax, waterY, 0.6);
+    } else if (age < T2) {
+      // through the surface: the head comes out, the fish rolls and slaps, the body still in the water
+      const f = (age - T1) / (T2 - T1);
+      const mx = S[0] + thrash(age) * W * 0.012, my = waterY - ease(f) * lenS * 0.35;
+      end = [mx, my];
+      kT = 0.2 + 0.24 * load; tipT = 0.05 * thrash(age * 4); spinning = f < 0.6;
+      shake = 0.8 * load * (1 - f);
+      const roll = Math.sin(age * 6.5 * prof.tempo + P.s2) * 0.9 * (1 - f * 0.5) + thrash(age * 1.9) * 0.6;
+      const ps = pose(dir, 0.3 + 0.35 * f + thrash(age * 1.7) * 0.3);
+      if (hasFish) fishSt = { anchor: [mx, my], ...ps, twist: roll, len: lenS * lerp(1, 1.1, f), bend: bendFn(thrash(age * 2.1) * 0.55, 0.5 * prof.flex * (1 - f * 0.4), age * 15 * prof.tempo), waterY, under: 0.7, alpha: 1 };
+      if (crossed(T1)) { splash(S[0], waterY, 1.15 * P.size * (0.7 + prof.splashy * 0.5), 34, { rnd: seedR, dir }); onSound?.("bigsplash"); }
+      if (age > T1 + 0.2 && seedR() < 0.12 * (0.5 + prof.splashy)) splash(mx + (seedR() - 0.5) * lenS * 0.8, waterY, 0.35 + seedR() * 0.3, 7, { rnd: seedR, dir: seedR() < 0.5 ? -1 : 1 });
+      const [rx, ry] = toRef(mx, waterY); turb.push({ x: rx, y: ry, r: 0.06, s: 0.9 * (1 - f * 0.5) });
+    } else if (age < LT.end) {
+      // lifted on the line: head first, turning to hang, the tail leaving the water last; then it hangs under the tip
+      // as a pendulum, kicks now and then (less as it tires) and turns slowly on the line
+      const f = ease(clamp((age - T2) / (T3 - T2), 0, 1));
+      const sx = S[0], sy = waterY - lenS * 0.35;
+      const st = Math.max(0, age - T2);
+      const phi = 0.32 * dir * Math.exp(-st * 0.42) * Math.cos(st * 2.3 + 0.4); // the swing, from the sideways pull out of the water
+      const hangPt = [tip[0] + Math.sin(phi) * R, tip[1] + Math.cos(phi) * R];
+      // at the end it's swung in to the angler: towards and past the camera, out of the bottom of the view
+      const g = ease(clamp((age - LT.swingIn) / (LT.end - LT.swingIn), 0, 1));
+      const mx = lerp(sx, hangPt[0], f) - dir * g * W * 0.1, my = lerp(sy, hangPt[1], f) + Math.sin(f * Math.PI) * H * 0.012 + g * g * H * 0.75;
+      end = [mx, my];
+      // kicks: a few, at set moments, each weaker than the last
+      let curl = 0, amp = lerp(0.4, 0.08, clamp((age - T2) / 4.5, 0, 1)) * prof.flex;
+      for (let i = 0; i < P.kicks.length; i++) {
+        const fa = age - P.kicks[i];
+        if (fa > 0 && fa < 0.55) { const e = Math.sin((fa / 0.55) * Math.PI) * Math.pow(0.7, i); curl += (i % 2 ? -1 : 1) * dir * e * 0.55 * prof.flex; amp += 0.3 * e * prof.flex; }
+      }
+      const a = lerp(0.65, Math.PI / 2, f) - phi * 0.5 * dir + curl * 0.25;
+      const ps = pose(dir, a);
+      // the rod: loaded hard as it lifts, then just the hanging weight, bouncing with the swing and the kicks
+      const weightLoad = 0.1 + 0.19 * load;
+      kT = lerp(lerp(0.2 + 0.23 * load, weightLoad, f) * (1 + 0.18 * Math.abs(curl) + 0.15 * Math.abs(phi)), 0.05, g); thT = th0 + 0.09 * f * (1 - g) - 0.22 * g + curl * 0.015;
+      tipT = phi * 0.1 + curl * 0.06;
+      spinning = f < 0.85;
+      if (hasFish) fishSt = { anchor: [mx, my], ...ps, twist: lerp(0.4 * Math.sin(age * 5), 0.55 * Math.sin(st * 1.1 + P.s3) * Math.exp(-st * 0.15), f), len: lerp(lenS * 1.1, lenH, f) * (1 + g * 1.4), bend: bendFn(curl, amp, age * 11 * prof.tempo), waterY: age < T3 ? waterY : null, floor: waterY, under: 0.7, alpha: 1, drip: clamp(1 - (age - T2) / 4, 0.04, 1) * (1 - g) };
+      if (crossed(T2 + (T3 - T2) * 0.45)) { splash(sx, waterY, 0.55, 12, { rnd: seedR, dir: -dir }); addRipple(sx, waterY, 0.8); } // the tail leaves the water
+      if (age < T3) { const [rx, ry] = toRef(sx, waterY); turb.push({ x: rx, y: ry, r: 0.05, s: 0.6 * (1 - f) }); }
+      push = ease(clamp((age - T4 + 0.6) / 1.6, 0, 1)) * (1 - g);
+      focus = [mx, my + lenH * 0.45];
+    }
+    if (age >= LT.end) { kT = 0.05; thT = th0 - 0.22 + 0.22 * ease(clamp((age - LT.end) / 1.2, 0, 1)); end = S; }
+    return { thT, kT, tipT, end: end || S, spinning, fishSt, shake, push, focus, hideLine: age >= LT.end - 0.05 };
   }
 
   return {
@@ -428,12 +694,23 @@ export function createActors(canvas, { onSound } = {}) {
       streaks = [];
     },
     setLayout({ cast, horizon: hz, map: mp }) { if (cast) castRef = cast; if (hz != null) horizon = hz; if (mp) map = mp; },
-    setEnv({ night: n, wind, windDir: wd, rain: r, floatRig: f, quality: q, dusk: dk }) {
-      if (dk != null) dusk = dk;
+    setEnv({ night: n, wind, windDir: wd, rain: r, floatRig: f, quality: q, dusk: dk, waterTint: wt }) {
+      if (dk != null) dusk = dk; if (wt) waterTint = wt;
       if (n != null) night = n; if (wind != null) windN = wind; if (wd != null) windDir = wd; if (r != null) rain = r; if (f != null) floatRig = f; if (q != null) quality = q;
     },
-    /** The species picture (a cut-out when FishDock has one) and the length to draw it at, in stage pixels. */
-    setFish(img, cutout, lengthFrac) { fishImg = img; fishCut = !!cutout; fishLenPx = lengthFrac * Math.min(W, H * 1.6); },
+    /** The species picture (a cut-out when FishDock has one), the species and its logged (or typical) size. */
+    setFish(img, cutout, { species, lengthCm, weightKg } = {}) {
+      prof = fightProfile(species);
+      if (img && prof.headRight) {
+        // the picture faces right: mirror it once so the mouth is on the left like the others
+        const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+        const g = c.getContext("2d"); g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(img, 0, 0); img = c;
+      }
+      fishImg = img; fishCut = !!cutout;
+      fishCm = clamp(lengthCm || 45, 8, 200);
+      load = fishLoad(species, fishCm, weightKg);
+      LT = landingTimes(species, fishCm, weightKg);
+    },
     splashAt(refPt, size = 1) { const [x, y] = toStage(refPt); splash(x, y, size); },
     frame,
     stageOf: toStage,

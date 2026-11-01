@@ -12,7 +12,7 @@ export const EV_INFO = {
 /** Event types the Live Fishing View plays and shares. Marks, notes and conditions snapshots stay on the phone. */
 export const SHARED_TYPES = ["cast", "bite", "smartbite", "missed", "hooked", "lost", "snag", "catch", "pause", "resume", "end"];
 // How long one-off moments last on screen (ms).
-export const DUR = { cast: 2900, bite: 5500, smartbite: 4500, missed: 2500, lost: 2600, snag: 2200, catch: 9000 };
+export const DUR = { cast: 2900, bite: 5500, smartbite: 4500, missed: 2500, lost: 2600, snag: 2200, catch: 11000 };
 
 const byTime = (a, b) => a.t - b.t || (a.seq || 0) - (b.seq || 0);
 

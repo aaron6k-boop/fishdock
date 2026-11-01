@@ -4,7 +4,7 @@
 // or High; it stops drawing when off screen or in the background, and steps down by itself if the phone struggles.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { createWaterRenderer, composeFrame, composeMask, composeSkyMask, composeWaterAuto, defaultWater, coverMap, skyLight } from "../lib/sceneGL.js";
-import { createActors } from "../lib/sceneActors.js";
+import { createActors, landingTimes } from "../lib/sceneActors.js";
 import { phaseAt, DRAW_CM, DUR } from "../lib/liveEvents.js";
 import { defaultView, waterKind } from "../lib/scene.js";
 import { hasArt, artUrl } from "../data/fishart.js";
@@ -59,7 +59,10 @@ export function sceneEnv({ cond, light, view, kind, photo = true }) {
   const moonDisc = moonInView && light.moonAlt > 2 ? (1 - cloud * 0.9) * sky.night * (0.5 + 0.5 * (light.moonIllum ?? 0.5)) : 0;
   const wk = waterKind(kind);
   const windDir = cond?.windDir != null && facing != null ? (Math.sin(((cond.windDir + 180 - facing) * Math.PI) / 180) >= 0 ? 1 : -1) : 1;
+  // the swell: the forecast wave height when there is one, otherwise a rough wind-sea guess; none on a river or lake
+  const swell = wk !== "sea" ? 0 : cond?.waveM != null ? Math.min(1, cond.waveM / 1.5) : Math.min(1, 0.15 + wind * 0.6);
   return {
+    swell,
     ...sky, wind, cloud, rain, fog: cloud > 0.95 && rain > 0 ? 0.3 : 0, sunX, sun, moonX, moon, sunUp, sunGlow, moonUp, moonDisc,
     river: wk === "river" ? 1 : 0, still: wk === "still" ? 1 : 0, flowX: windDir * 0.7, windDir,
   };
@@ -98,8 +101,16 @@ export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip }) {
   );
 }
 
-const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, floatRig = false, live = false, vibrate = false, catchPhoto, children, className = "", onPhase }, ref) {
-  const wrap = useRef(null), glc = useRef(null), fxc = useRef(null);
+const fishOf = (ev, hint) => {
+  const d = ev?.type === "catch" ? ev.data || {} : hint || {};
+  return { species: d.species || null, lengthCm: d.lengthCm || DRAW_CM[d.species] || null, weightKg: d.weightKg || null };
+};
+const reduceMotion = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } };
+
+/** `fishHint` ({ species, lengthCm }) lets the demo show the fish during the fight; a real session only knows the
+ *  species once the catch is logged, so until then the fight shows the water and the rod, not a guessed fish. */
+const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, children, className = "", onPhase }, ref) {
+  const wrap = useRef(null), glc = useRef(null), fxc = useRef(null), camEl = useRef(null);
   const R = useRef({ gl: null, actors: null, raf: 0, visible: true, onScreen: true, override: null, lastFrame: 0, slow: 0, q: null, prevPhase: "", fishFor: "", fallback: null, frameCanvas: null });
   const [q, setQ] = useState(() => (quality === "auto" ? autoQuality() : quality));
   const [card, setCard] = useState(null);
@@ -110,7 +121,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
   const [clip, setClip] = useState(null);
   const clipOk = typeof MediaRecorder !== "undefined" && typeof HTMLCanvasElement !== "undefined" && !!HTMLCanvasElement.prototype.captureStream;
   const props = useRef({});
-  props.current = { events, status, now, envIn, floatRig, live, vibrate, catchPhoto, onPhase, sound };
+  props.current = { events, status, now, envIn, floatRig, live, vibrate, catchPhoto, onPhase, sound, fishHint };
   const view = scene?.view || defaultView();
 
   useEffect(() => { setQ(quality === "auto" ? autoQuality() : quality); }, [quality]);
@@ -130,6 +141,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     const io = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(([e]) => { r.onScreen = e.isIntersecting; }) : null;
     io?.observe(wrap.current);
     const vis = () => { r.visible = document.visibilityState === "visible"; };
+    r.still = reduceMotion();
     document.addEventListener("visibilitychange", vis);
     return () => { cancelAnimationFrame(r.raf); io?.disconnect(); document.removeEventListener("visibilitychange", vis); r.gl?.destroy(); };
   }, []);
@@ -200,29 +212,37 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         const p = phaseAt(P.events, nowMs, { status: P.status });
         info = { ...p, age: Math.max(0, (nowMs - p.since) / 1000) };
       }
-      // the fish to draw for a landing
-      if (info.phase === "landing") {
-        const d = info.ev?.data || {};
-        const key = `${d.species}|${d.lengthCm}|${glc.current.width}`;
+      // the fish to draw (and how it fights): the logged catch, or during a fight, what the demo says it is
+      if (info.phase === "landing" || info.phase === "hooked") {
+        const f = fishOf(info.ev, P.fishHint);
+        const key = `${f.species}|${f.lengthCm}|${f.weightKg}`;
         if (r.fishFor !== key) {
           r.fishFor = key;
-          const cm = d.lengthCm || DRAW_CM[d.species] || 40;
-          const frac = Math.min(0.7, Math.max(0.1, (cm / 100) * 0.6));
-          if (d.species && CUTOUTS(d.species)) {
+          r.actors.setFish(null, false, f);
+          if (f.species && CUTOUTS(f.species)) {
             const img = new Image();
-            img.onload = () => r.actors.setFish(img, true, frac);
-            img.src = artUrl(d.species, "s");
-            r.actors.setFish(null, false, frac);
-          } else r.actors.setFish(null, false, frac);
+            img.onload = () => { if (r.fishFor === key) r.actors.setFish(img, true, f); };
+            img.src = artUrl(f.species, "s");
+          }
         }
       }
       const env = sceneEnv({ cond: P.envIn?.cond, light: P.envIn?.light, view, kind: P.envIn?.kind, photo: !!r.frameCanvas });
       r.actors.setEnv({ night: env.night, wind: env.wind, windDir: env.windDir, rain: env.rain, floatRig: P.floatRig, quality: qq.parts, dusk: env.dusk });
       const t0 = performance.now();
-      const ripples = r.actors.frame(t, info);
+      if (r.gl?.tint !== r.tint) { r.tint = r.gl?.tint; r.actors.setEnv({ waterTint: r.tint || [0.1, 0.2, 0.22] }); }
+      const out = r.actors.frame(t, info);
+      // the camera: a small nudge on strong pulls, a slow push in on a landed fish (not with reduced motion)
+      const cam = r.still ? null : out.cam;
+      r.cam = cam;
+      const ce = camEl.current;
+      if (ce) {
+        const idle = !cam || (Math.abs(cam.s - 1) < 1e-3 && Math.abs(cam.dx) < 1e-4 && Math.abs(cam.dy) < 1e-4);
+        if (!idle) { ce.style.transformOrigin = `${(cam.ox * 100).toFixed(1)}% ${(cam.oy * 100).toFixed(1)}%`; ce.style.transform = `translate(${(cam.dx * 100).toFixed(3)}%, ${(cam.dy * 100).toFixed(3)}%) scale(${Math.max(cam.s, 1 + 2.2 * Math.max(Math.abs(cam.dx), Math.abs(cam.dy))).toFixed(4)})`; r.camOn = true; }
+        else if (r.camOn) { ce.style.transform = ""; r.camOn = false; }
+      }
       if (r.gl) {
         r.gl.set({ ...env, oct: qq.oct, flow: qq.flow });
-        r.gl.render(t, ripples);
+        r.gl.render(t, out.ripples, out.dists);
         if (r.rec) drawClipFrame(r);
       } else if (r.fallback && r.frameCanvas) {
         const c = glc.current, [sx, sy, ox, oy] = coverMap(c.width / c.height), f = r.frameCanvas;
@@ -248,7 +268,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         const text = { bite: info.ev?.type === "smartbite" ? "Smart Bite alert (Beta)" : "Bite!", hooked: "Fish on!", lost: "Fish lost", missed: info.ev?.type === "snag" ? "Snag, not a fish" : "Missed", paused: "Paused" }[info.phase];
         setBanner(text && fresh ? { text, kind: info.phase, key } : null);
         if (fresh && P.vibrate && info.phase === "bite") try { navigator.vibrate?.([70, 50, 70]); } catch { /* ignore */ }
-        if (info.phase === "landing" && fresh) setTimeout(() => setCard({ ev: info.ev, key }), 3600);
+        if (info.phase === "landing" && fresh) { const f = fishOf(info.ev); setTimeout(() => setCard({ ev: info.ev, key }), Math.max(0, landingTimes(f.species, f.lengthCm, f.weightKg).card * 1000 - info.age * 1000)); }
       }
     };
     r.raf = requestAnimationFrame(loop);
@@ -275,11 +295,12 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     rec.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
     const done = new Promise((res) => { rec.onstop = res; });
     const st = performance.now();
-    r.rec = { canvas: out, g: out.getContext("2d"), start: st, ev, photo, art, name: d.name || speciesById(d.species)?.name || "Fish", facts: [fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") };
+    const f = fishOf(ev);
+    r.rec = { canvas: out, g: out.getContext("2d"), start: st, ev, photo, art, lt: landingTimes(f.species, f.lengthCm, f.weightKg), name: d.name || speciesById(d.species)?.name || "Fish", facts: [fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") };
     r.override = { ev, start: st }; r.fishFor = "";
     setClip({ busy: true });
     rec.start(250);
-    await new Promise((res) => setTimeout(res, 9500));
+    await new Promise((res) => setTimeout(res, (r.rec.lt.card + 3.2) * 1000));
     rec.stop(); await done;
     r.rec = null;
     const ext = type.startsWith("video/mp4") ? "mp4" : "webm";
@@ -288,12 +309,15 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     setClip({ file, url: URL.createObjectURL(blob) });
   }
   function drawClipFrame(r) {
-    const c = r.rec, g = c.g, w = c.canvas.width, h = c.canvas.height;
+    const c = r.rec, g = c.g, w = c.canvas.width, h = c.canvas.height, cam = r.cam;
+    g.save();
+    if (cam) { g.translate(cam.ox * w + cam.dx * w, cam.oy * h + cam.dy * h); g.scale(cam.s, cam.s); g.translate(-cam.ox * w, -cam.oy * h); }
     g.drawImage(glc.current, 0, 0, w, h);
     g.drawImage(fxc.current, 0, 0, w, h);
-    const age = (performance.now() - c.start) / 1000;
-    if (age > 4.6) {
-      const a = Math.min(1, (age - 4.6) / 0.5);
+    g.restore();
+    const age = (performance.now() - c.start) / 1000, at = c.lt.card;
+    if (age > at) {
+      const a = Math.min(1, (age - at) / 0.5);
       g.fillStyle = `rgba(5,9,12,${0.55 * a})`; g.fillRect(0, 0, w, h);
       const pic = c.photo || c.art;
       g.globalAlpha = a;
@@ -316,7 +340,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
   useImperativeHandle(ref, () => ({
     /** Plays a logged catch's landing again, then shows its close-up. */
     recordClip,
-    replayCatch(ev) { const st = performance.now(); R.current.override = { ev, start: st }; R.current.fishFor = ""; setCard(null); setTimeout(() => setCard({ ev, key: `r${st}` }), 3600); },
+    replayCatch(ev) { const st = performance.now(), f = fishOf(ev); R.current.override = { ev, start: st }; R.current.fishFor = ""; setCard(null); setTimeout(() => setCard({ ev, key: `r${st}` }), landingTimes(f.species, f.lengthCm, f.weightKg).card * 1000); },
     showCard(ev) { setCard({ ev, key: `s${Date.now()}` }); },
   }), []);
 
@@ -340,8 +364,10 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
 
   return (
     <div ref={wrap} className={`fscene${fs ? " is-fs" : ""} ${className}`} data-phase={banner?.kind || ""}>
-      <canvas ref={glc} className="fs-water" aria-hidden="true" />
-      <canvas ref={fxc} className="fs-fx" aria-hidden="true" />
+      <div ref={camEl} className="fs-cam">
+        <canvas ref={glc} className="fs-water" aria-hidden="true" />
+        <canvas ref={fxc} className="fs-fx" aria-hidden="true" />
+      </div>
       {photoState === "loading" ? <div className="fs-loading"><span className="loading-dots" aria-label="Loading the scene" /></div> : null}
       <div className="fs-overlay">{children}</div>
       {banner ? <div className={`fs-banner b-${banner.kind}`} key={banner.key} role="status">{banner.text}</div> : null}

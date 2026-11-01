@@ -4,6 +4,7 @@
 .fscene { position: relative; width: 100%; aspect-ratio: 4 / 3.3; max-height: 60vh; border-radius: var(--r-l); overflow: hidden; background: #0b1620; isolation: isolate; box-shadow: 0 18px 40px #0008; touch-action: manipulation; }
 .fscene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .fs-fx { pointer-events: none; }
+.fs-cam { position: absolute; inset: 0; will-change: transform; }
 .fs-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #0b162088; z-index: 2; }
 .fs-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; }
 .fs-overlay button, .fs-overlay a { pointer-events: auto; }
@@ -46,7 +47,8 @@ button.fs-chip { cursor: pointer; }
 .fscene.is-fs .fs-overlay { padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); }
 
 /* the close-up of a landed fish */
-.fs-cardwrap { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; padding: 14px; background: radial-gradient(ellipse at center, #05090c66, #05090cbb); animation: fs-fade .5s ease both; }
+/* the close-up comes once the fish is swung in; it sits low so the scene stays in view above it */
+.fs-cardwrap { position: absolute; inset: 0; z-index: 5; display: grid; place-items: end center; padding: 14px; background: linear-gradient(to bottom, #05090c00 30%, #05090c55 55%, #05090cc0); animation: fs-fade .5s ease both; }
 @keyframes fs-fade { from { opacity: 0; } }
 .catch-card { position: relative; width: min(520px, 100%); display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: #0d171ef2; border: 1px solid #ffffff1c; box-shadow: 0 24px 60px #000c; color: var(--text); animation: fs-rise .55s cubic-bezier(.2, 1.1, .3, 1) both; }
 @keyframes fs-rise { from { transform: translateY(18px) scale(.96); opacity: 0; } }

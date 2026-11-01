@@ -19,13 +19,15 @@ precision highp float;
 precision mediump float;
 #endif
 varying vec2 vUv;
-uniform sampler2D uFrame, uMask, uSky, uBlur;
+uniform sampler2D uFrame, uMask, uSky, uBlur, uShore;
 uniform vec4 uMap;
 uniform vec2 uRes;
 uniform vec3 uWaterCol;
 uniform float uTime, uHorizon, uWind, uFlowX, uRiver, uStill, uProc, uHasPhoto, uOct, uFlow;
 uniform float uNight, uDusk, uDay, uRain, uFog, uCloud, uSunX, uSun, uMoonX, uMoon, uSunUp, uSunGlow, uMoonUp, uMoonDisc;
 uniform vec4 uRip[6];
+uniform vec4 uDist[2];
+uniform float uSwell;
 
 float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
 float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
@@ -140,9 +142,11 @@ void main(){
     col += vec3(.92,.94,1.)*(smoothstep(.024, .019, ml)*.85 + exp(-ml*14.)*.22 + exp(-ml*4.)*.06)*uMoonDisc*sk;
   }
 
-  // ---- the water: a real wave surface in perspective, lit by the sky it reflects ----
-  // Waves are worked out on the flat water plane (so they shrink and slow towards the horizon), each face reflects
-  // the sky above it (from the photo itself, mirrored), and the photo's own water gives the colour and texture.
+  // ---- the water: a moving surface in perspective over the real scene ----
+  // Worked out on the flat water plane (waves shrink and slow towards the horizon). Long swells in drifting groups,
+  // wind waves from several directions and fine ripples riding on them, so nothing repeats. Each facet reflects
+  // what's above it in the photo, mirrored about the real waterline at that point (walls, rocks and cliffs show in
+  // the water right under them), sharp in calm and smeared in a blow. The body colour is the photo's own water.
   if (m > .002) {
     float dd = max(ref.y - hz, .0012);
     float z = .06/dd;
@@ -150,25 +154,42 @@ void main(){
     float fp = z*z/.06/max(uRes.y/uMap.y, 1.);
     float seaN = (1. - uRiver)*(1. - uStill);
     float wamp = (.5 + uWind*.85)*mix(1., .38, uStill)*mix(1., .7, uRiver);
+    float shore = photo > .5 ? max(texture2D(uShore, vec2(ref.x, .5)).r, hz) : hz;
+    float below = max(ref.y - shore, 0.);
+    vec2 Pw = P + (vec2(noise(P*2.3 + t*.07), noise(P*2.3 - t*.06 + 7.)) - .5)*.05;
+    // wave groups: patches of bigger and smaller waves drifting across
+    float grp = .45 + 1.1*noise(P*vec2(1.6, 1.1) + vec2(t*.04, -t*.07));
     vec2 g = vec2(0.);
     float hgt = 0.;
+    // long swell rolling in (sea), bigger with the sea state
+    for (int i = 0; i < 2; i++) {
+      float fi = float(i);
+      vec2 dir = normalize(vec2(.18 - fi*.35, -1.));
+      float f = 16. + fi*9.;
+      float a = (.0035 + .004*uSwell)*seaN/(1. + fi*.6);
+      float aa = clamp(1.7 - f*fp*.45, 0., 1.);
+      float ph = dot(Pw, dir)*f + t*(1.1 + fi*.35) + fi*2.1;
+      hgt += a*aa*sin(ph);
+      g += a*aa*f*cos(ph)*dir;
+    }
+    // wind waves from many directions, in groups
+    vec2 gw = vec2(0.);
     for (int i = 0; i < 8; i++) {
       float fi = float(i);
       vec2 dir = normalize(mix(vec2(sin(fi*2.4 + .5)*1.15, -1.), vec2(uFlowX >= 0. ? 1. : -1., sin(fi*2.1)*.6), uRiver));
       float f = 55.*pow(1.45, fi);
       float a = .0016/pow(1.33, fi);
       float aa = clamp(1.7 - f*fp*.45, 0., 1.);
-      float ph = dot(P, dir)*f + t*1.9*sqrt(f/55.) + fi*1.7 + sin(dot(P, dir.yx)*f*.31 + fi)*.6;
-      hgt += a*aa*sin(ph);
-      g += a*aa*f*cos(ph)*dir;
+      float ph = dot(Pw, dir)*f + t*1.9*sqrt(f/55.) + fi*1.7 + sin(dot(Pw, dir.yx)*f*.31 + fi)*.6;
+      hgt += a*aa*sin(ph)*wamp*grp;
+      gw += a*aa*f*cos(ph)*dir;
     }
-    g *= wamp;
-    hgt *= wamp;
-    // fine wind ripples on top
-    vec2 rp = P*vec2(170., 230.) + vec2(t*.35*(uFlowX >= 0. ? 1. : -1.), -t*1.2);
+    g += gw*wamp*grp;
+    // fine wind ripples riding on the waves (carried along by them)
+    vec2 rp = (P + g*.012)*vec2(170., 230.) + vec2(t*.35*(uFlowX >= 0. ? 1. : -1.), -t*1.2);
     float r0 = noise(rp), rx = noise(rp + vec2(.5, 0.)), ry = noise(rp + vec2(0., .5));
-    g += vec2(rx - r0, ry - r0)*.3*clamp(1.7 - 230.*fp*.35, 0., 1.)*(.35 + uWind*.8)*(1. - .55*uStill);
-    // rings where the line enters, where a fish breaks the surface, or the cast lands
+    g += vec2(rx - r0, ry - r0)*.3*clamp(1.7 - 230.*fp*.35, 0., 1.)*(.35 + uWind*.8)*(1. - .55*uStill)*(.7 + .6*grp);
+    // rings: the cast landing, a bite at the line, a fish at the surface
     float ring = 0.;
     for (int i = 0; i < 6; i++){
       vec4 r = uRip[i];
@@ -181,40 +202,62 @@ void main(){
       ring += sin(f)*exp(-pow(f*.18, 2.))*exp(-r.z*.9)*r.w;
     }
     g.y -= ring*.6;
+    // turbulence where a hooked fish thrashes: broken water and foam
+    float churnFoam = 0.;
+    for (int i = 0; i < 2; i++){
+      vec4 D = uDist[i];
+      if (D.w <= 0.) continue;
+      float rd = clamp((D.y - hz)/max(1. - hz, .05), .05, 1.);
+      float r = length((ref - D.xy)/vec2(1., .3 + .45*rd))/max(D.z, .001);
+      if (r > 1.6) continue;
+      float k = (1. - smoothstep(.2, 1.4, r))*D.w;
+      vec2 tp = ref*vec2(260., 520.) + vec2(t*2.3, -t*3.1);
+      g += (vec2(noise(tp), noise(tp + 3.7)) - .5)*1.6*k;
+      churnFoam += smoothstep(.45, .8, noise(ref*vec2(180., 360.) + t*1.7))*k;
+    }
     vec3 N = normalize(vec3(-g.x, 1., -g.y));
     vec3 V = normalize(vec3(P.x, -.06, z));
     vec3 R = reflect(V, N), R0 = reflect(V, vec3(0., 1., 0.));
     float F = .02 + .98*pow(1. - max(dot(N, -V), 0.), 5.);
-    float F0 = .02 + .98*pow(1. - max(-V.y, 0.), 5.);
-    // the reflected sky shifts sideways only by the waves' own tilt (never towards the photo's edges)
-    float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.12;
-    vec3 sky = reflSky(R, ref.x + clamp(sx, -.05, .05)), sky0 = reflSky(R0, ref.x);
-    vec3 base, detail = vec3(0.);
+    vec3 refl;
     if (photo > .5) {
-      // all of the water is drawn: its body colour is the photo's own water colour (so it sits in the picture),
-      // and it reflects the photo's sky, cliffs and walls above it
-      vec3 deep = uWaterCol*mix(.75, .95, 1. - d);
-      base = mix(deep, sky0, clamp(F0*1.3, 0., .85));
+      // the mirror image about the waterline, stretched and broken up by the tilt of each facet
+      float near = .25 + d;
+      vec2 off = vec2(N.x*.06, -N.z*.11 + (R.y - R0.y)*.18)*near;
+      vec2 q = vec2(clamp(ref.x + clamp(off.x, -.04, .04), .01, .99), shore - below*.92 - off.y);
+      q.y = clamp(q.y, .003, max(shore - .004, .004));
+      float rough = clamp(.18 + uWind*.85 + d*.25, 0., 1.);
+      refl = mix(texture2D(uFrame, q).rgb, texture2D(uBlur, q).rgb, rough*.8);
     } else {
-      vec3 deep = mix(vec3(.04,.16,.20), vec3(.10,.14,.09), max(uRiver, uStill)*.7)*(uDay*1. + uDusk*.6 + uNight*.15);
-      base = mix(deep, sky0, clamp(F0*1.6, 0., 1.));
+      float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.12;
+      refl = reflSky(R, ref.x + clamp(sx, -.05, .05));
     }
-    // the moving surface: each face shows more or less of the sky than flat water would, plus a little body colour
-    float gain = .65 + .25*d + uNight*.35;
-    vec3 water = base + detail*.8 + (sky*F - sky0*F0)*gain;
-    water *= 1. + hgt*(16. + 10.*d) - N.z*.08;
-    // the sun and moon on the water, from the waves themselves: a glittering path
+    // the water's own colour: the photo's water (or a sea, river or lake colour), with patches of depth and silt
+    vec3 body = photo > .5 ? uWaterCol : mix(vec3(.04,.16,.20), vec3(.10,.14,.09), max(uRiver, uStill)*.7)*(uDay*1. + uDusk*.6 + uNight*.15);
+    body *= mix(.78, 1., 1. - d)*(.88 + .24*noise(P*vec2(.9, .6) + vec2(t*.015, 0.)));
+    body *= 1. + hgt*(14. + 10.*d);
+    float Fv = clamp(F*1.7 + .07, 0., .93);
+    vec3 water = mix(body, refl, Fv);
+    // the sun and moon on the water: a broad soft path plus sharp glints on the facets that catch them
     vec3 Ls = normalize(vec3((uSunX - .5)*2.2, .05 + uSunUp*.9, 1.));
     vec3 Lm = normalize(vec3((uMoonX - .5)*2.2, .05 + uMoonUp*.9, 1.));
-    // a broad soft path plus sharp glints, so it reads as a glittering path rather than a line of dots
     float ss = max(dot(R, Ls), 0.), sm = max(dot(R, Lm), 0.);
-    water += sunCol*(pow(ss, 40.)*.22 + pow(ss, 500.)*1.6)*uSun + vec3(.8,.86,1.)*(pow(sm, 50.)*.16 + pow(sm, 600.)*1.2)*uMoon;
+    water += sunCol*(pow(ss, 40.)*.2 + pow(ss, 500.)*1.5)*uSun + vec3(.8,.86,1.)*(pow(sm, 50.)*.15 + pow(sm, 600.)*1.1)*uMoon;
+    // where the water meets walls and rocks: a darker contact line and a little working foam
+    float contact = exp(-below*420.)*step(.0005, below);
+    float wash = smoothstep(.42, .78, noise(P*vec2(70., 95.) + vec2(t*.5, -t*.8))*noise(ref*vec2(120., 50.) - t*.3)*1.6);
+    float shoreFoam = wash*exp(-below*70.)*(.2 + uWind*.9)*(1. - uStill*.7)*step(.0005, below)*(photo > .5 ? 1. : 0.);
+    water *= 1. - .22*contact;
     // whitecaps in a blow (sea only)
     float foam = smoothstep(.62, .92, hgt/max(.006*wamp, .0005)*.5 + .5 + (noise(P*vec2(140., 200.) + t*.2) - .5)*.5)*smoothstep(.35, .85, uWind)*seaN;
-    water = mix(water, vec3(.92,.95,.97)*lit, foam*(.2 + .4*d));
+    vec3 foamC = vec3(.9,.93,.95)*lit;
+    water = mix(water, foamC, clamp(foam*(.2 + .4*d) + shoreFoam*.55 + churnFoam*.7, 0., .85));
     water += vec3(.9)*max(ring, 0.)*.05;
     col = mix(col, clamp(water, 0., 1.), m);
   }
+  // a soft haze along the horizon, from the sky's own colour
+  vec3 hazeC = photo > .5 ? texture2D(uBlur, vec2(ref.x, max(hz - .03, .01))).rgb : skyColour(hz - .02, hz);
+  col = mix(col, hazeC, .14*exp(-abs(ref.y - hz)*32.)*(1. - uNight*.5));
 
   // the light of the hour over the photo (the representative scene is already lit)
   if (photo > .5) {
@@ -295,6 +338,32 @@ export function composeMask(view, w = 600) {
   return c;
 }
 
+/** The waterline in each column (the top of the water area), as a 256 x 1 texture: reflections mirror about it, and
+ *  foam and the contact line sit along it. */
+export function composeShore(mask, horizon = 0.42) {
+  const w = 256, h = 120;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.drawImage(mask, 0, 0, w, h);
+  const d = g.getImageData(0, 0, w, h).data;
+  const out = document.createElement("canvas"); out.width = w; out.height = 1;
+  const og = out.getContext("2d");
+  const img = og.createImageData(w, 1);
+  const tops = [];
+  for (let x = 0; x < w; x++) {
+    let top = -1;
+    for (let y = Math.max(0, Math.floor(h * horizon)); y < h; y++) if (d[(y * w + x) * 4] > 140) { top = y / h; break; }
+    tops.push(top < 0 ? 1 : top);
+  }
+  tops.forEach((v, x) => {
+    const near = tops.slice(Math.max(0, x - 3), x + 4).sort((a, b) => a - b);
+    const y = Math.max(horizon, near[near.length >> 1]);
+    img.data[x * 4] = Math.round(y * 255); img.data[x * 4 + 3] = 255;
+  });
+  og.putImageData(img, 0, 0);
+  return out;
+}
+
 /** The photo's own water colour (the average over the water area), so the drawn water matches the picture. */
 export function waterColour(frame, mask, horizon = 0.42) {
   try {
@@ -344,12 +413,19 @@ export function composeWaterAuto(frame, horizon = 0.42) {
   const hzRow = Math.round(h * horizon);
   // From the bottom of the picture up each column (the near water is the biggest, plainest part of a fishing
   // view), while it stays water-coloured: a wall, rocks, a pier or the far bank stops it, so they stay still.
-  const bottom = []; for (let x = 0; x < w; x++) bottom.push(px(x, h - 2));
-  const med = [0, 1, 2].map((k) => bottom.map((p) => p[k]).sort((a, b) => a - b)[w >> 1]);
+  // Each column starts from the middle value of its bottom few rows, so a glint or a speck of foam doesn't count.
+  const med3 = (ps) => [0, 1, 2].map((k) => ps.map((p) => p[k]).sort((a, b) => a - b)[ps.length >> 1]);
+  const bottom = []; for (let x = 0; x < w; x++) bottom.push(med3([2, 3, 4, 5, 6, 7].map((dy) => px(x, h - dy))));
+  const med = med3(bottom);
+  // how far the water's colour wanders along the bottom sets how strict to be: a plain sea is told from a grey pier
+  // by a little, a choppy, foamy one needs more room
+  const spread = bottom.map((p) => dist(p, med)).sort((a, b) => a - b)[w >> 1];
+  const thr = Math.min(95, Math.max(40, spread * 2.5 + 28));
+  const tint = (p) => p[2] - p[0]; // blue against red: water and stone, sand or grass mostly differ in it
   const tops = [];
   for (let x = 0; x < w; x++) {
-    let ref = px(x, h - 2);
-    if (dist(ref, med) > 95) { tops.push(-1); continue; }
+    const ref = bottom[x].slice();
+    if (dist(ref, med) > thr || Math.abs(tint(ref) - tint(med)) > 48) { tops.push(-1); continue; }
     let y = h - 2, odd = 0, last = h - 2;
     for (; y > hzRow; y--) {
       const p = px(x, y);
@@ -360,10 +436,12 @@ export function composeWaterAuto(frame, horizon = 0.42) {
     // water that runs up nearly to the horizon is open water: take it all the way
     tops.push(last <= hzRow + (h - hzRow) * 0.08 ? hzRow + 1 : last);
   }
+  // smooth the edge, and fill a lone column or two that a speck threw out when its neighbours are all water
   const edge = tops.map((v, x) => {
-    if (v < 0) return -1;
-    const near = tops.slice(Math.max(0, x - 4), x + 5).filter((u) => u >= 0).sort((a, b) => a - b);
-    return near[near.length >> 1];
+    const nb = tops.slice(Math.max(0, x - 4), x + 5);
+    const near = nb.filter((u) => u >= 0).sort((a, b) => a - b);
+    if (v < 0 && near.length < nb.length - 2) return -1;
+    return near.length ? near[near.length >> 1] : -1;
   });
   const cols = edge.filter((v) => v >= 0 && v < h - 4).length;
   if (cols < w * 0.3) return null; // not confident: the angler's water corners (or the default) are used instead
@@ -372,7 +450,20 @@ export function composeWaterAuto(frame, horizon = 0.42) {
   edge.forEach((top, x) => { if (top < 0 || x < 1 || x > w - 2) return; for (let y = top + 1; y < h - 1; y++) { dx += Math.abs(lum(px(x + 1, y)) - lum(px(x - 1, y))); dy += Math.abs(lum(px(x, y + 1)) - lum(px(x, y - 1))); } });
   if (dy / Math.max(1, dx + dy) < 0.45) return null;
   const out = g.createImageData(w, h);
-  edge.forEach((top, x) => { if (top < 0) return; for (let y = top; y < h; y++) { const o = (y * w + x) * 4; out.data[o] = out.data[o + 1] = out.data[o + 2] = out.data[o + 3] = 255; } });
+  const set = (x, y) => { const o = (y * w + x) * 4; out.data[o] = out.data[o + 1] = out.data[o + 2] = out.data[o + 3] = 255; };
+  edge.forEach((top, x) => { if (top < 0) return; for (let y = top; y < h; y++) set(x, y); });
+  // Beyond the end of a pier or a rock (a column that starts on it at the bottom), the far water is still water:
+  // from the horizon down while it matches the water found in the same row elsewhere.
+  const rowCol = [];
+  for (let y = hzRow + 1; y < h; y++) { const ps = []; edge.forEach((top, x) => { if (top >= 0 && y >= top) ps.push(px(x, y)); }); rowCol[y] = ps.length >= 8 ? med3(ps) : null; }
+  edge.forEach((top, x) => {
+    const stop = top < 0 ? h : top;
+    for (let y = hzRow + 1, miss = 0; y < stop; y++) {
+      const rc = rowCol[y];
+      if (!rc || dist(px(x, y), rc) > thr * 0.9) { if (++miss >= 2) break; continue; }
+      miss = 0; set(x, y);
+    }
+  });
   g.clearRect(0, 0, w, h); g.putImageData(out, 0, 0);
   const f = document.createElement("canvas"); f.width = w; f.height = h;
   const fg = f.getContext("2d");
@@ -450,7 +541,7 @@ export function createWaterRenderer(canvas) {
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = {};
-  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uMoonUp", "uMoonDisc", "uSky", "uBlur", "uWaterCol", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
+  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uMoonUp", "uMoonDisc", "uSky", "uBlur", "uWaterCol", "uShore", "uSwell", "uDist", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
   const tex = (unit) => {
     const t = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -459,11 +550,11 @@ export function createWaterRenderer(canvas) {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([10, 22, 32, 255]));
     return t;
   };
-  const tFrame = tex(0), tMask = tex(1), tSky = tex(2), tBlur = tex(3);
-  gl.uniform1i(U.uFrame, 0); gl.uniform1i(U.uMask, 1); gl.uniform1i(U.uSky, 2); gl.uniform1i(U.uBlur, 3);
-  let hasPhoto = 0, horizon = 0.42, lost = false;
-  const P = { wind: 0.3, flowX: 0.6, river: 0, still: 0, night: 0, dusk: 0, day: 1, rain: 0, fog: 0, cloud: 0.3, sunX: 0.62, sun: 0.6, moonX: 0.4, moon: 0, sunUp: 0.3, sunGlow: 0, moonUp: 0.3, moonDisc: 0, oct: 4, flow: 1 };
-  const rip = new Float32Array(24);
+  const tFrame = tex(0), tMask = tex(1), tSky = tex(2), tBlur = tex(3), tShore = tex(4);
+  gl.uniform1i(U.uFrame, 0); gl.uniform1i(U.uMask, 1); gl.uniform1i(U.uSky, 2); gl.uniform1i(U.uBlur, 3); gl.uniform1i(U.uShore, 4);
+  let hasPhoto = 0, horizon = 0.42, lost = false, tint = null;
+  const P = { wind: 0.3, flowX: 0.6, river: 0, still: 0, night: 0, dusk: 0, day: 1, rain: 0, fog: 0, cloud: 0.3, sunX: 0.62, sun: 0.6, moonX: 0.4, moon: 0, sunUp: 0.3, sunGlow: 0, moonUp: 0.3, moonDisc: 0, swell: 0.3, oct: 4, flow: 1 };
+  const rip = new Float32Array(24), dist = new Float32Array(8);
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; });
 
   const upload = (t, unit, source) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source); };
@@ -474,16 +565,20 @@ export function createWaterRenderer(canvas) {
     setScene(frame, mask, h, sky) {
       horizon = h ?? 0.42;
       hasPhoto = frame ? 1 : 0;
-      if (frame && mask) { const wc = waterColour(frame, mask, horizon); gl.uniform3f(U.uWaterCol, wc[0], wc[1], wc[2]); }
+      tint = null;
+      if (frame && mask) { const wc = waterColour(frame, mask, horizon); tint = wc; gl.uniform3f(U.uWaterCol, wc[0], wc[1], wc[2]); }
       try {
         if (frame) upload(tFrame, 0, frame);
         if (mask) upload(tMask, 1, mask);
         if (sky) upload(tSky, 2, sky);
         if (frame) upload(tBlur, 3, composeBlur(frame));
+        if (frame && mask) upload(tShore, 4, composeShore(mask, horizon));
       } catch (e) { hasPhoto = 0; console.warn("FishDock scene: photo texture refused", e?.message); }
     },
     set(params) { Object.assign(P, params); },
-    render(time, ripples = []) {
+    /** The photo's own water colour (0..1 RGB), or null for the drawn scene: fish under the surface take this tint. */
+    get tint() { return tint; },
+    render(time, ripples = [], dists = []) {
       if (lost) return;
       const w = canvas.width, h = canvas.height;
       gl.viewport(0, 0, w, h);
@@ -494,10 +589,13 @@ export function createWaterRenderer(canvas) {
       gl.uniform1f(U.uHorizon, horizon);
       gl.uniform1f(U.uHasPhoto, hasPhoto);
       gl.uniform1f(U.uProc, hasPhoto ? 0 : 1);
-      for (const [u, k] of [["uWind", "wind"], ["uFlowX", "flowX"], ["uRiver", "river"], ["uStill", "still"], ["uNight", "night"], ["uDusk", "dusk"], ["uDay", "day"], ["uRain", "rain"], ["uFog", "fog"], ["uCloud", "cloud"], ["uSunX", "sunX"], ["uSun", "sun"], ["uMoonX", "moonX"], ["uMoon", "moon"], ["uSunUp", "sunUp"], ["uSunGlow", "sunGlow"], ["uMoonUp", "moonUp"], ["uMoonDisc", "moonDisc"], ["uOct", "oct"], ["uFlow", "flow"]]) gl.uniform1f(U[u], P[k]);
+      for (const [u, k] of [["uWind", "wind"], ["uFlowX", "flowX"], ["uRiver", "river"], ["uStill", "still"], ["uNight", "night"], ["uDusk", "dusk"], ["uDay", "day"], ["uRain", "rain"], ["uFog", "fog"], ["uCloud", "cloud"], ["uSunX", "sunX"], ["uSun", "sun"], ["uMoonX", "moonX"], ["uMoon", "moon"], ["uSunUp", "sunUp"], ["uSunGlow", "sunGlow"], ["uMoonUp", "moonUp"], ["uMoonDisc", "moonDisc"], ["uSwell", "swell"], ["uOct", "oct"], ["uFlow", "flow"]]) gl.uniform1f(U[u], P[k]);
       rip.fill(0);
       ripples.slice(0, 6).forEach((r, i) => { rip[i * 4] = r.x; rip[i * 4 + 1] = r.y; rip[i * 4 + 2] = r.age; rip[i * 4 + 3] = r.s; });
       gl.uniform4fv(U.uRip, rip);
+      dist.fill(0);
+      dists.slice(0, 2).forEach((q, i) => { dist[i * 4] = q.x; dist[i * 4 + 1] = q.y; dist[i * 4 + 2] = q.r; dist[i * 4 + 3] = q.s; });
+      gl.uniform4fv(U.uDist, dist);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     },
     destroy() { try { gl.getExtension("WEBGL_lose_context")?.loseContext(); } catch { /* ignore */ } },

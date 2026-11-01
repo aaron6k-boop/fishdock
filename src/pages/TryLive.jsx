@@ -5,6 +5,7 @@
 /* global __BUILD_ID__ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
+import { fightSeconds } from "../lib/sceneActors.js";
 import { composeFrame } from "../lib/sceneGL.js";
 import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews } from "../lib/scene.js";
 import { DRAW_CM, activityText, phaseAt } from "../lib/liveEvents.js";
@@ -94,7 +95,8 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   function playAll() {
     clearAuto();
     setEvents([]);
-    const steps = [[300, () => add("cast")], [5200, () => add("bite")], [8200, () => add("hooked")], [17000, land]];
+    // the fight lasts as long as this kind and size of fish usually takes in the animation (a whiting is quick, a cod or tope longer)
+    const steps = [[300, () => add("cast")], [5200, () => add("bite")], [8200, () => add("hooked")], [8200 + fightSeconds(sp.id, length) * 1000, land]];
     timers.current = steps.map(([ms, f]) => setTimeout(f, ms));
   }
   const base = `${location.origin}/#try`;
@@ -104,7 +106,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
     <div className="watch-shell try-shell">
       <div className="watch">
         <div className="watch-stage">
-          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind }} quality={quality} sound={sound} floatRig={fresh}>
+          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind }} quality={quality} sound={sound} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }}>
             <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
