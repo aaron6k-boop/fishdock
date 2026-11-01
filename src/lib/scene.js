@@ -90,3 +90,34 @@ export function detectHorizon(img) {
     return best > 6 ? Math.round(at * 1000) / 1000 : null;
   } catch { return null; }
 }
+
+/** How much a photo looks like an open view of water, 0..1: below the horizon, water is mostly horizontal lines
+ *  (waves, ripples, reflections), where a pier deck, railings, buildings or boats bring strong upright edges. */
+export function waterScore(img) {
+  try {
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const w = 120, h = Math.max(30, Math.round((120 * ih) / iw));
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    g.drawImage(img, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    const L = (x, y) => { const i = (y * w + x) * 4; return 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; };
+    const hz = detectHorizon(c) ?? 0.42;
+    const y0 = Math.max(1, Math.round(h * (hz + 0.03))), y1 = Math.round(h * 0.95);
+    if (y1 - y0 < 4) return 0;
+    let dx = 0, dy = 0;
+    for (let y = y0; y < y1; y++) for (let x = 1; x < w - 1; x++) { dx += Math.abs(L(x + 1, y) - L(x - 1, y)); dy += Math.abs(L(x, y + 1) - L(x, y - 1)); }
+    const placed = hz > 0.18 && hz < 0.65 ? 1 : 0.8;
+    return Math.round((dy / Math.max(1, dx + dy)) * placed * 100) / 100;
+  } catch { return 0; }
+}
+
+/** Nearby photos with the best open-water views first (each scored from its small copy). */
+export async function rankWaterViews(photos) {
+  const scored = await Promise.all((photos || []).map((p, i) => new Promise((res) => {
+    const im = new Image(); im.crossOrigin = "anonymous"; im.referrerPolicy = "no-referrer";
+    im.onload = () => res({ p, i, s: waterScore(im) }); im.onerror = () => res({ p, i, s: 0 });
+    im.src = smallPhoto(p.url);
+  })));
+  return scored.sort((a, b) => b.s - a.s || a.i - b.i).map((x) => ({ ...x.p, water: x.s }));
+}

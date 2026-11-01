@@ -49,11 +49,12 @@ export function shapeScenes(answer) {
     const url = sceneUrl(String(info.url || "").split("?")[0], w);
     if (!url) continue;
     const title = niceTitle(p.title);
-    const words = `${title} ${stripHtml(ext.ImageDescription?.value).slice(0, 300)}`;
+    // place names like Gorleston-on-Sea or Weston-super-Mare don't make a photo a view of the sea
+    const words = `${title} ${stripHtml(ext.ImageDescription?.value).slice(0, 300)}`.replace(/-(on|by|next)-the-sea\b|-(on|by|next)-sea\b|-super-mare\b|\bsea palling\b/gi, "");
     const dist = Number(p.coordinates?.[0]?.dist);
     const good = (words.match(new RegExp(GOOD.source, "gi")) || []).length;
     const bad = (words.match(new RegExp(BAD.source, "gi")) || []).length + (/'[A-Z][a-z]+ [a-z]+'/.test(words) ? 2 : 0);
-    if (bad >= 2 && good === 0) continue;
+    if (good === 0) continue; // nothing says water: a street, a building, a bird
     const score = Math.min(good, 3) * 2 - bad * 3 + (w >= SCENE.thumbPx ? 1 : 0) - (Number.isFinite(dist) ? dist / 1500 : 1);
     out.push({
       file: String(p.title || "").replace(/^File:/, ""), title, url,
@@ -87,7 +88,7 @@ export async function handleScene(request, env, now = Date.now(), deps = {}) {
     await dataThrottle(db, env, request, now);
     const ctx = upstreamCtx(db, now, deps);
     try {
-      const got = await cachedJson(ctx, `scene1:${lat.toFixed(2)},${lon.toFixed(2)}`, SCENE.ttlMs, async () => {
+      const got = await cachedJson(ctx, `scene2:${lat.toFixed(2)},${lon.toFixed(2)}`, SCENE.ttlMs, async () => {
         const near = shapeScenes(await ctx.upstreamJson("wikimedia-commons", searchUrl(lat, lon, SCENE.radiusM), { headers: { "user-agent": UA, "api-user-agent": UA } }));
         if (near.length >= 3) return { photos: near, radiusKm: SCENE.radiusM / 1000 };
         const wide = shapeScenes(await ctx.upstreamJson("wikimedia-commons", searchUrl(lat, lon, SCENE.wideRadiusM), { headers: { "user-agent": UA, "api-user-agent": UA } }));

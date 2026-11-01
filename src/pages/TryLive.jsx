@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
 import { composeFrame } from "../lib/sceneGL.js";
-import { defaultView, nearbyPhotos, detectHorizon, smallPhoto } from "../lib/scene.js";
+import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews } from "../lib/scene.js";
 import { DRAW_CM, activityText, phaseAt } from "../lib/liveEvents.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -64,7 +64,8 @@ export default function TryLive({ initialPlace, initialSpecies }) {
     if (location.hash !== h) history.replaceState(null, "", h);
   }, [placeId, species]);
   useEffect(() => { clearAuto(); setEvents([]); setPhotos(null); setPick(0); setView(defaultView()); setCond(null);
-    nearbyPhotos(place).then((r) => setPhotos(r.photos || []));
+    // the clearest open-water view first; if none looks like open water, the drawn scene
+    nearbyPhotos(place).then((r) => rankWaterViews(r.photos || [])).then((list) => { setPhotos(list); setPick(list[0]?.water >= 0.62 ? 0 : -1); });
     getConditions(place.lat, place.lon).then((c) => setCond(c?.hourly?.length ? c : null));
     if (!fishList.some((f) => f.id === species)) { const f = fresh ? "perch" : "cod"; setSpecies(f); setLength(DRAW_CM[f] || 40); }
     return clearAuto;

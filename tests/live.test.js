@@ -220,7 +220,7 @@ test("scene photos near a place: free licences and landscape views of water only
     6: page("The Pier Gorleston-on-Sea.jpg", { w: 640, h: 427, dist: 900 }),
   } } };
   const list = shapeScenes(answer);
-  assert.deepEqual(list.map((p) => p.title), ["Gorleston South Pier", "The Pier Gorleston-on-Sea", "Coastguard Lookout Station"]);
+  assert.deepEqual(list.map((p) => p.title), ["Gorleston South Pier", "The Pier Gorleston-on-Sea"], "no water in the words (a lookout station, a bird): left out");
   assert.equal(list[0].url, "https://upload.wikimedia.org/wikipedia/commons/thumb/9/90/Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg/1280px-Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg");
   assert.equal(list[1].url.includes("/thumb/"), false, "a small original is used as it is");
   assert.equal(list[0].author, "Bob Jenkins");
@@ -230,7 +230,7 @@ test("scene photos near a place: free licences and landscape views of water only
   const calls = stubFetch(t, [[/commons\.wikimedia\.org\/w\/api\.php/, () => answer]]);
   const r = await s.call(handleScene, "/api/scene")("GET", "?lat=52.57331&lon=1.73752");
   assert.equal(r.status, 200, r.text);
-  assert.equal(r.body.photos.length, 3);
+  assert.equal(r.body.photos.length, 2);
   assert.match(calls.calls[0].url, /ggscoord=52\.57%7C1\.74&/, "only a 1 km square goes to Wikimedia");
   assert.equal((await s.call(handleScene, "/api/scene")("GET", "?lat=40.1&lon=1.7")).status, 400);
 });

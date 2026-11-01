@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sheet, Seg, Icon, Notice } from "./ui.jsx";
 import { composeFrame, REF_ASPECT } from "../lib/sceneGL.js";
-import { loadChoice, saveChoice, defaultView, ownPhoto, saveOwnPhoto, nearbyPhotos, detectHorizon, smallPhoto, scenePhotoKey } from "../lib/scene.js";
+import { loadChoice, saveChoice, defaultView, ownPhoto, saveOwnPhoto, nearbyPhotos, detectHorizon, smallPhoto, scenePhotoKey, rankWaterViews } from "../lib/scene.js";
 import { QUALITY_OPTIONS } from "./FishingScene.jsx";
 
 const FACING = [["", "Not set"], ["0", "North"], ["45", "North-east"], ["90", "East"], ["135", "South-east"], ["180", "South"], ["225", "South-west"], ["270", "West"], ["315", "North-west"]];
@@ -26,7 +26,7 @@ export default function SceneEditor({ place, quality, onQuality, onClose, onSave
   const editedWater = useRef(!!saved?.view?.water);
 
   useEffect(() => { ownPhoto(place).then(setOwn); }, [place]);
-  useEffect(() => { if (kind === "commons" && !near) nearbyPhotos(place).then(setNear); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (kind === "commons" && !near) nearbyPhotos(place).then(async (r) => setNear({ ...r, photos: await rankWaterViews(r.photos || []) })); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const src = kind === "own" ? own : kind === "commons" ? commons?.url : null;
   useEffect(() => {
