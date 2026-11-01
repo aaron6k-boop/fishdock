@@ -221,13 +221,17 @@ void main(){
     float F = .02 + .98*pow(1. - max(dot(N, -V), 0.), 5.);
     vec3 refl;
     if (photo > .5) {
-      // the mirror image about the waterline, stretched and broken up by the tilt of each facet
+      // the mirror image about the waterline, stretched into streaks and broken up by the tilt of each facet
       float near = .25 + d;
-      vec2 off = vec2(N.x*.06, -N.z*.11 + (R.y - R0.y)*.18)*near;
-      vec2 q = vec2(clamp(ref.x + clamp(off.x, -.04, .04), .01, .99), shore - below*.92 - off.y);
-      q.y = clamp(q.y, .003, max(shore - .004, .004));
-      float rough = clamp(.18 + uWind*.85 + d*.25, 0., 1.);
-      refl = mix(texture2D(uFrame, q).rgb, texture2D(uBlur, q).rgb, rough*.8);
+      vec2 off = vec2(N.x*.04, -N.z*.07 + (R.y - R0.y)*.11)*near;
+      float qy = shore - below*.92 - off.y;
+      vec2 q = vec2(clamp(ref.x + clamp(off.x, -.03, .03), .01, .99), clamp(qy, .003, max(shore - .006, .004)));
+      float rough = clamp(.4 + uWind*.6 + d*.2, 0., 1.);
+      vec3 soft = texture2D(uBlur, q).rgb*.5 + (texture2D(uBlur, q + vec2(0., .014)).rgb + texture2D(uBlur, q - vec2(0., .014)).rgb)*.25;
+      refl = mix(texture2D(uFrame, q).rgb, soft, rough);
+      // where the tilt would look past the waterline into the water itself, it sees the far sky's haze instead
+      vec3 hazeR = texture2D(uBlur, vec2(q.x, max(hz - .025, .01))).rgb;
+      refl = mix(refl, hazeR, smoothstep(shore - .01, shore + .004, qy));
     } else {
       float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.12;
       refl = reflSky(R, ref.x + clamp(sx, -.05, .05));
@@ -355,10 +359,13 @@ export function composeShore(mask, horizon = 0.42) {
     for (let y = Math.max(0, Math.floor(h * horizon)); y < h; y++) if (d[(y * w + x) * 4] > 140) { top = y / h; break; }
     tops.push(top < 0 ? 1 : top);
   }
-  tops.forEach((v, x) => {
-    const near = tops.slice(Math.max(0, x - 3), x + 4).sort((a, b) => a - b);
-    const y = Math.max(horizon, near[near.length >> 1]);
-    img.data[x * 4] = Math.round(y * 255); img.data[x * 4 + 3] = 255;
+  const med = tops.map((v, x) => { const near = tops.slice(Math.max(0, x - 3), x + 4).sort((a, b) => a - b); return Math.max(horizon, near[near.length >> 1]); });
+  // where the waterline steps (the end of a wall), ramp up to the open water's line instead, so the reflections
+  // don't change at a hard upright edge
+  med.forEach((v, x) => {
+    let s = 0, n = 0;
+    for (let k = -12; k <= 12; k++) { const q = med[Math.min(w - 1, Math.max(0, x + k))], wt = 13 - Math.abs(k); s += q * wt; n += wt; }
+    img.data[x * 4] = Math.round(Math.min(v, s / n) * 255); img.data[x * 4 + 3] = 255;
   });
   og.putImageData(img, 0, 0);
   return out;
