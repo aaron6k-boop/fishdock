@@ -59,7 +59,7 @@ vec3 skyColour(float y, float hz){
 // the sky (or cliff, or far bank) a water face reflects: from the photo, mirrored about the horizon, or drawn
 vec3 reflSky(vec3 R, float x){
   float el = clamp(R.y/max(length(R.xz), .001), 0., 1.2);
-  vec2 q = vec2(clamp(x + R.x*.12, .002, .998), clamp(uHorizon - .004 - el*.9, .004, max(uHorizon - .004, .005)));
+  vec2 q = vec2(clamp(x, .01, .99), clamp(uHorizon - .004 - el*.9, .004, max(uHorizon - .004, .005)));
   if (uHasPhoto > .5) return texture2D(uBlur, q).rgb;
   vec3 c = skyColour(q.y, uHorizon);
   if (max(uRiver, uStill) > .5) {
@@ -185,13 +185,16 @@ void main(){
     vec3 R = reflect(V, N), R0 = reflect(V, vec3(0., 1., 0.));
     float F = .02 + .98*pow(1. - max(dot(N, -V), 0.), 5.);
     float F0 = .02 + .98*pow(1. - max(-V.y, 0.), 5.);
-    vec3 sky = reflSky(R, ref.x), sky0 = reflSky(R0, ref.x);
+    // the reflected sky shifts sideways only by the waves' own tilt (never towards the photo's edges)
+    float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.05;
+    vec3 sky = reflSky(R, ref.x + clamp(sx, -.03, .03)), sky0 = reflSky(R0, ref.x);
     vec3 base, detail = vec3(0.);
     if (photo > .5) {
       base = texture2D(uBlur, ref).rgb;
-      vec2 dp = vec2(N.x, N.z)*(.004 + .008*d);
+      vec2 dp = vec2(N.x, N.z)*(.003 + .006*d);
       dp.y = max(dp.y, hz + .003 - ref.y);
-      detail = texture2D(uFrame, ref + dp).rgb - texture2D(uBlur, ref + dp).rgb;
+      vec2 dq = clamp(ref + dp, vec2(.002), vec2(.998));
+      detail = texture2D(uFrame, dq).rgb - texture2D(uBlur, dq).rgb;
     } else {
       vec3 deep = mix(vec3(.04,.16,.20), vec3(.10,.14,.09), max(uRiver, uStill)*.7)*(uDay*1. + uDusk*.6 + uNight*.15);
       base = mix(deep, sky0, clamp(F0*1.6, 0., 1.));

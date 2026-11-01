@@ -40,21 +40,23 @@ export function sceneEnv({ cond, light, view, kind, photo = true }) {
   const cloud = cond?.cloudPct != null ? cond.cloudPct / 100 : 0.35;
   const rain = cond?.precipMm > 0 ? Math.min(1, 0.25 + cond.precipMm / 3) : 0;
   const facing = view?.facing;
-  let sunX = 0.62, sun = 0, moonX = 0.4, moon = 0;
+  // On a photo the sun and moon (and their paths on the water) only appear when we know they're in view: the angler
+  // said which way they face. The drawn scene can always show them.
+  let sunX = 0.62, sun = 0, moonX = 0.4, moon = 0, moonInView = false;
   if (light?.sunAlt != null && light.sunAlt > -2) {
     if (facing != null && light.sunAz != null) { const r = rel(light.sunAz, facing); if (Math.abs(r) < 60) { sunX = 0.5 + r / 75; sun = Math.min(1, 0.35 + (35 - Math.min(35, light.sunAlt)) / 40); } }
-    else sun = sky.dusk * 0.45;
+    else if (!photo) sun = sky.dusk * 0.45;
   }
   if (light?.moonAlt != null && light.moonAlt > 0 && sky.night > 0.3) {
-    if (facing != null && light.moonAz != null) { const r = rel(light.moonAz, facing); if (Math.abs(r) < 60) { moonX = 0.5 + r / 75; moon = (light.moonIllum ?? 0.5) * sky.night; } }
-    else moon = (light.moonIllum ?? 0.5) * sky.night * 0.5;
+    if (facing != null && light.moonAz != null) { const r = rel(light.moonAz, facing); if (Math.abs(r) < 60) { moonX = 0.5 + r / 75; moon = (light.moonIllum ?? 0.5) * sky.night; moonInView = true; } }
+    else if (!photo) { moon = (light.moonIllum ?? 0.5) * sky.night * 0.5; moonInView = true; }
   }
   sun *= 1 - cloud * 0.8; moon *= 1 - cloud * 0.85;
   // the sun's glow in the sky: on a photo only where we know the sun is in view; the drawn sky always has it
   const sunUp = light?.sunAlt != null ? Math.min(1, Math.max(0, light.sunAlt / 40)) : 0.3;
   const sunGlow = photo ? (facing != null ? sun : 0) : light?.sunAlt != null && light.sunAlt > -3 ? Math.max(sun, 0.55 * (1 - cloud * 0.85)) : 0;
   const moonUp = light?.moonAlt != null ? Math.min(1, Math.max(0, light.moonAlt / 50)) : 0.3;
-  const moonDisc = light?.moonAlt != null && light.moonAlt > 2 && sky.night > 0.3 ? (1 - cloud * 0.9) * sky.night * (0.5 + 0.5 * (light.moonIllum ?? 0.5)) : 0;
+  const moonDisc = moonInView && light.moonAlt > 2 ? (1 - cloud * 0.9) * sky.night * (0.5 + 0.5 * (light.moonIllum ?? 0.5)) : 0;
   const wk = waterKind(kind);
   const windDir = cond?.windDir != null && facing != null ? (Math.sin(((cond.windDir + 180 - facing) * Math.PI) / 180) >= 0 ? 1 : -1) : 1;
   return {
