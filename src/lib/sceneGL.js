@@ -59,7 +59,7 @@ vec3 skyColour(float y, float hz){
 // the sky (or cliff, or far bank) a water face reflects: from the photo, mirrored about the horizon, or drawn
 vec3 reflSky(vec3 R, float x){
   float el = clamp(R.y/max(length(R.xz), .001), 0., 1.2);
-  vec2 q = vec2(clamp(x, .01, .99), clamp(uHorizon - .004 - el*.9, .004, max(uHorizon - .004, .005)));
+  vec2 q = vec2(clamp(x, .01, .99), clamp(uHorizon - .004 - el*.7, .004, max(uHorizon - .004, .005)));
   if (uHasPhoto > .5) return texture2D(uBlur, q).rgb;
   vec3 c = skyColour(q.y, uHorizon);
   if (max(uRiver, uStill) > .5) {
@@ -186,8 +186,8 @@ void main(){
     float F = .02 + .98*pow(1. - max(dot(N, -V), 0.), 5.);
     float F0 = .02 + .98*pow(1. - max(-V.y, 0.), 5.);
     // the reflected sky shifts sideways only by the waves' own tilt (never towards the photo's edges)
-    float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.05;
-    vec3 sky = reflSky(R, ref.x + clamp(sx, -.03, .03)), sky0 = reflSky(R0, ref.x);
+    float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.12;
+    vec3 sky = reflSky(R, ref.x + clamp(sx, -.05, .05)), sky0 = reflSky(R0, ref.x);
     vec3 base, detail = vec3(0.);
     if (photo > .5) {
       base = texture2D(uBlur, ref).rgb;
@@ -200,7 +200,7 @@ void main(){
       base = mix(deep, sky0, clamp(F0*1.6, 0., 1.));
     }
     // the moving surface: each face shows more or less of the sky than flat water would, plus a little body colour
-    float gain = .8 + .3*d + uNight*.8;
+    float gain = .65 + .25*d + uNight*.35;
     vec3 water = base + detail*.8 + (sky*F - sky0*F0)*gain;
     water *= 1. + hgt*(16. + 10.*d) - N.z*.08;
     // the sun and moon on the water, from the waves themselves: a glittering path
