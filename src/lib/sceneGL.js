@@ -341,39 +341,42 @@ export function composeWaterAuto(frame, horizon = 0.42) {
   const px = (x, y) => { const i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
   const lum = (p) => 0.3 * p[0] + 0.59 * p[1] + 0.11 * p[2];
   const dist = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
-  const y0 = Math.min(h - 2, Math.round(h * (horizon + 0.025)));
-  const band = []; for (let x = 0; x < w; x++) band.push(px(x, y0));
-  const med = [0, 1, 2].map((k) => band.map((p) => p[k]).sort((a, b) => a - b)[w >> 1]);
-  // each column: how far down the water goes (a glint or a whitecap is forgiven; three odd pixels in a row stop it)
-  const stops = [];
+  const hzRow = Math.round(h * horizon);
+  // From the bottom of the picture up each column (the near water is the biggest, plainest part of a fishing
+  // view), while it stays water-coloured: a wall, rocks, a pier or the far bank stops it, so they stay still.
+  const bottom = []; for (let x = 0; x < w; x++) bottom.push(px(x, h - 2));
+  const med = [0, 1, 2].map((k) => bottom.map((p) => p[k]).sort((a, b) => a - b)[w >> 1]);
+  const tops = [];
   for (let x = 0; x < w; x++) {
-    let ref = px(x, y0);
-    if (dist(ref, med) > 90) { stops.push(-1); continue; } // something other than water reaches the horizon here
-    let y = y0, odd = 0, last = y0;
-    for (; y < h; y++) {
+    let ref = px(x, h - 2);
+    if (dist(ref, med) > 95) { tops.push(-1); continue; }
+    let y = h - 2, odd = 0, last = h - 2;
+    for (; y > hzRow; y--) {
       const p = px(x, y);
-      if (dist(p, ref) > 105 || Math.abs(lum(p) - lum(ref)) > 42) { if (++odd >= 5) break; continue; }
+      if (dist(p, ref) > 80 || Math.abs(lum(p) - lum(px(x, y + 1))) > 34) { if (++odd >= 3) break; continue; }
       odd = 0; last = y;
       for (let k = 0; k < 3; k++) ref[k] = ref[k] * 0.9 + p[k] * 0.1;
     }
-    // water that runs most of the way down usually runs to the bottom (the near water is paler, foamy or in shadow)
-    stops.push(y >= h || last > y0 + (h - y0) * 0.7 ? h : last + 1);
+    // water that runs up nearly to the horizon is open water: take it all the way
+    tops.push(last <= hzRow + (h - hzRow) * 0.08 ? hzRow + 1 : last);
   }
-  // smooth the edge across neighbouring columns (median of seven)
-  const edge = stops.map((v, x) => {
+  const edge = tops.map((v, x) => {
     if (v < 0) return -1;
-    const near = stops.slice(Math.max(0, x - 3), x + 4).filter((u) => u >= 0).sort((a, b) => a - b);
+    const near = tops.slice(Math.max(0, x - 4), x + 5).filter((u) => u >= 0).sort((a, b) => a - b);
     return near[near.length >> 1];
   });
-  const cols = edge.filter((v) => v >= 0).length;
+  const cols = edge.filter((v) => v >= 0 && v < h - 4).length;
+  if (cols < w * 0.3) return null; // not confident: the angler's water corners (or the default) are used instead
+  // water shows mostly level lines; a deck, a beach or a wall mostly doesn't
+  let dx = 0, dy = 0;
+  edge.forEach((top, x) => { if (top < 0 || x < 1 || x > w - 2) return; for (let y = top + 1; y < h - 1; y++) { dx += Math.abs(lum(px(x + 1, y)) - lum(px(x - 1, y))); dy += Math.abs(lum(px(x, y + 1)) - lum(px(x, y - 1))); } });
+  if (dy / Math.max(1, dx + dy) < 0.6) return null;
   const out = g.createImageData(w, h);
-  edge.forEach((stop, x) => { if (stop < 0) return; for (let y = Math.round(h * horizon) + 1; y < stop; y++) { const o = (y * w + x) * 4; out.data[o] = out.data[o + 1] = out.data[o + 2] = out.data[o + 3] = 255; } });
-  if (cols < w * 0.25) return null; // not confident: the angler's water corners (or the default) are used instead
+  edge.forEach((top, x) => { if (top < 0) return; for (let y = top; y < h; y++) { const o = (y * w + x) * 4; out.data[o] = out.data[o + 1] = out.data[o + 2] = out.data[o + 3] = 255; } });
   g.clearRect(0, 0, w, h); g.putImageData(out, 0, 0);
   const f = document.createElement("canvas"); f.width = w; f.height = h;
   const fg = f.getContext("2d");
   fg.fillStyle = "#000"; fg.fillRect(0, 0, w, h);
-  // a soft halo first, then the area itself at full strength
   fg.globalAlpha = 0.35;
   for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) fg.drawImage(c, ox, oy);
   fg.globalAlpha = 1;
