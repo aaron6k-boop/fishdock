@@ -53,10 +53,12 @@ export function sceneEnv({ cond, light, view, kind, photo = true }) {
   // the sun's glow in the sky: on a photo only where we know the sun is in view; the drawn sky always has it
   const sunUp = light?.sunAlt != null ? Math.min(1, Math.max(0, light.sunAlt / 40)) : 0.3;
   const sunGlow = photo ? (facing != null ? sun : 0) : light?.sunAlt != null && light.sunAlt > -3 ? Math.max(sun, 0.55 * (1 - cloud * 0.85)) : 0;
+  const moonUp = light?.moonAlt != null ? Math.min(1, Math.max(0, light.moonAlt / 50)) : 0.3;
+  const moonDisc = light?.moonAlt != null && light.moonAlt > 2 && sky.night > 0.3 ? (1 - cloud * 0.9) * sky.night * (0.5 + 0.5 * (light.moonIllum ?? 0.5)) : 0;
   const wk = waterKind(kind);
   const windDir = cond?.windDir != null && facing != null ? (Math.sin(((cond.windDir + 180 - facing) * Math.PI) / 180) >= 0 ? 1 : -1) : 1;
   return {
-    ...sky, wind, cloud, rain, fog: cloud > 0.95 && rain > 0 ? 0.3 : 0, sunX, sun, moonX, moon, sunUp, sunGlow,
+    ...sky, wind, cloud, rain, fog: cloud > 0.95 && rain > 0 ? 0.3 : 0, sunX, sun, moonX, moon, sunUp, sunGlow, moonUp, moonDisc,
     river: wk === "river" ? 1 : 0, still: wk === "still" ? 1 : 0, flowX: windDir * 0.7, windDir,
   };
 }

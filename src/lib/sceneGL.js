@@ -23,7 +23,7 @@ uniform sampler2D uFrame, uMask, uSky;
 uniform vec4 uMap;
 uniform vec2 uRes;
 uniform float uTime, uHorizon, uWind, uFlowX, uRiver, uStill, uProc, uHasPhoto, uOct, uFlow;
-uniform float uNight, uDusk, uDay, uRain, uFog, uCloud, uSunX, uSun, uMoonX, uMoon, uSunUp, uSunGlow;
+uniform float uNight, uDusk, uDay, uRain, uFog, uCloud, uSunX, uSun, uMoonX, uMoon, uSunUp, uSunGlow, uMoonUp, uMoonDisc;
 uniform vec4 uRip[6];
 
 float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
@@ -38,7 +38,7 @@ float waves(vec2 w, float t){
   float sea = 1. - max(uRiver, uStill);
   float h = sea*(sin(w.y*1.15 + t*1.25 + sin(w.x*.35)*1.3)*.45 + sin(w.y*2.4 - w.x*.7 + t*2.05)*.2);
   vec2 drift = mix(vec2(0., -t*.28), vec2(t*.35*uFlowX, 0.), uRiver);
-  h += (fbm(w*vec2(1.5, 2.1) + drift) - .5)*(.35 + uWind*1.3);
+  h += (fbm(w*vec2(1.5, 2.1) + drift) - .5)*(.55 + uWind*1.2);
   return h;
 }
 
@@ -120,6 +120,10 @@ void main(){
     vec2 cell = floor(ref*vec2(520., 340.));
     float star = step(.9968, hash(cell))*(.55 + .45*sin(t*2.6 + hash(cell + 7.)*40.));
     col += vec3(star)*uNight*.6*(1. - uCloud)*sk*step(.15, above);
+    // the moon, when it's up
+    vec2 mp = (ref - vec2(uMoonX, hz - .08 - .5*uMoonUp))*vec2(1.5, 1.);
+    float ml = length(mp);
+    col += vec3(.92,.94,1.)*(smoothstep(.024, .019, ml)*.85 + exp(-ml*14.)*.22 + exp(-ml*4.)*.06)*uMoonDisc*sk;
   }
 
   // ---- the water ----
@@ -128,7 +132,7 @@ void main(){
     vec2 w = vec2((ref.x - .5)*z*1.6, z);
     float e = .06;
     float h0 = waves(w, t), hx = waves(w + vec2(e, 0.), t), hy = waves(w + vec2(0., e), t);
-    vec2 sl = vec2(hx - h0, hy - h0)/e*(.3 + uWind*.9);
+    vec2 sl = vec2(hx - h0, hy - h0)/e*(.45 + uWind*.8);
     // rings where the line enters, where a fish breaks the surface, or the cast lands
     float ring = 0.;
     for (int i = 0; i < 6; i++){
@@ -146,18 +150,18 @@ void main(){
     float seaN = (1. - uRiver)*(1. - uStill);
     if (photo > .5) {
       // the photo's water refracted by the moving surface and carried along by the flow
-      float amp = .55 + uWind*.9;
+      float amp = 1.2 + uWind*.7;
       vec2 uvw = ref + vec2(sl.x*.0075, sl.y*.006)*(.15 + d)*amp;
       vec2 fdir = mix(vec2(0., 1.), vec2(uFlowX, .05), uRiver)*(1. - uStill*.7);
       float st = noise(ref*vec2(2.5, 5.))*.5;
       float p0 = fract(t*.12 + st), p1 = fract(t*.12 + st + .5);
       float w0 = 1. - abs(2.*p0 - 1.);
-      float sp = uFlow*.028*(.5 + uWind)*(.12 + d);
+      float sp = uFlow*.034*(.9 + uWind)*(.12 + d);
       vec2 a0 = uvw - fdir*sp*(p0 - .5), a1 = uvw - fdir*sp*(p1 - .5);
       a0.y = max(a0.y, hz + .004); a1.y = max(a1.y, hz + .004);
       water = texture2D(uFrame, a0).rgb*w0 + texture2D(uFrame, a1).rgb*(1. - w0);
       // light on the moving faces: brighter where they tilt to the sky, darker in the troughs, swell lines rolling in
-      water *= 1. + sl.y*.16*(.4 + d) - sl.x*.03;
+      water *= 1. + sl.y*.2*(.4 + d) - sl.x*.03;
       float sw = sin(z*2.2 - t*1.4 + sin(ref.x*5. + t*.2)*.8);
       water *= 1. + sw*.05*seaN*(.3 + d)*(.6 + uWind);
     } else {
@@ -181,6 +185,9 @@ void main(){
     // little sparkles wherever the surface catches the sky
     float spk = smoothstep(.8, .98, fbm(w*vec2(4.5, 7.) + vec2(t*.15, t*.9)) + sl.y*.18);
     water += vec3(1.)*spk*(.16*uDay + .1*uDusk + .05*uMoon)*(.35 + .65*(1. - d))*(1. - uCloud*.5);
+    // after dark the water still shows: the night sky and any moon catching the moving wave faces
+    float shim = pow(clamp(sl.y*.6 + .5, 0., 1.), 3.);
+    water += vec3(.42,.52,.72)*shim*uNight*(.16 + .22*uMoon + .06*(1. - uCloud))*(.25 + d);
     // whitecaps in a blow (sea only)
     float foam = smoothstep(.66, .86, h0*.5 + .5 + (fbm(w*3.4 + t*.1) - .5)*.5)*smoothstep(.32, .85, uWind)*seaN;
     water = mix(water, vec3(.92,.95,.97)*lit, foam*(.25 + .45*d));
@@ -191,7 +198,7 @@ void main(){
   // the light of the hour over the photo (the representative scene is already lit)
   if (photo > .5) {
     float l = dot(col, vec3(.3,.59,.11));
-    vec3 nightC = mix(vec3(l)*vec3(.24,.31,.48), col*vec3(.26,.32,.50), .35);
+    vec3 nightC = mix(vec3(l)*vec3(.30,.38,.56), col*vec3(.32,.38,.58), .35) + vec3(.012,.016,.03);
     col = mix(col, col*vec3(1.08,.86,.70)*.86 + vec3(.05,.01,0.)*(1. - ref.y), uDusk*.75);
     col = mix(col, nightC, uNight*.9);
     col = mix(col, vec3(l)*.95, uCloud*.28);
@@ -314,8 +321,11 @@ export function composeWaterAuto(frame, horizon = 0.42) {
   const f = document.createElement("canvas"); f.width = w; f.height = h;
   const fg = f.getContext("2d");
   fg.fillStyle = "#000"; fg.fillRect(0, 0, w, h);
-  fg.globalAlpha = 0.2;
-  for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) fg.drawImage(c, ox, oy);
+  // a soft halo first, then the area itself at full strength
+  fg.globalAlpha = 0.35;
+  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) fg.drawImage(c, ox, oy);
+  fg.globalAlpha = 1;
+  fg.drawImage(c, 0, 0);
   return f;
 }
 
@@ -348,8 +358,11 @@ export function composeSkyMask(frame, horizon = 0.42) {
   const f = document.createElement("canvas"); f.width = w; f.height = h;
   const fg = f.getContext("2d");
   fg.fillStyle = "#000"; fg.fillRect(0, 0, w, h);
-  fg.globalAlpha = 0.2;
-  for (const [ox, oy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) fg.drawImage(c, ox, oy);
+  // a soft halo first, then the area itself at full strength
+  fg.globalAlpha = 0.35;
+  for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) fg.drawImage(c, ox, oy);
+  fg.globalAlpha = 1;
+  fg.drawImage(c, 0, 0);
   return f;
 }
 
@@ -382,7 +395,7 @@ export function createWaterRenderer(canvas) {
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = {};
-  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uSky", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
+  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uMoonUp", "uMoonDisc", "uSky", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
   const tex = (unit) => {
     const t = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -394,7 +407,7 @@ export function createWaterRenderer(canvas) {
   const tFrame = tex(0), tMask = tex(1), tSky = tex(2);
   gl.uniform1i(U.uFrame, 0); gl.uniform1i(U.uMask, 1); gl.uniform1i(U.uSky, 2);
   let hasPhoto = 0, horizon = 0.42, lost = false;
-  const P = { wind: 0.3, flowX: 0.6, river: 0, still: 0, night: 0, dusk: 0, day: 1, rain: 0, fog: 0, cloud: 0.3, sunX: 0.62, sun: 0.6, moonX: 0.4, moon: 0, sunUp: 0.3, sunGlow: 0, oct: 4, flow: 1 };
+  const P = { wind: 0.3, flowX: 0.6, river: 0, still: 0, night: 0, dusk: 0, day: 1, rain: 0, fog: 0, cloud: 0.3, sunX: 0.62, sun: 0.6, moonX: 0.4, moon: 0, sunUp: 0.3, sunGlow: 0, moonUp: 0.3, moonDisc: 0, oct: 4, flow: 1 };
   const rip = new Float32Array(24);
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; });
 
@@ -424,7 +437,7 @@ export function createWaterRenderer(canvas) {
       gl.uniform1f(U.uHorizon, horizon);
       gl.uniform1f(U.uHasPhoto, hasPhoto);
       gl.uniform1f(U.uProc, hasPhoto ? 0 : 1);
-      for (const [u, k] of [["uWind", "wind"], ["uFlowX", "flowX"], ["uRiver", "river"], ["uStill", "still"], ["uNight", "night"], ["uDusk", "dusk"], ["uDay", "day"], ["uRain", "rain"], ["uFog", "fog"], ["uCloud", "cloud"], ["uSunX", "sunX"], ["uSun", "sun"], ["uMoonX", "moonX"], ["uMoon", "moon"], ["uSunUp", "sunUp"], ["uSunGlow", "sunGlow"], ["uOct", "oct"], ["uFlow", "flow"]]) gl.uniform1f(U[u], P[k]);
+      for (const [u, k] of [["uWind", "wind"], ["uFlowX", "flowX"], ["uRiver", "river"], ["uStill", "still"], ["uNight", "night"], ["uDusk", "dusk"], ["uDay", "day"], ["uRain", "rain"], ["uFog", "fog"], ["uCloud", "cloud"], ["uSunX", "sunX"], ["uSun", "sun"], ["uMoonX", "moonX"], ["uMoon", "moon"], ["uSunUp", "sunUp"], ["uSunGlow", "sunGlow"], ["uMoonUp", "moonUp"], ["uMoonDisc", "moonDisc"], ["uOct", "oct"], ["uFlow", "flow"]]) gl.uniform1f(U[u], P[k]);
       rip.fill(0);
       ripples.slice(0, 6).forEach((r, i) => { rip[i * 4] = r.x; rip[i * 4 + 1] = r.y; rip[i * 4 + 2] = r.age; rip[i * 4 + 3] = r.s; });
       gl.uniform4fv(U.uRip, rip);
