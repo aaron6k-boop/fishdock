@@ -52,6 +52,7 @@ export const LINK_PERMS = { location: "area", photos: false, sizes: true, histor
 export const LOCATION_MODES = ["exact", "area", "hidden"];
 const STATUSES = ["running", "paused", "ended"];
 const PLACE_KINDS = ["sea", "river", "canal", "lake", "still", "fishery", "estuary"];
+const VENUES = ["beach", "pier", "estuary", "river", "lake"];
 const ID_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const EID_RE = /^[A-Za-z0-9_.:-]{4,48}$/;
 const PID_RE = /^[A-Za-z0-9_-]{4,40}$/;
@@ -122,7 +123,7 @@ export function cleanState(s, now) {
     name: label(s.name, LIVE.nameMax),
     target: t && SPECIES_RE.test(String(t.id || "")) ? { id: t.id, name: label(t.name, 40) || t.id } : null,
     method: label(s.method, 30),
-    place: { label: label(s.place?.label, 60), area: label(s.place?.area, 60), kind: PLACE_KINDS.includes(s.place?.kind) ? s.place.kind : "sea" },
+    place: { label: label(s.place?.label, 60), area: label(s.place?.area, 60), kind: PLACE_KINDS.includes(s.place?.kind) ? s.place.kind : "sea", venue: VENUES.includes(s.place?.venue) ? s.place.venue : null },
     counts, cond, light, scene,
   };
 }
@@ -160,7 +161,7 @@ export function eventOut(r, perms) {
 export function shareOut(row, perms, now) {
   const st = JSON.parse(row.state);
   const loc = perms.location;
-  const place = loc === "hidden" ? { label: null, area: null, kind: st.place.kind } : loc === "area" ? { label: null, area: st.place.area, kind: st.place.kind } : st.place;
+  const place = loc === "hidden" ? { label: null, area: null, kind: st.place.kind, venue: st.place.venue ?? null } : loc === "area" ? { label: null, area: st.place.area, kind: st.place.kind, venue: st.place.venue ?? null } : st.place;
   let scene = st.scene;
   if (loc === "hidden" || (scene.kind === "own" && !row.has_scene)) scene = { kind: "representative", view: { ...scene.view, x: 0, y: 0, zoom: 1, rot: 0 }, commons: null };
   const counts = { ...st.counts };

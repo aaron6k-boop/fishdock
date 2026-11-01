@@ -9,6 +9,21 @@ import { PREVIEW } from "./api.js";
 const VIEWS = "fishdock.sceneViews.v1";
 
 export const placeKey = (place) => (place?.id && place.id !== "custom" ? place.id : `c:${Number(place?.lat || 0).toFixed(3)},${Number(place?.lon || 0).toFixed(3)}`);
+/** The kind of place the angler stands at, for how the water moves, which rod and how a fish is landed:
+ *  beach | pier (piers, breakwaters, harbour walls, rocks) | estuary | river | lake. From the spot's own type where
+ *  FishDock has one, otherwise from the water kind and the name. */
+export const VENUES = ["beach", "pier", "estuary", "river", "lake"];
+export function venueOf(place) {
+  const t = place?.type || place?.venue;
+  if (VENUES.includes(t)) return t;
+  if (t === "breakwater" || t === "rocks" || t === "harbour") return "pier";
+  if (t === "reservoir" || t === "still" || t === "fishery") return "lake";
+  const k = place?.kind, n = String(place?.name || place?.label || "").toLowerCase();
+  if (k === "estuary") return "estuary";
+  if (k === "river" || k === "canal") return "river";
+  if (k === "sea") return /beach|sands|bay\b|strand/.test(n) && !/pier|harbour|breakwater|jetty|quay/.test(n) ? "beach" : "pier";
+  return "lake";
+}
 export const waterKind = (kind) => (kind === "sea" || kind === "estuary" ? "sea" : kind === "river" || kind === "canal" ? "river" : "still");
 
 export function defaultView(horizon = 0.42) {

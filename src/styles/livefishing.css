@@ -194,3 +194,58 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .update-bar { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom)); z-index: 400; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; border-radius: 16px; background: var(--elev); border: 1px solid color-mix(in srgb, var(--action) 45%, transparent); color: var(--text); font-size: 13.5px; box-shadow: var(--shadow); }
 .update-bar span { flex: 1; }
 .update-bar button { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--action); color: var(--action-ink); font-weight: 700; }
+
+/* ---- immersive viewing: on phones the scene fills the screen; controls sit low on the left, out of the rod's way;
+   a tap on the scene hides or shows them; details and settings come up in a sheet ---- */
+.fs-bottom { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: min(74%, 420px); }
+.fs-bottom .fs-who { margin-bottom: 0; }
+.fs-top .fs-btn { pointer-events: auto; }
+.demo-ctl { pointer-events: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: 16px; background: #0a141bc4; border: 1px solid #ffffff1f; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: #fff; box-shadow: 0 10px 30px #0006; }
+.demo-act { font-size: 15px; font-weight: 700; line-height: 1.25; text-shadow: 0 1px 2px #0008; }
+.demo-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.demo-main { min-height: 46px; padding: 0 18px; font-size: 16px; border-radius: 14px; }
+.demo-main[disabled] { opacity: 1; background: #ffffff1a; color: #d6e4ec; border-color: #ffffff26; box-shadow: none; }
+.demo-alt { min-height: 40px; background: #ffffff14; color: #fff; border-color: #ffffff2e; }
+.sheet-head { display: flex; align-items: flex-start; gap: 10px; }
+.sheet-head .try-head { flex: 1; }
+.sheet-x { display: none; }
+.immersive .fs-overlay > * { transition: opacity .25s; }
+.immersive.ui-hidden .fs-overlay > :not(.fs-foot) { opacity: 0; pointer-events: none; }
+.immersive.ui-hidden .fs-overlay > :not(.fs-foot) * { pointer-events: none; }
+.immersive.ui-hidden .fs-foot { opacity: .6; }
+
+@media not ((min-width: 960px) and (orientation: landscape)) {
+  .immersive .watch-stage { position: fixed; inset: 0; z-index: 1; }
+  .immersive .watch-stage .fscene { height: 100%; width: 100%; aspect-ratio: auto; max-height: none; border-radius: 0; box-shadow: none; }
+  .immersive .fs-overlay { padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .immersive .fs-fsbtn { top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); }
+  .immersive .fs-overlay { justify-content: flex-start; }
+  .immersive .fs-overlay > .fs-foot { position: static; order: 1; align-self: flex-end; max-width: 72%; margin-top: 6px; text-align: right; background: none; padding: 0; }
+  .immersive .fs-overlay > .fs-bottom { order: 2; margin-top: auto; }
+  .immersive .fs-cardwrap { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .immersive .sheet { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; max-height: 86vh; max-height: 86dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    background: var(--bg); border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); box-shadow: 0 -20px 50px #0009;
+    padding: 14px 16px calc(24px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .3s cubic-bezier(.2, .9, .3, 1); visibility: hidden; }
+  .immersive .sheet.open { transform: none; visibility: visible; }
+  .immersive .sheet-x { display: grid; }
+  .sheet-scrim { position: fixed; inset: 0; z-index: 19; background: #0007; }
+}
+@media (min-width: 960px) and (orientation: landscape) {
+  .sheet-scrim { display: none; }
+  .immersive .fs-top .fs-btn[aria-label="Demo settings"] { display: none; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .fs-bottom { max-width: 52%; }
+  .demo-ctl { padding: 8px 10px; gap: 6px; }
+  .demo-main { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .immersive .sheet { transition: none; }
+}
+.watch-ctl .demo-btns .btn svg { width: 15px; height: 15px; }
+.immersive .watch-panel.sheet .watch-activity { display: none; }
+@media (min-width: 960px) and (orientation: landscape) {
+  .immersive .fs-top .watch-more { display: none; }
+  .immersive .watch-panel .sheet-head { display: none; }
+  .immersive .watch-panel.sheet .watch-activity { display: block; }
+}

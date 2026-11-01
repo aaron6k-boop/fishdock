@@ -7,6 +7,7 @@
 import { toShareEvents, photoId, countsAt } from "./liveEvents.js";
 import { get } from "./storage.js";
 import { PREVIEW } from "./api.js";
+import { venueOf } from "./scene.js";
 
 const KEY = "fishdock.liveShare.v1";
 const subs = new Set();
@@ -41,7 +42,7 @@ export function buildState(s) {
   return {
     status: s.status, startedAt: s.startedAt, pausedMs: s.pausedMs || 0, pausedAt: s.pausedAt || null, endedAt: s.endedAt || null,
     name: x.name || null, target: x.target || null, method: s.method || null,
-    place: { label: s.place?.name || null, area: s.place?.region || x.area || null, kind: s.place?.kind || "sea" },
+    place: { label: s.place?.name || null, area: s.place?.region || x.area || null, kind: s.place?.kind || "sea", venue: venueOf(s.place) },
     counts: countsAt(s.events), cond: x.cond || null, light: x.light || null,
     scene: s.scene ? { kind: s.scene.kind, view: s.scene.view, commons: s.scene.kind === "commons" ? s.scene.commons : null } : { kind: "representative" },
   };

@@ -27,7 +27,7 @@ uniform float uTime, uHorizon, uWind, uFlowX, uRiver, uStill, uProc, uHasPhoto, 
 uniform float uNight, uDusk, uDay, uRain, uFog, uCloud, uSunX, uSun, uMoonX, uMoon, uSunUp, uSunGlow, uMoonUp, uMoonDisc;
 uniform vec4 uRip[6];
 uniform vec4 uDist[2];
-uniform float uSwell;
+uniform float uSwell, uWindAng, uSurf, uEstuary;
 
 float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
 float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f);
@@ -126,7 +126,7 @@ void main(){
     col = mix(col, col*vec3(.86,.94,1.12), uDay*above*.4*sk*(1. - uCloud*.6));
     col = mix(col, col*vec3(1.2,.9,.74) + vec3(.07,.025,0.), uDusk*(1. - above)*.65*sk);
     col = mix(col, col*vec3(.84,.76,1.14), uDusk*above*.5*sk);
-    col = mix(col, col*vec3(.7,.8,1.15), uNight*.5*sk);
+    col = mix(col, col*vec3(.82,.86,1.), uNight*.5*sk);
     vec2 spos = vec2(uSunX, hz - .03 - .55*uSunUp);
     vec2 dv = (ref - spos)*vec2(1.5, 1.);
     float sl0 = length(dv);
@@ -153,42 +153,73 @@ void main(){
     vec2 P = vec2((ref.x - .5)*z*1.8, z);
     float fp = z*z/.06/max(uRes.y/uMap.y, 1.);
     float seaN = (1. - uRiver)*(1. - uStill);
-    float wamp = (.5 + uWind*.85)*mix(1., .38, uStill)*mix(1., .7, uRiver);
+    float wamp = (.45 + uWind*.95)*mix(1., .35, uStill)*mix(1., .6, uRiver);
     float shore = photo > .5 ? max(texture2D(uShore, vec2(ref.x, .5)).r, hz) : hz;
     float below = max(ref.y - shore, 0.);
     vec2 Pw = P + (vec2(noise(P*2.3 + t*.07), noise(P*2.3 - t*.06 + 7.)) - .5)*.05;
-    // wave groups: patches of bigger and smaller waves drifting across
-    float grp = .45 + 1.1*noise(P*vec2(1.6, 1.1) + vec2(t*.04, -t*.07));
+    // the wind's direction on the water (0 = blowing towards the viewer); rivers run across with the flow
+    vec2 wd = normalize(mix(vec2(sin(uWindAng), -cos(uWindAng)), vec2(uFlowX >= 0. ? 1. : -1., 0.), uRiver));
+    vec2 wx = vec2(-wd.y, wd.x);
+    // wave groups: patches of bigger and smaller waves drifting downwind
+    float grp = .5 + 1.0*noise(P*vec2(1.6, 1.1) - wd*t*.08);
     vec2 g = vec2(0.);
     float hgt = 0.;
-    // long swell rolling in (sea), bigger with the sea state
+    // long swell rolling in (sea), bigger with the sea state, steepening as it nears a beach
+    float surfZone = uSurf*smoothstep(.35, .85, d);
     for (int i = 0; i < 2; i++) {
       float fi = float(i);
       vec2 dir = normalize(vec2(.18 - fi*.35, -1.));
       float f = 16. + fi*9.;
-      float a = (.0035 + .004*uSwell)*seaN/(1. + fi*.6);
+      float a = (.0035 + .0045*uSwell)*seaN*(1. + surfZone*1.6)/(1. + fi*.6);
       float aa = clamp(1.7 - f*fp*.45, 0., 1.);
       float ph = dot(Pw, dir)*f + t*(1.1 + fi*.35) + fi*2.1;
       hgt += a*aa*sin(ph);
       g += a*aa*f*cos(ph)*dir;
     }
-    // wind waves from many directions, in groups
+    // wind waves: mostly downwind with a spread, the steepness easing off at the small end as real water does
+    // (the old even steepness made the near water look like beaten metal)
     vec2 gw = vec2(0.);
     for (int i = 0; i < 8; i++) {
       float fi = float(i);
-      vec2 dir = normalize(mix(vec2(sin(fi*2.4 + .5)*1.15, -1.), vec2(uFlowX >= 0. ? 1. : -1., sin(fi*2.1)*.6), uRiver));
-      float f = 55.*pow(1.45, fi);
-      float a = .0016/pow(1.33, fi);
+      float sp = sin(fi*2.4 + .5)*(.55 + .25*uStill);
+      vec2 dir = normalize(wd + wx*sp);
+      float f = 50.*pow(1.45, fi);
+      float a = .0021/pow(1.56, fi);
       float aa = clamp(1.7 - f*fp*.45, 0., 1.);
-      float ph = dot(Pw, dir)*f + t*1.9*sqrt(f/55.) + fi*1.7 + sin(dot(Pw, dir.yx)*f*.31 + fi)*.6;
+      float ph = dot(Pw, dir)*f + t*1.9*sqrt(f/50.) + fi*1.7 + sin(dot(Pw, dir.yx)*f*.31 + fi)*.6;
       hgt += a*aa*sin(ph)*wamp*grp;
       gw += a*aa*f*cos(ph)*dir;
     }
     g += gw*wamp*grp;
-    // fine wind ripples riding on the waves (carried along by them)
-    vec2 rp = (P + g*.012)*vec2(170., 230.) + vec2(t*.35*(uFlowX >= 0. ? 1. : -1.), -t*1.2);
+    // fine wind ripples riding on the waves, stretched across the wind, carried along by it
+    vec2 rq = vec2(dot(P + g*.012, wx), dot(P + g*.012, wd));
+    vec2 rp = rq*vec2(150., 260.) - vec2(0., t*1.3);
     float r0 = noise(rp), rx = noise(rp + vec2(.5, 0.)), ry = noise(rp + vec2(0., .5));
-    g += vec2(rx - r0, ry - r0)*.3*clamp(1.7 - 230.*fp*.35, 0., 1.)*(.35 + uWind*.8)*(1. - .55*uStill)*(.7 + .6*grp);
+    vec2 rg = (rx - r0)*wx + (ry - r0)*wd;
+    g += rg*.22*clamp(1.7 - 230.*fp*.35, 0., 1.)*(.25 + uWind*.85)*(1. - .55*uStill)*(.7 + .6*grp);
+    // a river's or an estuary's current: slow slicks and boils drifting downstream
+    float slick = 0.;
+    if (max(uRiver, uEstuary) > .01) {
+      vec2 cq = P*vec2(.9, 2.6) - vec2(t*.05*(uFlowX >= 0. ? 1. : -1.), 0.);
+      slick = smoothstep(.55, .75, noise(cq))*max(uRiver*.7, uEstuary);
+      g *= 1. - slick*.6;
+    }
+    // rain: each drop a small ring, heavier rain more of them
+    if (uRain > .01) {
+      for (int L = 0; L < 2; L++) {
+        float fl = float(L);
+        vec2 rc = P*vec2(26., 40.)*(1. + fl*.7) + fl*7.3;
+        vec2 ci = floor(rc), cf = fract(rc) - .5;
+        float hc = hash(ci + fl*3.1);
+        if (hc < uRain*.9) {
+          float ph = fract(t*(1.1 + hc) + hc*13.);
+          vec2 o = (vec2(hash(ci + 1.7), hash(ci + 5.3)) - .5)*.5;
+          float rr = length(cf - o), fr = (rr - ph*.42)*28.;
+          float wv = sin(fr)*exp(-fr*fr*.06)*(1. - ph)*clamp(1.7 - 40.*fp*.4, 0., 1.);
+          g += normalize(cf - o + .0001)*wv*.16;
+        }
+      }
+    }
     // rings: the cast landing, a bite at the line, a fish at the surface
     float ring = 0.;
     for (int i = 0; i < 6; i++){
@@ -218,7 +249,10 @@ void main(){
     vec3 N = normalize(vec3(-g.x, 1., -g.y));
     vec3 V = normalize(vec3(P.x, -.06, z));
     vec3 R = reflect(V, N), R0 = reflect(V, vec3(0., 1., 0.));
-    float F = .02 + .98*pow(1. - max(dot(N, -V), 0.), 5.);
+    // how much is reflected comes from a calmer version of the surface: the small facets wobble the reflection but
+    // don't flick it on and off, which is what made it look like liquid metal
+    vec3 Nf = normalize(mix(vec3(0., 1., 0.), N, .45));
+    float F = .02 + .98*pow(1. - max(dot(Nf, -V), 0.), 5.);
     vec3 refl;
     if (photo > .5) {
       // the mirror image, stretched into streaks and wobbled by the tilt of each facet. A wall or rocks standing
@@ -231,7 +265,7 @@ void main(){
       float rag = (noise(vec2(ref.x*70., ref.y*25. + t*.5)) - .5)*reach*.7;
       float qy = mix(shore - below*.92, hz - (ref.y - hz)*.92, smoothstep(reach*.4, reach*1.25, below + rag)) - off.y;
       vec2 q = vec2(clamp(ref.x + clamp(off.x, -.03, .03), .01, .99), clamp(qy, .003, max(shore - .006, .004)));
-      float rough = clamp(.4 + uWind*.6 + d*.2, 0., 1.);
+      float rough = clamp(.55 + uWind*.45 + d*.2, 0., 1.);
       vec3 soft = texture2D(uBlur, q).rgb*.5 + (texture2D(uBlur, q + vec2(0., .014)).rgb + texture2D(uBlur, q - vec2(0., .014)).rgb)*.25;
       refl = mix(texture2D(uFrame, q).rgb, soft, rough);
       // where the tilt would look past the waterline into the water itself, it sees the far sky's haze instead
@@ -241,26 +275,43 @@ void main(){
       float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.12;
       refl = reflSky(R, ref.x + clamp(sx, -.05, .05));
     }
-    // the water's own colour: the photo's water (or a sea, river or lake colour), with patches of depth and silt
-    vec3 body = photo > .5 ? uWaterCol : mix(vec3(.04,.16,.20), vec3(.10,.14,.09), max(uRiver, uStill)*.7)*(uDay*1. + uDusk*.6 + uNight*.15);
-    body *= mix(.78, 1., 1. - d)*(.88 + .24*noise(P*vec2(.9, .6) + vec2(t*.015, 0.)));
-    body *= 1. + hgt*(14. + 10.*d);
-    float Fv = clamp(F*1.7 + .07, 0., .93);
+    // the water's own colour: on a photo, the photo's own water softened (its real bands of colour, silt and depth,
+    // gently moved by the waves) over its average colour; otherwise a sea, estuary, river or lake colour
+    vec3 body;
+    if (photo > .5) {
+      vec3 own = texture2D(uBlur, clamp(ref + vec2(g.x, g.y*.6)*.012, .002, .998)).rgb;
+      body = mix(uWaterCol, own, .6*smoothstep(shore, shore + .02, ref.y));
+    } else {
+      body = mix(vec3(.04,.16,.20), vec3(.10,.14,.09), max(uRiver, uStill)*.7);
+      body = mix(body, vec3(.20,.17,.12), uEstuary*.6)*(uDay*1. + uDusk*.6 + uNight*.15);
+    }
+    body *= mix(.8, 1., 1. - d)*(.9 + .2*noise(P*vec2(.9, .6) + vec2(t*.015, 0.)));
+    // light through the thin tops of the waves, a little darker in the troughs
+    body *= 1. + clamp(hgt*(12. + 8.*d), -.18, .2);
+    float Fv = clamp(F*1.25 + .02, 0., .82)*(1. - slick*.3);
     vec3 water = mix(body, refl, Fv);
-    // the sun and moon on the water: a broad soft path plus sharp glints on the facets that catch them
+    // the sun and moon on the water: a broad soft path, and small sparkles where facets catch them
     vec3 Ls = normalize(vec3((uSunX - .5)*2.2, .05 + uSunUp*.9, 1.));
     vec3 Lm = normalize(vec3((uMoonX - .5)*2.2, .05 + uMoonUp*.9, 1.));
     float ss = max(dot(R, Ls), 0.), sm = max(dot(R, Lm), 0.);
-    water += sunCol*(pow(ss, 40.)*.2 + pow(ss, 500.)*1.5)*uSun + vec3(.8,.86,1.)*(pow(sm, 50.)*.15 + pow(sm, 600.)*1.1)*uMoon;
+    float spark = smoothstep(.55, .9, noise(rp*1.7 + t*.8));
+    water += sunCol*(pow(ss, 36.)*.18 + pow(ss, 260.)*(.25 + 1.1*spark))*uSun + vec3(.8,.86,1.)*(pow(sm, 50.)*.14 + pow(sm, 400.)*(.2 + .8*spark))*uMoon;
     // where the water meets walls and rocks: a darker contact line and a little working foam
     float contact = exp(-below*420.)*step(.0005, below);
     float wash = smoothstep(.42, .78, noise(P*vec2(70., 95.) + vec2(t*.5, -t*.8))*noise(ref*vec2(120., 50.) - t*.3)*1.6);
     float shoreFoam = wash*exp(-below*70.)*(.2 + uWind*.9)*(1. - uStill*.7)*step(.0005, below)*(photo > .5 ? 1. : 0.);
     water *= 1. - .22*contact;
-    // whitecaps in a blow (sea only)
+    // whitecaps in a blow (sea only), and streaks of foam lying along the wind
     float foam = smoothstep(.62, .92, hgt/max(.006*wamp, .0005)*.5 + .5 + (noise(P*vec2(140., 200.) + t*.2) - .5)*.5)*smoothstep(.35, .85, uWind)*seaN;
+    float streak = smoothstep(.72, .9, noise(vec2(dot(P, wx)*9., dot(P, wd)*1.2 - t*.25)))*smoothstep(.55, 1., uWind)*seaN*.5;
+    // on a beach the swell breaks into lines of white water rolling in
+    float surf = 0.;
+    if (surfZone > .01) {
+      float band = sin(z*7. - t*1.6 + noise(vec2(ref.x*6., t*.2))*2.5);
+      surf = smoothstep(.55, .95, band)*smoothstep(.3, .7, noise(P*vec2(30., 10.) + t*.3))*surfZone*(.5 + uSwell);
+    }
     vec3 foamC = vec3(.9,.93,.95)*lit;
-    water = mix(water, foamC, clamp(foam*(.2 + .4*d) + shoreFoam*.55 + churnFoam*.7, 0., .85));
+    water = mix(water, foamC, clamp(foam*(.2 + .4*d) + streak*(.2 + .3*d) + surf*.85 + shoreFoam*.55 + churnFoam*.7, 0., .88));
     water += vec3(.9)*max(ring, 0.)*.05;
     col = mix(col, clamp(water, 0., 1.), m);
   }
@@ -271,10 +322,12 @@ void main(){
   // the light of the hour over the photo (the representative scene is already lit)
   if (photo > .5) {
     float l = dot(col, vec3(.3,.59,.11));
-    vec3 nightC = mix(vec3(l)*vec3(.30,.38,.56), col*vec3(.32,.38,.58), .35) + vec3(.012,.016,.03);
+    // night: much darker and nearly colourless with only a slight coolness, not a blue wash over a daytime photo
+    vec3 nightC = mix(vec3(l), col, .3)*vec3(.27,.28,.31)*(1. + .25*uMoon) + vec3(.008,.009,.012);
     col = mix(col, col*vec3(1.08,.86,.70)*.86 + vec3(.05,.01,0.)*(1. - ref.y), uDusk*.75);
     col = mix(col, nightC, uNight*.9);
-    col = mix(col, vec3(l)*.95, uCloud*.28);
+    // overcast: flatter, greyer light with the contrast softened
+    col = mix(col, mix(vec3(l)*.95, vec3(.5)*(uDay + uDusk*.6 + uNight*.15), .25), uCloud*.32);
   }
   // cloud shadows drifting over everything, a little mist and rain dulling
   float cs = fbm(ref*vec2(1.6, 2.8) + vec2(t*.008*wdir, 0.));
@@ -588,7 +641,7 @@ export function createWaterRenderer(canvas) {
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = {};
-  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uMoonUp", "uMoonDisc", "uSky", "uBlur", "uWaterCol", "uShore", "uSwell", "uDist", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
+  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uMoonUp", "uMoonDisc", "uSky", "uBlur", "uWaterCol", "uShore", "uSwell", "uWindAng", "uSurf", "uEstuary", "uDist", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
   const tex = (unit) => {
     const t = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -600,7 +653,7 @@ export function createWaterRenderer(canvas) {
   const tFrame = tex(0), tMask = tex(1), tSky = tex(2), tBlur = tex(3), tShore = tex(4);
   gl.uniform1i(U.uFrame, 0); gl.uniform1i(U.uMask, 1); gl.uniform1i(U.uSky, 2); gl.uniform1i(U.uBlur, 3); gl.uniform1i(U.uShore, 4);
   let hasPhoto = 0, horizon = 0.42, lost = false, tint = null;
-  const P = { wind: 0.3, flowX: 0.6, river: 0, still: 0, night: 0, dusk: 0, day: 1, rain: 0, fog: 0, cloud: 0.3, sunX: 0.62, sun: 0.6, moonX: 0.4, moon: 0, sunUp: 0.3, sunGlow: 0, moonUp: 0.3, moonDisc: 0, swell: 0.3, oct: 4, flow: 1 };
+  const P = { wind: 0.3, flowX: 0.6, river: 0, still: 0, night: 0, dusk: 0, day: 1, rain: 0, fog: 0, cloud: 0.3, sunX: 0.62, sun: 0.6, moonX: 0.4, moon: 0, sunUp: 0.3, sunGlow: 0, moonUp: 0.3, moonDisc: 0, swell: 0.3, windAng: 0.4, surf: 0, estuary: 0, oct: 4, flow: 1 };
   const rip = new Float32Array(24), dist = new Float32Array(8);
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); lost = true; });
 
@@ -636,7 +689,7 @@ export function createWaterRenderer(canvas) {
       gl.uniform1f(U.uHorizon, horizon);
       gl.uniform1f(U.uHasPhoto, hasPhoto);
       gl.uniform1f(U.uProc, hasPhoto ? 0 : 1);
-      for (const [u, k] of [["uWind", "wind"], ["uFlowX", "flowX"], ["uRiver", "river"], ["uStill", "still"], ["uNight", "night"], ["uDusk", "dusk"], ["uDay", "day"], ["uRain", "rain"], ["uFog", "fog"], ["uCloud", "cloud"], ["uSunX", "sunX"], ["uSun", "sun"], ["uMoonX", "moonX"], ["uMoon", "moon"], ["uSunUp", "sunUp"], ["uSunGlow", "sunGlow"], ["uMoonUp", "moonUp"], ["uMoonDisc", "moonDisc"], ["uSwell", "swell"], ["uOct", "oct"], ["uFlow", "flow"]]) gl.uniform1f(U[u], P[k]);
+      for (const [u, k] of [["uWind", "wind"], ["uFlowX", "flowX"], ["uRiver", "river"], ["uStill", "still"], ["uNight", "night"], ["uDusk", "dusk"], ["uDay", "day"], ["uRain", "rain"], ["uFog", "fog"], ["uCloud", "cloud"], ["uSunX", "sunX"], ["uSun", "sun"], ["uMoonX", "moonX"], ["uMoon", "moon"], ["uSunUp", "sunUp"], ["uSunGlow", "sunGlow"], ["uMoonUp", "moonUp"], ["uMoonDisc", "moonDisc"], ["uSwell", "swell"], ["uWindAng", "windAng"], ["uSurf", "surf"], ["uEstuary", "estuary"], ["uOct", "oct"], ["uFlow", "flow"]]) gl.uniform1f(U[u], P[k]);
       rip.fill(0);
       ripples.slice(0, 6).forEach((r, i) => { rip[i * 4] = r.x; rip[i * 4 + 1] = r.y; rip[i * 4 + 2] = r.age; rip[i * 4 + 3] = r.s; });
       gl.uniform4fv(U.uRip, rip);

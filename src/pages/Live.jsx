@@ -17,7 +17,7 @@ import ShareSheet from "../components/ShareSheet.jsx";
 import { Compose } from "./Community.jsx";
 import { EV_INFO, phaseAt, sceneEvents, catchesOf, notable, countsAt } from "../lib/liveEvents.js";
 import { onShare, shareInfo, setShareContext, sessionChanged, sessionEnded, stopSharing } from "../lib/liveShare.js";
-import { resolveScene, loadChoice, scenePhotoKey } from "../lib/scene.js";
+import { resolveScene, loadChoice, scenePhotoKey, venueOf } from "../lib/scene.js";
 import { accountsEnabled, onUser } from "../lib/account.js";
 import { hasArt, artUrl } from "../data/fishart.js";
 import ASTRO from "../lib/astro.js";
@@ -165,7 +165,7 @@ function Running({ s }) {
     <main className="col live-col">
       <div className="live-stage">
         <FishingScene ref={sceneRef} scene={scene} events={evs} status={s.status} now={Date.now}
-          env={{ cond: condAt(live, tide, Date.now()), light: lightAt(place, Date.now()), kind: place.kind }}
+          env={{ cond: condAt(live, tide, Date.now()), light: lightAt(place, Date.now()), kind: place.kind, venue: venueOf(place) }}
           quality={settings.liveQuality || "auto"} sound={!!settings.liveSound} floatRig={floatRig} catchPhoto={photoOf}>
           <div className="fs-top">
             <span className={`live-badge s-${s.status === "paused" ? "paused" : "live"}`}><span className="rec-dot" />{s.status === "paused" ? "Paused" : "Fishing"}</span>
@@ -391,7 +391,7 @@ function Replay({ s, onClose }) {
   return (
     <Sheet title={`${s.place?.name}`} aside={`${fmtDateTime(start)} · ${fmtDuration(elapsed(s))}`} onClose={onClose} wide>
       <div className="replay-stage">
-        <FishingScene scene={scene} events={evs} status="running" now={() => tRef.current} env={{ cond, light: lightAt(s.place, t), kind: s.place?.kind }} quality="auto" catchPhoto={photoOf}>
+        <FishingScene scene={scene} events={evs} status="running" now={() => tRef.current} env={{ cond, light: lightAt(s.place, t), kind: s.place?.kind, venue: venueOf(s.place) }} quality="auto" catchPhoto={photoOf}>
           <div className="fs-top"><span className="live-badge s-replay">Replay</span><span className="fs-chip num">{fmtTime(t)}</span></div>
         </FishingScene>
       </div>

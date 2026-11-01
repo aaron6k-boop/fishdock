@@ -40,6 +40,9 @@ export default function Watch({ token }) {
   const [pass, setPass] = useState("");
   const [passMsg, setPassMsg] = useState("");
   const [open, setOpen] = useState(null);
+  const [uiHidden, setUiHidden] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const goTo = (id) => { setSheet(true); setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 320); };
   const [, tick] = useState(0);
   const sceneRef = useRef(null);
   const st = useRef({ lastSeq: 0, offset: 0, skew: null, timer: 0, fails: 0, stopped: false, sceneV: -1 });
@@ -167,23 +170,38 @@ export default function Watch({ token }) {
   const quietFor = share.anglerSeenAt ? Date.now() + st.current.offset - share.anglerSeenAt : 0;
 
   return (
-    <div className="watch-shell">
+    <div className={`watch-shell immersive${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch">
         <div className="watch-stage">
           <FishingScene ref={sceneRef} scene={scene} events={evs} status={replayT != null ? "running" : share.status} now={sceneNow}
-            env={{ cond: share.cond, light: share.light, kind: share.place?.kind }} quality={quality} sound={sound} vibrate={buzz && replayT == null}
-            catchPhoto={(ev) => (ev?.data?.photo ? photos[ev.data.photo] || null : null)}>
+            env={{ cond: share.cond, light: share.light, kind: share.place?.kind, venue: share.place?.venue }} quality={quality} sound={sound} vibrate={buzz && replayT == null}
+            catchPhoto={(ev) => (ev?.data?.photo ? photos[ev.data.photo] || null : null)} onTap={() => setUiHidden((h) => !h)}>
             <div className="fs-top">
               <span className={`live-badge s-${replayT != null ? "replay" : statusChip[0]}`}>{replayT != null ? "Replay" : <><span className="rec-dot" />{statusChip[1]}</>}</span>
               <span className="fs-chip num">{fmtClock(elapsedOf(share, phoneNow()))}</span>
               {c.windKph != null ? <span className="fs-chip"><Icon name="wind" />{Math.round(c.windKph * 0.621)} mph {compass(c.windDir)}</span> : null}
               {c.tide ? <span className="fs-chip"><Icon name="wave" />{c.tide}</span> : null}
+              <span className="grow" />
+              <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
+              <button type="button" className="fs-btn watch-more" onClick={() => setSheet(true)} aria-label="Session details"><Icon name="list" /></button>
             </div>
-            <div className="fs-who"><b>{who}</b>{share.place?.label || share.place?.area ? <span> · {share.place.label || share.place.area}</span> : null}</div>
+            <div className="fs-bottom">
+              <div className="fs-who"><b>{who}</b>{share.place?.label || share.place?.area ? <span> · {share.place.label || share.place.area}</span> : null}</div>
+              <div className="demo-ctl watch-ctl">
+                <div className="demo-act" aria-live="polite">{replayT != null ? `Replay: ${activityText(p, { who: share.name, target })}` : activityText(p, { who: share.name, target })}</div>
+                <div className="demo-btns">
+                  <button type="button" className="btn small demo-alt" onClick={() => goTo("w-catches")}><Icon name="fish" />{catches.length ? `${catches.length} caught` : "Catches"}</button>
+                  <button type="button" className="btn small demo-alt" onClick={() => goTo("w-timeline")}><Icon name="clock" />Timeline</button>
+                  {catches[0] ? <button type="button" className="btn small demo-alt" onClick={() => setOpen(catches[0])}>{catches[0].data?.name || "Fish"}{catches[0].data?.lengthCm ? `, ${catches[0].data.lengthCm} cm` : ""}</button> : null}
+                </div>
+              </div>
+            </div>
           </FishingScene>
         </div>
 
-        <div className="watch-panel">
+        {sheet ? <div className="sheet-scrim" onClick={() => setSheet(false)} /> : null}
+        <div className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Session details">
+          <div className="sheet-head"><div className="try-head"><h1>{who}{replayT != null ? ": replay" : ""}</h1><p className="small muted">Animated from logged events, not a camera.</p></div><button type="button" className="xbtn sheet-x" onClick={() => setSheet(false)} aria-label="Close details"><Icon name="close" /></button></div>
           {replayT == null && !share.connected && share.status !== "ended" ? <div className="notice warn small"><Icon name="info" /><span>{who}'s phone hasn't sent anything for {fmtDuration(quietFor)}. Phones pause FishDock when the screen locks or there's no signal. This is the last thing it sent.</span></div> : null}
           {conn === "retrying" ? <div className="notice small"><Icon name="info" /><span>Reconnecting… you'll catch up on anything you missed.</span></div> : null}
           <div className="watch-activity" aria-live="polite">{activityText(p, { who: share.name, target })}</div>
@@ -205,7 +223,7 @@ export default function Watch({ token }) {
           </div>
           {share.pos ? <a className="btn small" href={`https://www.google.com/maps/search/?api=1&query=${share.pos.lat},${share.pos.lon}`} target="_blank" rel="noopener noreferrer"><Icon name="pin" />Exact location, shared by {who}</a> : null}
 
-          <section className="watch-sec">
+          <section className="watch-sec" id="w-catches">
             <div className="card-h"><h2>Catches</h2><span className="aside">{catches.length}</span></div>
             {catches.length ? <div className="catch-strip">{catches.map((e) => {
               const sp = speciesById(e.data?.species);
@@ -220,14 +238,14 @@ export default function Watch({ token }) {
             })}</div> : <p className="tiny">{share.counts?.catches && link?.perms && !link.perms.history ? "Catches from before you opened the link aren't shown on this link." : "Nothing landed yet. When a fish comes in, you'll see it here."}</p>}
           </section>
 
-          <section className="watch-sec">
-            <div className="card-h"><h2>What's happened</h2>{evs.length > 1 ? <button type="button" className="btn small" onClick={() => { setReplayT(share.startedAt); setPlaying(true); scrollTo({ top: 0, behavior: "smooth" }); }}><Icon name="play" />Replay</button> : null}</div>
+          <section className="watch-sec" id="w-timeline">
+            <div className="card-h"><h2>What's happened</h2>{evs.length > 1 ? <button type="button" className="btn small" onClick={() => { setReplayT(share.startedAt); setPlaying(true); setSheet(false); scrollTo({ top: 0, behavior: "smooth" }); }}><Icon name="play" />Replay</button> : null}</div>
             <ol className="timeline">
               {timelineRows(evs, { upTo: now, limit: 50 }).map((e) => (
                 <li key={`${e.seq}-${e.t}`} className={`ev-${e.type}`}>
                   <span className="tl-time num">{fmtTime(e.t)}</span><Icon name={EV_INFO[e.type]?.[0] || "info"} />
                   <span className="grow">{EV_INFO[e.type]?.[1]}{e.type === "catch" ? `: ${e.data?.name || "fish"}${e.data?.lengthCm ? `, ${e.data.lengthCm} cm` : ""}${e.data?.released ? ", released" : ""}` : ""}</span>
-                  {e.type !== "start" ? <button type="button" className="xbtn" aria-label={`Replay from ${fmtTime(e.t)}`} onClick={() => { setReplayT(Math.max(share.startedAt, e.t - 3000)); setPlaying(true); scrollTo({ top: 0, behavior: "smooth" }); }}><Icon name="play" /></button> : null}
+                  {e.type !== "start" ? <button type="button" className="xbtn" aria-label={`Replay from ${fmtTime(e.t)}`} onClick={() => { setReplayT(Math.max(share.startedAt, e.t - 3000)); setPlaying(true); setSheet(false); scrollTo({ top: 0, behavior: "smooth" }); }}><Icon name="play" /></button> : null}
                 </li>
               ))}
             </ol>
@@ -260,7 +278,7 @@ export default function Watch({ token }) {
         <div className="scrim" onClick={(e) => { if (e.target === e.currentTarget) setOpen(null); }}>
           <div className="watch-card-pop">
             <CatchCard ev={open} photoUrl={open.data?.photo ? photos[open.data.photo] || null : null} onClose={() => setOpen(null)} />
-            <button type="button" className="btn primary block" onClick={() => { const e = open; setOpen(null); setReplayT(null); scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => sceneRef.current?.replayCatch(e), 300); }}><Icon name="play" />Watch it landed again</button>
+            <button type="button" className="btn primary block" onClick={() => { const e = open; setOpen(null); setSheet(false); setReplayT(null); scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => sceneRef.current?.replayCatch(e), 300); }}><Icon name="play" />Watch it landed again</button>
           </div>
         </div>
       ) : null}

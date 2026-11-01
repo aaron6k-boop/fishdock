@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
 import { fightSeconds, ROD_STYLES } from "../lib/sceneActors.js";
 import { composeFrame } from "../lib/sceneGL.js";
-import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews } from "../lib/scene.js";
+import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews, venueOf } from "../lib/scene.js";
 import { DRAW_CM, activityText, phaseAt } from "../lib/liveEvents.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -17,11 +17,13 @@ import { hasArt, artUrl } from "../data/fishart.js";
 import ASTRO from "../lib/astro.js";
 import { Icon, Seg } from "../components/ui.jsx";
 
-const GORLESTON = { id: "gorleston-south-pier", name: "Gorleston South Pier", region: "Norfolk, East of England", kind: "sea", lat: 52.5733, lon: 1.7375 };
+const GORLESTON = { id: "gorleston-south-pier", name: "Gorleston South Pier", region: "Norfolk, East of England", kind: "sea", type: "pier", lat: 52.5733, lon: 1.7375 };
 export const TRY_PLACES = ["gorleston-south-pier", "cromer-pier", "chesil-beach-ferry-bridge", "whitby-piers", "brixham-breakwater", "st-ives-the-island", "holyhead-breakwater", "loch-ryan-leffnol", "river-wye-ross", "royalty-fishery-avon", "rutland-water", "lough-erne-enniskillen"];
 const placeOf = (id) => (id === GORLESTON.id ? GORLESTON : spotById(id)) || GORLESTON;
 const LIGHT = [{ value: "now", label: "Now" }, { value: "morning", label: "Morning" }, { value: "midday", label: "Midday" }, { value: "dusk", label: "Dusk" }, { value: "night", label: "Night" }];
-const RODS = Object.values(ROD_STYLES).map((r) => ({ value: r.id, label: r.name }));
+const RODS = [{ value: "auto", label: "For the place" }, ...Object.values(ROD_STYLES).map((r) => ({ value: r.id, label: r.name }))];
+const TIPS = [{ value: "auto", label: "At night" }, { value: "on", label: "On" }, { value: "off", label: "Off" }];
+const FROM = [{ value: "auto", label: "The place's own" }, { value: "beach", label: "Beach" }, { value: "pier", label: "Pier" }, { value: "estuary", label: "Estuary" }, { value: "river", label: "River bank" }, { value: "lake", label: "Lake" }];
 const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", label: "Calm" }, { value: "breezy", label: "Breezy" }, { value: "windy", label: "Windy" }, { value: "rain", label: "Rain" }];
 const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, rain: { windKph: 24, cloudPct: 100, precipMm: 1.5 } };
 let seq = 0;
@@ -57,10 +59,14 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [wx, setWx] = useState("live");
   const [cond, setCond] = useState(null);
   const [quality, setQuality] = useState("auto");
-  const [rod, setRod] = useState("allround");
+  const [rod, setRod] = useState("auto");
+  const [tipLight, setTipLight] = useState("auto");
+  const [from, setFrom] = useState("auto");
   const [sound, setSound] = useState(false);
   const [copied, setCopied] = useState("");
   const timers = useRef([]);
+  const [uiHidden, setUiHidden] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const sceneRef = useRef(null);
   const clearAuto = () => { timers.current.forEach(clearTimeout); timers.current = []; };
 
@@ -91,49 +97,73 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   // at dusk the demo faces the sunset, so the glitter path shows
   const v = { ...view, facing: light === "dusk" ? Math.round(sun.az) : light === "night" && moon.alt > 0 ? Math.round(moon.az) : null };
   const scene = photo ? { kind: "commons", src: photo.url, view: v, commons: photo } : { kind: "representative", src: null, view: { ...defaultView(), facing: v.facing } };
+  // the phase moves on with time (a cast settles, a landing ends), so the controller follows it
+  const [, setTick] = useState(0);
+  useEffect(() => { if (!events.length) return undefined; const id = setInterval(() => setTick((n) => n + 1), 400); return () => clearInterval(id); }, [events.length]);
   const p = phaseAt(events, Date.now());
+  const last = events.at(-1)?.type;
+  const playing = timers.current.length > 0 && events.length < 4;
   const add = (type, data) => setEvents((e) => [...e, ev(type, data)]);
   const land = () => add("catch", { species: sp.id, name: sp.name, lengthCm: length, released: true });
   function playAll() {
     clearAuto();
     setEvents([]);
+    setUiHidden(false);
     // the fight lasts as long as this kind and size of fish usually takes in the animation (a whiting is quick, a cod or tope longer)
-    const steps = [[300, () => add("cast")], [5200, () => add("bite")], [8200, () => add("hooked")], [8200 + fightSeconds(sp.id, length) * 1000, land]];
+    const steps = [[300, () => add("cast")], [5200, () => add("bite")], [8200, () => add("hooked")], [8200 + fightSeconds(sp.id, length) * 1000, () => { land(); timers.current = []; }]];
     timers.current = steps.map(([ms, f]) => setTimeout(f, ms));
   }
+  const reset = () => { clearAuto(); setEvents([]); };
+  // what can happen next: one main step, and only the other things that make sense right now
+  const next = (() => {
+    if (playing) return { main: ["Playing…", null, "play"], alt: [["Stop", reset]] };
+    if (p.phase === "idle" || p.phase === "ended") return { main: ["Cast", () => add("cast"), "target"], alt: [["Play it all", playAll]] };
+    if (p.phase === "cast") return { main: ["Casting…", null, "target"], alt: [] };
+    if (p.phase === "bite") return { main: ["Strike", () => add("hooked"), "hook"], alt: [["Miss it", () => add("missed")]] };
+    if (p.phase === "hooked") return { main: ["Land it", land, "fish"], alt: [["Lose it", () => add("lost")]] };
+    if (p.phase === "landing") return { main: ["Landing…", null, "fish"], alt: [] };
+    if (p.phase === "lost" || p.phase === "missed") return { main: ["Wait…", null, "clock"], alt: [] };
+    // waiting: after a catch or a lost fish the line is out of the water, so cast again; otherwise wait for a bite
+    if (last === "catch" || last === "lost") return { main: ["Cast again", () => add("cast"), "target"], alt: [["Reset", reset]] };
+    return { main: ["Get a bite", () => add("bite"), "bell"], alt: [["Cast again", () => add("cast")], ["Reset", reset]] };
+  })();
   const base = `${location.origin}/#try`;
   const copy = async (u) => { try { await navigator.clipboard.writeText(u); setCopied(u); setTimeout(() => setCopied(""), 1800); } catch { /* ignore */ } };
 
+  const catches = events.filter((e) => e.type === "catch");
   return (
-    <div className="watch-shell try-shell">
+    <div className={`watch-shell try-shell immersive${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch">
         <div className="watch-stage">
-          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind }} quality={quality} sound={sound} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod}>
+          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue: from === "auto" ? venueOf(place) : from }} quality={quality} sound={sound} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
             <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
               {c?.windKph != null ? <span className="fs-chip"><Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</span> : null}
+              <span className="grow" />
+              <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
+              <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
             </div>
-            <div className="fs-who"><b>{place.name}</b><span> · {sp.name}</span></div>
+            <div className="fs-bottom">
+              <div className="fs-who"><b>{place.name.replace(/ \(.*\)$/, "")}</b><span> · {sp.name}, {length} cm</span></div>
+              <div className="demo-ctl" role="group" aria-label="Demo controls">
+                <div className="demo-act" aria-live="polite">{p.phase === "idle" ? "Ready when you are" : p.phase === "landing" ? `${sp.name} landed (demo, not logged)` : activityText(p, { who: "", target: sp.name })}</div>
+                <div className="demo-btns">
+                  <button type="button" className="btn primary demo-main" onClick={next.main[1] || undefined} disabled={!next.main[1]}><Icon name={next.main[2]} />{next.main[0]}</button>
+                  {next.alt.map(([label, fn]) => <button key={label} type="button" className="btn small demo-alt" onClick={fn}>{label}</button>)}
+                </div>
+              </div>
+            </div>
           </FishingScene>
         </div>
-        <div className="watch-panel">
-          <div className="try-head">
-            <h1>Try the Live Fishing View</h1>
-            <p className="small muted">A demo: nothing here is a real session, and nothing is saved or shared. Pick a place and a fish, then play it.</p>
-          </div>
-          <div className="watch-activity" aria-live="polite">{activityText(p, { who: "", target: sp.name })}</div>
-          <div className="ctl-grid">
-            <button type="button" className="ctl cast" onClick={() => add("cast")}><Icon name="target" /><span>Cast</span></button>
-            <button type="button" className="ctl bite" onClick={() => add("bite")}><Icon name="bell" /><span>Bite</span></button>
-            <button type="button" className="ctl hook" onClick={() => add("hooked")}><Icon name="hook" /><span>Fish on</span></button>
-            <button type="button" className="ctl catch" onClick={land}><Icon name="fish" /><span>Land it</span></button>
-          </div>
-          <div className="row">
-            <button type="button" className="btn primary" onClick={playAll}><Icon name="play" />Play it all</button>
-            <button type="button" className="btn small" onClick={() => add("lost")}>Lose it</button>
-            <button type="button" className="btn small" onClick={() => add("missed")}>Miss a bite</button>
-            <button type="button" className="btn ghost small" onClick={() => { clearAuto(); setEvents([]); }}>Reset</button>
+        {sheet ? <div className="sheet-scrim" onClick={() => setSheet(false)} /> : null}
+        <aside className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Demo settings">
+          <div className="sheet-head">
+            <div className="try-head">
+              <h1>Try the Live Fishing View</h1>
+              <p className="small muted">A demo: nothing here is a real session or a real catch, and nothing is saved or shared.</p>
+            </div>
+            <button type="button" className="xbtn sheet-x" onClick={() => setSheet(false)} aria-label="Close settings"><Icon name="close" /></button>
           </div>
 
           <section className="watch-sec">
@@ -147,7 +177,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               ))}
             </div>
             <div className="cond-row"><span>Length</span><input type="range" min="10" max="150" step="1" value={length} onChange={(e) => setLength(Number(e.target.value))} aria-label="Demo length in cm" /><span className="num tiny">{length} cm</span></div>
-            <p className="tiny">Sea fish lift out of the water in FishDock's own pictures. Freshwater fish without a cut-out picture yet splash and go straight to the close-up.</p>
+            <p className="tiny">Sea fish are drawn from FishDock's own pictures. Freshwater fish without one yet splash and go straight to the close-up.</p>
           </section>
 
           <section className="watch-sec">
@@ -167,10 +197,23 @@ export default function TryLive({ initialPlace, initialSpecies }) {
           <section className="watch-sec">
             <div className="field"><span className="lbl">Light</span><Seg value={light} onChange={setLight} options={LIGHT} /></div>
             <div className="field"><span className="lbl">Weather</span><Seg value={wx} onChange={setWx} options={WEATHER} />{wx === "live" && !cond ? <span className="tiny">Live weather isn't available just now; showing a breeze.</span> : null}</div>
+            <div className="field"><span className="lbl">Fishing from</span><Seg value={from} onChange={setFrom} options={FROM} /></div>
             <div className="field"><span className="lbl">Rod</span><Seg value={rod} onChange={setRod} options={RODS} /></div>
+            <div className="field"><span className="lbl">Tip light</span><Seg value={tipLight} onChange={setTipLight} options={TIPS} /></div>
             <div className="field"><span className="lbl">Animation quality</span><Seg value={quality} onChange={setQuality} options={QUALITY_OPTIONS} /></div>
-            <button type="button" className={`btn small${sound ? " primary" : ""}`} onClick={() => setSound(!sound)}><Icon name={sound ? "bell" : "mic"} />{sound ? "Sound on" : "Sound off"}</button>
           </section>
+
+          {catches.length ? (
+            <section className="watch-sec">
+              <div className="card-h"><h2>Demo catches</h2><span className="aside">{catches.length}</span></div>
+              <div className="catch-strip">{catches.slice().reverse().map((e) => (
+                <button key={e.id} type="button" className="catch-tile" onClick={() => { setSheet(false); sceneRef.current?.replayCatch(e); }}>
+                  {hasArt(e.data.species) ? <img src={artUrl(e.data.species, "s")} alt="" className="art" /> : <span className="ct-ph"><Icon name="fish" /></span>}
+                  <span className="t">{e.data.name}</span><span className="s">{e.data.lengthCm} cm · demo</span>
+                </button>
+              ))}</div>
+            </section>
+          ) : null}
 
           <section className="watch-sec">
             <div className="card-h"><h2>Links to try</h2></div>
@@ -183,7 +226,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             </div>
           </section>
           <p className="tiny watch-foot">Demo of FishDock's Live Fishing View. Real sessions are shared on private links from the fishing screen. <a href="/">Open FishDock</a>{typeof __BUILD_ID__ !== "undefined" ? <><br />Version {__BUILD_ID__}</> : null}</p>
-        </div>
+        </aside>
       </div>
     </div>
   );

@@ -34,7 +34,7 @@ export function autoQuality() {
 
 const rel = (az, facing) => ((((az - facing) % 360) + 540) % 360) - 180;
 /** Light and weather for the shader and the actors, from the shared conditions and sky. */
-export function sceneEnv({ cond, light, view, kind, photo = true }) {
+export function sceneEnv({ cond, light, view, kind, venue, photo = true }) {
   const sky = skyLight(light?.sunAlt);
   const wind = Math.min(1, Math.max(0, (cond?.windKph ?? 12) / 45));
   const cloud = cond?.cloudPct != null ? cond.cloudPct / 100 : 0.35;
@@ -57,14 +57,19 @@ export function sceneEnv({ cond, light, view, kind, photo = true }) {
   const sunGlow = photo ? (facing != null ? sun : 0) : light?.sunAlt != null && light.sunAlt > -3 ? Math.max(sun, 0.55 * (1 - cloud * 0.85)) : 0;
   const moonUp = light?.moonAlt != null ? Math.min(1, Math.max(0, light.moonAlt / 50)) : 0.3;
   const moonDisc = moonInView && light.moonAlt > 2 ? (1 - cloud * 0.9) * sky.night * (0.5 + 0.5 * (light.moonIllum ?? 0.5)) : 0;
-  const wk = waterKind(kind);
+  const vn = venue || (kind === "estuary" ? "estuary" : null);
+  const wk = vn === "river" ? "river" : vn === "lake" ? "still" : vn ? "sea" : waterKind(kind);
   const windDir = cond?.windDir != null && facing != null ? (Math.sin(((cond.windDir + 180 - facing) * Math.PI) / 180) >= 0 ? 1 : -1) : 1;
+  // which way the waves run on screen: 0 is towards the viewer (the wind coming from where they face); without a
+  // known direction, from a little to one side
+  const windAng = cond?.windDir != null && facing != null ? -((((cond.windDir - facing) % 360) + 540) % 360 - 180) * Math.PI / 180 : 0.4;
   // the swell: the forecast wave height when there is one, otherwise a rough wind-sea guess; none on a river or lake
   const swell = wk !== "sea" ? 0 : cond?.waveM != null ? Math.min(1, cond.waveM / 1.5) : Math.min(1, 0.15 + wind * 0.6);
   return {
     swell,
     ...sky, wind, cloud, rain, fog: cloud > 0.95 && rain > 0 ? 0.3 : 0, sunX, sun, moonX, moon, sunUp, sunGlow, moonUp, moonDisc,
-    river: wk === "river" ? 1 : 0, still: wk === "still" ? 1 : 0, flowX: windDir * 0.7, windDir,
+    river: wk === "river" ? 1 : 0, still: wk === "still" ? 1 : 0, flowX: windDir * 0.7, windDir, windAng,
+    surf: vn === "beach" ? 1 : 0, estuary: vn === "estuary" ? 1 : 0, venue: vn || (wk === "river" ? "river" : wk === "still" ? "lake" : "pier"),
   };
 }
 
@@ -76,7 +81,7 @@ function fmtWeight(kg) {
 }
 
 /** The close-up of a landed fish: the angler's own photo when shared, otherwise FishDock's picture of the species. */
-export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip }) {
+export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = false }) {
   const d = ev?.data || {};
   const sp = speciesById(d.species);
   const name = d.name || sp?.name || "Fish";
@@ -90,11 +95,11 @@ export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip }) {
         {art ? <img className={`cc-art${own ? " small" : ""}`} src={art} alt="" /> : ph ? <img className={`cc-art photo${own ? " small" : ""}`} src={photoUrl(ph, 500)} alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" /> : null}
       </div>
       <div className="cc-body">
-        <span className="cc-kicker">Landed{ev?.t ? ` at ${fmtTime(ev.t)}` : ""}</span>
+        <span className="cc-kicker">{demo ? "Demo catch · not logged" : `Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
         <h3>{name}</h3>
-        <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released ? " · Released" : ""}</p>
+        <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released && !demo ? " · Released" : ""}</p>
         {d.bait ? <p className="tiny">On {d.bait}</p> : null}
-        <p className="cc-note">Animated reconstruction of a logged catch, not a video.{!own ? (art ? " Picture: FishDock's species picture." : ph ? ` Species photo: ${ph.author}, ${ph.licence}.` : "") : ""}</p>
+        <p className="cc-note">{demo ? "Animated for the demo: nothing was caught or logged." : "Animated reconstruction of a logged catch, not a video."}{!own ? (art ? " Picture: FishDock's species picture." : ph ? ` Species photo: ${ph.author}, ${ph.licence}.` : "") : ""}</p>
         {onClip ? <button type="button" className="btn small cc-clip" onClick={onClip}><Icon name="play" />Make a highlight clip</button> : null}
       </div>
     </div>
@@ -109,7 +114,7 @@ const reduceMotion = () => { try { return matchMedia("(prefers-reduced-motion: r
 
 /** `fishHint` ({ species, lengthCm }) lets the demo show the fish during the fight; a real session only knows the
  *  species once the catch is logged, so until then the fight shows the water and the rod, not a guessed fish. */
-const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, rod = "allround", children, className = "", onPhase }, ref) {
+const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, rod = "auto", tipLight = "auto", demo = false, onTap, children, className = "", onPhase }, ref) {
   const wrap = useRef(null), glc = useRef(null), fxc = useRef(null), camEl = useRef(null);
   const R = useRef({ gl: null, actors: null, raf: 0, visible: true, onScreen: true, override: null, lastFrame: 0, slow: 0, q: null, prevPhase: "", fishFor: "", fallback: null, frameCanvas: null });
   const [q, setQ] = useState(() => (quality === "auto" ? autoQuality() : quality));
@@ -121,7 +126,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
   const [clip, setClip] = useState(null);
   const clipOk = typeof MediaRecorder !== "undefined" && typeof HTMLCanvasElement !== "undefined" && !!HTMLCanvasElement.prototype.captureStream;
   const props = useRef({});
-  props.current = { events, status, now, envIn, floatRig, live, vibrate, catchPhoto, onPhase, sound, fishHint, rod };
+  props.current = { events, status, now, envIn, floatRig, live, vibrate, catchPhoto, onPhase, sound, fishHint, rod, tipLight, demo };
   const view = scene?.view || defaultView();
 
   useEffect(() => { setQ(quality === "auto" ? autoQuality() : quality); }, [quality]);
@@ -226,8 +231,9 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
           }
         }
       }
-      const env = sceneEnv({ cond: P.envIn?.cond, light: P.envIn?.light, view, kind: P.envIn?.kind, photo: !!r.frameCanvas });
-      r.actors.setEnv({ night: env.night, wind: env.wind, windDir: env.windDir, rain: env.rain, floatRig: P.floatRig, quality: qq.parts, dusk: env.dusk, rod: P.rod });
+      const env = sceneEnv({ cond: P.envIn?.cond, light: P.envIn?.light, view, kind: P.envIn?.kind, venue: P.envIn?.venue, photo: !!r.frameCanvas });
+      r.actors.setEnv({ night: env.night, wind: env.wind, windDir: env.windDir, rain: env.rain, floatRig: P.floatRig, quality: qq.parts, dusk: env.dusk, rod: P.rod, venue: env.venue, tipLight: P.tipLight });
+      r.venue = env.venue;
       const t0 = performance.now();
       if (r.gl?.tint !== r.tint) { r.tint = r.gl?.tint; r.actors.setEnv({ waterTint: r.tint || [0.1, 0.2, 0.22] }); }
       const out = r.actors.frame(t, info);
@@ -268,7 +274,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         const text = { bite: info.ev?.type === "smartbite" ? "Smart Bite alert (Beta)" : "Bite!", hooked: "Fish on!", lost: "Fish lost", missed: info.ev?.type === "snag" ? "Snag, not a fish" : "Missed", paused: "Paused" }[info.phase];
         setBanner(text && fresh ? { text, kind: info.phase, key } : null);
         if (fresh && P.vibrate && info.phase === "bite") try { navigator.vibrate?.([70, 50, 70]); } catch { /* ignore */ }
-        if (info.phase === "landing" && fresh) { const f = fishOf(info.ev); setTimeout(() => setCard({ ev: info.ev, key }), Math.max(0, landingTimes(f.species, f.lengthCm, f.weightKg).card * 1000 - info.age * 1000)); }
+        if (info.phase === "landing" && fresh) { const f = fishOf(info.ev); setTimeout(() => setCard({ ev: info.ev, key }), Math.max(0, landingTimes(f.species, f.lengthCm, f.weightKg, R.current.venue).card * 1000 - info.age * 1000)); }
       }
     };
     r.raf = requestAnimationFrame(loop);
@@ -296,7 +302,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     const done = new Promise((res) => { rec.onstop = res; });
     const st = performance.now();
     const f = fishOf(ev);
-    r.rec = { canvas: out, g: out.getContext("2d"), start: st, ev, photo, art, lt: landingTimes(f.species, f.lengthCm, f.weightKg), name: d.name || speciesById(d.species)?.name || "Fish", facts: [fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") };
+    r.rec = { canvas: out, g: out.getContext("2d"), start: st, ev, photo, art, demo: props.current.demo, lt: landingTimes(f.species, f.lengthCm, f.weightKg, R.current.venue), name: d.name || speciesById(d.species)?.name || "Fish", facts: [fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") };
     r.override = { ev, start: st }; r.fishFor = "";
     setClip({ busy: true });
     rec.start(250);
@@ -326,7 +332,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         const pw = pic.naturalWidth * k, ph = pic.naturalHeight * k;
         g.drawImage(pic, w * 0.06 + (bw - pw) / 2, h * 0.12 + (bh - ph) / 2, pw, ph);
       }
-      g.fillStyle = "#45d3cb"; g.font = `700 ${Math.round(h * 0.035)}px system-ui, sans-serif`; g.fillText("LANDED", w * 0.65, h * 0.3);
+      g.fillStyle = "#45d3cb"; g.font = `700 ${Math.round(h * 0.035)}px system-ui, sans-serif`; g.fillText(c.demo ? "DEMO CATCH" : "LANDED", w * 0.65, h * 0.3);
       g.fillStyle = "#fff"; g.font = `800 ${Math.round(h * 0.08)}px system-ui, sans-serif`; g.fillText(c.name, w * 0.65, h * 0.4);
       g.font = `600 ${Math.round(h * 0.04)}px system-ui, sans-serif`; g.fillText(c.facts || "", w * 0.65, h * 0.48);
       if (c.photo) { g.fillStyle = "#c9d6de"; g.font = `600 ${Math.round(h * 0.03)}px system-ui, sans-serif`; g.fillText("Angler's photo", w * 0.06, h * 0.09); }
@@ -334,13 +340,13 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     }
     g.fillStyle = "rgba(5,9,12,0.6)"; g.fillRect(0, h - h * 0.07, w, h * 0.07);
     g.fillStyle = "#e6f3f7"; g.font = `600 ${Math.round(h * 0.03)}px system-ui, sans-serif`;
-    g.fillText("FishDock · animated reconstruction of a logged catch, not video", w * 0.03, h - h * 0.022);
+    g.fillText(c.demo ? "FishDock demo · animated, not a real catch" : "FishDock · animated reconstruction of a logged catch, not video", w * 0.03, h - h * 0.022);
   }
 
   useImperativeHandle(ref, () => ({
     /** Plays a logged catch's landing again, then shows its close-up. */
     recordClip,
-    replayCatch(ev) { const st = performance.now(), f = fishOf(ev); R.current.override = { ev, start: st }; R.current.fishFor = ""; setCard(null); setTimeout(() => setCard({ ev, key: `r${st}` }), landingTimes(f.species, f.lengthCm, f.weightKg).card * 1000); },
+    replayCatch(ev) { const st = performance.now(), f = fishOf(ev); R.current.override = { ev, start: st }; R.current.fishFor = ""; setCard(null); setTimeout(() => setCard({ ev, key: `r${st}` }), landingTimes(f.species, f.lengthCm, f.weightKg, R.current.venue).card * 1000); },
     showCard(ev) { setCard({ ev, key: `s${Date.now()}` }); },
   }), []);
 
@@ -363,19 +369,23 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     : "Representative scene, not a photo of this place";
 
   return (
-    <div ref={wrap} className={`fscene${fs ? " is-fs" : ""} ${className}`} data-phase={banner?.kind || ""}>
+    <div ref={wrap} className={`fscene${fs ? " is-fs" : ""} ${className}`} data-phase={banner?.kind || ""}
+      onClick={(e) => { if (onTap && (e.target === e.currentTarget || e.target.tagName === "CANVAS" || e.target.classList?.contains("fs-overlay") || e.target.classList?.contains("fs-cam"))) onTap(); }}>
       <div ref={camEl} className="fs-cam">
         <canvas ref={glc} className="fs-water" aria-hidden="true" />
         <canvas ref={fxc} className="fs-fx" aria-hidden="true" />
       </div>
       {photoState === "loading" ? <div className="fs-loading"><span className="loading-dots" aria-label="Loading the scene" /></div> : null}
-      <div className="fs-overlay">{children}</div>
-      {banner ? <div className={`fs-banner b-${banner.kind}`} key={banner.key} role="status">{banner.text}</div> : null}
-      {card && !clip?.busy ? <div className="fs-cardwrap"><CatchCard ev={card.ev} photoUrl={props.current.catchPhoto?.(card.ev)} onClose={() => setCard(null)} compact onClip={clipOk ? () => { setCard(null); recordClip(card.ev); } : null} /></div> : null}
-      <button type="button" className="fs-btn fs-fsbtn" onClick={toggleFs} aria-label={fs ? "Leave full screen" : "Full screen"}><Icon name={fs ? "close" : "layers"} /></button>
-      <div className="fs-foot">
-        <span className="fs-credit">{credit}{!glOk ? " · Simple view (this browser can't draw moving water)" : ""}</span>
+      <div className="fs-overlay">
+        {children}
+        {/* the photo credit sits in the overlay's flow, so on a phone it can drop in under the top row however tall that is */}
+        <div className="fs-foot">
+          <span className="fs-credit">{credit}{!glOk ? " · Simple view (this browser can't draw moving water)" : ""}</span>
+        </div>
       </div>
+      {banner ? <div className={`fs-banner b-${banner.kind}`} key={banner.key} role="status">{banner.text}</div> : null}
+      {card && !clip?.busy ? <div className="fs-cardwrap"><CatchCard ev={card.ev} demo={demo} photoUrl={props.current.catchPhoto?.(card.ev)} onClose={() => setCard(null)} compact onClip={clipOk ? () => { setCard(null); recordClip(card.ev); } : null} /></div> : null}
+      <button type="button" className="fs-btn fs-fsbtn" onClick={toggleFs} aria-label={fs ? "Leave full screen" : "Full screen"}><Icon name={fs ? "close" : "expand"} /></button>
       {clip ? (
         <div className="clip-box" role="status">
           <span className="grow">{clip.busy ? "Making the highlight clip… keep this screen open." : clip.error ? clip.error : "Highlight clip ready. It's labelled as an animated reconstruction."}</span>
