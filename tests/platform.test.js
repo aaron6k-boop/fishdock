@@ -68,3 +68,17 @@ test("Firebase ID tokens: malformed, wrong project or expired tokens are refused
   assert.equal(await verifyIdToken(tok({}), "fishdock", { now, keys: [{ kid: "other" }] }), null);
   assert.equal(net.calls.length, 0);
 });
+
+test("a database that never answers fails the setting-up in time instead of hanging every request, then retries", async () => {
+  const { resetSchemaForTests } = await import("../server/db.js");
+  resetSchemaForTests();
+  let calls = 0;
+  const stuck = { prepare: () => ({ run: () => new Promise(() => {}) }), batch: () => { calls++; return new Promise(() => {}); } };
+  const t0 = Date.now();
+  await assert.rejects(ensureSchema(stuck, { waitMs: 60 }), (e) => e.status === 503 && e.code === "db_slow");
+  assert.ok(Date.now() - t0 < 1000, "gave up promptly");
+  // the next request tries again rather than waiting on the stuck attempt
+  await assert.rejects(ensureSchema(stuck, { waitMs: 60 }));
+  assert.equal(calls, 2);
+  resetSchemaForTests();
+});

@@ -85,9 +85,18 @@ const SCHEMA = [
 const MIGRATIONS = [];
 
 let schemaReady = null; // once per isolate
-export function ensureSchema(db) {
+// A database call that never answers mustn't hang every request: the setting-up is shared by all the requests an
+// isolate serves, so without a limit one stuck call would leave the whole region waiting until the isolate is
+// recycled. Past the limit it fails (a 503 the app shows as "not available just now") and the next request retries.
+export const DB_WAIT_MS = 10e3;
+function inTime(p, ms, onLate) {
+  let id;
+  const late = new Promise((_, reject) => { id = setTimeout(() => reject(onLate()), ms); });
+  return Promise.race([p, late]).finally(() => clearTimeout(id));
+}
+export function ensureSchema(db, { waitMs = DB_WAIT_MS } = {}) {
   if (!schemaReady) {
-    schemaReady = (async () => {
+    const work = (async () => {
       await db.batch(SCHEMA.map((s) => db.prepare(s)));
       for (const m of MIGRATIONS) {
         try {
@@ -96,7 +105,8 @@ export function ensureSchema(db) {
           if (!/duplicate column/i.test(String(e?.message))) throw e;
         }
       }
-    })().catch((e) => {
+    })();
+    schemaReady = inTime(work, waitMs, () => fail(503, "db_slow", "FishDock's database didn't answer in time. Try again in a moment.")).catch((e) => {
       schemaReady = null;
       throw e;
     });
@@ -182,13 +192,13 @@ export async function maybeSweep(db, now) {
   if (now - lastSweep < KEEP.sweepEveryMs) return;
   lastSweep = now;
   try {
-    await db.batch([
+    await inTime(db.batch([
       db.prepare(`DELETE FROM rate WHERE reset_at <= ?1`).bind(now),
       db.prepare(`DELETE FROM cache WHERE expires < ?1`).bind(now - KEEP.cacheGraceMs),
       db.prepare(`DELETE FROM active_days WHERE who LIKE 'g:%' AND day < ?1`).bind(ukDayBefore(now, KEEP.guestActivityDays)),
       db.prepare(`DELETE FROM active_days WHERE day < ?1`).bind(ukDayBefore(now, KEEP.userActivityDays)),
       db.prepare(`DELETE FROM ai_usage WHERE day < ?1`).bind(ukDayBefore(now, KEEP.aiUsageDays)),
-    ]);
+    ]), DB_WAIT_MS / 2, () => new Error("sweep_slow"));
   } catch {
     // housekeeping never fails a request
   }
