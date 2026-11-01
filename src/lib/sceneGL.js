@@ -370,7 +370,7 @@ export function composeWaterAuto(frame, horizon = 0.42) {
   // water shows mostly level lines; a deck, a beach or a wall mostly doesn't
   let dx = 0, dy = 0;
   edge.forEach((top, x) => { if (top < 0 || x < 1 || x > w - 2) return; for (let y = top + 1; y < h - 1; y++) { dx += Math.abs(lum(px(x + 1, y)) - lum(px(x - 1, y))); dy += Math.abs(lum(px(x, y + 1)) - lum(px(x, y - 1))); } });
-  if (dy / Math.max(1, dx + dy) < 0.6) return null;
+  if (dy / Math.max(1, dx + dy) < 0.45) return null;
   const out = g.createImageData(w, h);
   edge.forEach((top, x) => { if (top < 0) return; for (let y = top; y < h; y++) { const o = (y * w + x) * 4; out.data[o] = out.data[o + 1] = out.data[o + 2] = out.data[o + 3] = 255; } });
   g.clearRect(0, 0, w, h); g.putImageData(out, 0, 0);
