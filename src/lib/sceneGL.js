@@ -22,6 +22,7 @@ varying vec2 vUv;
 uniform sampler2D uFrame, uMask, uSky, uBlur;
 uniform vec4 uMap;
 uniform vec2 uRes;
+uniform vec3 uWaterCol;
 uniform float uTime, uHorizon, uWind, uFlowX, uRiver, uStill, uProc, uHasPhoto, uOct, uFlow;
 uniform float uNight, uDusk, uDay, uRain, uFog, uCloud, uSunX, uSun, uMoonX, uMoon, uSunUp, uSunGlow, uMoonUp, uMoonDisc;
 uniform vec4 uRip[6];
@@ -190,11 +191,10 @@ void main(){
     vec3 sky = reflSky(R, ref.x + clamp(sx, -.05, .05)), sky0 = reflSky(R0, ref.x);
     vec3 base, detail = vec3(0.);
     if (photo > .5) {
-      base = texture2D(uBlur, ref).rgb;
-      vec2 dp = vec2(N.x, N.z)*(.003 + .006*d);
-      dp.y = max(dp.y, hz + .003 - ref.y);
-      vec2 dq = clamp(ref + dp, vec2(.002), vec2(.998));
-      detail = texture2D(uFrame, dq).rgb - texture2D(uBlur, dq).rgb;
+      // all of the water is drawn: its body colour is the photo's own water colour (so it sits in the picture),
+      // and it reflects the photo's sky, cliffs and walls above it
+      vec3 deep = uWaterCol*mix(.75, .95, 1. - d);
+      base = mix(deep, sky0, clamp(F0*1.3, 0., .85));
     } else {
       vec3 deep = mix(vec3(.04,.16,.20), vec3(.10,.14,.09), max(uRiver, uStill)*.7)*(uDay*1. + uDusk*.6 + uNight*.15);
       base = mix(deep, sky0, clamp(F0*1.6, 0., 1.));
@@ -206,7 +206,9 @@ void main(){
     // the sun and moon on the water, from the waves themselves: a glittering path
     vec3 Ls = normalize(vec3((uSunX - .5)*2.2, .05 + uSunUp*.9, 1.));
     vec3 Lm = normalize(vec3((uMoonX - .5)*2.2, .05 + uMoonUp*.9, 1.));
-    water += sunCol*pow(max(dot(R, Ls), 0.), 260.)*uSun*3.5 + vec3(.8,.86,1.)*pow(max(dot(R, Lm), 0.), 300.)*uMoon*2.5;
+    // a broad soft path plus sharp glints, so it reads as a glittering path rather than a line of dots
+    float ss = max(dot(R, Ls), 0.), sm = max(dot(R, Lm), 0.);
+    water += sunCol*(pow(ss, 40.)*.22 + pow(ss, 500.)*1.6)*uSun + vec3(.8,.86,1.)*(pow(sm, 50.)*.16 + pow(sm, 600.)*1.2)*uMoon;
     // whitecaps in a blow (sea only)
     float foam = smoothstep(.62, .92, hgt/max(.006*wamp, .0005)*.5 + .5 + (noise(P*vec2(140., 200.) + t*.2) - .5)*.5)*smoothstep(.35, .85, uWind)*seaN;
     water = mix(water, vec3(.92,.95,.97)*lit, foam*(.2 + .4*d));
@@ -293,6 +295,23 @@ export function composeMask(view, w = 600) {
   return c;
 }
 
+/** The photo's own water colour (the average over the water area), so the drawn water matches the picture. */
+export function waterColour(frame, mask, horizon = 0.42) {
+  try {
+    const w = 80, h = Math.round(w / REF_ASPECT);
+    const read = (src) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(src, 0, 0, w, h); return g.getImageData(0, 0, w, h).data; };
+    const f = read(frame), m = read(mask);
+    let r = 0, gg = 0, b = 0, n = 0;
+    for (let i = 0; i < w * h; i++) {
+      const y = Math.floor(i / w) / h;
+      if (m[i * 4] < 160 || y < horizon + 0.03) continue;
+      r += f[i * 4]; gg += f[i * 4 + 1]; b += f[i * 4 + 2]; n++;
+    }
+    if (n < 20) return [0.14, 0.24, 0.27];
+    return [r / n / 255, gg / n / 255, b / n / 255];
+  } catch { return [0.14, 0.24, 0.27]; }
+}
+
 /** A soft, blurred copy of the frame: the water's colour without its fine detail, and the sky it reflects. */
 export function composeBlur(frame) {
   const steps = [[120, 80], [30, 20], [120, 80], [360, 240]];
@@ -333,11 +352,12 @@ export function composeWaterAuto(frame, horizon = 0.42) {
     let y = y0, odd = 0, last = y0;
     for (; y < h; y++) {
       const p = px(x, y);
-      if (dist(p, ref) > 70 || Math.abs(lum(p) - lum(ref)) > 30) { if (++odd >= 3) break; continue; }
+      if (dist(p, ref) > 105 || Math.abs(lum(p) - lum(ref)) > 42) { if (++odd >= 5) break; continue; }
       odd = 0; last = y;
       for (let k = 0; k < 3; k++) ref[k] = ref[k] * 0.9 + p[k] * 0.1;
     }
-    stops.push(y >= h ? h : last + 1);
+    // water that runs most of the way down usually runs to the bottom (the near water is paler, foamy or in shadow)
+    stops.push(y >= h || last > y0 + (h - y0) * 0.7 ? h : last + 1);
   }
   // smooth the edge across neighbouring columns (median of seven)
   const edge = stops.map((v, x) => {
@@ -427,7 +447,7 @@ export function createWaterRenderer(canvas) {
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = {};
-  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uMoonUp", "uMoonDisc", "uSky", "uBlur", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
+  for (const n of ["uFrame", "uMask", "uMap", "uRes", "uTime", "uHorizon", "uWind", "uFlowX", "uRiver", "uStill", "uProc", "uHasPhoto", "uOct", "uFlow", "uNight", "uDusk", "uDay", "uRain", "uFog", "uCloud", "uSunX", "uSun", "uMoonX", "uMoon", "uSunUp", "uSunGlow", "uMoonUp", "uMoonDisc", "uSky", "uBlur", "uWaterCol", "uRip"]) U[n] = gl.getUniformLocation(prog, n);
   const tex = (unit) => {
     const t = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -451,6 +471,7 @@ export function createWaterRenderer(canvas) {
     setScene(frame, mask, h, sky) {
       horizon = h ?? 0.42;
       hasPhoto = frame ? 1 : 0;
+      if (frame && mask) { const wc = waterColour(frame, mask, horizon); gl.uniform3f(U.uWaterCol, wc[0], wc[1], wc[2]); }
       try {
         if (frame) upload(tFrame, 0, frame);
         if (mask) upload(tMask, 1, mask);
