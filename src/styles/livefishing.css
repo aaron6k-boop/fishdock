@@ -187,3 +187,8 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .try-drawn { width: 100%; aspect-ratio: 3 / 2; display: grid; place-items: center; background: linear-gradient(180deg, #6f93b0, #c7d6df 44%, #2c4a5c 45%, #0f2430); color: #fff; font-weight: 700; font-size: 12px; text-shadow: 0 1px 2px #000; }
 .chip.on { background: var(--action-soft); color: var(--action); border-color: color-mix(in srgb, var(--action) 50%, transparent); }
 .moments .chip { cursor: pointer; }
+
+/* a newer build is ready (main.jsx) */
+.update-bar { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom)); z-index: 400; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; border-radius: 16px; background: var(--elev); border: 1px solid color-mix(in srgb, var(--action) 45%, transparent); color: var(--text); font-size: 13.5px; box-shadow: var(--shadow); }
+.update-bar span { flex: 1; }
+.update-bar button { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--action); color: var(--action-ink); font-weight: 700; }

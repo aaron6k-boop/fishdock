@@ -2,6 +2,7 @@
 // For trying places, fish, light and weather without a real session. Everything on the page says Demo: nothing
 // here is a real session, nothing is saved or shared. Backdrops are real free-licensed photos taken near each place
 // (Wikimedia Commons, credited) or the drawn scene; "Live weather" is the real forecast for that place.
+/* global __BUILD_ID__ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
 import { composeFrame } from "../lib/sceneGL.js";
@@ -49,7 +50,8 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [photos, setPhotos] = useState(null);
   const [pick, setPick] = useState(0);
   const [view, setView] = useState(defaultView());
-  const [light, setLight] = useState("now");
+  // the demo opens in daylight light at night (when "Now" is too dark to see much); "Now" is one tap away
+  const [light, setLight] = useState(() => (ASTRO.sunPos(Date.now(), place.lat, place.lon).alt > -4 ? "now" : "dusk"));
   const [wx, setWx] = useState("live");
   const [cond, setCond] = useState(null);
   const [quality, setQuality] = useState("auto");
@@ -175,7 +177,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               ); })}
             </div>
           </section>
-          <p className="tiny watch-foot">Demo of FishDock's Live Fishing View. Real sessions are shared on private links from the fishing screen. <a href="/">Open FishDock</a></p>
+          <p className="tiny watch-foot">Demo of FishDock's Live Fishing View. Real sessions are shared on private links from the fishing screen. <a href="/">Open FishDock</a>{typeof __BUILD_ID__ !== "undefined" ? <><br />Version {__BUILD_ID__}</> : null}</p>
         </div>
       </div>
     </div>
