@@ -227,7 +227,9 @@ void main(){
       float near = .25 + d;
       vec2 off = vec2(N.x*.035, -N.z*.035 + (R.y - R0.y)*.05)*near;
       float reach = (shore - hz)*1.15 + .004;
-      float qy = mix(shore - below*.92, hz - (ref.y - hz)*.92, smoothstep(reach*.8, reach*1.15, below)) - off.y;
+      // the end of a wall's reflection is ragged and moving, never a straight edge
+      float rag = (noise(vec2(ref.x*70., ref.y*25. + t*.5)) - .5)*reach*.7;
+      float qy = mix(shore - below*.92, hz - (ref.y - hz)*.92, smoothstep(reach*.4, reach*1.25, below + rag)) - off.y;
       vec2 q = vec2(clamp(ref.x + clamp(off.x, -.03, .03), .01, .99), clamp(qy, .003, max(shore - .006, .004)));
       float rough = clamp(.4 + uWind*.6 + d*.2, 0., 1.);
       vec3 soft = texture2D(uBlur, q).rgb*.5 + (texture2D(uBlur, q + vec2(0., .014)).rgb + texture2D(uBlur, q - vec2(0., .014)).rgb)*.25;
@@ -372,7 +374,7 @@ export function composeShore(mask, horizon = 0.42) {
   // don't change at a hard upright edge
   med.forEach((v, x) => {
     let s = 0, n = 0;
-    for (let k = -7; k <= 7; k++) { const q = med[Math.min(w - 1, Math.max(0, x + k))], wt = 8 - Math.abs(k); s += q * wt; n += wt; }
+    for (let k = -14; k <= 14; k++) { const q = med[Math.min(w - 1, Math.max(0, x + k))], wt = 15 - Math.abs(k); s += q * wt; n += wt; }
     img.data[x * 4] = Math.round(Math.min(v, s / n) * 255); img.data[x * 4 + 3] = 255;
   });
   og.putImageData(img, 0, 0);
@@ -498,10 +500,12 @@ export function composeWaterAuto(frame, horizon = 0.42) {
     }
     for (let y = hzRow + 1; y < h; y++) {
       let x = 0; while (x < w && !water[y * w + x]) x++;
+      // a short run at the picture's edge (the last of a reflection cut off by the frame) counts too
+      if (x > 0 && x < w * 0.06) { const run = []; for (let i = 0; i < x; i++) run.push([i, y]); fillRun(run); }
       for (; x < w; x++) {
         if (water[y * w + x]) continue;
         const run = []; while (x < w && !water[y * w + x]) { run.push([x, y]); x++; }
-        if (x < w && run.length < w * 0.25) fillRun(run);
+        if (x < w ? run.length < w * 0.25 : run.length < w * 0.06) fillRun(run);
       }
     }
   }
