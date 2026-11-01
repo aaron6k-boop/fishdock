@@ -362,9 +362,11 @@ export function composeShore(mask, horizon = 0.42) {
     for (let y = Math.max(0, Math.floor(h * horizon)); y < h; y++) if (d[(y * w + x) * 4] > 140) { top = y / h; break; }
     tops.push(top < 0 ? 1 : top);
   }
-  // a narrow gap up to the horizon (a lamp post, a gap in a railing) is closed over: dilate then erode
+  // a narrow notch down (a patch the water search missed) is opened out, and a narrow gap up to the horizon (a lamp
+  // post, a gap in a railing) is closed over
   const win = (a, r, fn) => a.map((v, x) => { let o = v; for (let k = Math.max(0, x - r); k <= Math.min(w - 1, x + r); k++) o = fn(o, a[k]); return o; });
-  const closed = win(win(tops.map((v) => Math.max(horizon, v)), 6, Math.max), 6, Math.min);
+  const opened = win(win(tops.map((v) => Math.max(horizon, v)), 12, Math.min), 12, Math.max);
+  const closed = win(win(opened, 6, Math.max), 6, Math.min);
   const med = closed.map((v, x) => { const near = closed.slice(Math.max(0, x - 3), x + 4).sort((a, b) => a - b); return near[near.length >> 1]; });
   // where the waterline steps (the end of a wall), ramp up to the open water's line instead, so the reflections
   // don't change at a hard upright edge
@@ -462,8 +464,8 @@ export function composeWaterAuto(frame, horizon = 0.42) {
   let dx = 0, dy = 0;
   edge.forEach((top, x) => { if (top < 0 || x < 1 || x > w - 2) return; for (let y = top + 1; y < h - 1; y++) { dx += Math.abs(lum(px(x + 1, y)) - lum(px(x - 1, y))); dy += Math.abs(lum(px(x, y + 1)) - lum(px(x, y - 1))); } });
   if (dy / Math.max(1, dx + dy) < 0.45) return null;
-  const out = g.createImageData(w, h);
-  const set = (x, y) => { const o = (y * w + x) * 4; out.data[o] = out.data[o + 1] = out.data[o + 2] = out.data[o + 3] = 255; };
+  const water = new Uint8Array(w * h);
+  const set = (x, y) => { water[y * w + x] = 1; };
   edge.forEach((top, x) => { if (top < 0) return; for (let y = top; y < h; y++) set(x, y); });
   // Beyond the end of a pier or a rock (a column that starts on it at the bottom), the far water is still water:
   // from the horizon down while it matches the water found in the same row elsewhere.
@@ -477,6 +479,34 @@ export function composeWaterAuto(frame, horizon = 0.42) {
       miss = 0; set(x, y);
     }
   });
+  // Close the holes a darker band leaves (the reflection of rocks or a wall in the photo's own water stops the
+  // search part way): a gap with water above and below it in the same column, or water either side of it in the
+  // same row (not reaching the picture's edge, under a quarter of its width), is water too if it has the water's
+  // hue. A grey pier against a blue sea keeps its place; a brown reflection in brown water doesn't.
+  const rowWater = [];
+  for (let y = hzRow + 1; y < h; y++) { const ps = []; for (let x = 0; x < w; x += 2) if (water[y * w + x]) ps.push(px(x, y)); rowWater[y] = ps.length >= 6 ? med3(ps) : null; }
+  const watery = (x, y) => { const rc = rowWater[y]; if (!rc) return false; const p = px(x, y); return Math.abs(tint(p) - tint(rc)) < 40 && dist(p, rc) < 210; };
+  const fillRun = (cells) => { let ok = 0; for (const [x, y] of cells) ok += watery(x, y); if (ok >= cells.length * 0.8) for (const [x, y] of cells) set(x, y); };
+  for (let pass = 0; pass < 2; pass++) {
+    for (let x = 0; x < w; x++) {
+      let y = hzRow + 1; while (y < h && !water[y * w + x]) y++;
+      for (; y < h; y++) {
+        if (water[y * w + x]) continue;
+        const run = []; while (y < h && !water[y * w + x]) { run.push([x, y]); y++; }
+        if (y < h) fillRun(run);
+      }
+    }
+    for (let y = hzRow + 1; y < h; y++) {
+      let x = 0; while (x < w && !water[y * w + x]) x++;
+      for (; x < w; x++) {
+        if (water[y * w + x]) continue;
+        const run = []; while (x < w && !water[y * w + x]) { run.push([x, y]); x++; }
+        if (x < w && run.length < w * 0.25) fillRun(run);
+      }
+    }
+  }
+  const out = g.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) if (water[i]) out.data[i * 4] = out.data[i * 4 + 1] = out.data[i * 4 + 2] = out.data[i * 4 + 3] = 255;
   g.clearRect(0, 0, w, h); g.putImageData(out, 0, 0);
   const f = document.createElement("canvas"); f.width = w; f.height = h;
   const fg = f.getContext("2d");
