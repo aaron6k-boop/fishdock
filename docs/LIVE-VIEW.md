@@ -85,10 +85,14 @@ push route forward each stored event to the share's object.
   - Each species has a fight profile (pull, tempo, darting, splashing, body flex, fight length, flat or eel body):
     cod heavy and slow, bass lively and splashy, whiting and mackerel quick and erratic, flatfish and rays flat,
     conger and eels sinuous. Weight is the logged one or estimated from length (for the animation only, never shown).
-  - The fish is FishDock's own cut-out species picture drawn as a bent strip of slices along a curved spine, so it
-    flexes head to tail with a travelling wave, rolls about its spine (showing its edge, then its other flank), is
-    lit for the hour and tinted by the water below the surface. Sizes follow the logged length: about a ninth of the
-    view's height for a 55 cm cod hanging near the angler, smaller further out.
+  - The fish are light 3D models built in the browser from FishDock's own cut-out pictures (`src/lib/fish3d.js`):
+    the outline gives the body (lofted round the spine, as thick as the species usually is) and finds the tail and
+    the fins on the outline, which become separate flat pieces that flutter and beat on their own; the picture is
+    the skin, so each species keeps its own shape, fins and markings. The spine bends side to side and up and down,
+    the fish rolls, turns towards or away from the viewer, and a small WebGL renderer (no libraries) lights it for
+    the hour with a wet highlight and a rim of sky light. Under 1,400 triangles each. The eel and the conger are
+    drawn curled in their pictures, so they (and any phone without WebGL) keep the flat picture bent along a curve.
+    Sizes follow the logged length: about a ninth of the view's height for a 55 cm cod hanging near the angler.
   - The landing is one sequence: up from where the fight had got to, through the surface rolling and splashing,
     lifted head first with the tail leaving the water last, hanging under the rod tip as a damped pendulum with a few
     weakening kicks and drips, then swung in to the angler; the camera eases in, and the catch card follows. Timings
@@ -115,6 +119,8 @@ catches up the moment FishDock is open again, and viewers are told the phone has
 - `tests/live.test.js`: the whitelist, owner keys, sequence numbers and retries, permissions per link, passcodes,
   expiry, revoking, stopping, clean-up, throttles, the feature flag, nearby photo selection.
 - `tests/liveEvents.test.js`: phases, counts (Smart Bite apart), what leaves the phone.
+- `tests/fish3d.test.js`: finding the body, fins and tail in an outline; the mesh; placing, bending, rolling and
+  turning the fish.
 - `tests/sceneMotion.test.js`: every pictured species has a fight profile; rod load by size and weight; demo fight
   lengths; the landing's beats in order and always within the landing phase.
 - Browser flows (Playwright, against `tests/e2e/server.mjs --dist`): angler and viewer together, passcode, the
@@ -124,7 +130,8 @@ catches up the moment FishDock is open again, and viewers are told the phone has
 
 - A Durable Object transport for instant updates (above).
 - Cut-out pictures for the freshwater species, so pike, carp and the rest lift out of the water too.
-- Layered or 3D fish (separate tail, fins and body, or rigged glTF models) for independent fin movement and true
-  side-to-side turning; today's cut-outs bend as one picture and show a mirrored flank when they roll.
+- Pectoral fins: they're painted on the flank in the pictures, so they move with the body; separate pectoral fin
+  pictures would let them move on their own. Sculpted models (with real head shapes and open mouths) would need new
+  3D art.
 - Panoramas: a wider photo the view can pan across as the angler changes where they cast.
 - Posting a replay moment to Community (needs accounts, and a public replay format with its own privacy review).

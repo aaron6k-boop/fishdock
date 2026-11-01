@@ -5,6 +5,8 @@
 // crosses their moment. The fish is FishDock's own species picture, bent along its body as it wriggles and scaled
 // to the logged length. It's a reconstruction of a logged catch, and the app says so.
 
+import { fishShape, buildFishMesh, bodyWidth, createFishRenderer, CURLED } from "./fish3d.js";
+
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, f) => a + (b - a) * f;
@@ -79,6 +81,8 @@ export function fightSeconds(species, lengthCm) {
 }
 
 export function createActors(canvas, { onSound } = {}) {
+  // the 3D fish (FishDock's own pictures lofted into light models); null without WebGL, then the flat bent picture
+  let fish3 = null, fish3Tried = false, fish3For = null;
   const ctx = canvas.getContext("2d");
   let W = 1, H = 1, k = 1, map = [1, 1, 0, 0];
   let castRef = [0.5, 0.62], horizon = 0.42, floatRig = false, night = 0, windN = 0.3, windDir = 1, rain = 0;
@@ -347,13 +351,79 @@ export function createActors(canvas, { onSound } = {}) {
   /** A bend for the fish's body: a curl plus a travelling wave that grows towards the tail (radians along u). */
   function bendFn(curl, amp, phase) {
     const lam = prof.eel ? 1.6 : 0.85;
-    return (u) => curl * u * u + amp * Math.sin(TAU * u * lam - phase) * Math.pow(0.12 + u, 1.5);
+    const wave = (u) => amp * Math.sin(TAU * u * lam - phase) * Math.pow(0.12 + u, 1.5);
+    const f = (u) => curl * u * u + wave(u);
+    // for the 3D fish: the swimming wave goes side to side (as a real fish's does), a little of it and the curl
+    // bend it in the picture's plane too, so it reads from a side-on view
+    f.lat = (u) => wave(u) * 1.1 + curl * 0.35 * u * u;
+    f.dv = (u) => curl * 0.8 * u * u + wave(u) * 0.35;
+    return f;
+  }
+  /** The light on the 3D fish for the hour: a soft sky, the low warm sun's edge at dusk, little at night. */
+  function fishLight() {
+    const day = clamp(1 - night - dusk, 0, 1);
+    const amb = [0.62 * day + 0.46 * dusk + 0.2 * night, 0.62 * day + 0.42 * dusk + 0.24 * night, 0.62 * day + 0.42 * dusk + 0.32 * night];
+    const dif = [0.5 * day + 0.42 * dusk + 0.08 * night, 0.5 * day + 0.32 * dusk + 0.09 * night, 0.48 * day + 0.26 * dusk + 0.12 * night];
+    const rim = [0.18 * day + 0.5 * dusk + 0.05 * night, 0.2 * day + 0.32 * dusk + 0.07 * night, 0.24 * day + 0.2 * dusk + 0.12 * night];
+    return { amb, dif, rim, dir: [-0.35, -0.8, 0.5], spec: 0.45 * day + 0.35 * dusk + 0.1 * night };
+  }
+  /** The fish drawn by the 3D renderer into the fish canvas, or null to use the flat picture. */
+  function draw3d(st) {
+    if (!fish3 || !fish3.ready || fish3For !== fishImg) return null;
+    const out = fish3.render({ anchor: st.anchor, rot: st.rot, flip: !!st.flip, twist: st.twist || 0, yaw: st.yaw || 0, len: st.len, lat: st.bend.lat || (() => 0), dv: st.bend.dv || st.bend, t: lastT, fin: 1, wing: prof.ray ? 0.05 * Math.sin(lastT * 4.5) : 0 }, fishLight());
+    if (!out) return null;
+    const { x, y, w: fw, h: fh } = out;
+    if (fishCanvas.width < fw || fishCanvas.height < fh) { fishCanvas.width = Math.max(fw, fishCanvas.width); fishCanvas.height = Math.max(fh, fishCanvas.height); }
+    fctx.setTransform(1, 0, 0, 1, 0, 0);
+    fctx.clearRect(0, 0, fishCanvas.width, fishCanvas.height);
+    fctx.drawImage(fish3.canvas, 0, out.sy, fw, fh, 0, 0, fw, fh);
+    const pts = []; let low = null;
+    for (let i = 0; i < out.spine.length; i += 2) { const q = [out.spine[i], out.spine[i + 1]]; pts.push(q); if (!low || q[1] > low[1]) low = q; }
+    return { x0: x, y0: y, fw, fh, pts, low, half: st.len * 0.11 * Math.max(0.3, Math.abs(Math.cos(st.twist || 0))) };
   }
   /** The fish as a bent strip of its own picture: slices laid along a curved spine, so it flexes from head to tail
    *  rather than sliding as a flat picture. Drawn into its own canvas; the part under the waterline is tinted and
    *  faded by the water. Returns where the mouth (the hook) is. */
   function renderFish(st) {
     if (!fishImg || !fishCut || st.alpha <= 0) return null;
+    const d = draw3d(st) || draw2d(st);
+    if (!d) return [st.anchor[0], st.anchor[1]];
+    const { x0, y0, fw, fh, pts, low, half } = d, y1 = y0 + fh;
+    const wY = st.waterY;
+    // above the water: as it is
+    if (wY == null || wY > y0) {
+      ctx.save(); ctx.globalAlpha = st.alpha;
+      if (wY != null && wY >= 0) { ctx.beginPath(); ctx.rect(0, 0, W, wY); ctx.clip(); }
+      if (wY == null || wY >= 0) ctx.drawImage(fishCanvas, 0, 0, fw, fh, x0, y0, fw, fh);
+      ctx.restore();
+    }
+    // below the water: tinted by it and fading with depth
+    if (wY != null && (wY < 0 || wY < y1)) {
+      fctx.globalCompositeOperation = "source-atop";
+      fctx.fillStyle = `rgba(${Math.round(waterTint[0] * 255)},${Math.round(waterTint[1] * 255)},${Math.round(waterTint[2] * 255)},0.62)`;
+      fctx.fillRect(0, 0, fw, fh);
+      fctx.globalCompositeOperation = "source-over";
+      ctx.save(); ctx.globalAlpha = st.alpha * st.under;
+      if (wY >= 0) { ctx.beginPath(); ctx.rect(0, wY, W, H - wY); ctx.clip(); }
+      ctx.drawImage(fishCanvas, 0, 0, fw, fh, x0, y0, fw, fh);
+      ctx.restore();
+      // where the body cuts the surface: a bright, broken waterline
+      if (wY >= 0 && y0 < wY && y1 > wY) {
+        let cx = null; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1][1], b = pts[i][1]; if ((a - wY) * (b - wY) <= 0) { cx = pts[i][0]; break; } }
+        if (cx != null) { ctx.strokeStyle = `rgba(235,242,248,${0.45 - night * 0.25})`; ctx.lineWidth = Math.max(1, 1.6 * k); ctx.beginPath(); ctx.ellipse(cx, wY, half * 0.9, half * 0.22, 0, 0, TAU); ctx.stroke(); }
+      }
+    }
+    // water running off: drips from the lowest point and along the body while it's wet
+    const fl = st.floor ?? wY;
+    if (st.drip && fl != null && fl >= 0 && low && low[1] < fl && seedR() < st.drip * 0.9) {
+      const q = pts[Math.floor(seedR() * pts.length)];
+      const src = seedR() < 0.55 ? low : q;
+      particles.push({ x: src[0] + (seedR() - 0.5) * 4 * k, y: src[1], vx: (seedR() - 0.5) * 18 * k, vy: 10 * k, life: 0, max: 1.1, r: (0.7 + seedR() * 1.5) * k, kind: "drop", floor: fl, ring: true });
+    }
+    return [st.anchor[0], st.anchor[1]];
+  }
+  /** The flat fallback: the picture as a bent strip of slices along a curved spine. */
+  function draw2d(st) {
     const img = fishImg, iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
     const u0 = 0.02, u1 = 0.985, N = 24, AX = 0.52;
     const s = st.len / (iw * 0.9);
@@ -375,7 +445,7 @@ export function createActors(canvas, { onSound } = {}) {
     for (const p of pts) { const px = p[0] + ox, py = p[1] + oy; x0 = Math.min(x0, px - half); y0 = Math.min(y0, py - half); x1 = Math.max(x1, px + half); y1 = Math.max(y1, py + half); if (!low || py > low[1]) low = [px, py]; }
     x0 = Math.floor(x0); y0 = Math.floor(y0);
     const fw = Math.ceil(x1 - x0) + 2, fh = Math.ceil(y1 - y0) + 2;
-    if (fw < 2 || fh < 2 || fw > 4096 || fh > 4096) return [st.anchor[0], st.anchor[1]];
+    if (fw < 2 || fh < 2 || fw > 4096 || fh > 4096) return null;
     if (fishCanvas.width < fw || fishCanvas.height < fh) { fishCanvas.width = Math.max(fw, fishCanvas.width); fishCanvas.height = Math.max(fh, fishCanvas.height); }
     fctx.setTransform(1, 0, 0, 1, 0, 0);
     fctx.clearRect(0, 0, fw, fh);
@@ -402,38 +472,7 @@ export function createActors(canvas, { onSound } = {}) {
       fctx.fillStyle = rim; fctx.fillRect(0, 0, fw, fh);
     }
     fctx.globalCompositeOperation = "source-over";
-    const wY = st.waterY;
-    // above the water: as it is
-    if (wY == null || wY > y0) {
-      ctx.save(); ctx.globalAlpha = st.alpha;
-      if (wY != null && wY >= 0) { ctx.beginPath(); ctx.rect(0, 0, W, wY); ctx.clip(); }
-      if (wY == null || wY >= 0) ctx.drawImage(fishCanvas, 0, 0, fw, fh, x0, y0, fw, fh);
-      ctx.restore();
-    }
-    // below the water: tinted by it and fading with depth
-    if (wY != null && (wY < 0 || wY < y1)) {
-      fctx.globalCompositeOperation = "source-atop";
-      fctx.fillStyle = `rgba(${Math.round(waterTint[0] * 255)},${Math.round(waterTint[1] * 255)},${Math.round(waterTint[2] * 255)},0.62)`;
-      fctx.fillRect(0, 0, fw, fh);
-      fctx.globalCompositeOperation = "source-over";
-      ctx.save(); ctx.globalAlpha = st.alpha * st.under;
-      if (wY >= 0) { ctx.beginPath(); ctx.rect(0, wY, W, H - wY); ctx.clip(); }
-      ctx.drawImage(fishCanvas, 0, 0, fw, fh, x0, y0, fw, fh);
-      ctx.restore();
-      // where the body cuts the surface: a bright, broken waterline
-      if (wY >= 0 && y0 < wY && y1 > wY) {
-        let cx = null; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1][1] + oy, b = pts[i][1] + oy; if ((a - wY) * (b - wY) <= 0) { cx = pts[i][0] + ox; break; } }
-        if (cx != null) { ctx.strokeStyle = `rgba(235,242,248,${0.45 - night * 0.25})`; ctx.lineWidth = Math.max(1, 1.6 * k); ctx.beginPath(); ctx.ellipse(cx, wY, half * 0.9, half * 0.22, 0, 0, TAU); ctx.stroke(); }
-      }
-    }
-    // water running off: drips from the lowest point and along the body while it's wet
-    const fl = st.floor ?? wY;
-    if (st.drip && fl != null && fl >= 0 && low && low[1] < fl && seedR() < st.drip * 0.9) {
-      const q = pts[Math.floor(seedR() * pts.length)];
-      const src = seedR() < 0.55 ? low : [q[0] + ox, q[1] + oy];
-      particles.push({ x: src[0] + (seedR() - 0.5) * 4 * k, y: src[1], vx: (seedR() - 0.5) * 18 * k, vy: 10 * k, life: 0, max: 1.1, r: (0.7 + seedR() * 1.5) * k, kind: "drop", floor: fl, ring: true });
-    }
-    return [st.anchor[0], st.anchor[1]];
+    return { x0, y0, fw, fh, pts: pts.map((p) => [p[0] + ox, p[1] + oy]), low, half };
   }
 
   function stepParticles(dt) {
@@ -617,7 +656,7 @@ export function createActors(canvas, { onSound } = {}) {
         const glimpse = clamp((Math.sin(age * 0.7 + P.s2) - 0.2) * 1.4, 0, 1) * clamp((pr - 0.4) * 4, 0, 1);
         if (glimpse > 0.02) {
           const hz = heading > 0 ? Math.PI : 0;
-          fishSt = { anchor: [fx, fy + lenHere * 0.12], rot: hz + dive * 0.3 * -heading + jit * 0.1, len: lenHere * 0.92, bend: bendFn(run * 0.25, 0.32 * prof.flex * (0.6 + surge), age * 9 * prof.tempo), waterY: -1, under: 0.42 * glimpse, alpha: 1, flip: heading > 0 };
+          fishSt = { anchor: [fx, fy + lenHere * 0.12], yaw: Math.sin(age * 4 * prof.tempo) * 0.25, rot: hz + dive * 0.3 * -heading + jit * 0.1, len: lenHere * 0.92, bend: bendFn(run * 0.25, 0.32 * prof.flex * (0.6 + surge), age * 9 * prof.tempo), waterY: -1, under: 0.42 * glimpse, alpha: 1, flip: heading > 0 };
         }
       }
     } else if (phase === "landing") {
@@ -707,7 +746,7 @@ export function createActors(canvas, { onSound } = {}) {
       kT = 0.2 + 0.24 * load * (0.9 + 0.3 * Math.max(0, thrash(age))); tipT = 0.03 * thrash(age * 3); spinning = true;
       shake = 0.4 * load * f;
       const ps = pose(dir, 0.35 + thrash(age * 0.8) * 0.3);
-      if (hasFish) fishSt = { anchor: [ax, ay], ...ps, twist: thrash(age * 0.6) * 0.5, len: lenS * lerp(lerp(0.4, 1, depthAt(F[1])), 1, f), bend: bendFn(thrash(age * 1.3) * 0.3, 0.34 * prof.flex, age * 12 * prof.tempo), waterY: -1, under: 0.12 + 0.5 * f, alpha: 1 };
+      if (hasFish) fishSt = { anchor: [ax, ay], ...ps, twist: thrash(age * 0.6) * 0.5, yaw: thrash(age * 0.9 + 3) * 0.45, len: lenS * lerp(lerp(0.4, 1, depthAt(F[1])), 1, f), bend: bendFn(thrash(age * 1.3) * 0.3, 0.34 * prof.flex, age * 12 * prof.tempo), waterY: -1, under: 0.12 + 0.5 * f, alpha: 1 };
       const [rx, ry] = toRef(ax, waterY); turb.push({ x: rx, y: ry, r: 0.03 + 0.03 * f, s: 0.25 + 0.6 * f });
       if (crossed(T1 * 0.6)) addRipple(ax, waterY, 0.6);
     } else if (age < T2) {
@@ -719,7 +758,7 @@ export function createActors(canvas, { onSound } = {}) {
       shake = 0.8 * load * (1 - f);
       const roll = Math.sin(age * 6.5 * prof.tempo + P.s2) * 0.9 * (1 - f * 0.5) + thrash(age * 1.9) * 0.6;
       const ps = pose(dir, 0.3 + 0.35 * f + thrash(age * 1.7) * 0.3);
-      if (hasFish) fishSt = { anchor: [mx, my], ...ps, twist: roll, len: lenS * lerp(1, 1.1, f), bend: bendFn(thrash(age * 2.1) * 0.55, 0.5 * prof.flex * (1 - f * 0.4), age * 15 * prof.tempo), waterY, under: 0.7, alpha: 1 };
+      if (hasFish) fishSt = { anchor: [mx, my], ...ps, twist: roll, yaw: thrash(age * 2.3 + 5) * 0.55, len: lenS * lerp(1, 1.1, f), bend: bendFn(thrash(age * 2.1) * 0.55, 0.5 * prof.flex * (1 - f * 0.4), age * 15 * prof.tempo), waterY, under: 0.7, alpha: 1 };
       if (crossed(T1)) { splash(S[0], waterY, 1.15 * P.size * (0.7 + prof.splashy * 0.5), 34, { rnd: seedR, dir }); onSound?.("bigsplash"); }
       if (age > T1 + 0.2 && seedR() < 0.12 * (0.5 + prof.splashy)) splash(mx + (seedR() - 0.5) * lenS * 0.8, waterY, 0.35 + seedR() * 0.3, 7, { rnd: seedR, dir: seedR() < 0.5 ? -1 : 1 });
       const [rx, ry] = toRef(mx, waterY); turb.push({ x: rx, y: ry, r: 0.06, s: 0.9 * (1 - f * 0.5) });
@@ -748,7 +787,7 @@ export function createActors(canvas, { onSound } = {}) {
       kT = lerp(lerp(0.2 + 0.23 * load, weightLoad, f) * (1 + 0.18 * Math.abs(curl) + 0.15 * Math.abs(phi)), 0.05, g); thT = th0 + 0.09 * f * (1 - g) - 0.22 * g + curl * 0.015;
       tipT = phi * 0.1 + curl * 0.06;
       spinning = f < 0.85;
-      if (hasFish) fishSt = { anchor: [mx, my], ...ps, twist: lerp(0.4 * Math.sin(age * 5), 0.55 * Math.sin(st * 1.1 + P.s3) * Math.exp(-st * 0.15), f), len: lerp(lenS * 1.1, lenH, f) * (1 + g * 1.4), bend: bendFn(curl, amp, age * 11 * prof.tempo), waterY: age < T3 ? waterY : null, floor: waterY, under: 0.7, alpha: 1, drip: clamp(1 - (age - T2) / 4, 0.04, 1) * (1 - g) };
+      if (hasFish) fishSt = { anchor: [mx, my], ...ps, yaw: curl * 0.7 + Math.sin(age * 1.7 + P.s1) * 0.12 * (1 - f * 0.5), twist: lerp(0.4 * Math.sin(age * 5), 0.55 * Math.sin(st * 1.1 + P.s3) * Math.exp(-st * 0.15), f), len: lerp(lenS * 1.1, lenH, f) * (1 + g * 1.4), bend: bendFn(curl, amp, age * 11 * prof.tempo), waterY: age < T3 ? waterY : null, floor: waterY, under: 0.7, alpha: 1, drip: clamp(1 - (age - T2) / 4, 0.04, 1) * (1 - g) };
       if (crossed(T2 + (T3 - T2) * 0.45)) { splash(sx, waterY, 0.55, 12, { rnd: seedR, dir: -dir }); addRipple(sx, waterY, 0.8); } // the tail leaves the water
       if (age < T3) { const [rx, ry] = toRef(sx, waterY); turb.push({ x: rx, y: ry, r: 0.05, s: 0.6 * (1 - f) }); }
       push = ease(clamp((age - T4 + 0.6) / 1.6, 0, 1)) * (1 - g);
@@ -779,6 +818,20 @@ export function createActors(canvas, { onSound } = {}) {
         const g = c.getContext("2d"); g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(img, 0, 0); img = c;
       }
       fishImg = img; fishCut = !!cutout;
+      if (img && cutout && !CURLED.has(species)) {
+        if (!fish3Tried) { fish3Tried = true; try { fish3 = createFishRenderer(); } catch { fish3 = null; } }
+        if (fish3) {
+          try {
+            const c = document.createElement("canvas"); c.width = 480; c.height = 320;
+            const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0, 480, 320);
+            const px = g.getImageData(0, 0, 480, 320).data, a = new Uint8Array(480 * 320);
+            for (let i = 0; i < a.length; i++) a[i] = px[i * 4 + 3];
+            const shape = fishShape(a, 480, 320);
+            if (shape.ok) { fish3.setFish(c, shape, buildFishMesh(shape, { width: bodyWidth(species), flat: prof.flat })); fish3For = img; }
+            else fish3For = null;
+          } catch (e) { console.warn("FishDock fish: 3D model failed", e?.message); fish3For = null; }
+        }
+      } else fish3For = null;
       fishCm = clamp(lengthCm || 45, 8, 200);
       load = fishLoad(species, fishCm, weightKg);
       LT = landingTimes(species, fishCm, weightKg);
