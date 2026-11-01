@@ -109,7 +109,7 @@ const reduceMotion = () => { try { return matchMedia("(prefers-reduced-motion: r
 
 /** `fishHint` ({ species, lengthCm }) lets the demo show the fish during the fight; a real session only knows the
  *  species once the catch is logged, so until then the fight shows the water and the rod, not a guessed fish. */
-const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, children, className = "", onPhase }, ref) {
+const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, rod = "allround", children, className = "", onPhase }, ref) {
   const wrap = useRef(null), glc = useRef(null), fxc = useRef(null), camEl = useRef(null);
   const R = useRef({ gl: null, actors: null, raf: 0, visible: true, onScreen: true, override: null, lastFrame: 0, slow: 0, q: null, prevPhase: "", fishFor: "", fallback: null, frameCanvas: null });
   const [q, setQ] = useState(() => (quality === "auto" ? autoQuality() : quality));
@@ -121,7 +121,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
   const [clip, setClip] = useState(null);
   const clipOk = typeof MediaRecorder !== "undefined" && typeof HTMLCanvasElement !== "undefined" && !!HTMLCanvasElement.prototype.captureStream;
   const props = useRef({});
-  props.current = { events, status, now, envIn, floatRig, live, vibrate, catchPhoto, onPhase, sound, fishHint };
+  props.current = { events, status, now, envIn, floatRig, live, vibrate, catchPhoto, onPhase, sound, fishHint, rod };
   const view = scene?.view || defaultView();
 
   useEffect(() => { setQ(quality === "auto" ? autoQuality() : quality); }, [quality]);
@@ -227,7 +227,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         }
       }
       const env = sceneEnv({ cond: P.envIn?.cond, light: P.envIn?.light, view, kind: P.envIn?.kind, photo: !!r.frameCanvas });
-      r.actors.setEnv({ night: env.night, wind: env.wind, windDir: env.windDir, rain: env.rain, floatRig: P.floatRig, quality: qq.parts, dusk: env.dusk });
+      r.actors.setEnv({ night: env.night, wind: env.wind, windDir: env.windDir, rain: env.rain, floatRig: P.floatRig, quality: qq.parts, dusk: env.dusk, rod: P.rod });
       const t0 = performance.now();
       if (r.gl?.tint !== r.tint) { r.tint = r.gl?.tint; r.actors.setEnv({ waterTint: r.tint || [0.1, 0.2, 0.22] }); }
       const out = r.actors.frame(t, info);

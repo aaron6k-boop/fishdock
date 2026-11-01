@@ -74,6 +74,10 @@ push route forward each stored event to the share's object.
   at a bite, where a fish rolls or breaks the surface and under drips; broken water and foam where a hooked fish
   thrashes. Without a photo it draws a representative sea, river or lake with the same light and weather.
 - `src/lib/sceneActors.js`: the rod, line, reel, float, lead, splashes, drips and rain on a 2D canvas over the water.
+  - The rod is FishDock's own design: a black carbon blank with the FishDock name, whippings in the rod's colour
+    at every guide, lined guides, black shrink grips either side of a chrome-collared reel seat, and a black and
+    silver reel with line in the rod's colour. The demo offers Light Pier (red, bends most), All-Rounder (blue) and
+    Heavy Surf (gold, stiffest, thickest); sessions use the All-Rounder.
   - The rod is a chain of segments bent progressively towards the tip, with three springs (blank, soft tip, angle),
     so it overshoots and settles: a hand's small movements and the wind at idle; back, forward and a tip whip on the
     cast; tip taps for a light bite and a pull-over for a proper take; a load that follows the fish's pull in a

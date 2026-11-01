@@ -5,7 +5,7 @@
 /* global __BUILD_ID__ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
-import { fightSeconds } from "../lib/sceneActors.js";
+import { fightSeconds, ROD_STYLES } from "../lib/sceneActors.js";
 import { composeFrame } from "../lib/sceneGL.js";
 import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews } from "../lib/scene.js";
 import { DRAW_CM, activityText, phaseAt } from "../lib/liveEvents.js";
@@ -21,6 +21,7 @@ const GORLESTON = { id: "gorleston-south-pier", name: "Gorleston South Pier", re
 export const TRY_PLACES = ["gorleston-south-pier", "cromer-pier", "chesil-beach-ferry-bridge", "whitby-piers", "brixham-breakwater", "st-ives-the-island", "holyhead-breakwater", "loch-ryan-leffnol", "river-wye-ross", "royalty-fishery-avon", "rutland-water", "lough-erne-enniskillen"];
 const placeOf = (id) => (id === GORLESTON.id ? GORLESTON : spotById(id)) || GORLESTON;
 const LIGHT = [{ value: "now", label: "Now" }, { value: "morning", label: "Morning" }, { value: "midday", label: "Midday" }, { value: "dusk", label: "Dusk" }, { value: "night", label: "Night" }];
+const RODS = Object.values(ROD_STYLES).map((r) => ({ value: r.id, label: r.name }));
 const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", label: "Calm" }, { value: "breezy", label: "Breezy" }, { value: "windy", label: "Windy" }, { value: "rain", label: "Rain" }];
 const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, rain: { windKph: 24, cloudPct: 100, precipMm: 1.5 } };
 let seq = 0;
@@ -56,6 +57,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [wx, setWx] = useState("live");
   const [cond, setCond] = useState(null);
   const [quality, setQuality] = useState("auto");
+  const [rod, setRod] = useState("allround");
   const [sound, setSound] = useState(false);
   const [copied, setCopied] = useState("");
   const timers = useRef([]);
@@ -106,7 +108,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
     <div className="watch-shell try-shell">
       <div className="watch">
         <div className="watch-stage">
-          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind }} quality={quality} sound={sound} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }}>
+          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind }} quality={quality} sound={sound} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod}>
             <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
@@ -165,6 +167,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
           <section className="watch-sec">
             <div className="field"><span className="lbl">Light</span><Seg value={light} onChange={setLight} options={LIGHT} /></div>
             <div className="field"><span className="lbl">Weather</span><Seg value={wx} onChange={setWx} options={WEATHER} />{wx === "live" && !cond ? <span className="tiny">Live weather isn't available just now; showing a breeze.</span> : null}</div>
+            <div className="field"><span className="lbl">Rod</span><Seg value={rod} onChange={setRod} options={RODS} /></div>
             <div className="field"><span className="lbl">Animation quality</span><Seg value={quality} onChange={setQuality} options={QUALITY_OPTIONS} /></div>
             <button type="button" className={`btn small${sound ? " primary" : ""}`} onClick={() => setSound(!sound)}><Icon name={sound ? "bell" : "mic"} />{sound ? "Sound on" : "Sound off"}</button>
           </section>

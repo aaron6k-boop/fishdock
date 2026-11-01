@@ -14,6 +14,14 @@ const wob = (t, s = 0) => Math.sin(t * 1.3 + s) * 0.5 + Math.sin(t * 2.7 + s * 1
 
 const GUIDES = [0.42, 0.54, 0.64, 0.72, 0.79, 0.85, 0.9, 0.94, 0.975];
 
+/** FishDock's rods: the colour of the whippings, trim and line, how far the blank bends under the same load, and how
+ *  thick it is. A look and a feel for the animation, not a product description. */
+export const ROD_STYLES = {
+  light: { id: "light", name: "Light Pier", accent: [214, 52, 52], flex: 1.25, thick: 0.86 },
+  allround: { id: "allround", name: "All-Rounder", accent: [40, 112, 236], flex: 1, thick: 1 },
+  heavy: { id: "heavy", name: "Heavy Surf", accent: [214, 166, 60], flex: 0.78, thick: 1.15 },
+};
+
 // repeatable randomness per event (a replay looks the same; the next cast or splash doesn't)
 function hashSeed(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function rng(seed) { let a = seed || 1; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -78,6 +86,7 @@ export function createActors(canvas, { onSound } = {}) {
   let reelA = 0, lastPhaseKey = "", prevAge = -1, lastT = 0, quality = 1, dusk = 0;
   let birds = [], nextFlock = 6 + Math.random() * 10;
   let prof = fightProfile(null), fishCm = 45, load = 1, waterTint = [0.12, 0.22, 0.25], rings = [];
+  let rodStyle = ROD_STYLES.allround;
   const fishCanvas = document.createElement("canvas");
   const fctx = fishCanvas.getContext("2d");
 
@@ -127,24 +136,40 @@ export function createActors(canvas, { onSound } = {}) {
   const down = (a) => { let nx = -Math.sin(a), ny = Math.cos(a); if (ny < 0) { nx = -nx; ny = -ny; } return [nx, ny]; };
 
   // ---- drawing ----
+  // The rod: a black carbon blank with the FishDock name, whippings in the rod's colour at every guide, lined guides,
+  // black shrink grips either side of a chrome-collared reel seat, and a black and silver reel with line in the
+  // rod's colour on the spool (FishDock's own rod design).
+  const shade = (c, f, add = 0) => `rgb(${Math.round(c[0] * f + add)},${Math.round(c[1] * f + add)},${Math.round(c[2] * f + add)})`;
+  const halfW = (s) => (lerp(21 * k, 2.2 * k, Math.pow(s, 0.75)) / 2) * rodStyle.thick;
+  /** A short stretch of something round on the blank (a whipping, a collar, a grip): a stroke along the rod with
+   *  light across it, so it reads as a cylinder. */
+  function sleeve(rod, s0, s1, width, base, { metal = false, lit = 1, gloss = 0.25 } = {}) {
+    const p0 = at(rod, s0), p1 = at(rod, s1), a = p0[2];
+    const nx = -Math.sin(a) * width * 0.5, ny = Math.cos(a) * width * 0.5;
+    const g = ctx.createLinearGradient(p0[0] + nx, p0[1] + ny, p0[0] - nx, p0[1] - ny);
+    if (metal) {
+      g.addColorStop(0, shade(base, 0.35 * lit, 4)); g.addColorStop(0.35, shade(base, 0.8 * lit, 8)); g.addColorStop(0.55, shade([255, 255, 255], 0.95 * lit, 6));
+      g.addColorStop(0.7, shade(base, 0.7 * lit, 6)); g.addColorStop(1, shade(base, 0.3 * lit, 4));
+    } else {
+      g.addColorStop(0, shade(base, 0.45 * lit, 2)); g.addColorStop(0.5, shade(base, 0.9 * lit, 3)); g.addColorStop(0.62, shade(base.map((v) => v + (255 - v) * gloss), lit, 3)); g.addColorStop(1, shade(base, 0.35 * lit, 2));
+    }
+    ctx.strokeStyle = g; ctx.lineWidth = width; ctx.lineCap = "butt";
+    ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
+  }
   function drawRod(rod) {
-    const n = rod.pts.length;
-    const wBase = 21 * k, wTip = 2.2 * k;
+    const n = rod.pts.length, lit = 1 - night * 0.75, acc = rodStyle.accent;
     const left = [], right = [];
     for (let i = 0; i < n; i++) {
-      const s = i / (n - 1), a = rod.ang[Math.min(i, rod.ang.length - 1)];
-      const hw = lerp(wBase, wTip, Math.pow(s, 0.75)) / 2 * (s < 0.27 ? 1.45 : 1);
+      const s = i / (n - 1), a = rod.ang[Math.min(i, rod.ang.length - 1)], hw = halfW(s);
       left.push([rod.pts[i][0] - Math.sin(a) * hw, rod.pts[i][1] + Math.cos(a) * hw]);
       right.push([rod.pts[i][0] + Math.sin(a) * hw, rod.pts[i][1] - Math.cos(a) * hw]);
     }
+    // the blank: black carbon, a soft sheen and one sharp highlight
     const mid = rod.pts[Math.floor(n * 0.45)], ma = rod.ang[Math.floor(n * 0.45)];
-    const nx = -Math.sin(ma) * 6 * k, ny = Math.cos(ma) * 6 * k;
+    const nx = -Math.sin(ma) * 6 * k * rodStyle.thick, ny = Math.cos(ma) * 6 * k * rodStyle.thick;
     const g = ctx.createLinearGradient(mid[0] + nx, mid[1] + ny, mid[0] - nx, mid[1] - ny);
-    const lit = 1 - night * 0.75;
-    g.addColorStop(0, `rgba(${8 * lit + 4},${11 * lit + 5},${14 * lit + 6},1)`);
-    g.addColorStop(0.55, `rgba(${46 * lit + 6},${56 * lit + 7},${66 * lit + 9},1)`);
-    g.addColorStop(0.72, `rgba(${132 * lit + 10},${146 * lit + 12},${158 * lit + 14},1)`);
-    g.addColorStop(1, `rgba(${14 * lit + 4},${18 * lit + 5},${22 * lit + 6},1)`);
+    g.addColorStop(0, shade([6, 7, 9], lit, 3)); g.addColorStop(0.45, shade([26, 29, 34], lit, 4)); g.addColorStop(0.66, shade([92, 100, 112], lit, 8));
+    g.addColorStop(0.72, shade([30, 33, 38], lit, 4)); g.addColorStop(1, shade([5, 6, 8], lit, 3));
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 6 * k; ctx.shadowOffsetY = 3 * k;
     ctx.beginPath();
@@ -152,26 +177,47 @@ export function createActors(canvas, { onSound } = {}) {
     for (let i = n - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
     ctx.closePath(); ctx.fillStyle = g; ctx.fill();
     ctx.restore();
-    // grip (EVA) and reel seat near the butt
-    const seat = at(rod, 0.3), grip0 = at(rod, 0.0), grip1 = at(rod, 0.25);
-    ctx.lineCap = "round";
-    // EVA grip: dark, slightly textured
-    ctx.strokeStyle = `rgba(${22 * lit + 6},${24 * lit + 6},${26 * lit + 7},1)`; ctx.lineWidth = 30 * k;
-    ctx.beginPath(); ctx.moveTo(grip0[0], grip0[1]); ctx.lineTo(grip1[0], grip1[1]); ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,255,${0.07 * lit})`; ctx.lineWidth = 9 * k;
-    ctx.beginPath(); ctx.moveTo(grip0[0] - 6 * k, grip0[1]); ctx.lineTo(grip1[0] - 6 * k, grip1[1]); ctx.stroke();
-    // reel seat: a brushed metal band either side of the reel foot
-    const s0 = at(rod, 0.27), s1 = at(rod, 0.33);
-    const mg = ctx.createLinearGradient(s0[0] - 10 * k, s0[1], s0[0] + 10 * k, s0[1]);
-    mg.addColorStop(0, `rgb(${70 * lit + 10},${74 * lit + 10},${78 * lit + 10})`); mg.addColorStop(0.5, `rgb(${190 * lit + 20},${196 * lit + 20},${202 * lit + 20})`); mg.addColorStop(1, `rgb(${60 * lit + 8},${64 * lit + 8},${68 * lit + 8})`);
-    ctx.strokeStyle = mg; ctx.lineWidth = 22 * k;
-    ctx.beginPath(); ctx.moveTo(s0[0], s0[1]); ctx.lineTo(s1[0], s1[1]); ctx.stroke();
+    // a faint carbon weave on the thicker part of the blank
+    ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.045 * lit})`; ctx.lineWidth = halfW(0.4) * 1.1; ctx.setLineDash([1.6 * k, 1.6 * k]);
+    ctx.beginPath(); for (let i = Math.floor(n * 0.34); i < Math.floor(n * 0.62); i++) i === Math.floor(n * 0.34) ? ctx.moveTo(rod.pts[i][0], rod.pts[i][1]) : ctx.lineTo(rod.pts[i][0], rod.pts[i][1]);
+    ctx.stroke(); ctx.restore();
+    // butt grip, reel seat with chrome collars and coloured trim rings, fore grip
+    const gw = 31 * k * rodStyle.thick;
+    sleeve(rod, 0, 0.165, gw, [22, 23, 25], { lit, gloss: 0.12 });
+    sleeve(rod, 0.165, 0.178, gw * 1.04, [200, 205, 212], { metal: true, lit });
+    sleeve(rod, 0.178, 0.186, gw * 0.98, acc, { lit, gloss: 0.4 });
+    sleeve(rod, 0.186, 0.25, gw * 0.84, [16, 17, 19], { lit, gloss: 0.3 });
+    // threads on the seat
+    ctx.save(); ctx.strokeStyle = `rgba(200,206,214,${0.22 * lit})`; ctx.lineWidth = gw * 0.8; ctx.setLineDash([0.9 * k, 2.4 * k]);
+    { const p0 = at(rod, 0.192), p1 = at(rod, 0.21); ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke(); }
+    ctx.restore();
+    sleeve(rod, 0.25, 0.258, gw * 0.98, acc, { lit, gloss: 0.4 });
+    sleeve(rod, 0.258, 0.272, gw * 1.04, [200, 205, 212], { metal: true, lit });
+    sleeve(rod, 0.272, 0.345, gw * 0.9, [22, 23, 25], { lit, gloss: 0.12 });
+    // grip texture: fine speckle of the shrink tube
+    ctx.save(); ctx.strokeStyle = `rgba(255,255,255,${0.035 * lit})`; ctx.lineWidth = gw * 0.7; ctx.setLineDash([0.7 * k, 1.9 * k]);
+    for (const [s0, s1] of [[0, 0.16], [0.276, 0.34]]) { const p0 = at(rod, s0), p1 = at(rod, s1); ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke(); }
+    ctx.restore();
+    sleeve(rod, 0.345, 0.352, halfW(0.35) * 2.5, [200, 205, 212], { metal: true, lit });
+    sleeve(rod, 0.352, 0.36, halfW(0.355) * 2.35, acc, { lit, gloss: 0.4 });
+    // the name on the blank, along the rod, with a swoosh in the rod's colour
+    {
+      const [x, y, a] = at(rod, 0.39), hw = halfW(0.39);
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      const fs = Math.max(5, hw * 1.55);
+      ctx.font = `italic 700 ${fs}px system-ui, -apple-system, "Segoe UI", sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = `rgba(238,242,248,${0.85 * lit + 0.1})`; ctx.fillText("FishDock", 0, -hw * 0.08);
+      ctx.strokeStyle = shade(acc, lit, 10); ctx.lineWidth = Math.max(0.6, fs * 0.12);
+      const tw = ctx.measureText("FishDock").width;
+      ctx.beginPath(); ctx.moveTo(-tw * 0.45, hw * 0.55); ctx.quadraticCurveTo(0, hw * 0.25, tw * 0.5, hw * 0.4); ctx.stroke();
+      ctx.restore();
+    }
     // a thin highlight along the blank
     ctx.strokeStyle = `rgba(255,255,255,${0.16 * lit})`; ctx.lineWidth = Math.max(0.6, 1.1 * k);
     ctx.beginPath();
-    for (let i = Math.floor(n * 0.22); i < n - 1; i++) { const a = rod.ang[Math.min(i, rod.ang.length - 1)], hw = lerp(wBase, wTip, i / (n - 1)) * 0.22; const p = [rod.pts[i][0] + Math.sin(a) * hw, rod.pts[i][1] - Math.cos(a) * hw]; i === Math.floor(n * 0.22) ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]); }
+    for (let i = Math.floor(n * 0.36); i < n - 1; i++) { const a = rod.ang[Math.min(i, rod.ang.length - 1)], hw = halfW(i / (n - 1)) * 0.45; const p = [rod.pts[i][0] + Math.sin(a) * hw, rod.pts[i][1] - Math.cos(a) * hw]; i === Math.floor(n * 0.36) ? ctx.moveTo(p[0], p[1]) : ctx.lineTo(p[0], p[1]); }
     ctx.stroke();
-    return seat;
+    return at(rod, 0.21);
   }
 
   function guidePoints(rod) {
@@ -180,63 +226,89 @@ export function createActors(canvas, { onSound } = {}) {
       const [dx, dy] = down(a);
       const r = Math.max(1.8 * k, 22 * k * Math.pow(1 - s, 1.3));
       const off = r * 1.45 + lerp(9 * k, 1.2 * k, s);
-      return { x, y, cx: x + dx * off, cy: y + dy * off, r, a };
+      return { x, y, cx: x + dx * off, cy: y + dy * off, r, a, s };
     });
   }
-  function drawGuides(gs) {
-    const lit = 1 - night * 0.7;
+  function drawGuides(gs, rod) {
+    const lit = 1 - night * 0.7, acc = rodStyle.accent;
     for (const g of gs) {
-      ctx.strokeStyle = `rgba(${20 * lit + 5},${24 * lit + 5},${28 * lit + 6},1)`; ctx.lineWidth = Math.max(1, 1.6 * k);
+      // the whipping on the blank, in the rod's colour with a dark trim either side
+      const hw = halfW(g.s), len = Math.max(0.006, 0.018 * (1 - g.s) + 0.004);
+      sleeve(rod, g.s - len, g.s + len, hw * 2.5, [12, 13, 15], { lit, gloss: 0.3 });
+      sleeve(rod, g.s - len * 0.75, g.s + len * 0.75, hw * 2.6, acc, { lit, gloss: 0.45 });
+      // frame: gunmetal with a chrome edge
+      ctx.lineCap = "round";
+      ctx.strokeStyle = shade([28, 31, 36], lit, 5); ctx.lineWidth = Math.max(1, 1.9 * k * (0.5 + g.r / (14 * k)));
       ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.cx, g.cy); ctx.stroke();
+      ctx.strokeStyle = `rgba(220,226,232,${0.35 * lit})`; ctx.lineWidth = Math.max(0.5, 0.6 * k);
+      ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.cx, g.cy); ctx.stroke();
+      // ring: a chrome frame round a dark lined insert
       ctx.save(); ctx.translate(g.cx, g.cy); ctx.rotate(g.a);
-      ctx.strokeStyle = `rgba(${170 * lit + 25},${180 * lit + 25},${190 * lit + 25},0.95)`; ctx.lineWidth = Math.max(0.8, 1.4 * k * (g.r / (10 * k)) + 0.6);
+      const rw = Math.max(0.9, 1.6 * k * (g.r / (10 * k)) + 0.6);
+      ctx.strokeStyle = shade([24, 26, 30], lit, 4); ctx.lineWidth = rw * 1.7;
       ctx.beginPath(); ctx.ellipse(0, 0, g.r * 0.35, g.r, 0, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = `rgba(${Math.round(205 * lit + 25)},${Math.round(212 * lit + 25)},${Math.round(220 * lit + 25)},0.95)`; ctx.lineWidth = rw * 0.55;
+      ctx.beginPath(); ctx.ellipse(0, 0, g.r * 0.35 + rw * 0.6, g.r + rw * 0.6, 0, 0, TAU); ctx.stroke();
       ctx.restore();
     }
   }
 
   function drawReel(seat, a, spin) {
     const [dx, dy] = down(a);
-    const k0 = k;
+    const k0 = k, acc = rodStyle.accent;
     k = k0 * 2.3; // the reel is close to the camera
     const c = [seat[0] + dx * 24 * k, seat[1] + dy * 24 * k];
     const lit = 1 - night * 0.7;
     ctx.save();
     ctx.lineCap = "round";
-    ctx.strokeStyle = `rgba(${40 * lit + 6},${44 * lit + 6},${48 * lit + 7},1)`; ctx.lineWidth = 6 * k;
+    // foot and stem
+    ctx.strokeStyle = shade([22, 24, 27], lit, 5); ctx.lineWidth = 6 * k;
     ctx.beginPath(); ctx.moveTo(seat[0], seat[1]); ctx.lineTo(c[0], c[1]); ctx.stroke();
+    ctx.strokeStyle = `rgba(210,216,224,${0.4 * lit})`; ctx.lineWidth = 1.2 * k;
+    ctx.beginPath(); ctx.moveTo(seat[0] + dy * 2 * k, seat[1] - dx * 2 * k); ctx.lineTo(c[0] + dy * 2 * k, c[1] - dx * 2 * k); ctx.stroke();
     ctx.translate(c[0], c[1]); ctx.rotate(a);
-    // body
+    // body: black, with a silver side plate ring
     const bg = ctx.createLinearGradient(0, -14 * k, 0, 16 * k);
-    bg.addColorStop(0, `rgb(${70 * lit + 8},${76 * lit + 8},${84 * lit + 10})`); bg.addColorStop(0.5, `rgb(${26 * lit + 5},${29 * lit + 5},${33 * lit + 6})`); bg.addColorStop(1, `rgb(${12 * lit + 4},${13 * lit + 4},${15 * lit + 5})`);
+    bg.addColorStop(0, shade([64, 68, 76], lit, 8)); bg.addColorStop(0.45, shade([20, 22, 25], lit, 5)); bg.addColorStop(1, shade([8, 9, 10], lit, 4));
     ctx.fillStyle = bg;
     ctx.beginPath(); ctx.ellipse(-6 * k, 4 * k, 17 * k, 13 * k, 0, 0, TAU); ctx.fill();
-    // spool (towards the tip), with line on it
-    const sg = ctx.createLinearGradient(0, -16 * k, 0, 16 * k);
-    sg.addColorStop(0, `rgb(${210 * lit + 20},${214 * lit + 20},${220 * lit + 20})`); sg.addColorStop(0.45, `rgb(${120 * lit + 12},${126 * lit + 12},${134 * lit + 14})`); sg.addColorStop(1, `rgb(${60 * lit + 8},${64 * lit + 8},${70 * lit + 9})`);
-    ctx.fillStyle = sg;
-    ctx.beginPath(); ctx.ellipse(16 * k, 3 * k, 6 * k, 15 * k, 0, 0, TAU); ctx.fill();
-    ctx.strokeStyle = `rgba(${200 * lit + 30},${215 * lit + 30},${225 * lit + 30},0.55)`; ctx.lineWidth = 0.7 * k;
-    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.ellipse(13 * k - i * 1.6 * k, 3 * k, 4.5 * k, 12.5 * k, 0, -1.2, 1.2); ctx.stroke(); }
+    ctx.strokeStyle = `rgba(200,206,214,${0.55 * lit})`; ctx.lineWidth = 1.3 * k;
+    ctx.beginPath(); ctx.ellipse(-7 * k, 4 * k, 10 * k, 8.5 * k, 0, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = shade(acc, lit * 0.9, 8); ctx.lineWidth = 0.9 * k;
+    ctx.beginPath(); ctx.ellipse(-7 * k, 4 * k, 7.5 * k, 6.2 * k, 0, 0, TAU); ctx.stroke();
+    // rotor and spool, with line in the rod's colour wound on it
+    const rg = ctx.createLinearGradient(0, -16 * k, 0, 16 * k);
+    rg.addColorStop(0, shade([90, 96, 104], lit, 8)); rg.addColorStop(0.5, shade([24, 26, 29], lit, 4)); rg.addColorStop(1, shade([10, 11, 12], lit, 3));
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.ellipse(11 * k, 3 * k, 5 * k, 14 * k, 0, 0, TAU); ctx.fill();
+    const sg = ctx.createLinearGradient(0, -14 * k, 0, 14 * k);
+    sg.addColorStop(0, shade(acc.map((v) => v + (255 - v) * 0.5), lit, 10)); sg.addColorStop(0.5, shade(acc, lit * 0.85, 6)); sg.addColorStop(1, shade(acc, lit * 0.35, 3));
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(17 * k, 3 * k, 5.2 * k, 12.5 * k, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${0.18 * lit})`; ctx.lineWidth = 0.6 * k;
+    for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(15.5 * k + i * 0.7 * k, 3 * k, 4.2 * k, 11.5 * k, 0, -1.25, 1.25); ctx.stroke(); }
+    // chrome spool lip
+    ctx.strokeStyle = `rgba(${Math.round(215 * lit + 25)},${Math.round(220 * lit + 25)},${Math.round(226 * lit + 25)},0.95)`; ctx.lineWidth = 1.6 * k;
+    ctx.beginPath(); ctx.ellipse(21.5 * k, 3 * k, 3.6 * k, 13 * k, 0, 0, TAU); ctx.stroke();
     // bail arm
-    ctx.strokeStyle = `rgba(${190 * lit + 20},${196 * lit + 20},${200 * lit + 20},0.9)`; ctx.lineWidth = 1.4 * k;
+    ctx.strokeStyle = `rgba(${Math.round(195 * lit + 20)},${Math.round(200 * lit + 20)},${Math.round(206 * lit + 20)},0.9)`; ctx.lineWidth = 1.4 * k;
     ctx.beginPath(); ctx.ellipse(18 * k, 3 * k, 8 * k, 18 * k, 0, -2.2 + Math.sin(spin) * 0.15, 0.6); ctx.stroke();
-    // handle, turning when the angler reels
+    // handle: black arm with a silver edge, turning when the angler reels
     const hx = -8 * k, hy = 4 * k, R = 15 * k;
     const kx = hx + Math.cos(spin) * R, ky = hy + Math.sin(spin) * R * 0.55 - 14 * k;
-    ctx.strokeStyle = `rgb(${34 * lit + 6},${37 * lit + 6},${41 * lit + 7})`; ctx.lineWidth = 3 * k;
+    ctx.strokeStyle = shade([22, 24, 27], lit, 5); ctx.lineWidth = 3.2 * k;
+    ctx.beginPath(); ctx.moveTo(hx, hy - 14 * k); ctx.lineTo(kx, ky); ctx.stroke();
+    ctx.strokeStyle = `rgba(210,216,224,${0.5 * lit})`; ctx.lineWidth = 0.8 * k;
     ctx.beginPath(); ctx.moveTo(hx, hy - 14 * k); ctx.lineTo(kx, ky); ctx.stroke();
     const kg = ctx.createRadialGradient(kx - 2 * k, ky - 2 * k, 0.5, kx, ky, 6 * k);
-    kg.addColorStop(0, `rgb(${120 * lit + 10},${126 * lit + 10},${132 * lit + 10})`); kg.addColorStop(1, `rgb(${18 * lit + 4},${20 * lit + 4},${22 * lit + 5})`);
+    kg.addColorStop(0, shade([110, 116, 124], lit, 10)); kg.addColorStop(1, shade([12, 13, 15], lit, 4));
     ctx.fillStyle = kg; ctx.beginPath(); ctx.ellipse(kx, ky, 4.6 * k, 6 * k, 0, 0, TAU); ctx.fill();
     ctx.restore();
-    const out = [c[0] + Math.cos(a) * 16 * k, c[1] + Math.sin(a) * 16 * k];
+    const out = [c[0] + Math.cos(a) * 18 * k, c[1] + Math.sin(a) * 18 * k];
     k = k0;
     return out;
   }
 
   function lineStroke(alpha = 0.55) {
-    ctx.strokeStyle = night > 0.6 ? `rgba(200,215,230,${alpha * 0.45})` : `rgba(236,240,244,${alpha})`;
+    ctx.strokeStyle = night > 0.6 ? `rgba(200,215,230,${alpha * 0.45})` : `rgba(226,236,246,${alpha})`;
     ctx.lineWidth = Math.max(0.7, 0.9 * k);
   }
   function drawLineThroughRod(spoolExit, gs, tip) {
@@ -566,7 +638,7 @@ export function createActors(canvas, { onSound } = {}) {
     prevAge = age;
 
     // the rod: the whole blank, the tip, and its angle, each with its own spring
-    springTo(rodS, "k", "kv", kT, 12, 0.28, dt);
+    springTo(rodS, "k", "kv", kT * rodStyle.flex, 12 * Math.sqrt(1 / rodStyle.flex), 0.28, dt);
     springTo(rodS, "tip", "tipv", tipT, 26, 0.2, dt);
     springTo(rodS, "th", "thv", thT, thW, 0.55, dt);
     reelA += dt * (spinning ? 9 : 0);
@@ -591,7 +663,7 @@ export function createActors(canvas, { onSound } = {}) {
 
     // the rod, reel and line
     const seat = drawRod(rod);
-    drawGuides(gs);
+    drawGuides(gs, rod);
     const spoolExit = drawReel(seat, rod.ang[9], reelA);
     if (phase !== "ended") drawLineThroughRod(spoolExit, gs, tip);
     if (showLine) drawLineOut(tip, lineEnd, slack, t, slack === 0 ? 0.6 + 0.4 * shake : 0);
@@ -694,8 +766,8 @@ export function createActors(canvas, { onSound } = {}) {
       streaks = [];
     },
     setLayout({ cast, horizon: hz, map: mp }) { if (cast) castRef = cast; if (hz != null) horizon = hz; if (mp) map = mp; },
-    setEnv({ night: n, wind, windDir: wd, rain: r, floatRig: f, quality: q, dusk: dk, waterTint: wt }) {
-      if (dk != null) dusk = dk; if (wt) waterTint = wt;
+    setEnv({ night: n, wind, windDir: wd, rain: r, floatRig: f, quality: q, dusk: dk, waterTint: wt, rod }) {
+      if (dk != null) dusk = dk; if (wt) waterTint = wt; if (rod && ROD_STYLES[rod]) rodStyle = ROD_STYLES[rod];
       if (n != null) night = n; if (wind != null) windN = wind; if (wd != null) windDir = wd; if (r != null) rain = r; if (f != null) floatRig = f; if (q != null) quality = q;
     },
     /** The species picture (a cut-out when FishDock has one), the species and its logged (or typical) size. */
