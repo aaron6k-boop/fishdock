@@ -20,7 +20,8 @@ export function createActors(canvas, { onSound } = {}) {
   let W = 1, H = 1, k = 1, map = [1, 1, 0, 0];
   let castRef = [0.5, 0.62], horizon = 0.42, floatRig = false, night = 0, windN = 0.3, windDir = 1, rain = 0;
   let fishImg = null, fishCut = false, fishLenPx = 0, particles = [], ripples = [], streaks = [];
-  let reelA = 0, lastPhaseKey = "", prevAge = -1, lastT = 0, nextBoil = 0, nextDrip = 0, quality = 1;
+  let reelA = 0, lastPhaseKey = "", prevAge = -1, lastT = 0, nextBoil = 0, nextDrip = 0, quality = 1, dusk = 0;
+  let birds = [], nextFlock = 6 + Math.random() * 10;
   const fishCanvas = document.createElement("canvas");
   const fctx = fishCanvas.getContext("2d");
 
@@ -251,6 +252,32 @@ export function createActors(canvas, { onSound } = {}) {
       else { const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r); gr.addColorStop(0, `rgba(235,242,248,${0.22 * f})`); gr.addColorStop(1, "rgba(235,242,248,0)"); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill(); }
     }
   }
+  /** Now and then a few gulls glide across the sky, wings beating, then gliding (none at night). */
+  function stepBirds(t, dt) {
+    if (t > nextFlock && night < 0.5) {
+      nextFlock = t + 18 + Math.random() * 30;
+      const dir = Math.random() < 0.5 ? 1 : -1, n = 1 + Math.floor(Math.random() * 3);
+      const [, hy] = toStage([0, horizon]);
+      const y0 = hy * (0.25 + Math.random() * 0.5), size = (5 + Math.random() * 6) * k;
+      for (let i = 0; i < n; i++) birds.push({ x: dir > 0 ? -40 * k - i * 30 * k : W + 40 * k + i * 30 * k, y: y0 + (Math.random() - 0.5) * 30 * k, vx: dir * (28 + Math.random() * 14) * k * (1 + windN * 0.6), s: size * (0.8 + Math.random() * 0.4), ph: Math.random() * 6, bob: Math.random() * 6 });
+    }
+    birds = birds.filter((b) => b.x > -80 * k && b.x < W + 80 * k);
+    const shade = night > 0.3 ? 0.25 : dusk > 0.4 ? 0.15 : 0.32;
+    ctx.strokeStyle = `rgba(${Math.round(30 + 20 * (1 - dusk))},${Math.round(34 + 20 * (1 - dusk))},${Math.round(40 + 20 * (1 - dusk))},${0.75 - shade})`;
+    ctx.lineCap = "round";
+    for (const b of birds) {
+      b.x += b.vx * dt; b.y += Math.sin(t * 0.7 + b.bob) * 4 * k * dt;
+      const beat = Math.sin(t * 0.25 + b.ph) > 0.2 ? Math.sin(t * 9 + b.ph) : 0.25; // flaps, then a glide
+      const wy = b.s * (0.15 + 0.45 * beat), dir = Math.sign(b.vx);
+      ctx.lineWidth = Math.max(1, b.s * 0.22);
+      ctx.beginPath();
+      ctx.moveTo(b.x - b.s * dir * 0.1 - b.s, b.y - wy);
+      ctx.quadraticCurveTo(b.x - b.s * 0.45, b.y - wy * 0.2 - b.s * 0.25, b.x, b.y);
+      ctx.quadraticCurveTo(b.x + b.s * 0.45, b.y - wy * 0.2 - b.s * 0.25, b.x + b.s, b.y - wy);
+      ctx.stroke();
+    }
+  }
+
   function drawRain(dt) {
     const want = Math.round(clamp(rain, 0, 1) * 260 * quality);
     while (streaks.length < want) streaks.push({ x: Math.random() * W, y: Math.random() * H, v: (900 + Math.random() * 700) * (H / 600), l: 8 + Math.random() * 14 });
@@ -337,6 +364,7 @@ export function createActors(canvas, { onSound } = {}) {
     const tip = rod.pts.at(-1);
     const gs = guidePoints(rod);
 
+    stepBirds(t, dt);
     // things in the water first (behind the rod)
     let fishMouth = null;
     if (phase === "landing" && age >= 0.85 && age < 9) {
@@ -400,7 +428,8 @@ export function createActors(canvas, { onSound } = {}) {
       streaks = [];
     },
     setLayout({ cast, horizon: hz, map: mp }) { if (cast) castRef = cast; if (hz != null) horizon = hz; if (mp) map = mp; },
-    setEnv({ night: n, wind, windDir: wd, rain: r, floatRig: f, quality: q }) {
+    setEnv({ night: n, wind, windDir: wd, rain: r, floatRig: f, quality: q, dusk: dk }) {
+      if (dk != null) dusk = dk;
       if (n != null) night = n; if (wind != null) windN = wind; if (wd != null) windDir = wd; if (r != null) rain = r; if (f != null) floatRig = f; if (q != null) quality = q;
     },
     /** The species picture (a cut-out when FishDock has one) and the length to draw it at, in stage pixels. */

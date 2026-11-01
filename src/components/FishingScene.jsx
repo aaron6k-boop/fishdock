@@ -3,7 +3,7 @@
 // at `now()` (liveEvents.phaseAt); it never invents a bite, a size or a fish. Quality: Auto, Battery Saver, Balanced
 // or High; it stops drawing when off screen or in the background, and steps down by itself if the phone struggles.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { createWaterRenderer, composeFrame, composeMask, coverMap, skyLight } from "../lib/sceneGL.js";
+import { createWaterRenderer, composeFrame, composeMask, composeSkyMask, composeWaterAuto, defaultWater, coverMap, skyLight } from "../lib/sceneGL.js";
 import { createActors } from "../lib/sceneActors.js";
 import { phaseAt, DRAW_CM, DUR } from "../lib/liveEvents.js";
 import { defaultView, waterKind } from "../lib/scene.js";
@@ -34,7 +34,7 @@ export function autoQuality() {
 
 const rel = (az, facing) => ((((az - facing) % 360) + 540) % 360) - 180;
 /** Light and weather for the shader and the actors, from the shared conditions and sky. */
-export function sceneEnv({ cond, light, view, kind }) {
+export function sceneEnv({ cond, light, view, kind, photo = true }) {
   const sky = skyLight(light?.sunAlt);
   const wind = Math.min(1, Math.max(0, (cond?.windKph ?? 12) / 45));
   const cloud = cond?.cloudPct != null ? cond.cloudPct / 100 : 0.35;
@@ -50,10 +50,13 @@ export function sceneEnv({ cond, light, view, kind }) {
     else moon = (light.moonIllum ?? 0.5) * sky.night * 0.5;
   }
   sun *= 1 - cloud * 0.8; moon *= 1 - cloud * 0.85;
+  // the sun's glow in the sky: on a photo only where we know the sun is in view; the drawn sky always has it
+  const sunUp = light?.sunAlt != null ? Math.min(1, Math.max(0, light.sunAlt / 40)) : 0.3;
+  const sunGlow = photo ? (facing != null ? sun : 0) : light?.sunAlt != null && light.sunAlt > -3 ? Math.max(sun, 0.55 * (1 - cloud * 0.85)) : 0;
   const wk = waterKind(kind);
   const windDir = cond?.windDir != null && facing != null ? (Math.sin(((cond.windDir + 180 - facing) * Math.PI) / 180) >= 0 ? 1 : -1) : 1;
   return {
-    ...sky, wind, cloud, rain, fog: cloud > 0.95 && rain > 0 ? 0.3 : 0, sunX, sun, moonX, moon,
+    ...sky, wind, cloud, rain, fog: cloud > 0.95 && rain > 0 ? 0.3 : 0, sunX, sun, moonX, moon, sunUp, sunGlow,
     river: wk === "river" ? 1 : 0, still: wk === "still" ? 1 : 0, flowX: windDir * 0.7, windDir,
   };
 }
@@ -136,7 +139,9 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
       if (gone) return;
       const frame = img ? composeFrame(img, view, qq.frame) : null;
       r.frameCanvas = frame;
-      r.gl?.setScene(frame, composeMask(view, 600), view.horizon);
+      // the water area: the angler's corners if they set them, otherwise found from the photo itself
+      const mask = (frame && defaultWater(view) && composeWaterAuto(frame, view.horizon)) || composeMask(view, 600);
+      r.gl?.setScene(frame, mask, view.horizon, frame ? composeSkyMask(frame, view.horizon) : null);
     };
     if (!scene?.src) { setPhotoState("none"); apply(null); return () => { gone = true; }; }
     setPhotoState("loading");
@@ -207,8 +212,8 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
           } else r.actors.setFish(null, false, frac);
         }
       }
-      const env = sceneEnv({ cond: P.envIn?.cond, light: P.envIn?.light, view, kind: P.envIn?.kind });
-      r.actors.setEnv({ night: env.night, wind: env.wind, windDir: env.windDir, rain: env.rain, floatRig: P.floatRig, quality: qq.parts });
+      const env = sceneEnv({ cond: P.envIn?.cond, light: P.envIn?.light, view, kind: P.envIn?.kind, photo: !!r.frameCanvas });
+      r.actors.setEnv({ night: env.night, wind: env.wind, windDir: env.windDir, rain: env.rain, floatRig: P.floatRig, quality: qq.parts, dusk: env.dusk });
       const t0 = performance.now();
       const ripples = r.actors.frame(t, info);
       if (r.gl) {
