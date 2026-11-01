@@ -7,7 +7,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
 import { fightSeconds, ROD_STYLES } from "../lib/sceneActors.js";
 import { composeFrame } from "../lib/sceneGL.js";
-import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews, venueOf } from "../lib/scene.js";
+import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews, venueOf, viewFeatures, levelling } from "../lib/scene.js";
+import { VIEWPOINTS } from "../lib/viewpoint.js";
+import { shrinkImage } from "../lib/storage.js";
 import { DRAW_CM, activityText, phaseAt } from "../lib/liveEvents.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -24,8 +26,8 @@ const LIGHT = [{ value: "now", label: "Now" }, { value: "morning", label: "Morni
 const RODS = [{ value: "auto", label: "For the place" }, ...Object.values(ROD_STYLES).map((r) => ({ value: r.id, label: r.name }))];
 const TIPS = [{ value: "auto", label: "At night" }, { value: "on", label: "On" }, { value: "off", label: "Off" }];
 const FROM = [{ value: "auto", label: "The place's own" }, { value: "beach", label: "Beach" }, { value: "pier", label: "Pier" }, { value: "estuary", label: "Estuary" }, { value: "river", label: "River bank" }, { value: "lake", label: "Lake" }];
-const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", label: "Calm" }, { value: "breezy", label: "Breezy" }, { value: "windy", label: "Windy" }, { value: "rain", label: "Rain" }];
-const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, rain: { windKph: 24, cloudPct: 100, precipMm: 1.5 } };
+const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", label: "Calm" }, { value: "breezy", label: "Breezy" }, { value: "windy", label: "Windy" }, { value: "overcast", label: "Overcast" }, { value: "drizzle", label: "Light rain" }, { value: "rain", label: "Heavy rain" }];
+const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, overcast: { windKph: 14, cloudPct: 100, precipMm: 0 }, drizzle: { windKph: 16, cloudPct: 95, precipMm: 0.4 }, rain: { windKph: 30, cloudPct: 100, precipMm: 4 } };
 let seq = 0;
 const ev = (type, data = null) => ({ id: `demo_${++seq}`, seq, t: Date.now(), type, data });
 
@@ -63,6 +65,8 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [tipLight, setTipLight] = useState("auto");
   const [from, setFrom] = useState("auto");
   const [sound, setSound] = useState(false);
+  const [volume, setVolume] = useState(0.7);
+  const [own, setOwn] = useState(null); // the visitor's own photo for this demo: kept in this page only, never sent anywhere
   const [copied, setCopied] = useState("");
   const timers = useRef([]);
   const [uiHidden, setUiHidden] = useState(false);
@@ -74,20 +78,30 @@ export default function TryLive({ initialPlace, initialSpecies }) {
     const h = `#try/${placeId}/${species}`;
     if (location.hash !== h) history.replaceState(null, "", h);
   }, [placeId, species]);
-  useEffect(() => { clearAuto(); setEvents([]); setPhotos(null); setPick(0); setView(defaultView()); setCond(null);
-    // the clearest open-water view first; if none looks like open water, the drawn scene
-    nearbyPhotos(place).then((r) => rankWaterViews(r.photos || [])).then((list) => { setPhotos(list); setPick(list[0]?.water >= 0.62 ? 0 : -1); });
+  useEffect(() => { clearAuto(); setEvents([]); setPhotos(null); setPick(0); setView(defaultView()); setCond(null); setOwn(null);
+    // the photo that best suits a rod at the water's edge here; if none does (only views from high up, no water
+    // where the line lands, a blocked foreground), the drawn scene, labelled as representative
+    nearbyPhotos(place).then((r) => rankWaterViews(r.photos || [], venueOf(place))).then((list) => { setPhotos(list); setPick(list[0]?.ok ? 0 : -1); });
     getConditions(place.lat, place.lon).then((c) => setCond(c?.hourly?.length ? c : null));
     if (!fishList.some((f) => f.id === species)) { const f = fresh ? "perch" : "cod"; setSpecies(f); setLength(DRAW_CM[f] || 40); }
     return clearAuto;
   }, [placeId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const photo = photos && pick >= 0 ? photos[pick] : null;
-  useEffect(() => { // line the horizon up with the photo
+  const photo = own || (photos && pick >= 0 ? photos[pick] : null);
+  useEffect(() => { // level the photo if it leans a little, then line the water and the cast up with its horizon
     if (!photo) { setView(defaultView()); return; }
     const i = new Image(); i.crossOrigin = "anonymous"; i.referrerPolicy = "no-referrer";
-    i.onload = () => { const h = detectHorizon(composeFrame(i, defaultView(), 600)); setView(defaultView(h || 0.42)); };
+    i.onload = () => {
+      let lv = { rot: 0, zoom: 1 };
+      try { lv = levelling(viewFeatures(i).tilt); } catch { /* a photo we can't read is used as it is */ }
+      const h = detectHorizon(composeFrame(i, { ...defaultView(), ...lv }, 600));
+      setView({ ...defaultView(h || 0.42), ...lv });
+    };
     i.src = photo.url;
   }, [photo?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function useOwn(file) {
+    if (!file) return;
+    try { const s = await shrinkImage(file, 1600, 0.84); setOwn({ url: s.dataUrl, own: true }); setSheet(false); } catch { /* not an image this browser can read */ }
+  }
 
   const t = timeFor(light, place);
   const live = conditionsAt(cond, t);
@@ -96,7 +110,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const lightNow = { sunAlt: sun.alt, sunAz: sun.az, moonAlt: moon.alt, moonAz: moon.az, moonIllum: ASTRO.moonIllum(t).fraction };
   // at dusk the demo faces the sunset, so the glitter path shows
   const v = { ...view, facing: light === "dusk" ? Math.round(sun.az) : light === "night" && moon.alt > 0 ? Math.round(moon.az) : null };
-  const scene = photo ? { kind: "commons", src: photo.url, view: v, commons: photo } : { kind: "representative", src: null, view: { ...defaultView(), facing: v.facing } };
+  const scene = own ? { kind: "own", src: own.url, view: v, label: "Your photo (it stays on this device)" } : photo ? { kind: "commons", src: photo.url, view: v, commons: photo } : { kind: "representative", src: null, view: { ...defaultView(), facing: v.facing } };
   // the phase moves on with time (a cast settles, a landing ends), so the controller follows it
   const [, setTick] = useState(0);
   useEffect(() => { if (!events.length) return undefined; const id = setInterval(() => setTick((n) => n + 1), 400); return () => clearInterval(id); }, [events.length]);
@@ -135,7 +149,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
     <div className={`watch-shell try-shell immersive${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch">
         <div className="watch-stage">
-          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue: from === "auto" ? venueOf(place) : from }} quality={quality} sound={sound} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
+          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue: from === "auto" ? venueOf(place) : from }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
             <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
@@ -147,7 +161,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             <div className="fs-bottom">
               <div className="fs-who"><b>{place.name.replace(/ \(.*\)$/, "")}</b><span> · {sp.name}, {length} cm</span></div>
               <div className="demo-ctl" role="group" aria-label="Demo controls">
-                <div className="demo-act" aria-live="polite">{p.phase === "idle" ? "Ready when you are" : p.phase === "landing" ? `${sp.name} landed (demo, not logged)` : activityText(p, { who: "", target: sp.name })}</div>
+                <div className="demo-act" aria-live="polite">{p.phase === "idle" ? "Ready when you are" : p.phase === "waiting" && (last === "catch" || last === "lost") ? "Line's out of the water. Cast again when you're ready" : p.phase === "landing" ? `${sp.name} landed (demo, not logged)` : activityText(p, { who: "", target: sp.name })}</div>
                 <div className="demo-btns">
                   <button type="button" className="btn primary demo-main" onClick={next.main[1] || undefined} disabled={!next.main[1]}><Icon name={next.main[2]} />{next.main[0]}</button>
                   {next.alt.map(([label, fn]) => <button key={label} type="button" className="btn small demo-alt" onClick={fn}>{label}</button>)}
@@ -185,13 +199,20 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             <div className="moments">{TRY_PLACES.map((id) => { const pl = placeOf(id); return <button key={id} type="button" className={`chip${id === placeId ? " on" : ""}`} onClick={() => setPlaceId(id)}>{pl.name.replace(/ \(.*\)$/, "").replace(/,.*$/, "")}</button>; })}</div>
             <div className="sv-near">
               {photos == null ? <span className="loading-dots" aria-label="Finding photos" /> : photos.map((ph, i) => (
-                <button key={ph.url} type="button" className={`sv-thumb${i === pick ? " on" : ""}`} onClick={() => setPick(i)}>
-                  <img src={smallPhoto(ph.url)} alt={ph.title} loading="lazy" referrerPolicy="no-referrer" /><span>{ph.title}</span>
+                <button key={ph.url} type="button" className={`sv-thumb${!own && i === pick ? " on" : ""}${ph.ok ? "" : " poor"}`} onClick={() => { setOwn(null); setPick(i); }}>
+                  <img src={smallPhoto(ph.url)} alt={ph.title} loading="lazy" referrerPolicy="no-referrer" />
+                  <span>{ph.title}</span>
+                  <span className={`sv-fit${ph.ok ? " good" : ""}`}>{ph.ok ? (VIEWPOINTS[ph.viewKind] ? `${VIEWPOINTS[ph.viewKind]} view` : "Good match") : ph.problems?.[0] || "Poor match"}</span>
                 </button>
               ))}
-              {photos ? <button type="button" className={`sv-thumb${pick === -1 ? " on" : ""}`} onClick={() => setPick(-1)}><span className="try-drawn">Drawn scene</span><span>Representative</span></button> : null}
+              {photos ? <button type="button" className={`sv-thumb${!own && pick === -1 ? " on" : ""}`} onClick={() => { setOwn(null); setPick(-1); }}><span className="try-drawn">Drawn scene</span><span>Representative</span></button> : null}
+              <label className={`sv-thumb sv-own${own ? " on" : ""}`}>
+                <input type="file" accept="image/*" onChange={(e) => { useOwn(e.target.files?.[0]); e.target.value = ""; }} />
+                {own ? <img src={own.url} alt="Your photo" /> : <span className="try-drawn"><Icon name="camera" /></span>}
+                <span>{own ? "Your photo" : "Use your own photo"}</span>
+              </label>
             </div>
-            <p className="tiny">Real photos taken near {place.name.replace(/ \(.*\)$/, "")}, from Wikimedia Commons (credited on the scene). In a real session your own photo of where your rod points works best.</p>
+            <p className="tiny">Real photos taken near {place.name.replace(/ \(.*\)$/, "")}, from Wikimedia Commons (credited on the scene), checked for a view a rod could be held in: water where the line lands, the camera at the water's edge, a level horizon. Photos taken from high up aren't used. Your own photo stays on this device.</p>
           </section>
 
           <section className="watch-sec">
@@ -200,6 +221,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             <div className="field"><span className="lbl">Fishing from</span><Seg value={from} onChange={setFrom} options={FROM} /></div>
             <div className="field"><span className="lbl">Rod</span><Seg value={rod} onChange={setRod} options={RODS} /></div>
             <div className="field"><span className="lbl">Tip light</span><Seg value={tipLight} onChange={setTipLight} options={TIPS} /></div>
+            <div className="field"><span className="lbl">Sound</span><div className="vol-row"><button type="button" className="btn small" onClick={() => setSound(!sound)} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} />{sound ? "On" : "Off"}</button><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => { setVolume(Number(e.target.value)); if (!sound) setSound(true); }} aria-label="Volume" /><span className="num tiny">{Math.round(volume * 100)}%</span></div></div>
             <div className="field"><span className="lbl">Animation quality</span><Seg value={quality} onChange={setQuality} options={QUALITY_OPTIONS} /></div>
           </section>
 

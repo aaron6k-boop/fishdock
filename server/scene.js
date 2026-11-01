@@ -3,6 +3,7 @@
 // - Wikimedia Commons' own geographic search (files with a camera position) within a few km of the point. Only
 //   photos with a free licence (CC0, public domain, CC BY or CC BY-SA) and a landscape shape come back, scored so
 //   views of water (pier, beach, harbour, river, lake...) come first and birds, signs and buildings drop out.
+//   Each says where it seems to have been taken from (src/lib/viewpoint.js); views from high up rank last.
 // - The point is rounded to two decimals (about 1 km) on the phone and again here, so neither FishDock's server
 //   nor Wikimedia ever learns the exact mark. Answers are kept for everyone for a week per 1 km square.
 // - Every photo travels with its author, licence and file page, which the app shows under the scene. The app
@@ -13,6 +14,7 @@ import { ensureSchema } from "./db.js";
 import { cachedJson, upstreamCtx, UpstreamError } from "./upstream.js";
 import { dataThrottle } from "./throttle.js";
 import { UA } from "./fishinfo.js";
+import { viewpointFromWords } from "../src/lib/viewpoint.js";
 
 export const SCENE = { ttlMs: 7 * 86400e3, radiusM: 4000, wideRadiusM: 10000, max: 8, thumbPx: 1280, minWidth: 640, minAspect: 1.25 };
 const FREE = /^(cc0( 1\.0)?|cc[- ]zero|public domain|pd(-[a-z0-9-]+)?|cc by(-sa)?( \d\.\d)?( [a-z]{2,3})?)$/i;
@@ -55,7 +57,9 @@ export function shapeScenes(answer) {
     const good = (words.match(new RegExp(GOOD.source, "gi")) || []).length;
     const bad = (words.match(new RegExp(BAD.source, "gi")) || []).length + (/'[A-Z][a-z]+ [a-z]+'/.test(words) ? 2 : 0);
     if (good === 0) continue; // nothing says water: a street, a building, a bird
-    const score = Math.min(good, 3) * 2 - bad * 3 + (w >= SCENE.thumbPx ? 1 : 0) - (Number.isFinite(dist) ? dist / 1500 : 1);
+    // where it was taken from: a town seen from the abbey or a cliff top doesn't suit a rod at the water's edge
+    const view = viewpointFromWords(words);
+    const score = Math.min(good, 3) * 2 - bad * 3 + (w >= SCENE.thumbPx ? 1 : 0) - (Number.isFinite(dist) ? dist / 1500 : 1) - (view.elevated ? 6 : 0) + (view.level ? 2 : 0);
     out.push({
       file: String(p.title || "").replace(/^File:/, ""), title, url,
       width: w > SCENE.thumbPx ? SCENE.thumbPx : w, height: w > SCENE.thumbPx ? Math.round((h * SCENE.thumbPx) / w) : h,
@@ -64,6 +68,7 @@ export function shapeScenes(answer) {
       licenceUrl: /^https:\/\//.test(ext.LicenseUrl?.value || "") ? ext.LicenseUrl.value : null,
       filePage: /^https:\/\/commons\.wikimedia\.org\//.test(info.descriptionurl || "") ? info.descriptionurl : null,
       km: Number.isFinite(dist) ? Math.round(dist / 100) / 10 : null,
+      view,
       score,
     });
   }

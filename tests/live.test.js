@@ -226,6 +226,14 @@ test("scene photos near a place: free licences and landscape views of water only
   assert.equal(list[0].author, "Bob Jenkins");
   assert.equal(sceneUrl("https://example.com/x.jpg", 2000), null);
   assert.equal(niceTitle("File:Gorleston, end of the pier - geograph.org.uk - 1605193.jpg"), "Gorleston, end of the pier");
+  // a view from high up ranks after a level one, however close; each says where it was taken from
+  const whitby = shapeScenes({ query: { pages: {
+    1: page("Whitby harbour from the Abbey steps.jpg", { dist: 50 }),
+    2: page("Entrance To The Harbour - geograph.org.uk - 1333919.jpg", { dist: 1500, desc: "Looking out to sea between the piers" }),
+  } } });
+  assert.deepEqual(whitby.map((p) => p.title), ["Entrance To The Harbour", "Whitby harbour from the Abbey steps"]);
+  assert.deepEqual(whitby[0].view, { kind: "pier", elevated: false, level: true });
+  assert.equal(whitby[1].view.elevated, true);
   const { s } = lSetup(t);
   const calls = stubFetch(t, [[/commons\.wikimedia\.org\/w\/api\.php/, () => answer]]);
   const r = await s.call(handleScene, "/api/scene")("GET", "?lat=52.57331&lon=1.73752");

@@ -99,6 +99,13 @@ void main(){
       vec3 drifted = texture2D(uFrame, b0).rgb*qw + texture2D(uFrame, b1).rgb*(1. - qw);
       col = mix(col, drifted, sk);
     }
+    // a clouded-over day: the photo's sky fills with grey cloud moving with the wind, thicker and darker in rain
+    float cover = smoothstep(.3, 1., uCloud);
+    if (sk > .01 && cover > .01) {
+      float cl = fbm(vec2(ref.x*2.2 - t*.006*wdir, ref.y*5.) + vec2(fbm(ref*2.5 + vec2(t*.008, 0.))*.6, 0.));
+      vec3 cloudC = mix(vec3(.80,.82,.84), vec3(.50,.53,.56), clamp(uRain*.8 + cover*.25, 0., 1.))*(.92 + .16*cl);
+      col = mix(col, cloudC, clamp(cover*(.5 + .5*smoothstep(.35, .75, cl)), 0., .9)*sk);
+    }
   } else {
     // representative sky: gradient, layered cloud drifting with the wind
     col = skyColour(ref.y, hz);
@@ -161,7 +168,7 @@ void main(){
     vec2 wd = normalize(mix(vec2(sin(uWindAng), -cos(uWindAng)), vec2(uFlowX >= 0. ? 1. : -1., 0.), uRiver));
     vec2 wx = vec2(-wd.y, wd.x);
     // wave groups: patches of bigger and smaller waves drifting downwind
-    float grp = .5 + 1.0*noise(P*vec2(1.6, 1.1) - wd*t*.08);
+    float grp = .7 + .6*noise(P*vec2(1.6, 1.1) - wd*t*.08);
     vec2 g = vec2(0.);
     float hgt = 0.;
     // long swell rolling in (sea), bigger with the sea state, steepening as it nears a beach
@@ -208,15 +215,15 @@ void main(){
     if (uRain > .01) {
       for (int L = 0; L < 2; L++) {
         float fl = float(L);
-        vec2 rc = P*vec2(26., 40.)*(1. + fl*.7) + fl*7.3;
+        vec2 rc = P*vec2(58., 88.)*(1. + fl*.8) + fl*7.3; // drop-sized rings, not puddle-sized blotches near the camera
         vec2 ci = floor(rc), cf = fract(rc) - .5;
         float hc = hash(ci + fl*3.1);
         if (hc < uRain*.9) {
           float ph = fract(t*(1.1 + hc) + hc*13.);
           vec2 o = (vec2(hash(ci + 1.7), hash(ci + 5.3)) - .5)*.5;
           float rr = length(cf - o), fr = (rr - ph*.42)*28.;
-          float wv = sin(fr)*exp(-fr*fr*.06)*(1. - ph)*clamp(1.7 - 40.*fp*.4, 0., 1.);
-          g += normalize(cf - o + .0001)*wv*.16;
+          float wv = sin(fr)*exp(-fr*fr*.06)*(1. - ph)*clamp(1.7 - 88.*fp*.4*(1. + fl*.8), 0., 1.);
+          g += normalize(cf - o + .0001)*wv*.12;
         }
       }
     }
@@ -251,7 +258,7 @@ void main(){
     vec3 R = reflect(V, N), R0 = reflect(V, vec3(0., 1., 0.));
     // how much is reflected comes from a calmer version of the surface: the small facets wobble the reflection but
     // don't flick it on and off, which is what made it look like liquid metal
-    vec3 Nf = normalize(mix(vec3(0., 1., 0.), N, .45));
+    vec3 Nf = normalize(mix(vec3(0., 1., 0.), N, .45 - .2*d)); // calmer still near the camera, where facets are big on screen
     float F = .02 + .98*pow(1. - max(dot(Nf, -V), 0.), 5.);
     vec3 refl;
     if (photo > .5) {
@@ -271,6 +278,9 @@ void main(){
       // where the tilt would look past the waterline into the water itself, it sees the far sky's haze instead
       vec3 hazeR = texture2D(uBlur, vec2(q.x, max(hz - .025, .01))).rgb;
       refl = mix(refl, hazeR, smoothstep(shore - .01, shore + .004, qy));
+      // under cloud the sky in the water is the same grey as the sky above
+      float cv = smoothstep(.3, 1., uCloud);
+      refl = mix(refl, mix(vec3(.74,.76,.78), vec3(.46,.49,.52), clamp(uRain*.8 + cv*.25, 0., 1.)), cv*.8*texture2D(uSky, q).r);
     } else {
       float sx = (R.x/max(length(R.yz), .001) - R0.x/max(length(R0.yz), .001))*.12;
       refl = reflSky(R, ref.x + clamp(sx, -.05, .05));
@@ -279,15 +289,20 @@ void main(){
     // gently moved by the waves) over its average colour; otherwise a sea, estuary, river or lake colour
     vec3 body;
     if (photo > .5) {
-      vec3 own = texture2D(uBlur, clamp(ref + vec2(g.x, g.y*.6)*.012, .002, .998)).rgb;
-      body = mix(uWaterCol, own, .6*smoothstep(shore, shore + .02, ref.y));
+      // its broad bands of colour only: averaged over a wide patch and kept close to the average, so the photo's
+      // own frozen waves and dark patches don't sit under the moving ones as fixed blotches
+      vec2 oq = clamp(ref + vec2(g.x, g.y*.6)*.012, .06, .94);
+      vec3 own = (texture2D(uBlur, oq).rgb*2. + texture2D(uBlur, oq + vec2(.05, 0.)).rgb + texture2D(uBlur, oq - vec2(.05, 0.)).rgb
+        + texture2D(uBlur, oq + vec2(0., .03)).rgb + texture2D(uBlur, oq - vec2(0., .03)).rgb)/6.;
+      own = uWaterCol + clamp(own - uWaterCol, vec3(-.06), vec3(.06));
+      body = mix(uWaterCol, own, .55*smoothstep(shore, shore + .02, ref.y));
     } else {
       body = mix(vec3(.04,.16,.20), vec3(.10,.14,.09), max(uRiver, uStill)*.7);
       body = mix(body, vec3(.20,.17,.12), uEstuary*.6)*(uDay*1. + uDusk*.6 + uNight*.15);
     }
     body *= mix(.8, 1., 1. - d)*(.9 + .2*noise(P*vec2(.9, .6) + vec2(t*.015, 0.)));
     // light through the thin tops of the waves, a little darker in the troughs
-    body *= 1. + clamp(hgt*(12. + 8.*d), -.18, .2);
+    body *= 1. + clamp(hgt*(10. + 4.*d), -.08, .1);
     float Fv = clamp(F*1.25 + .02, 0., .82)*(1. - slick*.3);
     vec3 water = mix(body, refl, Fv);
     // the sun and moon on the water: a broad soft path, and small sparkles where facets catch them
@@ -302,7 +317,9 @@ void main(){
     float shoreFoam = wash*exp(-below*70.)*(.2 + uWind*.9)*(1. - uStill*.7)*step(.0005, below)*(photo > .5 ? 1. : 0.);
     water *= 1. - .22*contact;
     // whitecaps in a blow (sea only), and streaks of foam lying along the wind
-    float foam = smoothstep(.62, .92, hgt/max(.006*wamp, .0005)*.5 + .5 + (noise(P*vec2(140., 200.) + t*.2) - .5)*.5)*smoothstep(.35, .85, uWind)*seaN;
+    // (broken up by fine noise, so they read as torn foam on the crests, not smooth white patches)
+    float foam = smoothstep(.66, .95, hgt/max(.006*wamp, .0005)*.5 + .5 + (noise(P*vec2(140., 200.) + t*.2) - .5)*.5)*smoothstep(.35, .85, uWind)*seaN;
+    foam *= smoothstep(.35, .7, noise(P*vec2(420., 640.) + vec2(t*.4, 0.))*.6 + noise(P*vec2(90., 160.) - t*.15)*.6);
     float streak = smoothstep(.72, .9, noise(vec2(dot(P, wx)*9., dot(P, wd)*1.2 - t*.25)))*smoothstep(.55, 1., uWind)*seaN*.5;
     // on a beach the swell breaks into lines of white water rolling in
     float surf = 0.;
@@ -327,7 +344,7 @@ void main(){
     col = mix(col, col*vec3(1.08,.86,.70)*.86 + vec3(.05,.01,0.)*(1. - ref.y), uDusk*.75);
     col = mix(col, nightC, uNight*.9);
     // overcast: flatter, greyer light with the contrast softened
-    col = mix(col, mix(vec3(l)*.95, vec3(.5)*(uDay + uDusk*.6 + uNight*.15), .25), uCloud*.32);
+    col = mix(col, mix(vec3(l)*.95, vec3(.5)*(uDay + uDusk*.6 + uNight*.15), .25), uCloud*.42);
   }
   // cloud shadows drifting over everything, a little mist and rain dulling
   float cs = fbm(ref*vec2(1.6, 2.8) + vec2(t*.008*wdir, 0.));

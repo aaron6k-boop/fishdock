@@ -10,7 +10,7 @@ import { defaultView, waterKind } from "../lib/scene.js";
 import { hasArt, artUrl } from "../data/fishart.js";
 import { photoFor, photoUrl } from "../data/photos.js";
 import { speciesById } from "../data/species.js";
-import { soundOn, soundOff, play } from "../lib/sceneAudio.js";
+import { soundOn, soundOff, soundEnv, setVolume, play } from "../lib/sceneAudio.js";
 import { fmtTime } from "../lib/time.js";
 import { Icon } from "./ui.jsx";
 
@@ -67,7 +67,7 @@ export function sceneEnv({ cond, light, view, kind, venue, photo = true }) {
   const swell = wk !== "sea" ? 0 : cond?.waveM != null ? Math.min(1, cond.waveM / 1.5) : Math.min(1, 0.15 + wind * 0.6);
   return {
     swell,
-    ...sky, wind, cloud, rain, fog: cloud > 0.95 && rain > 0 ? 0.3 : 0, sunX, sun, moonX, moon, sunUp, sunGlow, moonUp, moonDisc,
+    ...sky, wind, cloud, rain, fog: rain > 0 ? Math.min(0.4, 0.06 + Math.max(0, rain - 0.3) * 0.5) : cloud > 0.95 ? 0.05 : 0, sunX, sun, moonX, moon, sunUp, sunGlow, moonUp, moonDisc,
     river: wk === "river" ? 1 : 0, still: wk === "still" ? 1 : 0, flowX: windDir * 0.7, windDir, windAng,
     surf: vn === "beach" ? 1 : 0, estuary: vn === "estuary" ? 1 : 0, venue: vn || (wk === "river" ? "river" : wk === "still" ? "lake" : "pier"),
   };
@@ -100,7 +100,7 @@ export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = 
         <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released && !demo ? " · Released" : ""}</p>
         {d.bait ? <p className="tiny">On {d.bait}</p> : null}
         <p className="cc-note">{demo ? "Animated for the demo: nothing was caught or logged." : "Animated reconstruction of a logged catch, not a video."}{!own ? (art ? " Picture: FishDock's species picture." : ph ? ` Species photo: ${ph.author}, ${ph.licence}.` : "") : ""}</p>
-        {onClip ? <button type="button" className="btn small cc-clip" onClick={onClip}><Icon name="play" />Make a highlight clip</button> : null}
+        {onClip ? <button type="button" className="btn small cc-clip" onClick={onClip}><Icon name="play" />Highlight clip</button> : null}
       </div>
     </div>
   );
@@ -114,7 +114,7 @@ const reduceMotion = () => { try { return matchMedia("(prefers-reduced-motion: r
 
 /** `fishHint` ({ species, lengthCm }) lets the demo show the fish during the fight; a real session only knows the
  *  species once the catch is logged, so until then the fight shows the water and the rod, not a guessed fish. */
-const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, rod = "auto", tipLight = "auto", demo = false, onTap, children, className = "", onPhase }, ref) {
+const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, volume = 0.7, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, rod = "auto", tipLight = "auto", demo = false, onTap, children, className = "", onPhase }, ref) {
   const wrap = useRef(null), glc = useRef(null), fxc = useRef(null), camEl = useRef(null);
   const R = useRef({ gl: null, actors: null, raf: 0, visible: true, onScreen: true, override: null, lastFrame: 0, slow: 0, q: null, prevPhase: "", fishFor: "", fallback: null, frameCanvas: null });
   const [q, setQ] = useState(() => (quality === "auto" ? autoQuality() : quality));
@@ -195,7 +195,12 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
   }, [q, JSON.stringify(view)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- sound on/off ----
-  useEffect(() => { if (sound) soundOn({ kind: waterKind(envIn?.kind), wind: Math.min(1, (envIn?.cond?.windKph ?? 12) / 45) }); else soundOff(); return () => soundOff(); }, [sound, envIn?.kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  // what you hear follows the same conditions as what you see: the water, wind, rain, day or night, the kind of place
+  const heard = (() => { const e = sceneEnv({ cond: envIn?.cond, light: envIn?.light, view, kind: envIn?.kind, venue: envIn?.venue }); return { kind: waterKind(envIn?.kind), wind: Math.round(e.wind * 20) / 20, rain: Math.round(e.rain * 20) / 20, night: Math.round(e.night * 10) / 10, venue: e.venue }; })();
+  const heardKey = JSON.stringify(heard);
+  useEffect(() => { if (sound) soundOn(heard); else soundOff(); return () => soundOff(); }, [sound]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { soundEnv(heard); }, [heardKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setVolume(volume); }, [volume]);
 
   // ---- the loop ----
   useEffect(() => {
@@ -364,8 +369,9 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
   };
   useEffect(() => { if (!fs) return undefined; const k = (e) => { if (e.key === "Escape") setFs(false); }; addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, [fs]);
 
-  const credit = scene?.kind === "commons" && scene.commons ? <>Photo near here, not the exact view: <a href={scene.commons.filePage || "#"} target="_blank" rel="noopener noreferrer">{scene.commons.author}, {scene.commons.licence}</a></>
-    : scene?.kind === "own" ? (photoState === "failed" ? "The scene photo couldn't load" : "The angler's photo of this spot")
+  const credit = photoState === "failed" ? "The photo couldn't load, so this is a representative scene, not this place"
+    : scene?.kind === "commons" && scene.commons ? <>Photo near here, not the exact view: <a href={scene.commons.filePage || "#"} target="_blank" rel="noopener noreferrer">{scene.commons.author}, {scene.commons.licence}</a></>
+    : scene?.kind === "own" ? (scene.label || "The angler's photo of this spot")
     : "Representative scene, not a photo of this place";
 
   return (

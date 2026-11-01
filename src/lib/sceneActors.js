@@ -552,21 +552,32 @@ export function createActors(canvas, { onSound } = {}) {
     }
   }
 
+  // light rain: a few fine, short drops; heavy rain: many more, longer and brighter near the camera, slanting with
+  // the wind. Two depths, so the near drops fall faster than the far ones. (The rings on the water are drawn by the
+  // water itself, from the same rain amount.)
   function drawRain(dt) {
-    const want = Math.round(clamp(rain, 0, 1) * 260 * quality);
-    while (streaks.length < want) streaks.push({ x: Math.random() * W, y: Math.random() * H, v: (900 + Math.random() * 700) * (H / 600), l: 8 + Math.random() * 14 });
+    const r = clamp(rain, 0, 1), want = Math.round(Math.pow(r, 1.3) * 340 * quality);
+    while (streaks.length < want) {
+      const near = Math.random() < 0.35;
+      streaks.push({ x: Math.random() * W, y: Math.random() * H, near, v: (near ? 1300 + Math.random() * 600 : 700 + Math.random() * 400) * (H / 600), l: near ? 14 + Math.random() * 16 : 5 + Math.random() * 8 });
+    }
     streaks.length = want;
     if (!want) return;
-    const slant = windDir * windN * 0.35;
-    ctx.strokeStyle = `rgba(210,222,235,${0.18 + 0.1 * (1 - night)})`; ctx.lineWidth = Math.max(0.6, 0.8 * k);
-    ctx.beginPath();
-    for (const s of streaks) {
-      s.y += s.v * dt; s.x += s.v * dt * slant;
-      if (s.y > H) { s.y = -20; s.x = Math.random() * W; }
-      if (s.x > W) s.x -= W; if (s.x < 0) s.x += W;
-      ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.l * slant * k, s.y - s.l * k);
+    const slant = windDir * windN * 0.35, heavy = clamp((r - 0.5) * 2, 0, 1);
+    for (const near of [false, true]) {
+      ctx.strokeStyle = `rgba(210,222,235,${(near ? 0.16 + 0.12 * heavy : 0.1 + 0.06 * heavy) * (1 - 0.45 * night)})`;
+      ctx.lineWidth = Math.max(0.5, (near ? 1 + 0.4 * heavy : 0.6) * k);
+      ctx.beginPath();
+      for (const s of streaks) {
+        if (s.near !== near) continue;
+        s.y += s.v * dt; s.x += s.v * dt * slant;
+        if (s.y > H) { s.y = -20 - Math.random() * 40; s.x = Math.random() * W; }
+        if (s.x > W) s.x -= W; if (s.x < 0) s.x += W;
+        const len = s.l * (0.7 + 0.5 * heavy) * k;
+        ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - len * slant, s.y - len);
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
   }
 
   // ---- the rod's springiness: it follows where it's pulled, with a natural overshoot ----

@@ -5,7 +5,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Sheet, Seg, Icon, Notice } from "./ui.jsx";
 import { composeFrame, REF_ASPECT } from "../lib/sceneGL.js";
-import { loadChoice, saveChoice, defaultView, ownPhoto, saveOwnPhoto, nearbyPhotos, detectHorizon, smallPhoto, scenePhotoKey, rankWaterViews } from "../lib/scene.js";
+import { loadChoice, saveChoice, defaultView, ownPhoto, saveOwnPhoto, nearbyPhotos, detectHorizon, smallPhoto, scenePhotoKey, rankWaterViews, venueOf } from "../lib/scene.js";
+import { VIEWPOINTS } from "../lib/viewpoint.js";
 import { QUALITY_OPTIONS } from "./FishingScene.jsx";
 
 const FACING = [["", "Not set"], ["0", "North"], ["45", "North-east"], ["90", "East"], ["135", "South-east"], ["180", "South"], ["225", "South-west"], ["270", "West"], ["315", "North-west"]];
@@ -26,7 +27,7 @@ export default function SceneEditor({ place, quality, onQuality, onClose, onSave
   const editedWater = useRef(!!saved?.view?.water);
 
   useEffect(() => { ownPhoto(place).then(setOwn); }, [place]);
-  useEffect(() => { if (kind === "commons" && !near) nearbyPhotos(place).then(async (r) => setNear({ ...r, photos: await rankWaterViews(r.photos || []) })); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (kind === "commons" && !near) nearbyPhotos(place).then(async (r) => setNear({ ...r, photos: await rankWaterViews(r.photos || [], venueOf(place)) })); }, [kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const src = kind === "own" ? own : kind === "commons" ? commons?.url : null;
   useEffect(() => {
@@ -114,9 +115,10 @@ export default function SceneEditor({ place, quality, onQuality, onClose, onSave
         near == null ? <div className="loading-dots" aria-label="Finding photos" /> : near.photos?.length ? (
           <div className="sv-near">
             {near.photos.map((p) => (
-              <button key={p.url} type="button" className={`sv-thumb${commons?.url === p.url ? " on" : ""}`} onClick={() => { setCommons(p); setView(defaultView()); editedWater.current = false; }}>
+              <button key={p.url} type="button" className={`sv-thumb${commons?.url === p.url ? " on" : ""}${p.ok ? "" : " poor"}`} onClick={() => { setCommons(p); setView(defaultView()); editedWater.current = false; }}>
                 <img src={smallPhoto(p.url)} alt={p.title} loading="lazy" referrerPolicy="no-referrer" />
                 <span>{p.title}{p.km != null ? ` · ${p.km} km` : ""}</span>
+                <span className={`sv-fit${p.ok ? " good" : ""}`}>{p.ok ? (VIEWPOINTS[p.viewKind] ? `${VIEWPOINTS[p.viewKind]} view` : "Good match") : p.problems?.[0] || "Poor match"}</span>
               </button>
             ))}
           </div>

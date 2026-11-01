@@ -23,6 +23,8 @@ const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const compass = (deg) => (deg == null ? "" : COMPASS[Math.round(deg / 45) % 8]);
 const elapsedOf = (s, now) => (s ? Math.max(0, (s.endedAt || (s.status === "paused" && s.pausedAt ? s.pausedAt : now)) - s.startedAt - (s.pausedMs || 0)) : 0);
 
+const TL_MARKS = ["cast", "bite", "missed", "hooked", "lost", "catch"];
+
 export default function Watch({ token }) {
   const [phase, setPhase] = useState("loading"); // loading | passcode | ended | ok
   const [share, setShare] = useState(null);
@@ -31,6 +33,7 @@ export default function Watch({ token }) {
   const [watching, setWatching] = useState(0);
   const [conn, setConn] = useState("ok");
   const [sound, setSound] = useState(false);
+  const [volume, setVolume] = useState(() => { try { return Number(localStorage.getItem("fishdock.watch.volume") ?? 0.7); } catch { return 0.7; } });
   const [buzz, setBuzz] = useState(false);
   const [quality, setQuality] = useState(() => { try { return localStorage.getItem("fishdock.watch.quality") || "auto"; } catch { return "auto"; } });
   const [replayT, setReplayT] = useState(null);
@@ -163,6 +166,7 @@ export default function Watch({ token }) {
   const who = share.name || "The angler";
   const target = share.target?.name || null;
   const catches = catchesOf(evs, now).reverse();
+  const tlPct = (t) => Math.max(0, Math.min(100, ((t - share.startedAt) / Math.max(60e3, end - share.startedAt)) * 100));
   const counts = replayT != null ? null : share.counts;
   const statusChip = share.status === "ended" ? ["ended", "Ended"] : share.status === "paused" ? ["paused", "Paused"] : !share.connected ? ["quiet", "Phone quiet"] : ["live", "LIVE"];
   const c = share.cond || {};
@@ -174,7 +178,7 @@ export default function Watch({ token }) {
       <div className="watch">
         <div className="watch-stage">
           <FishingScene ref={sceneRef} scene={scene} events={evs} status={replayT != null ? "running" : share.status} now={sceneNow}
-            env={{ cond: share.cond, light: share.light, kind: share.place?.kind, venue: share.place?.venue }} quality={quality} sound={sound} vibrate={buzz && replayT == null}
+            env={{ cond: share.cond, light: share.light, kind: share.place?.kind, venue: share.place?.venue }} quality={quality} sound={sound} volume={volume} vibrate={buzz && replayT == null}
             catchPhoto={(ev) => (ev?.data?.photo ? photos[ev.data.photo] || null : null)} onTap={() => setUiHidden((h) => !h)}>
             <div className="fs-top">
               <span className={`live-badge s-${replayT != null ? "replay" : statusChip[0]}`}>{replayT != null ? "Replay" : <><span className="rec-dot" />{statusChip[1]}</>}</span>
@@ -189,6 +193,13 @@ export default function Watch({ token }) {
               <div className="fs-who"><b>{who}</b>{share.place?.label || share.place?.area ? <span> · {share.place.label || share.place.area}</span> : null}</div>
               <div className="demo-ctl watch-ctl">
                 <div className="demo-act" aria-live="polite">{replayT != null ? `Replay: ${activityText(p, { who: share.name, target })}` : activityText(p, { who: share.name, target })}</div>
+                {/* the session at a glance: casts, bites and catches along a line from the start to now (tap for the full timeline) */}
+                {evs.some((e) => TL_MARKS.includes(e.type)) ? (
+                  <button type="button" className="mini-tl" onClick={() => goTo("w-timeline")} aria-label={`Timeline: ${catches.length} caught. Open the full timeline`}>
+                    {evs.filter((e) => TL_MARKS.includes(e.type) && e.t <= now).slice(-80).map((e) => <i key={`${e.seq}-${e.t}`} className={`t-${e.type}`} style={{ left: `${tlPct(e.t)}%` }} />)}
+                    <b style={{ left: `${tlPct(now)}%` }} />
+                  </button>
+                ) : null}
                 <div className="demo-btns">
                   <button type="button" className="btn small demo-alt" onClick={() => goTo("w-catches")}><Icon name="fish" />{catches.length ? `${catches.length} caught` : "Catches"}</button>
                   <button type="button" className="btn small demo-alt" onClick={() => goTo("w-timeline")}><Icon name="clock" />Timeline</button>
@@ -269,6 +280,7 @@ export default function Watch({ token }) {
               <button type="button" className={`btn small${sound ? " primary" : ""}`} onClick={() => setSound(!sound)}><Icon name={sound ? "bell" : "mic"} />{sound ? "Sound on" : "Sound off"}</button>
               {"vibrate" in navigator ? <button type="button" className={`btn small${buzz ? " primary" : ""}`} onClick={() => setBuzz(!buzz)}><Icon name="bell" />{buzz ? "Buzz on bites" : "No buzz"}</button> : null}
             </div>
+            <div className="field"><span className="lbl">Sound level</span><div className="vol-row"><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => { const v = Number(e.target.value); setVolume(v); if (!sound) setSound(true); try { localStorage.setItem("fishdock.watch.volume", String(v)); } catch { /* ignore */ } }} aria-label="Sound level" /><span className="num tiny">{Math.round(volume * 100)}%</span></div><span className="tiny">Waves, wind, rain and gulls to match the weather there, the bite, the reel and the splashes.</span></div>
             <div className="field"><span className="lbl">Animation quality</span><Seg value={quality} onChange={(q) => { setQuality(q); try { localStorage.setItem("fishdock.watch.quality", q); } catch { /* ignore */ } }} options={QUALITY_OPTIONS} /></div>
           </section>
           <p className="tiny watch-foot">A private link from FishDock{link?.label ? ` for ${link.label}` : ""}, until {link ? fmtDateTime(link.expiresAt) : ""}. Please don't pass it on. What you see is animated from {who === "The angler" ? "the angler's" : `${who}'s`} logged casts, bites and catches, with the weather and tide: it isn't a camera.</p>
