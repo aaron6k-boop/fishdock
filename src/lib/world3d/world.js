@@ -181,6 +181,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   function tick(t, now, dt, draw = true) {
     const t0 = performance.now();
     const outs = {};
+    if (env.waveState) envState = { ...envState, ...env.waveState() }; // the sea as the water shows it (conditions ease in)
     for (const [id, x] of anglers) { x.out = x.a.frame(t, now, dt || 0.016, envState); outs[id] = x.out; }
     const view = updateCamera(t, dt || 0.016);
     // droplets fall back, rings spread

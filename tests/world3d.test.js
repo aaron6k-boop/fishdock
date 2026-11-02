@@ -73,3 +73,16 @@ test("each kind of fish fights its own way in 3D: divers deep, upper-water fish 
   assert.ok(st("thornback-ray").depth > st("cod").depth && st("thornback-ray").heavy > st("cod").heavy, "a ray sits deep and heavy");
   assert.equal(st("conger").pump, true);
 });
+
+test("the shore map: distance to the nearest land for the water's foam and shallows, from real or drawn places", async () => {
+  const { shoreDistances, shoreBytes, drawnLand, SHORE } = await import("../src/lib/world3d/shoreMap.js");
+  // land is everything north of z = -100 (z < -100 is... water south): a straight shore
+  const d = shoreDistances((x, z) => z < -100, { half: 240, n: 96 });
+  const at = (x, z) => d[Math.floor((z + 240) / 5) * 96 + Math.floor((x + 240) / 5)];
+  assert.equal(at(0, -150), 0, "on land");
+  assert.ok(Math.abs(at(0, -90) - 10) < 5.1, `10 m out: ${at(0, -90)}`);
+  assert.equal(at(0, 200), SHORE.cap, "far out is capped");
+  const b = shoreBytes(d); assert.equal(b[0], 0); assert.equal(b[b.length - 1], 255);
+  const pier = drawnLand("pier", { width: 9, from: 70, to: -48 });
+  assert.equal(pier(0, 0), true); assert.equal(pier(10, 0), false); assert.equal(drawnLand("beach", {}), null, "the beach has its own surf");
+});

@@ -97,7 +97,7 @@ export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = 
         {art ? <img className={`cc-art${own ? " small" : ""}`} src={art} alt="" /> : ph ? <img className={`cc-art photo${own ? " small" : ""}`} src={photoUrl(ph, 500)} alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" /> : null}
       </div>
       <div className="cc-body">
-        <span className="cc-kicker">{demo ? "Demo catch · not logged" : sim ? `${who ? `${who}'s simulated` : "Simulated"} catch · not a real record` : `${who ? `${who} · ` : ""}Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
+        <span className="cc-kicker">{demo ? "Demo · not logged" : sim ? `${who ? `${who}'s simulated` : "Simulated"} catch · not a real record` : `${who ? `${who} · ` : ""}Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
         <h3>{name}</h3>
         <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released && !demo && !sim ? " · Released" : ""}</p>
         {d.bait ? <p className="tiny">On {d.bait}</p> : null}
@@ -210,14 +210,17 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     const r = R.current;
     const qq = QUALITY[q] || QUALITY.balanced;
     let lastPhase = "";
-    const loop = (ts) => {
-      r.raf = requestAnimationFrame(loop);
-      if (!r.visible || !r.onScreen) return;
-      if (ts - r.lastFrame < 1000 / (r.rec ? 30 : qq.fps) - 2) return;
+    // test hook (never used by the app): with window.__fdFilm set before loading, a test can freeze this scene's clock
+    // and step it a set time per frame, to film a landing exactly where frames are slow (software graphics)
+    if (typeof window !== "undefined" && window.__fdFilm) window.__fdScene = { freeze() { r.film = { ts: performance.now(), now: props.current.now() }; }, step(ms) { if (!r.film) return; r.film.ts += ms; r.film.now += ms; loop(r.film.ts, true); } };
+    const loop = (ts, forced = false) => {
+      if (!forced) { r.raf = requestAnimationFrame(loop); if (r.film) return; }
+      if (!forced && (!r.visible || !r.onScreen)) return;
+      if (!forced && ts - r.lastFrame < 1000 / (r.rec ? 30 : qq.fps) - 2) return;
       r.lastFrame = ts;
       const P = props.current;
       const t = ts / 1000;
-      const nowMs = P.now();
+      const nowMs = r.film ? r.film.now : P.now();
       let info;
       if (r.override && ts - r.override.start < DUR.catch) info = { phase: "landing", since: r.override.start, age: (ts - r.override.start) / 1000, ev: r.override.ev };
       else {

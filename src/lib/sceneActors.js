@@ -865,7 +865,9 @@ export function createActors(canvas, { onSound, onFeel } = {}) {
       // the fish: thrashing beside the net, then drawn over it, then curled in the bag
       const { curl, amp } = kick();
       const beside = [S[0] + thrash(age) * W * 0.012, waterY - lenS * 0.22];
-      const inBag = [c[0] - dir * lenS * 0.4 * grow, c[1] + bag * 0.45];
+      // in the bag: the anchor is the fish's mouth and its body runs back from it, so the mouth goes on the side it
+      // faces and the body lies back across the middle of the hoop (it was the other side: the fish ended up outside)
+      const inBag = [c[0] + dir * lenS * 0.5 * grow, c[1] + bag * 0.45];
       const ax = lerp(beside[0], inBag[0], Math.max(fOver, fUp)), ay = lerp(beside[1], inBag[1], Math.max(fOver, fUp));
       end = [ax, ay];
       const ps = pose(dir, lerp(0.45, 0.18 + 0.25 * Math.sin(age * 3), fOver));

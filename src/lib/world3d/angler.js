@@ -248,7 +248,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // ---- what the rod is doing ----
     // poses are in the angler's own space: x right, y up, -z forward
     let held = true, pitch = 0.75, yawOff = 0.12, bendT = 0.03, tipT = 0, rigAt = null, slack = 0.4, showLine = true, showFish = false;
-    let netOn = false, netAt = null, ropesOn = false, poleFrom = null;
+    let netOn = false, netAt = null, ropesOn = false, poleFrom = null, inNet = false;
     let fpE = 0.4, fpYaw = -0.03; // first person: the rod's angle up from level, and a little towards the middle
     const ph = info.phase;
     if (ph === "idle" || ph === "ended" || ph === "paused") { held = false; showLine = false; }
@@ -329,15 +329,19 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         const rail = toWorld(new THREE.Vector3(-0.2, 1.0, -0.45)), water = surf.clone();
         if (age < T2) { const f = ease(seg(age, T1 - 0.6, T2)); netAt = rail.clone().lerp(water, f); netAt.y = lerp(rail.y, water.y + 0.05, f); rigAt = age >= T1 ? surf.clone().add(new THREE.Vector3(1.0, -0.05, 0)) : rigAt; }
         else if (age < T3) { const f = ease(seg(age, T2, T3)); netAt = water.clone(); netAt.y = water.y + 0.05; rigAt = surf.clone().add(new THREE.Vector3(1.0 * (1 - f), -0.05 - 0.1 * f, 0)); }
-        else if (age < swingIn) { const f = ease(seg(age, T3, T4)); netAt = water.clone().lerp(rail, f); netAt.y = lerp(water.y + 0.05, rail.y + 0.2, f); rigAt = netAt.clone().add(new THREE.Vector3(0, -0.15, 0)); pitch = 0.7; bendT = 0.08; }
-        else { const f = ease(seg(age, swingIn, card)); netAt = rail.clone().add(new THREE.Vector3(0, 0.2, 0)).lerp(toWorld(new THREE.Vector3(-0.3, 0.1, 0.1)), f); rigAt = f > 0.7 ? hand.clone().lerp(hand, 1) : netAt.clone().add(new THREE.Vector3(0, -0.15, 0)); pitch = 0.6; bendT = 0.05; }
+        else if (age < swingIn) { const f = ease(seg(age, T3, T4)); netAt = water.clone().lerp(rail, f); netAt.y = lerp(water.y + 0.05, rail.y + 0.2, f); rigAt = netAt.clone(); inNet = true; pitch = 0.7; bendT = 0.08; }
+        else {
+          // set down on the deck beside the angler (not round their feet), resting on its bag
+          const ns = Math.max(1, (fishLen * 0.62) / 0.35), down = toWorld(new THREE.Vector3(-(0.55 + 0.4 * ns), 0.05 + 0.3 * ns, 0.1));
+          const f = ease(seg(age, swingIn, card)); netAt = rail.clone().add(new THREE.Vector3(0, 0.2, 0)).lerp(down, f); rigAt = netAt.clone(); inNet = true; pitch = 0.6; bendT = 0.05;
+        }
         if (crossed(T3)) onSound?.("splash", water);
       } else if (tech === "net") {
         // the landing net reached out, the fish drawn over it, lifted in
         netOn = true; poleFrom = toWorld(new THREE.Vector3(-0.25, 1.05, -0.35));
         const out = surf.clone(); out.y = surf.y - 0.05;
         if (age < T3) { const f = ease(seg(age, T1 - 0.8, T2)); netAt = poleFrom.clone().lerp(out, f); netAt.y = lerp(poleFrom.y - 0.4, out.y, f); if (age >= T2) { const g = ease(seg(age, T2, T3)); rigAt = surf.clone().add(new THREE.Vector3(1.2 * (1 - g), -0.1 * g, 0)); } }
-        else { const f = ease(seg(age, T3, T4)); netAt = out.clone().lerp(toWorld(new THREE.Vector3(-0.35, 0.5, -0.2)), f); rigAt = netAt.clone().add(new THREE.Vector3(0, -0.12, 0)); pitch = 0.6; bendT = 0.05; if (age >= swingIn) rigAt = hand; }
+        else { const f = ease(seg(age, T3, T4)); netAt = out.clone().lerp(toWorld(new THREE.Vector3(-0.35, 0.5, -0.2)), f); rigAt = netAt.clone(); inNet = true; pitch = 0.6; bendT = 0.05; }
       } else {
         // the beach: a wave carries it in and it's drawn up the sand to the angler's feet
         const sand = toWorld(new THREE.Vector3(0, -0.85, -1.4)); sand.y = Math.max(sand.y, 0.25);
@@ -420,7 +424,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       rig.visible = !(ph === "hooked" || ph === "landing");
     } else rig.visible = false;
     fish.visible = false;
-    if (showFish && rigAt && ph === "hooked") {
+    // a net big enough for the fish (a drop net is about 70 cm across; a big fish gets a bigger one, and still curls)
+    const netScale = Math.max(1, (fishLen * 0.62) / 0.35);
+    net.scale.setScalar(netScale);
+    if (showFish && rigAt && inNet && netAt) {
+      // in the net: lying across the bag, curled to fit, its middle at the middle of the net, sagging into the mesh
+      const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]);
+      const bend = clamp((fishLen - 0.6 * netScale * 0.7) / fishLen, 0, 0.6);
+      const mouth = netAt.clone().addScaledVector(side, fishLen * 0.5 * (1 - bend * 0.5)).add(new THREE.Vector3(0, -0.22 * netScale, 0));
+      poseFish(mouth, side.clone().negate().add(new THREE.Vector3(0, -0.08, 0)).normalize(), t, { beat: 0.5, curl: 0.35 + bend + Math.sin(t * 2.6) * 0.12 });
+    } else if (showFish && rigAt && ph === "hooked") {
       // leaping: nose up going out, nose down coming back in, body bent
       const goingUp = P.jumps?.some((tj) => age >= tj && age < tj + 0.375);
       const away = new THREE.Vector3(dirOf(face)[0], 0, dirOf(face)[1]);
