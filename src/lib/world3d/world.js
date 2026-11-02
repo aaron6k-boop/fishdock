@@ -295,6 +295,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       at(x, y, z) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); },
       get walker() { return W ? { x: W.x, y: W.y, z: W.z, face: W.face } : null; },
       get lag() { return film ? nowFn() - film.now : 0; },
+      get scene() { return scene; },
       get me() { const x = anglers.get(localId); return x?.out ? { at: x.out.at.toArray(), face: x.out.face, phase: x.out.phase } : null; },
       ground: env.ground,
     };

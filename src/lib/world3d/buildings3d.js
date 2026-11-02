@@ -106,6 +106,18 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
         }
       }
       if (front) doorDone = true;
+      // a plinth along the foot of the wall (a darker band of render or engineering brick), just proud of it
+      {
+        const ux = x2 - x1, uz = z2 - z1, ul = Math.hypot(ux, uz) || 1, ox = (uz / ul) * 0.035 * -1, oz = (-ux / ul) * 0.035 * -1;
+        quad(B.dark, [x1 + ox, base, z1 + oz], [x2 + ox, base, z2 + oz], [x2 + ox, base + 0.42, z2 + oz], [x1 + ox, base + 0.42, z1 + oz], [0, 0, 1, 0, 1, 1, 0, 1], [1.7, 1.7, 1.65]);
+      }
+      // the lookout's roof: a railing round the parapet
+      if (st.type === "lookout") {
+        const rh = top + 0.35, n = Math.max(1, Math.round(len / 1.2));
+        quad(B.dark, [x1, rh + 0.95, z1], [x2, rh + 0.95, z2], [x2, rh + 1.0, z2], [x1, rh + 1.0, z1], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+        quad(B.dark, [x1, rh + 0.5, z1], [x2, rh + 0.5, z2], [x2, rh + 0.53, z2], [x1, rh + 0.53, z1], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+        for (let q = 0; q <= n; q++) { const f = q / n, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f, ux = (x2 - x1) / len * 0.025, uz = (z2 - z1) / len * 0.025; quad(B.dark, [px - ux, rh, pz - uz], [px + ux, rh, pz + uz], [px + ux, rh + 1.0, pz + uz], [px - ux, rh + 1.0, pz - uz], [0, 0, 1, 0, 1, 1, 0, 1], W1); }
+      }
       // the gutter: a dark strip just under the eaves
       if (st.roof !== "flat") quad(B.dark, [x1, top - 0.12, z1], [x2, top - 0.12, z2], [x2, top + 0.02, z2], [x1, top + 0.02, z1], [0, 0, 1, 0, 1, 1, 0, 1], W1);
       else { // a parapet coping on a flat roof

@@ -258,7 +258,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let events = [];
   // the fight as you reel it (tap reeling, reelModel.js), for your own angler: how far in the fish is, the line's
   // tension, the drag slipping, the handle's turns. Others' fights follow their events' times
-  let fightIn = null, lastTurns = 0, lastDragSound = 0, viewIn = null;
+  let fightIn = null, lastTurns = 0, lastDragSound = 0, viewIn = null, figYaw = 0;
   let face = 0, at = new THREE.Vector3(), castAt = new THREE.Vector3(), nearAt = new THREE.Vector3(), edge = 1;
   // `edge`: how far in front of the angler the pier, quay or bank ends (the water starts). The fish comes up a little
   // beyond it, never under the deck, so it can be seen being landed
@@ -596,7 +596,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (!emote) emoting = null;
     // leaning out over the rail in first person: the body goes with the eye, so the hands still reach the rod
     if (fp) { brace = 0; crouch = 0; lean = Math.max(0, lean) + 0.06 + leanNow * 0.9; }
-    fig.pose({ t, dt, emote, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toLocal(lookAtW) : null, speaking, hood: (env.rain || 0) > 0.35 });
+    // first person: your body turns to face where you look (only your forearms show), so your arms never reach back
+    // across the view; the hands' places are worked out in the angler's space, so turn them into the body's
+    const wantYaw = fp && viewIn ? Math.atan2(Math.sin(viewIn.yaw - face), Math.cos(viewIn.yaw - face)) : 0;
+    figYaw = fp ? figYaw + Math.atan2(Math.sin(wantYaw - figYaw), Math.cos(wantYaw - figYaw)) * Math.min(1, dt * 10) : 0;
+    fig.group.rotation.y = -figYaw;
+    const toFig = (v) => (v && figYaw ? v.clone().applyAxisAngle(UP, figYaw) : v);
+    for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFig(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
+    fig.pose({ t, dt, emote, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFig(toLocal(lookAtW)) : null, speaking, hood: (env.rain || 0) > 0.35 });
 
     // ---- line, rig, fish, net ----
     line.visible = showLine;
@@ -662,7 +669,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
   // shoulders and your arms together, and your hands still reach the rod
-  function fpEye() { return fig.eyeAt.add(new THREE.Vector3(0, 0, -0.02)); }
+  function fpEye() { return fig.eyeAt.add(new THREE.Vector3(0, 0, -0.02)).applyAxisAngle(UP, -figYaw); }
   function tipWorld() { root.updateMatrixWorld(true); return toWorld(pts[NSEG]); }
 
   return {

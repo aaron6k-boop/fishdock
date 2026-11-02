@@ -44,6 +44,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   const LAND = GROUND.land;
   const targets = []; // what the rendered-geometry check casts its rays at (world.js)
   const walls = (place.edges || []).filter((e) => e[6] === "wall");
+  const perches = []; // lamp tops (wildlife.js)
   const nearestWall = segIndex(walls);
   // the exact land, for the vertices along a wall (the grid's own answer is only right to a cell)
   const landRings = place.land || [], waterRings = place.water || [], pierRings = (place.piers || []).filter((p) => p.ring).map((p) => p.ring);
@@ -144,7 +145,10 @@ export function buildRealPlace(group, place, M, solids = []) {
 
   // ---- harbour walls: steel sheet piling under a concrete cap, along the real water's edge ----
   const sp = sheetPiling({ water: (0 - WALL_BOTTOM) / (LAND - WALL_BOTTOM) });
-  const wp = [], wuv = [], wi = [], cp = [], cuv = [], ci = [], cwp = [], cwi = [];
+  const wp = [], wuv = [], wi = [], wcol = [], cp = [], cuv = [], ci = [], cwp = [], cwi = [];
+  // the wall's rows: [height, tint]. Weed and wet steel from below the water up to the tide line, dry above
+  const WEED = [0.42, 0.44, 0.3], WET = [0.6, 0.6, 0.52], DRY = [1, 1, 1];
+  const WALL_ROWS = [[WALL_BOTTOM, WEED], [-0.05, WEED], [0.55, WET], [Math.min(LAND - 0.3, 1.15), [0.86, 0.86, 0.82]], [LAND, DRY]].filter(([y], i, a) => i === 0 || y > a[i - 1][0] + 0.05);
   let run = 0;
   for (const e of walls) {
     let [x1, z1, x2, z2, nx, nz] = e;
@@ -152,8 +156,10 @@ export function buildRealPlace(group, place, M, solids = []) {
     // face the water: (b - a) turned left is the face's normal; swap the ends if that points at the land
     if ((-(z2 - z1)) * nx + (x2 - x1) * nz < 0) { [x1, z1, x2, z2] = [x2, z2, x1, z1]; }
     const o = wp.length / 3, u0 = run / 2.4, u1 = (run + len) / 2.4; run += len;
-    wp.push(x1, WALL_BOTTOM, z1, x2, WALL_BOTTOM, z2, x2, LAND, z2, x1, LAND, z1);
-    wuv.push(u0, 0, u1, 0, u1, 1, u0, 1); wi.push(o, o + 1, o + 2, o, o + 2, o + 3);
+    // in rows up the wall, so the tide line shows: dark weed and wet piling up to about a metre above the water, then
+    // the dry, paler steel
+    WALL_ROWS.forEach(([y, c]) => { const v = (y - WALL_BOTTOM) / (LAND - WALL_BOTTOM); wp.push(x1, y, z1, x2, y, z2); wuv.push(u0, v, u1, v); wcol.push(...c, ...c); });
+    for (let r = 0; r < WALL_ROWS.length - 1; r++) { const a = o + r * 2; wi.push(a, a + 1, a + 3, a, a + 3, a + 2); }
     // the cap: a concrete lip standing 12 cm proud of the piling, with its top and its underside
     const ox = nx * 0.12, oz = nz * 0.12, c0 = cp.length / 3, yT = LAND + 0.03, yB = LAND - 0.45;
     cp.push(x1 + ox, yB, z1 + oz, x2 + ox, yB, z2 + oz, x2 + ox, yT, z2 + oz, x1 + ox, yT, z1 + oz); // front
@@ -163,8 +169,8 @@ export function buildRealPlace(group, place, M, solids = []) {
     if (nearSpot((x1 + x2) / 2, (z1 + z2) / 2)) { const c = cwp.length / 3; cwp.push(x1, WALL_BOTTOM, z1, x2, WALL_BOTTOM, z2, x2, LAND + 0.05, z2, x1, LAND + 0.05, z1); cwi.push(c, c + 1, c + 2, c, c + 2, c + 3); }
   }
   if (wp.length) {
-    const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute("uv", new THREE.Float32BufferAttribute(wuv, 2)); wg.setIndex(wi); wg.computeVertexNormals();
-    const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughnessMap: sp.roughnessMap, roughness: 1, metalness: 0.15 })); wm.receiveShadow = true; group.add(wm); wm.userData.kind = "a harbour wall"; targets.push(wm);
+    const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute("uv", new THREE.Float32BufferAttribute(wuv, 2)); wg.setAttribute("color", new THREE.Float32BufferAttribute(wcol, 3)); wg.setIndex(wi); wg.computeVertexNormals();
+    const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughnessMap: sp.roughnessMap, roughness: 1, metalness: 0.15, vertexColors: true })); wm.receiveShadow = true; group.add(wm); wm.userData.kind = "a harbour wall"; targets.push(wm);
     const cg = new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.Float32BufferAttribute(cp, 3)); cg.setAttribute("uv", new THREE.Float32BufferAttribute(cuv, 2)); cg.setIndex(ci); cg.computeVertexNormals();
     const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.9, color: 0xe6e2da, side: THREE.DoubleSide })); cm.receiveShadow = true; cm.castShadow = true; group.add(cm);
   }
@@ -213,6 +219,7 @@ export function buildRealPlace(group, place, M, solids = []) {
           addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], LAND + 2.5, q[1]);
           const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, LAND + 4.95, q[1] - nz * 0.35, ry);
           addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, LAND + 4.85, q[1] - nz * 0.7, ry); void arm;
+          perches.push([q[0] - nx * 0.7, LAND + 4.97, q[1] - nz * 0.7]); // somewhere for a gull to sit
         }
       }
       if (Math.floor((d + 14) / 55) !== Math.floor((d + 13) / 55)) {
@@ -336,6 +343,9 @@ export function buildRealPlace(group, place, M, solids = []) {
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }
   void PLACE3D;
+  // open sea only (outside the land and outside any mapped river, lake or harbour water), for boats
+  place.waterAt = (x, z) => { const q = [x, z]; return !LR.some((bb) => inB(q, bb)) && !PR.some((bb) => inB(q, bb)) && !WR.some((bb) => inB(q, bb)); };
+  place.perches = perches;
   return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c]; const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
 function segDist(q, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dz) / l2)); return Math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dz * t); }

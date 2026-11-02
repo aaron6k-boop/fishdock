@@ -5,6 +5,7 @@
 import * as THREE from "three";
 import { layoutFor } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
+import { createWildlife } from "./wildlife.js";
 import { SHORE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
 
 // ---- shared shader pieces: noise and the sky's colour in any direction ----
@@ -388,6 +389,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   rain.frustumCulled = false; rain.visible = false; group.add(rain);
 
   let rainAmt = 0, wind = 0.3, windDir = [0.3, -1];
+  // gulls and a few boats at the coast (wildlife.js): where the anglers are, the water to put boats on, lamps to perch on
+  const spotsNow = real ? real.spots || [] : L?.spots || [];
+  const centre = spotsNow.length ? [spotsNow.reduce((a, q) => a + q.at[0], 0) / spotsNow.length, spotsNow.reduce((a, q) => a + q.at[2], 0) / spotsNow.length] : [0, -20];
+  const wildlife = pano ? null : createWildlife(group, { venue, waterAt: real ? real.waterAt : (x, z) => z < -25, perches: real ? real.perches || [] : [], centre, seed: Math.round(Math.abs(centre[0] * 13 + centre[1] * 7)) + 3 });
   // ---- conditions: worked out once (setEnv), then eased towards every frame, so a change of weather or light
   // comes in over a few seconds instead of jumping (the first one, as the view opens, is applied at once) ----
   let target = null, cur = null;
@@ -448,6 +453,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         for (const key of ["sunDir", "moonDir", "windDir"]) { if (cur[key].distanceTo(target[key]) > 1e-4) { cur[key].lerp(target[key], k); moved = true; } }
         if (moved) apply(cur);
       }
+      wildlife?.update(t, dt, { night: cur?.night ?? 0, swell: cur?.swell ?? 0.3 });
       if (rainAmt > 0.02) {
         const p = rainGeo.attributes.position, sp = (14 + rainAmt * 10) * dt, sx = -windDir[0] * wind * 6 * dt, sz = -windDir[1] * wind * 6 * dt;
         for (let i = 0; i < RAIN_N; i++) { let y = p.getY(i * 2) - sp; let x = p.getX(i * 2) + sx, z = p.getZ(i * 2) + sz; if (y < -1) { y = 25 + Math.random() * 5; x = (Math.random() - 0.5) * 60; z = (Math.random() - 0.5) * 60; } p.setXYZ(i * 2, x, y, z); p.setXYZ(i * 2 + 1, x + windDir[0] * wind * 0.3, y - 0.45 - rainAmt * 0.3, z + windDir[1] * wind * 0.3); }
