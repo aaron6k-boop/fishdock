@@ -1,7 +1,7 @@
 // GET /api/pano?spot=<id>  A real 360° photo taken near a documented FishDock mark, from Mapillary.
 //
 // - Needs MAPILLARY_TOKEN (a free Mapillary client token) as a server secret; the phone never sees it. Without it
-//   this answers 503 and the 3D view uses the map-data place instead.
+//   this answers { pano: null } and the 3D view uses the map-data place instead.
 // - Only FishDock's public, documented marks, never an arbitrary position. The nearest panorama within about 250 m
 //   is chosen; photos are CC BY-SA 4.0 and shown with the photographer's name and a link to the photo.
 // - Kept for 12 hours (Mapillary's image links are signed and expire).
@@ -44,8 +44,9 @@ export async function handlePano(request, env, now = Date.now(), deps = {}) {
     const url = new URL(request.url), id = url.searchParams.get("spot") || "";
     const mark = markFor(id);
     if (!mark) return err(404, "not_found", "That place isn't one of FishDock's documented marks.");
-    if (!env?.MAPILLARY_TOKEN) return err(503, "not_configured", "Real 360° photos aren't switched on yet.");
-    if (env.PANO_PUBLIC !== "1" && url.searchParams.get("preview") !== "1") return err(503, "not_public", "Real 360° photos aren't switched on yet.");
+    // switched off answers 200 with no photo (the 3D view just uses the map-built place; nothing to log as an error)
+    if (!env?.MAPILLARY_TOKEN) return json({ pano: null, off: "not_configured", message: "Real 360° photos aren't switched on yet." });
+    if (env.PANO_PUBLIC !== "1" && url.searchParams.get("preview") !== "1") return json({ pano: null, off: "not_public", message: "Real 360° photos aren't switched on yet." });
     if (env.DB) await ensureSchema(env.DB);
     const ctx = upstreamCtx(env.DB, now, deps);
     const dLat = 250 / 111320, dLon = 250 / (111320 * Math.cos((mark.lat * Math.PI) / 180));

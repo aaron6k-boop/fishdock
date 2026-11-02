@@ -9,7 +9,7 @@ const MODES = [["first", "First person"], ["third", "Third person"], ["spectator
 
 export default function Stage3D({ spotId = null, placeName = "", venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase }) {
   const w = useRef(null);
-  const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
+  const [menu, setMenu] = useState(false), [mode, setMode] = useState("third"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
@@ -23,7 +23,8 @@ export default function Stage3D({ spotId = null, placeName = "", venue, anglers,
   };
   return (
     <div className="stage3d">
-      <World3D ref={w} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+      {/* third person to start: on a phone it shows the angler, rod, line and water together (first person is in the menu) */}
+      <World3D ref={w} startMode="third" spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
         onPhase={(id, phase, info) => { onPhase?.(id, phase, info); if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); } }}
         onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (a?.local || (mode === "spectator" && watch === id)) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
         <div className="fs-overlay">{children}</div>

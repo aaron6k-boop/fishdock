@@ -8,7 +8,7 @@ import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
 import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.js";
 
-const World3D = forwardRef(function World3D({ spotId = null, placeName = "", onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
@@ -37,7 +37,8 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", onT
         const osm = await r.json();
         const { buildPlace } = await import("../lib/world3d/osmPlace.js");
         const place = buildPlace(osm, lat, lon, venue);
-        if (!gone) setReal(place.grid && place.spots.length === 4 ? place : null);
+        // only a layout that passes the check (anglers at the mark, water in front); otherwise the labelled drawing
+        if (!gone) setReal(place.grid && place.spots.length === 4 && place.check?.ok ? place : null);
       } catch { if (!gone) setReal(null); }
     })();
     return () => { gone = true; };
@@ -61,6 +62,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", onT
         W.current = w;
         w.setNow(() => props.current.now());
         w.setAnglers(props.current.anglers);
+        if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
         w.onFrame(({ outs, view }) => {
           setHeading((h) => { const deg = Math.round(((props.current.facing + (view.yaw * 180) / Math.PI) % 360 + 360) % 360); return Math.abs(deg - h) >= 2 ? deg : h; });
           for (const [id, o] of Object.entries(outs)) {

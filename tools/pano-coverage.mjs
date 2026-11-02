@@ -17,7 +17,7 @@ let photoOk = null;
 for (const id of ids) {
   const r = await fetch(`${base}/api/pano?spot=${encodeURIComponent(id)}&preview=1`, { headers: { "x-fishdock": "1", accept: "application/json" } });
   const b = await r.json().catch(() => ({}));
-  if (r.status === 503) { console.log(`Stopped: ${b.message || "not configured"} (is MAPILLARY_TOKEN set on this site?)`); process.exit(1); }
+  if (b.off === "not_configured") { console.log(`Stopped: ${b.message} (is MAPILLARY_TOKEN set on this site?)`); process.exit(1); }
   if (r.status === 200 && b.pano) {
     const p = b.pano;
     if (photoOk === null) {

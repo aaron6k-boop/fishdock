@@ -37,7 +37,8 @@ const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { win
 /** A time today that gives the chosen light at this place, found from the real sun. */
 
 export default function TryLive({ initialPlace, initialSpecies }) {
-  const [placeId, setPlaceId] = useState(TRY_PLACES.includes(initialPlace) ? initialPlace : GORLESTON.id);
+  // the chips offer the demo places, but a link to any documented mark opens that mark (never a different place)
+  const [placeId, setPlaceId] = useState(initialPlace && (initialPlace === GORLESTON.id || spotById(initialPlace)) ? initialPlace : GORLESTON.id);
   const place = placeOf(placeId);
   const fresh = place.kind !== "sea";
   const fishList = useMemo(() => SPECIES.filter((s) => (fresh ? s.type !== "sea" : s.type !== "fresh")).sort((a, b) => (hasArt(b.id) ? 1 : 0) - (hasArt(a.id) ? 1 : 0)), [fresh]);

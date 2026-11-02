@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildPlace, unrle, landFromCoast, GROUND } from "../src/lib/world3d/osmPlace.js";
+import { buildPlace, unrle, landFromCoast, GROUND, checkLayout } from "../src/lib/world3d/osmPlace.js";
 import { handlePlace3d, markFor } from "../server/place3d.js";
 import { handlePano, pickPano } from "../server/pano.js";
 import { setup, stubFetch } from "./helpers/fishdock.js";
@@ -29,6 +29,22 @@ test("Gorleston from real map data: the sea and the river are water, the town is
     assert.equal(s.at[1], GROUND.land);
   }
   assert.match(L.attribution, /OpenStreetMap/);
+  assert.deepEqual(L.check, { ok: true, why: [] }, "real Gorleston passes the layout check");
+});
+
+test("the layout check: anglers away from the mark, or looking at land or across a pier, mean the drawn place is used", () => {
+  const water = (q) => q[1] < 0; // water to the north (z < 0)
+  const spot = (name, x, z, face) => ({ name, at: [x, 2.2, z], face });
+  const good = { piers: [], spots: [spot("a", 0, 1, 0), spot("b", 10, 1, 0), spot("c", -10, 1, 0), spot("d", 20, 1, 0)] };
+  assert.deepEqual(checkLayout(good, water), { ok: true, why: [] });
+  const far = { piers: [], spots: good.spots.map((s) => ({ ...s, at: [s.at[0], 2.2, 300] })) };
+  assert.equal(checkLayout(far, (q) => q[1] < 290).ok, false, "300 m from the mark");
+  assert.match(checkLayout(far, (q) => q[1] < 290).why[0], /300 m from the mark/);
+  const inland = { piers: [], spots: good.spots.map((s) => ({ ...s, face: Math.PI })) };
+  assert.match(checkLayout(inland, water).why[0], /no open water ahead/, "facing inland");
+  const pier = { piers: [{ line: [[-50, -18], [50, -18]], width: 8 }], spots: good.spots };
+  assert.match(checkLayout(pier, water).why[0], /no open water ahead/, "a pier deck straight ahead");
+  assert.equal(checkLayout({ piers: [], spots: good.spots.slice(0, 3) }, water).ok, false, "fewer than four spots");
 });
 
 test("the coastline closes into land on its left, round the edge of the area", () => {
@@ -56,7 +72,7 @@ test("the place route: only FishDock's documented marks, OpenStreetMap's answer 
 test("360° photos: off without a Mapillary token, hidden until made public; otherwise the nearest panorama, credited", async (t) => {
   const s = setup();
   const c = s.call(handlePano, "/api/pano");
-  assert.equal((await c("GET", "?spot=gorleston-south-pier")).status, 503);
+  { const off = await c("GET", "?spot=gorleston-south-pier"); assert.equal(off.status, 200); assert.equal(off.body.pano, null); assert.equal(off.body.off, "not_configured"); }
   const im = (id, lon, lat, pano = true) => ({ id, is_pano: pano, thumb_2048_url: `https://scontent.example/${id}.jpg`, computed_compass_angle: 95, computed_geometry: { type: "Point", coordinates: [lon, lat] }, captured_at: 1693526400000, creator: { username: "pierphotos" } });
   const answer = { data: [im("far", 1.7383, 52.575), im("flat", 1.7384, 52.5721, false), im("near", 1.7385, 52.5722), im("nearer", 1.7383, 52.57211)] };
   const p = pickPano(answer, 52.5721, 1.7383);
@@ -64,7 +80,7 @@ test("360° photos: off without a Mapillary token, hidden until made public; oth
   assert.equal(pickPano({ data: [im("far", 1.7383, 52.58)] }, 52.5721, 1.7383), null);
   s.env.MAPILLARY_TOKEN = "MLY|test";
   const calls = stubFetch(t, [[/graph\.mapillary\.com\/images\?access_token=MLY%7Ctest&.*is_pano=true/, () => answer]]);
-  assert.equal((await c("GET", "?spot=gorleston-south-pier")).status, 503, "hidden until PANO_PUBLIC is set");
+  { const hid = await c("GET", "?spot=gorleston-south-pier"); assert.equal(hid.body.pano, null, "hidden until PANO_PUBLIC is set"); assert.equal(hid.body.off, "not_public"); }
   const r = await c("GET", "?spot=gorleston-south-pier&preview=1");
   assert.equal(r.status, 200, r.text); assert.equal(r.body.pano.id, "nearer");
   s.env.PANO_PUBLIC = "1";
