@@ -3,6 +3,7 @@
 // double tap to face your rod again. A small compass, camera modes, Look at my rod and Watch a friend. It is drawn,
 // not filmed: the label says it's a representative 3D scene, never the real place or a camera.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { spotById } from "../data/spots.js";
 import { Icon } from "./ui.jsx";
 import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
@@ -36,7 +37,11 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
         const [lat, lon] = (r.headers.get("x-mark") || "").split(",").map(Number);
         const osm = await r.json();
         const { buildPlace } = await import("../lib/world3d/osmPlace.js");
-        const place = buildPlace(osm, lat, lon, venue);
+        // a mark whose listed position is approximate may use the nearest bank within 400 m (and the label says so)
+        // (only when the server used that listed position: some marks have a checked position kept on the server)
+        const listed = spotById(spotId);
+        const approx = listed?.coordsVerified === false && Math.abs(listed.lat - lat) < 1e-4 && Math.abs(listed.lon - lon) < 1e-4;
+        const place = buildPlace(osm, lat, lon, venue, { approx });
         // only a layout that passes the check (anglers at the mark, water in front); otherwise the labelled drawing
         if (!gone) setReal(place.grid && place.spots.length === 4 && place.check?.ok ? place : null);
       } catch { if (!gone) setReal(null); }
@@ -115,7 +120,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
   useImperativeHandle(ref, () => ({
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
-    focus: (id) => W.current?.focus(id), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),
+    focus: (id) => W.current?.focus(id), follow: (id, sec) => W.current?.follow(id, sec), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),
     get mode() { return mode; },
   }), [mode]);
 
@@ -126,7 +131,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
       {failed ? <div className="w3d-fail">This browser can't draw the 3D view. The photo view still works.</div> : null}
       <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b>N</b></span><i>{compassPoint(heading)}</i></div>
       {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
-      <div className="w3d-label">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and buildings from OpenStreetMap, drawn in 3D · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</div>
+      <div className="w3d-label">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and buildings from OpenStreetMap, drawn in 3D{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</div>
       {children}
     </div>
   );

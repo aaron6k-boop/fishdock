@@ -14,6 +14,7 @@ export function autoQuality3d() {
   try { const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4; if (mem <= 2 || cores <= 4) return "performance"; if (mem >= 8 && cores >= 8) return "high"; } catch { /* ignore */ }
   return "balanced";
 }
+export const HOME_PITCH = -0.09;
 export const CAMERA_MODES = [
   { id: "first", label: "First person" }, { id: "third", label: "Third person" }, { id: "spectator", label: "Spectator" },
   { id: "cinematic", label: "Cinematic" }, { id: "free", label: "Free look" },
@@ -40,12 +41,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const look = createLook({ pitch: -0.12 });
   let homeFor = null;
   let mode = "first", focusId = null, localId = null, anglers = new Map(), envState = { swell: 0.3, wind: 0.3, windDir: [0.3, -1], kind: 0 };
+  let followId = null, followUntil = 0, steering = false; // watching another angler's catch; the camera steering itself
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
 
   // ---- splashes (droplets) and rings on the water ----
   const DROPS = 260, dropPos = new Float32Array(DROPS * 3), dropV = new Float32Array(DROPS * 3), dropLife = new Float32Array(DROPS);
   const dropGeo = new THREE.BufferGeometry(); dropGeo.setAttribute("position", new THREE.BufferAttribute(dropPos, 3));
-  const drops = new THREE.Points(dropGeo, new THREE.PointsMaterial({ color: 0xf2f6f8, size: 0.07, transparent: true, opacity: 0.9, depthWrite: false })); drops.frustumCulled = false; scene.add(drops);
+  // round, soft droplets (a radial sprite), not square points
+  const dropTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d"); const r = g.createRadialGradient(16, 16, 0, 16, 16, 16); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.45, "rgba(240,248,252,.85)"); r.addColorStop(1, "rgba(240,248,252,0)"); g.fillStyle = r; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
+  const drops = new THREE.Points(dropGeo, new THREE.PointsMaterial({ color: 0xf2f6f8, size: 0.09, map: dropTex, transparent: true, opacity: 0.95, depthWrite: false, alphaTest: 0.02 })); drops.frustumCulled = false; scene.add(drops);
   let dropHead = 0;
   function splash(at, size = 0.6) {
     const n = Math.round(30 * size + 10);
@@ -77,10 +81,24 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     for (const [id, x] of anglers) if (!seen.has(id)) { x.a.dispose(); anglers.delete(id); }
     if (!focusId || !anglers.has(focusId)) focusId = localId || [...anglers.keys()][0] || null;
     const me = anglers.get(localId) || anglers.get(focusId);
-    if (me && homeFor !== me.a.id) { homeFor = me.a.id; const s = spotOf(me.spotId); look.setHome(s.face, -0.12); look.aim(s.face, -0.12); }
+    // start looking out the way the spot faces, a little down towards where the line goes in
+    if (me && homeFor !== me.a.id) { homeFor = me.a.id; const s = spotOf(me.spotId); look.setHome(s.face, HOME_PITCH); look.aim(s.face, HOME_PITCH); }
   }
 
   // ---- camera ----
+  // nothing the camera may pass through: walls, decks, buildings (thin things like railings are left out) and the
+  // ground under it; a ray from the angler's head to where the camera wants to be stops short of the first one
+  const ray = new THREE.Raycaster(), solids = env.solids || [];
+  for (const m of solids) m.updateMatrixWorld(true);
+  const pivot = new THREE.Vector3(), toCam = new THREE.Vector3();
+  function unblocked(from, want) {
+    toCam.subVectors(want, from); const d = toCam.length(); if (d < 0.01 || !solids.length) return want;
+    ray.set(from, toCam.multiplyScalar(1 / d)); ray.far = d + 0.35;
+    const hit = ray.intersectObjects(solids, false)[0];
+    const out = hit ? from.clone().addScaledVector(toCam, Math.max(0.35, hit.distance - 0.35)) : want.clone();
+    out.y = Math.max(out.y, (env.floorAt ? env.floorAt(out.x, out.z) : 0) + 0.6);
+    return out;
+  }
   let camPos = new THREE.Vector3(0, L.deck + 1.65, 0), camTarget = null, cineShot = null, cineSince = 0, lastPhaseKey = "";
   function updateCamera(t, dt) {
     look.step(dt);
@@ -88,14 +106,28 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const out = focus?.out;
     let pos = camPos.clone();
     let yaw = look.yaw, pitch = look.pitch;
+    // the camera steers itself (unless you've turned it in the last few seconds): to follow your own fish while it's
+    // fought and landed in first or third person, or another angler's catch you chose to watch
+    const idle = performance.now() - look.touched > 2500;
+    const watched = followId && anglers.get(followId)?.out;
+    let steerTo = null;
+    if (watched && t < followUntil) {
+      const wo = watched, busy = wo.phase === "hooked" || wo.phase === "landing" || wo.phase === "bite";
+      steerTo = busy ? (wo.fishAt || wo.rig || wo.tip) : wo.at.clone().add(new THREE.Vector3(0, 1.2, 0));
+      if (wo.phase === "landing" && wo.landed) followUntil = Math.min(followUntil, t + 2.5);
+    } else if (followId && t >= followUntil) followId = null;
+    else if (out && focus?.a.local && (mode === "first" || mode === "third") && (out.phase === "hooked" || out.phase === "landing") && !(out.phase === "landing" && out.landed)) {
+      steerTo = out.phase === "landing" ? (out.fishAt || out.rig) : (out.rig ? out.tip.clone().lerp(out.rig, 0.55) : null);
+    }
     if (!out) { camera.position.copy(pos); }
     else if (mode === "first" || mode === "free") {
       pos.copy(out.eye);
       if (!reduceMotion) { pos.y += Math.sin(t * 1.4) * 0.008; pos.x += Math.sin(t * 0.7) * 0.004; } // breathing
     } else if (mode === "third" || mode === "spectator") {
-      // behind and a little to the side of the angler, orbiting as you drag
+      // behind and a little to the side of the angler, orbiting as you drag; never inside a wall or a building
       const r = 4.2, h = 1.9;
       pos.set(out.at.x - Math.sin(yaw) * r + Math.cos(yaw) * 0.8, out.at.y + h, out.at.z + Math.cos(yaw) * r + Math.sin(yaw) * 0.8);
+      pivot.copy(out.at).add(new THREE.Vector3(0, 1.5, 0)); pos = unblocked(pivot, pos);
     } else if (mode === "cinematic") {
       // a shot for the moment: the rod tip at a bite, side on for a fight, down at the water for a landing
       const key = `${out.phase}|${out.info.since}`;
@@ -105,14 +137,20 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       else if (out.phase === "hooked") { const w = Math.sin((t - cineSince) * 0.15) * 0.8; pos.set(out.at.x - fx * 3.2 + side[0] * (1.6 + w), out.at.y + 2.8, out.at.z - fz * 3.2 + side[1] * (1.6 + w)); const mid = out.at.clone().lerp(out.cast, 0.45); mid.y = 0; const l = lookAt(pos.toArray(), mid.toArray()); yaw = l.yaw; pitch = l.pitch; }
       else if (out.phase === "landing") { const tgt = out.fishAt || out.tip; pos.set(out.at.x - fx * 1.6 + side[0] * 1.4, out.at.y + 2.1, out.at.z - fz * 1.6 + side[1] * 1.4); const l = lookAt(pos.toArray(), tgt.toArray()); yaw = l.yaw; pitch = l.pitch; }
       else { const a = out.face + Math.sin((t - cineSince) * 0.05) * 0.5; pos.set(out.at.x - Math.sin(a) * 6, out.at.y + 2.6, out.at.z + Math.cos(a) * 6); yaw = a; pitch = -0.15; }
+      pivot.copy(out.at).add(new THREE.Vector3(0, 1.5, 0)); pos = unblocked(pivot, pos);
       camPos.lerp(pos, 1 - Math.exp(-dt * 1.5)); pos = camPos.clone();
       if (!cineShot) cineShot = { yaw, pitch };
       cineShot.yaw = wrap(cineShot.yaw + wrap(yaw - cineShot.yaw) * (1 - Math.exp(-dt * 2))); cineShot.pitch += (pitch - cineShot.pitch) * (1 - Math.exp(-dt * 2));
       yaw = cineShot.yaw; pitch = cineShot.pitch;
     }
-    if (mode !== "cinematic") { camPos.lerp(pos, mode === "first" || mode === "free" ? 1 : 1 - Math.exp(-dt * 6)); cineShot = null; }
+    // switching who you watch glides the camera across rather than cutting
+    if (mode !== "cinematic") { camPos.lerp(pos, mode === "first" || mode === "free" ? 1 : 1 - Math.exp(-dt * (mode === "spectator" ? 2.5 : 6))); cineShot = null; }
+    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(-1.2, Math.min(0.6, l.pitch))); steering = true; }
+    else if (steering && idle && !steerTo) { steering = false; const h = look.home; if (mode === "first" || mode === "third") look.aim(h.yaw, h.pitch); }
+    yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
     camera.position.copy(camPos);
-    camera.fov = look.fov; camera.updateProjectionMatrix();
+    // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
+    camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1); camera.updateProjectionMatrix();
     const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     camera.lookAt(camera.position.clone().add(d));
     for (const [id, x] of anglers) x.a.setFirstPerson((mode === "first" || mode === "free") && id === (focus?.a.id));
@@ -125,9 +163,21 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   document.addEventListener("visibilitychange", vis);
   function frame(ts) {
     raf = requestAnimationFrame(frame);
-    if (!visible) return;
+    if (!visible || film) return;
     const dt = Math.min(0.1, (ts - (last || ts)) / 1000); last = ts;
-    const t = (ts - clock0) / 1000, now = nowFn();
+    tick((ts - clock0) / 1000, nowFn(), dt);
+  }
+  // test hook (never used by the app): a test sets window.__fdFilm before loading, then freezes the clock and steps it
+  // a set time per frame, so an animation can be filmed exactly even where frames are slow (software graphics)
+  let film = null;
+  if (typeof window !== "undefined" && window.__fdFilm) {
+    window.__fdWorld = {
+      freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
+      step(ms) { if (!film) return; const n = Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
+      get mode() { return mode; },
+    };
+  }
+  function tick(t, now, dt, draw = true) {
     const t0 = performance.now();
     const outs = {};
     for (const [id, x] of anglers) { x.out = x.a.frame(t, now, dt || 0.016, envState); outs[id] = x.out; }
@@ -143,9 +193,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     while (ripples.length && ripples[0][2] > 6) ripples.shift();
     env.setRipples(ripples.map((r) => [r[0], r[1], r[2], r[3] * Math.max(0, 1 - r[2] / 6)]));
     env.update(t, dt, camera);
-    renderer.render(scene, camera);
+    if (draw) renderer.render(scene, camera);
     const spent = performance.now() - t0;
-    slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
+    if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
     onFrame?.({ outs, view, slow, mode, focusId, localId });
   }
   function resize() {
@@ -161,6 +211,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     setNow(f) { nowFn = f || Date.now; },
     setEnv({ light, cond, facing = 180 } = {}) {
       const s = env.setEnv({ light, cond, facing });
+      renderer.toneMappingExposure = 1 + 0.3 * s.dusk + 0.45 * s.night; // eyes adapt: dusk and night aren't black
       envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind };
       return s;
     },
@@ -172,6 +223,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     lookAtRod() { const me = anglers.get(localId) || anglers.get(focusId); if (me?.out) { const l = lookAt(camera.position.toArray(), me.out.tip.clone().lerp(me.out.cast, 0.15).toArray()); look.aim(l.yaw, l.pitch); } },
     lookAtAngler(id) { const x = anglers.get(id); if (x?.out) { const tgt = x.out.at.clone(); tgt.y += 1.2; const l = lookAt(camera.position.toArray(), tgt.toArray()); look.aim(l.yaw, l.pitch); } },
     lookAtFish(id) { const x = anglers.get(id); const p = x?.out?.fishAt || x?.out?.tip; if (p) { const l = lookAt(camera.position.toArray(), p.toArray()); look.aim(l.yaw, l.pitch); } },
+    /** keep turning to watch another angler (their rod, the fight and the landing) for a while; dragging takes over */
+    follow(id, seconds = 60) { if (!anglers.has(id)) return; followId = id; followUntil = (performance.now() - clock0) / 1000 + seconds; },
+    get followId() { return followId; },
     onFrame(f) { onFrame = f; },
     resize,
     /** the screen position (0..1) of a world point, or null when behind the camera */

@@ -48,7 +48,9 @@ button.fs-chip { cursor: pointer; }
 
 /* the close-up of a landed fish */
 /* the close-up comes once the fish is swung in; it sits low so the scene stays in view above it */
-.fs-cardwrap { position: absolute; inset: 0; z-index: 5; display: grid; place-items: end center; padding: 14px; background: linear-gradient(to bottom, #05090c00 30%, #05090c55 55%, #05090cc0); animation: fs-fade .5s ease both; }
+/* the catch card at the top, with a light shade behind it only up there: the fish and the water below stay clear */
+.fs-cardwrap { position: absolute; inset: 0; z-index: 5; display: grid; place-items: start center; padding: calc(max(10px, env(safe-area-inset-top)) + 50px) 14px 14px; background: linear-gradient(to top, #05090c00 55%, #05090c40 75%, #05090ca0); animation: fs-fade .5s ease both; pointer-events: none; }
+.fs-cardwrap .catch-card { pointer-events: auto; max-height: 40%; }
 @keyframes fs-fade { from { opacity: 0; } }
 .catch-card { position: relative; width: min(520px, 100%); display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: #0d171ef2; border: 1px solid #ffffff1c; box-shadow: 0 24px 60px #000c; color: var(--text); animation: fs-rise .55s cubic-bezier(.2, 1.1, .3, 1) both; }
 @keyframes fs-rise { from { transform: translateY(18px) scale(.96); opacity: 0; } }
@@ -307,14 +309,19 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .w3d-compass span { position: absolute; inset: 3px; display: grid; justify-items: center; transition: transform .15s linear; }
 .w3d-compass span b { font-size: 10px; color: #ff6b5e; line-height: 1; }
 .w3d-compass i { font-style: normal; font-size: 10px; font-weight: 700; margin-top: 10px; }
-.w3d-label { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom)); width: max-content; max-width: min(92vw, 640px); text-align: center; font-size: 10.5px; line-height: 1.3; color: #dbe6ec; text-shadow: 0 1px 2px #000; pointer-events: none; opacity: .85; }
+/* what the place is (and its credits): under the top bar, out of the way of the fishing controls at the bottom */
+.w3d-label { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 86px); width: max-content; max-width: min(76vw, 560px); text-align: center; font-size: 10.5px; line-height: 1.3; color: #dbe6ec; text-shadow: 0 1px 2px #000; pointer-events: none; opacity: .8; }
 .w3d-label b { color: var(--action); }
 .w3d-tools { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: auto; }
 .immersive.ui-hidden .w3d-tools, .immersive.ui-hidden .w3d-compass { opacity: 0; pointer-events: none; }
 .fs-btn.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: color-mix(in srgb, var(--action) 60%, transparent); }
 .cam-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: #0a141be6; border: 1px solid #ffffff26; }
 .cam-menu button { text-align: left; }
-.w3d-card { position: absolute; z-index: 6; left: 0; right: 0; bottom: 0; padding: 0 12px calc(14px + env(safe-area-inset-bottom)); pointer-events: none; }
+/* the catch card sits under the top bar: the landed fish (in the hands, or the net) is in the lower part of the view */
+.w3d-card { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 50px); padding: 0 12px; pointer-events: none; display: flex; justify-content: center; }
+.w3d-card .catch-card.compact { max-height: 132px; }
+.w3d-watch { pointer-events: auto; cursor: pointer; border-color: #7ee8de88; font: inherit; font-size: 13px; }
+.w3d-watch b { color: #7ee8de; }
 .w3d-card .catch-card { pointer-events: auto; }
 .w3d-toasts { position: absolute; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 52px); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
 .w3d-toast { padding: 7px 14px; border-radius: 999px; background: #0a141bd9; border: 1px solid #ffffff26; color: #fff; font-size: 13px; font-weight: 650; animation: fs-pop .3s ease both; white-space: nowrap; }

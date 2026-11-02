@@ -24,7 +24,11 @@ const windowTex = () => tex((g, n) => {
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 const COL_OF = [[0.25, 0.3, 0.28], [0.52, 0.52, 0.46], [0.84, 0.76, 0.56], [0.36, 0.5, 0.26]];
 
-export function buildRealPlace(group, place, M) {
+// what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
+const NEAR_SOLID = 45;
+
+export function buildRealPlace(group, place, M, solids = []) {
+  const spots = place.spots || [], nearSpot = (x, z, r = NEAR_SOLID) => spots.some((sp) => Math.hypot(x - sp.at[0], z - sp.at[2]) < r);
   const xs = place.grid.xs, n = xs.length, cls = unrle(place.grid.cls, n * n);
   // ---- the ground ----
   const h = new Float32Array(n * n);
@@ -62,7 +66,7 @@ export function buildRealPlace(group, place, M) {
 
   // ---- harbour walls: upright faces along the real water's edge (not on beaches) ----
   const H = PLACE3D.box, cAt = (x, z) => { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; };
-  const wp = [], wi = [], wuv = [];
+  const wp = [], wi = [], wuv = [], cwp = [], cwi = [];
   for (const ring of [...(place.land || []), ...(place.water || [])]) {
     for (let k = 0; k < ring.length; k++) {
       const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length];
@@ -72,6 +76,7 @@ export function buildRealPlace(group, place, M) {
       if (cAt(mx + nx, mz + nz) === 2 || cAt(mx - nx, mz - nz) === 2) continue; // a beach: no wall
       const o = wp.length / 3;
       wp.push(x1, GROUND.water - 0.6, z1, x2, GROUND.water - 0.6, z2, x2, GROUND.land + 0.05, z2, x1, GROUND.land + 0.05, z1);
+      if (nearSpot(mx, mz)) { const c = cwp.length / 3; cwp.push(x1, GROUND.water - 0.6, z1, x2, GROUND.water - 0.6, z2, x2, GROUND.land + 0.05, z2, x1, GROUND.land + 0.05, z1); cwi.push(c, c + 1, c + 2, c, c + 2, c + 3); }
       wuv.push(0, 0, len / 4, 0, len / 4, 1, 0, 1);
       wi.push(o, o + 1, o + 2, o, o + 2, o + 3);
     }
@@ -80,9 +85,10 @@ export function buildRealPlace(group, place, M) {
     const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute("uv", new THREE.Float32BufferAttribute(wuv, 2)); wg.setIndex(wi); wg.computeVertexNormals();
     const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: M.stone.map, color: 0x8a867c, roughness: 0.95, side: THREE.DoubleSide })); wm.receiveShadow = true; group.add(wm);
   }
+  if (cwp.length) solids.push(collider(cwp, cwi));
 
   // ---- buildings: walls and flat roofs, all in one mesh ----
-  const bp = [], bc = [], bi = [], bu = [];
+  const bp = [], bc = [], bi = [], bu = [], cbp = [], cbi = [];
   const palette = [[0.86, 0.82, 0.74], [0.78, 0.7, 0.6], [0.9, 0.88, 0.84], [0.7, 0.6, 0.52], [0.82, 0.76, 0.66], [0.64, 0.6, 0.58]];
   place.buildings.forEach((b, n2) => {
     const ring = b.ring.slice(); if (ring.length < 3) return;
@@ -99,7 +105,11 @@ export function buildRealPlace(group, place, M) {
     const tri = THREE.ShapeUtils.triangulateShape(ring.map(([x, z]) => new THREE.Vector2(x, z)), []), o = bp.length / 3;
     for (const [x, z] of ring) { bp.push(x, top, z); bc.push(...(b.h > 9 ? c.map((v) => v * 0.7) : roof)); bu.push(0.03, 0.03); }
     for (const [a, b2, c2] of tri) bi.push(o + a, o + c2, o + b2);
+    if (nearSpot(ring[0][0], ring[0][1], NEAR_SOLID + 30)) {
+      for (let k = 0; k < ring.length; k++) { const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], c = cbp.length / 3; cbp.push(x1, base, z1, x2, base, z2, x2, top, z2, x1, top, z1); cbi.push(c, c + 2, c + 1, c, c + 3, c + 2); }
+    }
   });
+  if (cbp.length) solids.push(collider(cbp, cbi));
   if (bp.length) {
     const bg = new THREE.BufferGeometry(); bg.setAttribute("position", new THREE.Float32BufferAttribute(bp, 3)); bg.setAttribute("color", new THREE.Float32BufferAttribute(bc, 3)); bg.setAttribute("uv", new THREE.Float32BufferAttribute(bu, 2)); bg.setIndex(bi); bg.computeVertexNormals();
     const wt = windowTex(); place.windowTex = wt;
@@ -117,6 +127,7 @@ export function buildRealPlace(group, place, M) {
         const ang = Math.atan2(z2 - z1, x2 - x1), cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
         const deck = new THREE.Mesh(new THREE.BoxGeometry(len + p.width * 0.5, p.h - GROUND.water + 0.5, p.width), mat);
         deck.position.set(cx, (p.h + GROUND.water - 0.5) / 2, cz); deck.rotation.y = -ang; deck.castShadow = deck.receiveShadow = true; group.add(deck);
+        if (nearSpot(cx, cz, NEAR_SOLID + len / 2)) solids.push(deck);
         if (p.kind === "pier") for (const side of [-1, 1]) {
           const r = new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 0.06), M.rail); r.position.set(cx + Math.sin(ang) * side * (p.width / 2 - 0.15), p.h + 1.05, cz - Math.cos(ang) * side * (p.width / 2 - 0.15)); r.rotation.y = -ang; group.add(r);
           for (let t = 0; t < len; t += 2.5) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.05, 0.07), M.rail); const f = t / len; post.position.set(x1 + (x2 - x1) * f + Math.sin(ang) * side * (p.width / 2 - 0.15), p.h + 0.52, z1 + (z2 - z1) * f - Math.cos(ang) * side * (p.width / 2 - 0.15)); group.add(post); }
@@ -127,6 +138,14 @@ export function buildRealPlace(group, place, M) {
       const sh = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
       const geo = new THREE.ExtrudeGeometry(sh, { depth: p.h - GROUND.water, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, GROUND.water, 0);
       const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; group.add(m);
+      if (ring.some(([x, z]) => nearSpot(x, z, NEAR_SOLID + 60))) solids.push(m);
     }
   }
+  // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
+  return (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : H_OF[c]; };
+}
+// a mesh only for the camera's ray (never drawn)
+function collider(p, i) {
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); g.setIndex(i); g.computeBoundingSphere();
+  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
 }

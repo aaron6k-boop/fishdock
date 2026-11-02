@@ -202,3 +202,43 @@ test("the live connection is checked by origin: a page elsewhere can't open a pa
   const r = await h.c("GET", `/${code}/ws?m=x`, { headers: { upgrade: "websocket" }, origin: "https://evil.example", fishdock: false });
   assert.equal(r.status, 403);
 });
+
+test("only the host can use the host's controls, whatever a guest's phone sends", async (t) => {
+  const h = harness(t);
+  const { code, member, secret } = (await start(h.c)).body;
+  const host = await h.sock(code, member.key);
+  const j = (await h.c("POST", `/${code}/join`, { body: { secret, name: "James", role: "angler" } })).body.member;
+  const james = await h.sock(code, j.key);
+  const before = JSON.stringify((await h.c("GET", `/${code}?s=${secret}`)).body);
+  for (const m of [{ t: "kick", who: member.id }, { t: "assign", who: member.id, spot: 3 }, { t: "settings", locked: true, codeOn: false, chatOn: false, voiceOn: false, anglersOn: false, light: "night" }, { t: "newLink" }, { t: "challenge", kind: "biggest", minutes: 60 }, { t: "close" }]) await james.send(m);
+  assert.equal(JSON.stringify((await h.c("GET", `/${code}?s=${secret}`)).body), before, "nothing about the party changed");
+  assert.equal((await h.c("GET", `/${code}?s=${secret}`)).status, 200, "the old link still works: no new link was made");
+  assert.ok(!host.got.some((m) => m.t === "kicked" || m.t === "closed"));
+  assert.ok(!james.got.some((m) => m.t === "settings" && m.secret), "a guest never receives the invite secret");
+  // and a guest can't fish as someone else: events are always theirs
+  await james.send({ t: "event", ev: { type: "cast", cid: "x1", who: member.id } });
+  assert.equal(host.last("event").ev.who, james.member);
+});
+
+test("asking about codes, joining and starting parties are limited per connection", async (t) => {
+  const h = harness(t);
+  const { code, secret } = (await start(h.c)).body;
+  let last;
+  for (let i = 0; i <= PARTY.lookupsPerMinute; i++) last = await h.c("GET", `/ZZZZZ${"23456789ABCDEFGHJKMNPQRSTUVWXYZ"[i % 31]}?via=code`);
+  assert.equal(last.status, 429, "guessing codes is slowed down");
+  for (let i = 0; i <= PARTY.joinsPerMinute; i++) last = await h.c("POST", `/${code}/join`, { body: { secret: `wrong${i}xxxxxx`, name: "x" } });
+  assert.equal(last.status, 429, "guessing invite secrets is slowed down");
+  h.advance?.(70e3);
+});
+
+test("a party's saved record can't grow without limit: reports are capped, and so is everyone who ever joined", async (t) => {
+  const room = new PartyRoom(null), now = Date.now();
+  const host = await room.init({ code: "ABCDEF", mode: "virtual", venue: "pier", name: "H", hours: 2 }, now);
+  const g = await room.join({ secret: room.s.secret, name: "G", role: "spectator" }, now);
+  for (let i = 0; i < PARTY.maxReports + 50; i++) room.message(g.member.id, { t: "report", who: host.id, reason: `r${i}` }, now + i * 1000);
+  assert.ok(room.s.reports.length <= PARTY.maxReports, `${room.s.reports.length} reports kept`);
+  let full = 0;
+  for (let i = 0; i < PARTY.maxEverMembers + 5; i++) { const r = await room.join({ secret: room.s.secret, name: `p${i}`, role: "spectator" }, now); if (r.error === "full") full++; else room.s.members[r.member.id].left = true; }
+  assert.ok(Object.keys(room.s.members).length <= PARTY.maxEverMembers && full > 0);
+  const codes = Array.from({ length: 2000 }, makeCode); assert.ok(codes.every(validCode));
+});

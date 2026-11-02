@@ -65,6 +65,20 @@ const FIGHT = {
 const FIGHT_BASE = { pull: 1, tempo: 1, erratic: 0.4, splashy: 0.3, flex: 1, long: 1, flat: false, ray: false, eel: false, headRight: false };
 export const fightProfile = (species) => ({ ...FIGHT_BASE, ...(FIGHT[species] || {}), species: FIGHT[species] ? species : null });
 
+/** How a species moves in the 3D fight, from its profile: how deep, how wide and fast its runs, whether it leaps,
+ *  how heavily it pulls, and whether the tip pumps (eels). */
+export function fightStyle(p) {
+  const diver = !!(p.ray || p.eel || (p.pull >= 1.15 && p.splashy < 0.5));
+  return {
+    depth: p.ray ? 2.6 : diver ? 2.0 : p.flat ? 1.2 : p.splashy >= 0.55 ? 0.35 : 0.9,
+    runWidth: p.ray ? 0.35 : p.flat ? 1.35 : 0.6 + 0.8 * (p.erratic ?? 0.4),
+    runSpeed: p.flat ? 0.6 : p.ray ? 0.5 : 0.8 + 0.6 * (p.erratic ?? 0.4),
+    leaps: p.splashy >= 0.8 && !p.flat && !p.eel,
+    heavy: p.ray ? 1.3 : diver ? 1.12 : 1,
+    pump: !!p.eel,
+  };
+}
+
 /** How a bite shows at the rod tip, by the kind of fish: [seconds, tip tap, rod bend, how fast it fades]. Small,
  *  quick fish rattle the tip; bass knock hard then run; cod and other heavy fish knock and then pull the rod
  *  round; flatfish lean on it gently; rays and eels draw it down slowly. `strong` is a proper take rather than a

@@ -9,26 +9,39 @@ const MODES = [["first", "First person"], ["third", "Third person"], ["spectator
 
 export default function Stage3D({ spotId = null, placeName = "", venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase }) {
   const w = useRef(null);
-  const [menu, setMenu] = useState(false), [mode, setMode] = useState("third"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
+  const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
   useEffect(() => { if (watching && mode !== "spectator" && mode !== "cinematic") { const t = setTimeout(() => pick("spectator"), 600); return () => clearTimeout(t); } return undefined; }, [watching]); // eslint-disable-line react-hooks/exhaustive-deps
   const pick = (m) => { setMode(m); w.current?.setMode(m); setMenu(false); if (m === "spectator" && others[0]) { const id = watch || others[0].id; setWatch(id); w.current?.focus(id); } };
+  // watching someone: in spectator mode the camera glides over behind them; otherwise you stay where you are and turn
+  // to keep them (their rod, the fight, the landing) in view until you drag the view yourself
+  const watchOne = (id) => { setWatch(id); setAlert(null); if (mode === "spectator") w.current?.focus(id); else w.current?.follow(id, 90); };
   const watchNext = () => {
     if (!others.length) return;
     const i = others.findIndex((a) => a.id === watch), next = others[(i + 1) % others.length];
-    setWatch(next.id);
-    if (mode === "spectator") w.current?.focus(next.id); else w.current?.lookAtAngler(next.id);
+    watchOne(next.id);
   };
+  // someone else has a fish on: a small chip offers to watch it
+  const [alert, setAlert] = useState(null);
+  useEffect(() => { if (!alert) return undefined; const t = setTimeout(() => setAlert(null), 14000); return () => clearTimeout(t); }, [alert]);
   return (
     <div className="stage3d">
-      {/* third person to start: on a phone it shows the angler, rod, line and water together (first person is in the menu) */}
-      <World3D ref={w} startMode="third" spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
-        onPhase={(id, phase, info) => { onPhase?.(id, phase, info); if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); } }}
-        onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (a?.local || (mode === "spectator" && watch === id)) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
+      {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
+      <World3D ref={w} startMode="first" spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+        onPhase={(id, phase, info) => {
+          onPhase?.(id, phase, info);
+          if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); return; }
+          const a = anglers.find((x) => x.id === id);
+          if (a && !a.local && phase === "hooked" && !watching) setAlert({ id, name: a.name || "Someone" });
+        }}
+        onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (alert?.id === id) setAlert(null); if (a?.local || watch === id) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
         <div className="fs-overlay">{children}</div>
-        <div className="w3d-toasts" aria-live="polite">{toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}</div>
+        <div className="w3d-toasts" aria-live="polite">
+          {toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
+          {alert ? <button type="button" className="w3d-toast w3d-watch" onClick={() => watchOne(alert.id)}>{alert.name} has a fish on · <b>Watch</b></button> : null}
+        </div>
         <div className="w3d-tools">
           {menu ? (
             <div className="cam-menu" role="menu" aria-label="Camera">

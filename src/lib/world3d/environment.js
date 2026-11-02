@@ -202,7 +202,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     reed: new THREE.MeshStandardMaterial({ color: 0x7a7a3e, roughness: 1 }),
     lampGlow: new THREE.MeshBasicMaterial({ color: 0xffe0a0 }),
   };
-  const box = (w, h, d, mat, x, y, z, parent = group) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; };
+  // solid things the camera mustn't pass through (anything at least 30 cm across: walls, decks, buildings, posts
+  // left out); the camera also keeps above floorAt()
+  const solids = [];
+  let floorAt = () => 0;
+  const box = (w, h, d, mat, x, y, z, parent = group) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); if (Math.min(w, h, d) >= 0.3) solids.push(m); return m; };
   const lamps = [], pointLights = [];
   const buildings = (x0, x1, z0, z1, n, seed = 1) => {
     // a town's worth of simple houses and flats, roofs and lit windows at night
@@ -247,7 +251,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   }
   // ---- the place itself: the real one from map data when there is one, otherwise a representative one ----
   if (pano) { /* the photo is the place */ }
-  else if (real) { buildRealPlace(group, real, M); if (real.buildingMat) lamps.push(real.buildingMat); }
+  else if (real) {
+    floorAt = buildRealPlace(group, real, M, solids) || floorAt; if (real.buildingMat) lamps.push(real.buildingMat);
+    // a lamp over the anglers after dark (piers, quays and promenades are lit), like the drawn pier's
+    const sp = real.spots || [];
+    if (sp.length) { const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 34, 1.5); pl.position.set(c[0], c[1] + 5.5, c[2]); group.add(pl); pointLights.push(pl); }
+  }
   else if (venue === "pier") {
     const len = L.from - L.to, mid = (L.from + L.to) / 2;
     box(L.width, 1, len, M.stone, 0, L.deck - 0.5, mid);
@@ -320,7 +329,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
 
   let rainAmt = 0, wind = 0.3, windDir = [0.3, -1];
   return {
-    group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M,
+    group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids,
+    floorAt: (x, z) => floorAt(x, z),
     /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM }; facing: bearing of -z */
     setEnv({ light = {}, cond = {}, facing = 180 } = {}) {
       const toDir = (alt, az) => { const a = (alt * Math.PI) / 180, b = (((az ?? 180) - facing) * Math.PI) / 180; return new THREE.Vector3(Math.sin(b) * Math.cos(a), Math.sin(a), -Math.cos(b) * Math.cos(a)); };
@@ -340,7 +350,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       sun.position.copy(lightDir).multiplyScalar(80); sun.target.position.set(0, 0, 0);
       sun.color.setRGB(1, 0.92 - dusk * 0.3, 0.82 - dusk * 0.45).lerp(new THREE.Color(0.55, 0.62, 0.8), night);
       sun.intensity = (2.4 * day + 1.2 * dusk + 0.25 * night * U.uMoonLight.value) * (1 - cloud * 0.6) * (1 - r * 0.3);
-      hemi.intensity = 0.25 + 0.75 * day + 0.35 * dusk; hemi.color.setRGB(0.7 + 0.1 * day, 0.8, 0.95).multiplyScalar(1 - 0.2 * cloud); hemi.groundColor.setRGB(0.25, 0.22, 0.18);
+      hemi.intensity = 0.25 + 0.75 * day + 0.7 * dusk; // the sky still lights things well after the sun is low hemi.color.setRGB(0.7 + 0.1 * day, 0.8, 0.95).multiplyScalar(1 - 0.2 * cloud); hemi.groundColor.setRGB(0.25, 0.22, 0.18);
       if (night > 0.6) hemi.intensity = 0.32 + 0.18 * U.uMoonLight.value; // enough to see by: moonlight, the town's glow, the pier's lamps
       // the haze matches the horizon's colour, closer in rain
       const hz = new THREE.Color().setRGB(0.70, 0.8, 0.88).multiplyScalar(day).add(new THREE.Color(0.95, 0.6, 0.4).multiplyScalar(dusk)).add(new THREE.Color(0.04, 0.05, 0.08).multiplyScalar(night)).lerp(new THREE.Color(0.6, 0.63, 0.66).multiplyScalar(day + dusk * 0.5 + night * 0.06), cloud > 0.55 ? (cloud - 0.55) * 1.6 : 0);

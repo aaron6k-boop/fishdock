@@ -143,7 +143,18 @@ const rle = (a) => { let out = "", cur = a[0], run = 0; for (const v of a) { if 
 export const unrle = (s, size) => { const a = new Uint8Array(size); let k = 0; for (const part of s.split(",")) { const v = +part[0], r = +part.slice(1); a.fill(v, k, k + r); k += r; } return a; };
 
 /** The layout for the 3D view from an OpenStreetMap JSON answer round (lat0, lon0). venue: pier | beach | estuary | river | lake. */
-export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box } = {}) {
+// an outline round a line, `half` metres either side (for rivers drawn only as a centre line)
+function bandAround(line, half) {
+  if (line.length < 2) return null;
+  const L = [], R = [];
+  for (let i = 0; i < line.length; i++) {
+    const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+    const nx = -dz / l, nz = dx / l; L.push([line[i][0] + nx * half, line[i][1] + nz * half]); R.push([line[i][0] - nx * half, line[i][1] - nz * half]);
+  }
+  return [...L, ...R.reverse()];
+}
+
+export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box, approx = false } = {}) {
   const P = projector(lat0, lon0), nodes = new Map(), ways = new Map(), out = { origin: [lat0, lon0], venue, land: [], water: [], piers: [], beaches: [], green: [], buildings: [], spots: [], attribution: "Map data © OpenStreetMap contributors (ODbL)" };
   const rels = [];
   for (const e of osm?.elements || []) {
@@ -152,7 +163,7 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box 
     else if (e.type === "relation" && e.tags?.type === "multipolygon") rels.push(e);
   }
   const pts = (ids) => ids.map((id) => nodes.get(id)).filter(Boolean);
-  const coast = [], waterRings = [];
+  const coast = [], waterRings = [], riverLines = [];
   for (const w of ways.values()) {
     const t = w.tags || {}, ids = w.nodes || [];
     if (t.natural === "coastline") { coast.push(ids); continue; }
@@ -160,10 +171,12 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box 
     if (ring.length < 2) continue;
     const isClosed = closed(ids);
     if (isClosed && (t.natural === "water" || t.waterway === "riverbank" || t.landuse === "basin" || t.landuse === "reservoir" || t.water)) waterRings.push(ring.slice(0, -1));
+    else if (t.waterway === "river" || t.waterway === "canal") { const wTag = parseFloat(t.width); riverLines.push({ ring, w: Number.isFinite(wTag) && wTag > 2 && wTag < 300 ? wTag : t.waterway === "canal" ? 10 : 20 }); }
     else if (/^(pier|breakwater|groyne|quay)$/.test(t.man_made || "")) {
       const kind = t.man_made, wTag = parseFloat(t.width);
       const width = Number.isFinite(wTag) && wTag > 0 && wTag < 40 ? wTag : kind === "groyne" ? 2 : kind === "breakwater" ? 7 : 8;
-      const area = isClosed && (t.area === "yes" || ring.length > 5 && Math.abs(area2(ring.slice(0, -1))) > 400);
+      // a closed outline of any size worth standing on (simple rectangles have only four corners)
+      const area = isClosed && (t.area === "yes" || Math.abs(area2(ring.slice(0, -1))) > 400);
       out.piers.push({ kind, width, area, line: area ? null : ring, ring: area ? ring.slice(0, -1) : null, h: kind === "groyne" ? 1.2 : kind === "quay" ? 2.4 : kind === "breakwater" ? 3.5 : 4.2 });
     } else if (isClosed && (t.natural === "beach" || t.natural === "sand" || t.natural === "shingle")) out.beaches.push(ring.slice(0, -1));
     else if (isClosed && (t.leisure === "park" || t.landuse === "grass" || t.leisure === "pitch" || t.landuse === "recreation_ground" || t.leisure === "golf_course" || t.landuse === "meadow")) out.green.push(ring.slice(0, -1));
@@ -195,97 +208,123 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box 
   const xs = gridAxis(H), n = xs.length, cls = new Uint8Array(n * n);
   if (land.length) for (const r of land) fill(cls, xs, r, 1);
   else if (!coastChains.length && venue !== "pier" && venue !== "beach") cls.fill(1);
+  // a river drawn only as its centre line (common upstream): water its width either side of the line
+  for (const { ring, w } of riverLines) { const band = bandAround(ring, w / 2); if (band) { waterRings.push(band); } }
   for (const w of waterRings) fill(cls, xs, w, 0);
+  // a pier or breakwater drawn as an outline is something to stand on
+  for (const p of out.piers) if (p.ring) fill(cls, xs, p.ring, 1);
   for (const b of out.beaches) fill(cls, xs, b, 2, true);
   for (const g of out.green) fill(cls, xs, g, 3, true);
   out.grid = { xs, cls: rle(cls) };
   out.land = land; out.water = waterRings;
   const at = (p) => { const i = nearestIdx(xs, p[0]), j = nearestIdx(xs, p[1]); return cls[j * n + i]; };
   const inWater = (p) => at(p) === 0;
+  out.approx = !!approx;
   out.spots = spotsFor(out, venue, inWater);
   out.check = checkLayout(out, inWater);
   delete out.green; delete out.beaches;
   return out;
 }
 
+// ---- where an angler can stand ----
+// One set of rules for every way of finding spots, and for the final check: on dry ground or a pier's deck, open water
+// straight ahead (no land, and no pier or breakwater across the view), and nothing built where they stand or just
+// behind them (where the third-person camera goes). Returns what's wrong, or null.
+export const LAYOUT_CHECK = { nearMark: 100, nearMarkApprox: 400, waterAhead: [14, 26] };
+function standRules(L, inWater) {
+  const piers = L.piers || [];
+  const onPier = (q) => piers.some((p) => (p.ring ? inside(q, p.ring) : p.line && nearestOnLine(q, p.line).d < p.width / 2 + 0.5));
+  // buildings near the mark, with their bounding boxes, so testing a point is quick
+  const bs = (L.buildings || []).map((b) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of b.ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { ring: b.ring, x0, x1, z0, z1 }; }).filter((b) => Math.hypot(Math.max(Math.abs(b.x0), Math.abs(b.x1)), Math.max(Math.abs(b.z0), Math.abs(b.z1))) < 600);
+  const built = (q) => bs.some((b) => q[0] >= b.x0 && q[0] <= b.x1 && q[1] >= b.z0 && q[1] <= b.z1 && inside(q, b.ring));
+  return function problem(q, face) {
+    const f = [Math.sin(face), -Math.cos(face)], ahead = (m) => [q[0] + f[0] * m, q[1] + f[1] * m];
+    if (!LAYOUT_CHECK.waterAhead.every((m) => inWater(ahead(m)) && !onPier(ahead(m)))) return "no open water ahead";
+    for (let m = 3; m <= LAYOUT_CHECK.waterAhead[1]; m += 2) if (onPier(ahead(m))) return "no open water ahead";
+    const around = [[0, 0], [0, -3], [0, -6], [0, -9], [2.5, -4], [-2.5, -4]].map(([side, back]) => [q[0] + f[0] * back - f[1] * side, q[1] + f[1] * back + f[0] * side]);
+    if (around.some(built)) return "a building in the way";
+    return null;
+  };
+}
+
 // ---- is this layout right? ----
 // The real place is only used when it passes: four spots, all near the documented mark (positions in the marks list
-// can be approximate, and a coastline that didn't close properly puts the "shore" somewhere else entirely), each on
-// dry ground or a pier deck with open water straight ahead. Otherwise the phone shows the drawn place, labelled as one.
-export const LAYOUT_CHECK = { nearMark: 70, waterAhead: [14, 26] };
+// can be approximate, and a coastline that didn't close properly puts the "shore" somewhere else entirely), each
+// passing the rules above. Otherwise the phone shows the drawn place, labelled as one.
 export function checkLayout(L, inWater) {
-  const why = [];
-  // a pier's deck in front blocks the view as much as land does
-  const onPier = (q) => L.piers.some((p) => (p.ring ? inside(q, p.ring) : p.line && nearestOnLine(q, p.line).d < p.width / 2 + 0.5));
+  const why = [], problem = standRules(L, inWater), near = L.approx ? LAYOUT_CHECK.nearMarkApprox : LAYOUT_CHECK.nearMark;
   if (L.spots.length !== 4) why.push(`${L.spots.length} spots`);
   for (const sp of L.spots) {
-    const [x, , z] = sp.at, d = Math.hypot(x, z), f = [Math.sin(sp.face), -Math.cos(sp.face)];
-    if (d > LAYOUT_CHECK.nearMark) why.push(`${sp.name}: ${Math.round(d)} m from the mark`);
-    const ahead = (m) => [x + f[0] * m, z + f[1] * m], clear = [];
-    for (let m = 3; m <= LAYOUT_CHECK.waterAhead[1]; m += 2) clear.push(ahead(m)); // no pier anywhere in the view out to there
-    if (!LAYOUT_CHECK.waterAhead.every((m) => inWater(ahead(m))) || clear.some(onPier)) why.push(`${sp.name}: no open water ahead`);
-    // nothing built where the angler stands or just behind (where the camera goes in third person)
-    const around = [[0, 0], [0, -3], [0, -6], [0, -9], [2.5, -4], [-2.5, -4]].map(([side, back]) => [x + f[0] * back - f[1] * side, z + f[1] * back + f[0] * side]);
-    if ((L.buildings || []).some((b) => around.some((q) => Math.abs(q[0] - b.ring[0][0]) < 300 && inside(q, b.ring)))) why.push(`${sp.name}: a building in the way`);
+    const q = [sp.at[0], sp.at[2]], d = Math.hypot(q[0], q[1]);
+    if (d > near) why.push(`${sp.name}: ${Math.round(d)} m from the mark`);
+    const pr = problem(q, sp.face); if (pr) why.push(`${sp.name}: ${pr}`);
   }
   return { ok: !why.length, why };
 }
 
 // ---- where the anglers stand ----
 function spotsFor(L, venue, inWater) {
-  const spot = (id, at, face, y, cast, name) => ({ id, name, at: [r1(at[0]), y, r1(at[1])], face: Math.round(face * 1000) / 1000, cast });
+  const spot = (id, at, face, y, cast, name, edge) => ({ id, name, at: [r1(at[0]), y, r1(at[1])], face: Math.round(face * 1000) / 1000, cast, edge: r1(edge) });
   const faceOf = (dx, dz) => Math.atan2(dx, -dz); // heading of a direction: 0 is north (-z), positive turns east
+  const problem = standRules(L, inWater), apart = (got, q) => got.every((g) => dist(g.q, q) >= 9);
+  const pierAt = (q) => L.piers.find((p) => p.ring && inside(q, p.ring));
+  const reach = L.approx ? 400 : 160;
   // the nearest shore edge (coastline, a pier arm drawn as land, a river's or lake's edge) and the nearest pier line
   const edges = [...L.land, ...L.water].map((r) => [...r, r[0]]);
   let shore = null;
   for (const e of edges) { const n = nearestOnLine([0, 0], e); if (n.at && (!shore || n.d < shore.n.d)) shore = { e, n }; }
   const piers = L.piers.filter((p) => p.line && p.kind !== "groyne").map((p) => ({ p, near: nearestOnLine([0, 0], p.line) })).filter((x) => x.near.d < 160).sort((a, b) => a.near.d - b.near.d);
-  // a pier drawn as its own line, when the mark is on it: both sides and the seaward end
+  // a pier drawn as its own line, when the mark is on it or right beside it: spots on its sides round the mark, and
+  // its end when that's close
   if ((venue === "pier" || venue === "estuary") && piers.length && (!shore || piers[0].near.d < shore.n.d + 10 || (venue === "pier" && piers[0].near.d < 40))) {
     const { p } = piers[0], line = p.line, a = line[0], b = line[line.length - 1];
     const sea = inWater(b) && !inWater(a) ? line : inWater(a) && !inWater(b) ? [...line].reverse() : dist(b, [0, 0]) > dist(a, [0, 0]) ? line : [...line].reverse();
-    const end = sea[sea.length - 1], prev = sea[sea.length - 2];
     let len = 0; for (let k = 1; k < sea.length; k++) len += dist(sea[k], sea[k - 1]);
-    const along = (m) => { let left = len - m; for (let k = sea.length - 1; k > 0; k--) { const sl = dist(sea[k], sea[k - 1]); if (left <= sl) { const t = 1 - left / Math.max(sl, 1e-6); return { q: [sea[k - 1][0] + (sea[k][0] - sea[k - 1][0]) * t, sea[k - 1][1] + (sea[k][1] - sea[k - 1][1]) * t], dir: [(sea[k][0] - sea[k - 1][0]) / sl, (sea[k][1] - sea[k - 1][1]) / sl] }; } left -= sl; } return { q: sea[0], dir: [0, -1] }; };
-    const half = p.width / 2 - 0.6, out = [];
-    // where the mark is along the pier (a long pier's mark is often well out from the shore): the spots go round it
+    const along = (m) => { let left = m; for (let k = 1; k < sea.length; k++) { const sl = dist(sea[k], sea[k - 1]) || 1e-6; if (left <= sl) { const t = left / sl; return { q: [sea[k - 1][0] + (sea[k][0] - sea[k - 1][0]) * t, sea[k - 1][1] + (sea[k][1] - sea[k - 1][1]) * t], dir: [(sea[k][0] - sea[k - 1][0]) / sl, (sea[k][1] - sea[k - 1][1]) / sl] }; } left -= sl; } const k = sea.length - 1, sl = dist(sea[k], sea[k - 1]) || 1e-6; return { q: sea[k], dir: [(sea[k][0] - sea[k - 1][0]) / sl, (sea[k][1] - sea[k - 1][1]) / sl] }; };
     const mk = nearestOnLine([0, 0], sea);
     let s0 = 0; for (let k = 0; k < mk.i; k++) s0 += dist(sea[k], sea[k + 1]); s0 += mk.t * dist(sea[mk.i], sea[mk.i + 1]);
-    const at = (m) => Math.max(4, Math.min(len - 4, m));
-    const sideSpot = (id, m, side, name) => { const { q, dir } = along(at(m)); const nx = -dir[1] * side, nz = dir[0] * side; return spot(id, [q[0] + nx * half, q[1] + nz * half], faceOf(nx, nz), p.h, 26, name); };
-    out.push(sideSpot(1, s0 - 6, -1, "Left side of the pier"), sideSpot(2, s0 + 6, 1, "Right side of the pier"), sideSpot(3, s0 + 18, -1, "Further along the pier"));
-    const ed = [(end[0] - prev[0]) / dist(end, prev), (end[1] - prev[1]) / dist(end, prev)];
-    if (len - s0 < 90) out.push(spot(4, [end[0] - ed[0] * 1.8, end[1] - ed[1] * 1.8], faceOf(ed[0], ed[1]), p.h, 34, "End of the pier"));
-    else out.push(sideSpot(4, s0 - 18, 1, "Back along the pier"));
-    return out;
+    const half = p.width / 2 - 0.6, got = [];
+    // the end first when the mark's near it, then both sides, nearest the mark first
+    if (len - s0 < 90 && len > 8) { const e = along(len - 1.8); if (!problem(e.q, faceOf(e.dir[0], e.dir[1]))) got.push({ q: e.q, face: faceOf(e.dir[0], e.dir[1]), cast: 34, name: "End of the pier", edge: 1.8 }); }
+    const names = { "-1": ["Left side of the pier", "Further along, left", "Back along, left", "Along the left side"], "1": ["Right side of the pier", "Further along, right", "Back along, right", "Along the right side"] }, used = { "-1": 0, "1": 0 };
+    for (const off of [0, 6, -6, 12, -12, 18, -18, 24, -24, 30, -30, 40, -40, 50, -50]) {
+      const m = s0 + off; if (m < 4 || m > len - 4) continue;
+      for (const side of off % 12 === 0 ? [-1, 1] : [1, -1]) {
+        if (got.length === 4) break;
+        const { q, dir } = along(m), nx = -dir[1] * side, nz = dir[0] * side, at = [q[0] + nx * half, q[1] + nz * half], face = faceOf(nx, nz);
+        if (!apart(got, at) || problem(at, face)) continue;
+        got.push({ q: at, face, cast: 26, name: names[side][Math.min(3, used[side]++)], edge: 0.6 });
+      }
+    }
+    if (got.length === 4) return got.map((g, k) => spot(k + 1, g.q, g.face, p.h, g.cast, g.name, g.edge));
   }
+  // a pier or breakwater drawn as an outline near the mark: spots along its edge facing out over the water
   if (venue === "pier" || venue === "estuary") {
-    const areas = L.piers.filter((p) => p.ring && p.ring.length > 2).map((p) => ({ p, ring: [...p.ring, p.ring[0]], inside: inside([0, 0], p.ring) })).map((x) => ({ ...x, near: nearestOnLine([0, 0], x.ring) })).filter((x) => x.inside || x.near.d < 30).sort((a, b) => (b.inside - a.inside) || a.near.d - b.near.d);
-    if (areas.length) {
-      const { p, ring, near } = areas[0], onDeck = (q) => inside(q, p.ring), got = [];
+    const areas = L.piers.filter((p) => p.ring && p.ring.length > 2).map((p) => ({ p, ring: [...p.ring, p.ring[0]], inside: inside([0, 0], p.ring) })).map((x) => ({ ...x, near: nearestOnLine([0, 0], x.ring) })).filter((x) => x.inside || x.near.d < 60).sort((a, b) => (b.inside - a.inside) || a.near.d - b.near.d);
+    for (const { p, ring, near } of areas.slice(0, 2)) {
+      const onDeck = (q) => inside(q, p.ring), got = [];
       const segs = ring.length - 1, segLen = (k) => dist(ring[k], ring[k + 1]);
       const walkRing = (m) => { let k = near.i, t = near.t, left = Math.abs(m); const fw = m >= 0; for (let g = 0; g < segs * 2; g++) { const sl = segLen(k) || 1e-6, have = fw ? (1 - t) * sl : t * sl; if (left <= have) { const tt = fw ? t + left / sl : t - left / sl; return { q: [ring[k][0] + (ring[k + 1][0] - ring[k][0]) * tt, ring[k][1] + (ring[k + 1][1] - ring[k][1]) * tt], dir: [(ring[k + 1][0] - ring[k][0]) / sl, (ring[k + 1][1] - ring[k][1]) / sl] }; } left -= have; if (fw) { k = (k + 1) % segs; t = 0; } else { k = (k - 1 + segs) % segs; t = 1; } } return null; };
-      const offs = [0]; for (let m = 5; m <= 90; m += 5) offs.push(m, -m);
+      const offs = [0]; for (let m = 5; m <= 160; m += 5) offs.push(m, -m);
       for (const m of offs) {
         if (got.length === 4) break;
         const w = walkRing(m); if (!w) continue;
         let nrm = [-w.dir[1], w.dir[0]]; if (onDeck([w.q[0] + nrm[0] * 1.5, w.q[1] + nrm[1] * 1.5])) nrm = [-nrm[0], -nrm[1]]; // outward
-        const q = [w.q[0] - nrm[0] * 1.2, w.q[1] - nrm[1] * 1.2];
-        if (!onDeck(q) || !inWater([w.q[0] + nrm[0] * 12, w.q[1] + nrm[1] * 12]) || !inWater([w.q[0] + nrm[0] * 25, w.q[1] + nrm[1] * 25])) continue;
-        if (got.some((g) => dist(g.q, q) < 9)) continue;
-        got.push({ q, nrm });
+        const q = [w.q[0] - nrm[0] * 1.2, w.q[1] - nrm[1] * 1.2], face = faceOf(nrm[0], nrm[1]);
+        if (!onDeck(q) || !apart(got, q) || problem(q, face)) continue;
+        got.push({ q, face });
       }
-      const names = ["On the pier", "Along the pier", "Other side of the pier", "Further along the pier"];
-      if (got.length === 4) return got.map(({ q, nrm }, k) => spot(k + 1, q, faceOf(nrm[0], nrm[1]), p.h, 30, names[k]));
+      const names = ["On the pier", "Along the pier", "Further along the pier", "Along the other way"];
+      if (got.length === 4) return got.map(({ q, face }, k) => spot(k + 1, q, face, p.h, 30, names[k], 1.2));
     }
   }
-  if (!shore || shore.n.d > 400) return [];
+  if (!shore || shore.n.d > reach + 40) return [];
   // along the shore edge, walking round it from the nearest point, facing the water
   const e = shore.e, n = shore.n, segLen = (k) => dist(e[k], e[k + 1]);
   const walk = (m) => {
-    let k = n.i, t = n.t, left = Math.abs(m), fw = m >= 0;
+    let k = n.i, t = n.t, left = Math.abs(m); const fw = m >= 0;
     for (let guard = 0; guard < e.length * 2; guard++) {
-      const sl = segLen(k), have = fw ? (1 - t) * sl : t * sl;
+      const sl = segLen(k) || 1e-6, have = fw ? (1 - t) * sl : t * sl;
       if (left <= have) { const tt = fw ? t + left / sl : t - left / sl; return { at: [e[k][0] + (e[k + 1][0] - e[k][0]) * tt, e[k][1] + (e[k + 1][1] - e[k][1]) * tt], dir: [(e[k + 1][0] - e[k][0]) / sl, (e[k + 1][1] - e[k][1]) / sl] }; }
       left -= have;
       if (fw) { k = (k + 1) % (e.length - 1); t = 0; } else { k = (k - 1 + e.length - 1) % (e.length - 1); t = 1; }
@@ -293,20 +332,20 @@ function spotsFor(L, venue, inWater) {
     return { at: n.at, dir: [1, 0] };
   };
   const pierLike = venue === "pier";
-  const back = venue === "beach" ? 6 : pierLike ? 1.6 : 2.2, y = venue === "beach" ? GROUND.beach : GROUND.land;
+  const back = venue === "beach" ? 6 : pierLike ? 1.6 : 2.2;
   const names = venue === "beach" ? ["On the beach, left", "On the beach, right", "Further along, left", "Further along, right"] : pierLike ? ["On the pier", "Along the pier", "Further along the pier", "Along the other way"] : ["Along the bank, left", "Along the bank, right", "Further along, left", "Further along, right"];
   // try places along the edge, nearest first, until four stand on dry ground with open water ahead, well apart
   const got = [], offsets = [0];
-  for (let m = 6; m <= 180; m += 6) offsets.push(m, -m);
+  for (let m = 6; m <= 240; m += 6) offsets.push(m, -m);
   for (const m of offsets) {
     if (got.length === 4) break;
     const w = walk(m);
     for (const bk of [back, back + 1.5, back + 3.5, back + 6]) {
       const probe = [w.at[0] - w.dir[1] * 4, w.at[1] + w.dir[0] * 4], sgn = inWater(probe) ? 1 : -1, wn = [-w.dir[1] * sgn, w.dir[0] * sgn];
-      const p = [w.at[0] - wn[0] * bk, w.at[1] - wn[1] * bk];
-      const ok = !inWater(p) && inWater([p[0] + wn[0] * 15, p[1] + wn[1] * 15]) && inWater([p[0] + wn[0] * 28, p[1] + wn[1] * 28]) && got.every((g) => dist(g.p, p) >= 9);
-      if (ok) { got.push({ p, wn }); break; }
+      const q = [w.at[0] - wn[0] * bk, w.at[1] - wn[1] * bk], face = faceOf(wn[0], wn[1]);
+      if (inWater(q) || !apart(got, q) || problem(q, face)) continue;
+      got.push({ q, face, bk }); break;
     }
   }
-  return got.map(({ p, wn }, k) => spot(k + 1, p, faceOf(wn[0], wn[1]), y, venue === "beach" ? 70 : venue === "river" ? 14 : 30, names[k]));
+  return got.map(({ q, face, bk }, k) => { const pr = pierAt(q); return spot(k + 1, q, face, pr ? pr.h : venue === "beach" ? GROUND.beach : GROUND.land, venue === "beach" ? 70 : venue === "river" ? 14 : 30, names[k], bk); });
 }

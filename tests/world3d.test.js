@@ -62,3 +62,14 @@ test("double tap and Look at my rod turn smoothly back; headings and compass poi
   assert.equal(Math.abs(wrap(Math.PI * 3)), Math.PI);
   assert.equal(compassPoint(0), "N"); assert.equal(compassPoint(-90), "W"); assert.equal(compassPoint(200), "S");
 });
+
+test("each kind of fish fights its own way in 3D: divers deep, upper-water fish shallow and erratic, bass and garfish leap, rays heavy", async () => {
+  const { fightProfile, fightStyle } = await import("../src/lib/sceneActors.js");
+  const st = (s) => fightStyle(fightProfile(s));
+  assert.ok(st("cod").depth > st("mackerel").depth * 3, "a cod bores down; a mackerel stays up");
+  assert.ok(st("mackerel").runWidth > st("cod").runWidth, "a mackerel runs about more");
+  assert.equal(st("bass").leaps, true); assert.equal(st("garfish").leaps, true); assert.equal(st("cod").leaps, false); assert.equal(st("plaice").leaps, false);
+  assert.ok(st("plaice").runWidth > 1.2 && st("plaice").runSpeed < 0.7, "flatfish swing wide and slow");
+  assert.ok(st("thornback-ray").depth > st("cod").depth && st("thornback-ray").heavy > st("cod").heavy, "a ray sits deep and heavy");
+  assert.equal(st("conger").pump, true);
+});

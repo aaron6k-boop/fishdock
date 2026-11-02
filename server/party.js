@@ -19,7 +19,7 @@ import { ipKey } from "./ipKey.js";
 import { assignSpots, layoutFor, MAX_ANGLERS } from "../src/lib/world3d/spots.js";
 
 export const PARTY = {
-  maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
+  maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
   spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, signalBytes: 16000, photoBytes: 400e3,
 };
 export const VENUES = ["pier", "beach", "estuary", "river", "lake"];
@@ -27,7 +27,12 @@ export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch"]
 export const REACTIONS = { nice: "Nice one", wow: "Wow", clap: "Well done", fish: "Fish on!" };
 export const CHALLENGES = { biggest: "Biggest fish", most: "Most fish", species: "Most species", longest: "Longest fish" };
 const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-export const makeCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => CODE_ABC[b % CODE_ABC.length]).join("");
+// each character equally likely (a byte that would favour the first few letters is thrown away and drawn again)
+export function makeCode() {
+  const out = [], top = 256 - (256 % CODE_ABC.length);
+  while (out.length < 6) for (const b of crypto.getRandomValues(new Uint8Array(12))) { if (b < top && out.length < 6) out.push(CODE_ABC[b % CODE_ABC.length]); }
+  return out.join("");
+}
 export const validCode = (c) => typeof c === "string" && /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(c);
 const hashKey = (k) => sha256Hex(`party-member|${k}`);
 const nameOf = (v, d) => cleanLine(v, 24) || d;
@@ -98,6 +103,9 @@ export class PartyRoom {
     const S = this.s;
     if (S.locked) return { error: "locked" };
     if (Object.values(S.members).filter((m) => !m.left && !m.kicked).length >= PARTY.maxMembers) return { error: "full" };
+    // everyone who ever joined is kept (a removed person's key must keep failing), so joining and leaving over and
+    // over can't grow the party's saved record without limit
+    if (Object.keys(S.members).length >= PARTY.maxEverMembers) return { error: "full" };
     const wants = role === "angler" && S.anglersOn && this.anglerCount() < PARTY.maxAnglers ? "angler" : "spectator";
     const m = await this.addMember({ name, role: wants, outfit }, now);
     return { member: m, role: S.members[m.id].role };
@@ -224,6 +232,7 @@ export class PartyRoom {
         const who = S.members[msg.who];
         if (!who || who.id === mid) return res();
         S.reports.push({ at: now, by: mid, who: who.id, reason: cleanLine(msg.reason, 200) || null });
+        if (S.reports.length > PARTY.maxReports) S.reports.splice(0, S.reports.length - PARTY.maxReports);
         out.push({ to: mid, msg: { t: "reported", who: who.id } });
         return res({ save: true });
       }
