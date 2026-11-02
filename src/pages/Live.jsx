@@ -1,5 +1,6 @@
 // ---- Live Fishing Mode: timer, bites, catches, marks, conditions snapshots, Smart Bite (Beta), history and replay ----
 import { useEffect, useMemo, useRef, useState } from "react";
+import { haptics } from "../lib/haptics.js";
 import { useApp } from "../lib/store.js";
 import { startSession, addEvent, undoLast, pauseSession, resumeSession, endSession, elapsed, recoverSession, setGpsAllowed, positionAt, eventsUntil, trackLengthM, onSessionChange, setSessionScene } from "../lib/session.js";
 import { all, onChange, remove } from "../lib/storage.js";
@@ -156,7 +157,7 @@ function Running({ s }) {
   const evs = sceneEvents(s);
   const ph = phaseAt(evs, Date.now(), { status: s.status });
   const hooked = !!ph.hooked;
-  const press = (type, label) => { addEvent(type); try { navigator.vibrate?.(30); } catch { /* ignore */ } say(label); };
+  const press = (type, label) => { addEvent(type); haptics.feel("button", { recorded: true }); say(label); };
   const sharing = share && share.sessionId === s.id && !share.ended ? share : null;
   const catches = catchesOf(evs).reverse();
   const counts = countsAt(s.events);

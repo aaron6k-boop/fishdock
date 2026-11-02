@@ -1,5 +1,6 @@
 // ---- Settings and privacy: units, theme, privacy, account and backup, your data, Beta features, data sources ----
 import { useEffect, useState } from "react";
+import HapticSettings from "../components/HapticSettings.jsx";
 import { useApp } from "../lib/store.js";
 import { exportAll, clearAll } from "../lib/storage.js";
 import { exportFile } from "../lib/files.js";
@@ -59,6 +60,11 @@ export default function Settings() {
         <div className="cond-row"><span>Weight</span><Seg value={settings.units.weight} onChange={(v) => update((s) => ({ units: { ...s.units, weight: v } }))} options={[{ value: "lb", label: "lb and oz" }, { value: "kg", label: "kg" }]} /></div>
         <div className="cond-row"><span>Theme</span><Seg value={settings.theme} onChange={(v) => update({ theme: v })} options={[{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }, { value: "system", label: "System" }]} /></div>
         <div className="cond-row"><span>Rules for</span><Seg value={settings.nation} onChange={(v) => update({ nation: v })} options={[{ value: "auto", label: "Where I fish" }, "England", "Wales", "Scotland", { value: "Northern Ireland", label: "NI" }]} /></div>
+      </section>
+
+      <section className="card">
+        <h2 className="h2">Haptic feedback</h2>
+        <HapticSettings />
       </section>
 
       <section className="card">

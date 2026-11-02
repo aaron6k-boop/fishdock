@@ -4,6 +4,7 @@
 // catch is marked simulated; real trips are logged by the people actually fishing, and others watch reconstructions.
 // The group button opens people, voice and text chat, catches and challenges, the invitation and the host's controls.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { haptics } from "../lib/haptics.js";
 import Stage3D from "../components/Stage3D.jsx";
 import FishTray from "../components/FishTray.jsx";
 import { Icon } from "../components/ui.jsx";
@@ -102,7 +103,7 @@ function PartyLive({ code, mkey }) {
   const P = useParty(code, mkey, {
     onMessage: (m) => {
       const name = (id) => P_ref.current?.members.find((x) => x.id === id)?.name || "Someone";
-      if (m.t === "react" && !blocked.has(m.from)) toast(`${name(m.from)}: ${REACT.find((r) => r[0] === m.r)?.[1] || "Nice"}`, "react");
+      if (m.t === "react" && !blocked.has(m.from)) { toast(`${name(m.from)}: ${REACT.find((r) => r[0] === m.r)?.[1] || "Nice"}`, "react"); if (m.from !== P_ref.current?.me?.id) haptics.feel("reaction"); }
       if (m.t === "chat" && m.c.who !== P_ref.current?.me?.id && !blocked.has(m.c.who) && sheetRef.current !== "chat") toast(`${name(m.c.who)}: ${m.c.text}`, "chat");
       if (m.t === "signal") voice.current?.signal(m.from, m.data);
       if (m.t === "voice" && m.voice.on && m.who !== P_ref.current?.me?.id && !blocked.has(m.who)) voice.current?.meet(m.who);
@@ -124,6 +125,7 @@ function PartyLive({ code, mkey }) {
   const myEvents = mode === "virtual" ? vf.events : myServerEvents;
   const now = Date.now();
   const myPhase = phaseAt(myEvents, now);
+  useEffect(() => { if (myPhase.phase !== "hooked") haptics.reeling(false); }, [myPhase.phase]); // the fight's over: no more reeling ticks
   const [, tick] = useState(0);
   useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 500); return () => clearInterval(id); }, []);
   // once you're in, the invite secret leaves the address bar: it can't be copied, screenshotted or kept in history by
@@ -142,7 +144,8 @@ function PartyLive({ code, mkey }) {
       const name = P.members.find((m) => m.id === e.who)?.name;
       if (e.type === "catch") { const at = landedDelay(e, venue); setTimeout(() => toast(momentText(name, e, mode), "catch"), at); }
       else { const t = momentText(name, e, mode); if (t) toast(t); }
-      if (navigator.vibrate && e.type === "bite") try { navigator.vibrate(40); } catch { /* ignore */ }
+      // another angler with a fish on: one distinct notification (each event once, never on catching up after reconnecting)
+      if (e.type === "hooked") haptics.feel("friendHooked", { key: `${e.who}|${e.seq}|hooked` });
     }
     firstLoad.current = false;
   }, [P.events.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -192,7 +195,7 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D feel={haptics.feel} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>
@@ -206,7 +209,7 @@ function PartyLive({ code, mkey }) {
           <div className="fs-bottom">
             {voiceState.on && voiceState.ptt ? <button type="button" className="ft-pill ptt" onPointerDown={() => voice.current?.talk(true)} onPointerUp={() => voice.current?.talk(false)} onPointerLeave={() => voice.current?.talk(false)}><Icon name="mic" />Hold to talk</button> : null}
             {!fishing ? <span className="ft-label">Watching{meM?.role === "spectator" ? "" : " (no spot free)"}</span>
-              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} reel={vf.reel} autoplay={false} onCast={vf.cast} onStrike={vf.strike} onHold={vf.hold} onNudge={vf.nudge} />
+              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} reel={vf.reel} autoplay={false} onCast={vf.cast} onStrike={vf.strike} onHold={(on) => { vf.hold(on); haptics.reeling(on && myPhase.phase === "hooked", { load: 0.7 }); }} onNudge={vf.nudge} />
               : <div className="fish-tray real-tray" role="group" aria-label="Log what happens">{realNext.map(([l, f, ic]) => <button key={l} type="button" className="ft-pill" onClick={f}><Icon name={ic} />{l}</button>)}<span className="ft-label">{meM?.presence === "water" ? "At the water" : "Not at the water"}</span></div>}
           </div>
         </Stage3D>

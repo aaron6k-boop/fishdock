@@ -2,6 +2,7 @@
 // Fish alone, start a party (virtual fishing or a real trip), watch a friend, join with a code, or go back to a party
 // you're in. Everything here is private: parties are only for the people you invite.
 import { useState } from "react";
+import HapticSettings from "../components/HapticSettings.jsx";
 import { Icon } from "../components/ui.jsx";
 import { startParty, previewParty, remember, myParties, cleanCode, CODE_RE } from "../lib/party.js";
 import { OUTFITS } from "../lib/world3d/angler.js";
@@ -95,6 +96,7 @@ export default function Together() {
           </section>
         ) : null}
         {msg ? <p className="notice warn small" role="alert"><Icon name="info" /><span>{msg}</span></p> : null}
+        <details className="tg-haptics"><summary className="small">Haptic feedback</summary><HapticSettings compact /></details>
         <p className="tiny tg-foot">Fish Together is in Beta. Virtual catches are simulated and kept apart from real ones. A party knows the kind of place and the name you give it, never anyone's position. The host can lock it, remove people and close it.</p>
       </main>
     </div>

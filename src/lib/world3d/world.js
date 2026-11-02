@@ -20,7 +20,7 @@ export const CAMERA_MODES = [
   { id: "cinematic", label: "Cinematic" }, { id: "free", label: "Free look" },
 ];
 
-export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, reduceMotion = false, real = null, pano = null } = {}) {
+export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, onFeel, reduceMotion = false, real = null, pano = null } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.q >= 1, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
@@ -70,7 +70,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const spot = spotOf(a.spot);
       if (!x || x.spotId !== a.spot || x.outfit !== a.outfit || x.name !== a.name) {
         if (x) x.a.dispose();
-        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, local: !!a.local, real: !!a.real, onSound: (n, p) => onSound?.(n, p, a.id) });
+        // only your own angler is felt (other people's catches arrive as a party notification instead)
+        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, local: !!a.local, real: !!a.real, onSound: (n, p) => onSound?.(n, p, a.id), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
         made.onSplash(splash); made.onRipple(ripple);
         x = { a: made, spotId: a.spot, outfit: a.outfit, name: a.name, out: null };
         anglers.set(a.id, x);

@@ -3,6 +3,7 @@
 // at `now()` (liveEvents.phaseAt); it never invents a bite, a size or a fish. Quality: Auto, Battery Saver, Balanced
 // or High; it stops drawing when off screen or in the background, and steps down by itself if the phone struggles.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { haptics } from "../lib/haptics.js";
 import { createWaterRenderer, composeFrame, composeMask, composeSkyMask, composeWaterAuto, defaultWater, coverMap, skyLight } from "../lib/sceneGL.js";
 import { createActors, landingTimes } from "../lib/sceneActors.js";
 import { phaseAt, DRAW_CM, DUR } from "../lib/liveEvents.js";
@@ -115,7 +116,7 @@ const reduceMotion = () => { try { return matchMedia("(prefers-reduced-motion: r
 
 /** `fishHint` ({ species, lengthCm }) lets the demo show the fish during the fight; a real session only knows the
  *  species once the catch is logged, so until then the fight shows the water and the rod, not a guessed fish. */
-const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, volume = 0.7, floatRig = false, live = false, vibrate = false, catchPhoto, fishHint = null, rod = "auto", tipLight = "auto", demo = false, onTap, children, className = "", onPhase }, ref) {
+const FishingScene = forwardRef(function FishingScene({ scene, events, status, now = Date.now, env: envIn, quality = "auto", sound = false, volume = 0.7, floatRig = false, live = false, vibrate = false, feel = null, catchPhoto, fishHint = null, rod = "auto", tipLight = "auto", demo = false, onTap, children, className = "", onPhase }, ref) {
   const wrap = useRef(null), glc = useRef(null), fxc = useRef(null), camEl = useRef(null);
   const R = useRef({ gl: null, actors: null, raf: 0, visible: true, onScreen: true, override: null, lastFrame: 0, slow: 0, q: null, prevPhase: "", fishFor: "", fallback: null, frameCanvas: null });
   const [q, setQ] = useState(() => (quality === "auto" ? autoQuality() : quality));
@@ -127,7 +128,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
   const [clip, setClip] = useState(null);
   const clipOk = typeof MediaRecorder !== "undefined" && typeof HTMLCanvasElement !== "undefined" && !!HTMLCanvasElement.prototype.captureStream;
   const props = useRef({});
-  props.current = { events, status, now, envIn, floatRig, live, vibrate, catchPhoto, onPhase, sound, fishHint, rod, tipLight, demo };
+  props.current = { events, status, now, envIn, floatRig, live, vibrate, feel, catchPhoto, onPhase, sound, fishHint, rod, tipLight, demo };
   const view = scene?.view || defaultView();
 
   useEffect(() => { setQ(quality === "auto" ? autoQuality() : quality); }, [quality]);
@@ -143,7 +144,8 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     const r = R.current;
     r.gl = createWaterRenderer(glc.current);
     if (!r.gl) { setGlOk(false); r.fallback = glc.current.getContext("2d"); }
-    r.actors = createActors(fxc.current, { onSound: (n) => { if (props.current.sound) play(n); } });
+    // haptics: the scene's own moments; a live view of a real session (live) only feels what the angler logged
+    r.actors = createActors(fxc.current, { onSound: (n) => { if (props.current.sound) play(n); }, onFeel: (n, d) => { if (r.override || r.rec) return; const f = props.current.feel || (props.current.vibrate ? haptics.feel : null); f?.(n, { ...d, real: !!props.current.live }); } }); // (never during a replay or a highlight clip)
     const io = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(([e]) => { r.onScreen = e.isIntersecting; }) : null;
     io?.observe(wrap.current);
     const vis = () => { r.visible = document.visibilityState === "visible"; };
@@ -279,7 +281,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         if (prev === "hooked" && info.phase !== "landing") play("reelOff");
         const text = { bite: info.ev?.type === "smartbite" ? "Smart Bite alert (Beta)" : "Bite!", hooked: "Fish on!", lost: "Fish lost", missed: info.ev?.type === "snag" ? "Snag, not a fish" : "Missed", paused: "Paused" }[info.phase];
         setBanner(text && fresh ? { text, kind: info.phase, key } : null);
-        if (fresh && P.vibrate && info.phase === "bite") try { navigator.vibrate?.([70, 50, 70]); } catch { /* ignore */ }
+        // (bites are felt through haptics.js, from the scene's own bite)
         if (info.phase === "landing" && fresh) { const f = fishOf(info.ev); setTimeout(() => setCard({ ev: info.ev, key }), Math.max(0, landingTimes(f.species, f.lengthCm, f.weightKg, R.current.venue).card * 1000 - info.age * 1000)); }
       }
     };

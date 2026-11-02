@@ -9,11 +9,11 @@ import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
 import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.js";
 
-const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap };
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel };
   const phases = useRef({});
   // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
   const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
@@ -62,6 +62,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
         const q = quality === "auto" ? mod.autoQuality3d() : quality;
         w = mod.createWorld(canvas.current, {
           venue, quality: q, reduceMotion: reduce, real, pano: panoOn ? pano : null,
+          onFeel: (n, d) => props.current.feel?.(n, d),
           onSound: (name, pos) => { if (!props.current.sound) return; const cam = W.current?.camera; if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name); },
         });
         W.current = w;

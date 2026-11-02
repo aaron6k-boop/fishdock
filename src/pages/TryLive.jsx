@@ -4,6 +4,8 @@
 // (Wikimedia Commons, credited) or the drawn scene; "Live weather" is the real forecast for that place.
 /* global __BUILD_ID__ */
 import { useEffect, useMemo, useRef, useState } from "react";
+import HapticSettings from "../components/HapticSettings.jsx";
+import { haptics } from "../lib/haptics.js";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
 import { ROD_STYLES } from "../lib/sceneActors.js";
 import { composeFrame } from "../lib/sceneGL.js";
@@ -111,6 +113,8 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [, setTick] = useState(0);
   useEffect(() => { if (!events.length) return undefined; const id = setInterval(() => setTick((n) => n + 1), 400); return () => clearInterval(id); }, [events.length]);
   const p = phaseAt(events, Date.now());
+  // the fight's over (landed, lost or never started): the reeling ticks stop with it
+  useEffect(() => { if (p.phase !== "hooked") haptics.reeling(false); }, [p.phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = events.at(-1)?.type;
   const base = `${location.origin}/#try`;
   const copy = async (u) => { try { await navigator.clipboard.writeText(u); setCopied(u); setTimeout(() => setCopied(""), 1800); } catch { /* ignore */ } };
@@ -132,7 +136,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
             </div>
             <div className="fs-bottom">
-              <FishTray phase={p.phase} last={last} reel={vf.reel} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onHold={vf.hold} onNudge={vf.nudge} onStop={vf.stop} />
+              <FishTray phase={p.phase} last={last} reel={vf.reel} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onHold={(on) => { vf.hold(on); haptics.reeling(on && p.phase === "hooked", { load: 0.7, species: sp.id }); }} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
     </>
   );
@@ -141,11 +145,11 @@ export default function TryLive({ initialPlace, initialSpecies }) {
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D feel={haptics.feel} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (
-            <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
+            <FishingScene ref={sceneRef} feel={haptics.feel} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </FishingScene>
           )}
@@ -204,6 +208,11 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             <div className="field"><span className="lbl">Tip light</span><Seg value={tipLight} onChange={setTipLight} options={TIPS} /></div>
             <div className="field"><span className="lbl">Sound</span><div className="vol-row"><button type="button" className="btn small" onClick={() => setSound(!sound)} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} />{sound ? "On" : "Off"}</button><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => { setVolume(Number(e.target.value)); if (!sound) setSound(true); }} aria-label="Volume" /><span className="num tiny">{Math.round(volume * 100)}%</span></div></div>
             <div className="field"><span className="lbl">Animation quality</span><Seg value={quality} onChange={setQuality} options={QUALITY_OPTIONS} /></div>
+          </section>
+
+          <section className="watch-sec">
+            <div className="card-h"><h2>Haptic feedback</h2></div>
+            <HapticSettings compact />
           </section>
 
           <section className="watch-sec test-panel">

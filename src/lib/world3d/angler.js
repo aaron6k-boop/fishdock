@@ -78,7 +78,7 @@ function genericFishGeometry() {
   return g;
 }
 
-export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, local = false, real = false, onSound } = {}) {
+export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, local = false, real = false, onSound, onFeel } = {}) {
   const root = new THREE.Group(); world.add(root);
   const body = new THREE.Group(); root.add(body);
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
@@ -239,6 +239,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (info.phase === "landing") landStart = fightPos ? fightPos.clone() : nearAt.clone().lerp(castAt, 0.25);
     }
     const crossed = (m) => prevAge < m && age >= m;
+    // what you feel (haptics.js), at the same moments the scene draws; a real trip only feels what was logged
+    const fishInfo = () => { const d = info.ev?.type === "catch" ? info.ev.data || {} : hintFish || {}; return { species: prof.species || d.species || null, lengthCm: d.lengthCm || null, pull: prof.pull }; };
+    const feel = (n, extra = {}, recorded = false) => onFeel?.(n, { ...fishInfo(), ...extra, real, recorded, key: recorded ? `${id}|${info.since}|${n}` : undefined });
     const sea = { swell: env.swell, wind: env.wind, windDir: env.windDir, kind: env.kind };
     const wh = (x, z) => waveHeight(x, z, t, sea);
 
@@ -258,15 +261,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (age < 0.85) showLine = false;
       else if (age < 2.15) { const f = (age - 0.85) / 1.3, tip = tipWorld(); rigAt = tip.clone().lerp(castAt, f); rigAt.y = lerp(tip.y, 0, f) + Math.sin(f * Math.PI) * (castAt.distanceTo(at) * 0.35); slack = 0.05; }
       else { rigAt = castAt.clone(); slack = clamp((age - 2.15) / 0.8, 0.05, 0.6); }
-      if (crossed(0.75)) onSound?.("whoosh", at);
-      if (crossed(2.15)) { splashCb?.(castAt, 0.6); rippleCb?.(castAt, 0.7); onSound?.("plop", castAt); }
+      if (crossed(0.75)) { onSound?.("whoosh", at); feel("release"); }
+      if (crossed(2.15)) { splashCb?.(castAt, 0.6); rippleCb?.(castAt, 0.7); onSound?.("plop", castAt); feel("splashdown"); }
       if (age > 2.4) held = age < 2.9;
     } else if (ph === "waiting" || ph === "bite" || ph === "missed") {
       held = false; rigAt = castAt.clone(); slack = 0.35;
+      if (ph === "missed" && crossed(0.02)) feel("missed", {}, true);
       if (ph === "bite") {
         if (!P.taps) P.taps = biteTaps(prof.species, P.strong, seed);
-        for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; bendT += b * e * prof.pull; if (crossed(p0 + 0.001) && a > 0.05) rippleCb?.(castAt, 0.3); }
-        if (crossed(0.02)) { onSound?.("bell", at); rippleCb?.(castAt, 0.45); }
+        for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; bendT += b * e * prof.pull; if (crossed(p0 + 0.001)) { if (a > 0.05) rippleCb?.(castAt, 0.3); if (p0 > 0.05) feel("tap", { a, b }); } }
+        if (crossed(0.02)) { onSound?.("bell", at); rippleCb?.(castAt, 0.45); feel("bite", { strong: P.strong }, true); }
         slack = 0.15;
       }
     } else if (ph === "hooked") {
@@ -289,13 +293,18 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         if (crossed(tj) || crossed(tj + 0.75)) { const sp = f.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.55 + prof.splashy * 0.35); rippleCb?.(sp, 0.7); onSound?.("splash", sp); }
       }
       if (jumping) { showFish = true; }
+      for (const tj of P.jumps) if (crossed(tj)) feel("run");
+      // each surge of the fight, as it builds (never a continuous buzz: haptics.js spaces them and caps a minute's worth)
+      const surgeNow = surge;
+      if (surgeNow > 0.6 && (P.lastSurge ?? 0) <= 0.6) feel("pull", { tension: load * (0.72 + 0.4 * surgeNow) * st.heavy, surge: surgeNow });
+      P.lastSurge = surgeNow;
       fightPos = f; rigAt = f; slack = 0;
       const tension = load * (0.72 + 0.4 * surge) * st.heavy;
       bendT = 0.16 + 0.26 * tension; tipT = 0.05 * surge + (st.pump ? 0.05 * Math.max(0, Math.sin(age * 5.5)) : 0);
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
       fpE = 0.5 + 0.1 * surge; fpYaw = clamp(run * 0.22 * st.runWidth, -0.3, 0.3);
       P.tension = tension;
-      if (crossed(0.02)) onSound?.("reelOn", at);
+      if (crossed(0.02)) { onSound?.("reelOn", at); feel("hooked", {}, true); }
       if (!st.leaps && prof.splashy > 0.3 && Math.floor(age * 0.5 + P.s1) !== Math.floor((age - dt) * 0.5 + P.s1) && seed() < prof.splashy * 0.5 && age > 2) { const sp = f.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.35 + prof.splashy * 0.4); rippleCb?.(sp, 0.5); onSound?.("splash", sp); }
       reel.userData.spin = (reel.userData.spin || 0) + dt * 12;
     } else if (ph === "landing") {
@@ -336,11 +345,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         else if (age >= T3) { const f = ease(seg(age, T4, card)); rigAt = sand.clone().lerp(hand, f); pitch = 0.6; bendT = 0.03; }
       }
       if (age >= card - 0.3) { rigAt = hand; showLine = true; }
+      if (crossed(card)) feel("landed", {}, true);
       reel.userData.spin = (reel.userData.spin || 0) + dt * (age < T3 ? 10 : 2);
       if (crossed(T4)) onSound?.("reelOff", at);
     } else if (ph === "lost") {
       rigAt = (fightPos || castAt).clone().lerp(at, ease(age / 2)); rigAt.y = Math.min(0, rigAt.y); slack = 0.6; bendT = 0.02;
-      if (crossed(0.02)) { spr.kv -= 1.6 * load; onSound?.("reelOff", at); }
+      if (crossed(0.02)) { spr.kv -= 1.6 * load; onSound?.("reelOff", at); feel("lost", {}, true); }
     }
 
     // ---- springs, then the rod's shape ----
