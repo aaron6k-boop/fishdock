@@ -331,6 +331,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         onPose?.({ x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed, air: W.air });
       }
     }
+    anglers.get(localId)?.a.setView(look.yaw, look.pitch);
     for (const [id, x] of anglers) { if (remote.has(id)) applyRemote(id, x, dt || 0.016); x.out = x.a.frame(t, now, dt || 0.016, envState); outs[id] = x.out; }
     // your landed fish stays in the net (or on the deck) until you've had a look and decided (Stage3D)
     let kept = null;

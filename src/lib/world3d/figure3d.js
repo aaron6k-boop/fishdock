@@ -97,7 +97,8 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
   const carried = (i, restPoint, out = V()) => { dq.copy(restQ[i]).invert().premultiply(bones[i].quaternion); return out.copy(restPoint).sub(restP[i]).applyQuaternion(dq).add(bones[i].position); };
 
   // ---- the body: lofted rings, each vertex weighted to one or two bones ----
-  const G = { pos: [], col: [], si: [], sw: [], idx: [] };
+  const newG = () => ({ pos: [], col: [], si: [], sw: [], idx: [] });
+  let G = newG();
   const vert = (p, c, w) => {
     G.pos.push(p.x, p.y, p.z); G.col.push(c.r, c.g, c.b);
     const ws = w.filter((x) => x[1] > 1e-4).slice(0, 4), tot = ws.reduce((s, x) => s + x[1], 0) || 1;
@@ -163,21 +164,24 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
     loft(FOOT.map(([z, w, h]) => ({ c: V(x, h + 0.002, z), ax: AX, bx: BY, w: w * Wd, d: h, p: 3.2, wts: W1("ft" + k), col: (th, ri, sx, sy) => (sy < -0.82 ? sole : boot) })), 14, { capStart: true, capEnd: true });
   }
 
-  // sleeves: from a rounded shoulder to a cuff
-  for (const k of ["L", "R"]) {
+  // sleeves: from a rounded shoulder to a cuff (from = where along the arm to start: the first-person forearms start
+  // below the elbow)
+  const sleeves = (from = -1) => { for (const k of ["L", "R"]) {
     const sh = J["sh" + k], el = J["el" + k], wr = J["wr" + k];
     const qU = restQ[B["up" + k]], qL = restQ[B["lo" + k]];
     const fU = { y: el.clone().sub(sh).normalize(), x: V(1, 0, 0).applyQuaternion(qU), z: V(0, 0, 1).applyQuaternion(qU) };
     const fL = { y: wr.clone().sub(el).normalize(), x: V(1, 0, 0).applyQuaternion(qL), z: V(0, 0, 1).applyQuaternion(qL) };
     const L1 = LEN.up, L2 = LEN.lo;
     const ARM = [[-0.045, 0.02], [-0.034, 0.04], [-0.014, 0.054], [0.012, 0.06], [0.07, 0.058], [0.16, 0.054], [L1 - 0.02, 0.05], [L1 + 0.03, 0.05], [L1 + 0.12, 0.048], [L1 + 0.2, 0.045], [L1 + L2 - 0.025, 0.042], [L1 + L2 - 0.012, 0.048], [L1 + L2 + 0.004, 0.047], [L1 + L2 + 0.012, 0.041]];
-    loft(ARM.map(([s, r], i) => {
+    loft(ARM.filter(([s]) => s >= from).map(([s, r], i0, list) => {
+      const i = ARM.length - list.length + i0;
       const upper = s < L1, f = upper ? fU : fL;
       const c = upper ? sh.clone().addScaledVector(f.y, s) : el.clone().addScaledVector(f.y, s - L1);
       const wts = s < -0.02 ? [[B.chest, 0.5], [B["up" + k], 0.5]] : s < 0.04 ? [[B.chest, 0.35 * (1 - (s + 0.02) / 0.06)], [B["up" + k], 1]] : s < L1 - 0.035 ? W1("up" + k) : s < L1 + 0.035 ? blend("up" + k, "lo" + k, (s - (L1 - 0.035)) / 0.07) : W1("lo" + k);
       return { c, ax: f.x, bx: f.z, w: r * Wd, d: r * 0.92 * Wd, p: 2, wts, col: () => (i >= 11 ? trim : s < 0.12 ? yoke : jacket) };
     }), 14, { capStart: true });
-  }
+  } };
+  sleeves();
   // the neck
   loft([[1.42, 0.056, "chest", "neck", 0.5], [1.47, 0.055, "neck", "neck", 0], [1.53, 0.053, "neck", "head", 0.2], [1.6, 0.052, "neck", "head", 0.8]].map(([y, r, a, b, t]) => ({ c: S(0, y, 0.012), ax: AX, bx: BZ, w: r * HS, d: r * 1.06 * HS, p: 2, wts: blend(a, b, t), col: () => skin.clone().multiplyScalar(0.94) })), 12);
 
@@ -191,6 +195,14 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
   const body = new THREE.SkinnedMesh(geo, mBody); body.castShadow = true; body.frustumCulled = false; group.add(body);
   const skeleton = new THREE.Skeleton(bones, inverses);
   body.bind(skeleton, new THREE.Matrix4());
+  // first person: just your forearms and hands, on the rod, at the bottom of the view (the rest of you would fill it)
+  G = newG(); sleeves(LEN.up + 0.1);
+  const fpGeo = new THREE.BufferGeometry();
+  fpGeo.setAttribute("position", new THREE.Float32BufferAttribute(G.pos, 3)); fpGeo.setAttribute("color", new THREE.Float32BufferAttribute(G.col, 3));
+  fpGeo.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(G.si, 4)); fpGeo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(G.sw, 4));
+  fpGeo.setIndex(G.idx); fpGeo.computeVertexNormals();
+  const fpArms = new THREE.SkinnedMesh(fpGeo, mBody); fpArms.frustumCulled = false; fpArms.visible = false; group.add(fpArms);
+  fpArms.bind(skeleton, new THREE.Matrix4());
 
   // ---- rigid parts, carried by a bone ----
   const mats = [];
@@ -459,7 +471,7 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
       setBone("up" + k, sh, arm.B, inner); setBone("lo" + k, arm.B, arm.C, inner);
       if (!spec.axis) { Yh = arm.C.clone().sub(arm.B).normalize(); Zh = spec.palm ? spec.palm.clone() : V(-s, 0, 0); }
       setBone("ha" + k, arm.C, arm.C.clone().add(Yh), Zh);
-      hands[i].grip.visible = !!spec.axis && !spec.hide && !fp; hands[i].open.visible = !spec.axis && !spec.hide && !fp;
+      hands[i].grip.visible = !!spec.axis && !spec.hide; hands[i].open.visible = !spec.axis && !spec.hide;
       P["hand" + k] = arm.C;
     }
 
@@ -484,10 +496,12 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
     /** the top of the head now (figure space), for name labels */
     get top() { return (P.head?.y ?? J.head.y) + 0.24 * HS; },
     get headAt() { return P.head ? P.head.clone() : J.head.clone(); },
+    /** between the eyes, now (figure space): where a first-person camera sees from */
+    get eyeAt() { return carried(B.head, V(0, hc.y + 0.017 * HS, -0.075 * HS)); },
     hand(i) { return P[i ? "handR" : "handL"]?.clone() || null; },
     // first person: your own body would fill the view, so none of it is drawn
-    setFirstPerson(on) { fp = !!on; body.visible = !on; for (const m of headParts()) m.visible = !on && (m !== hoodUp); hoodDown.visible = !on; for (const h of hands) { h.open.visible = h.grip.visible = false; } },
-    dispose() { geo.dispose(); mBody.dispose(); group.traverse((o) => o.geometry?.dispose?.()); for (const m of mats) m.dispose(); skeleton.dispose(); },
+    setFirstPerson(on) { fp = !!on; body.visible = !on; fpArms.visible = !!on; for (const m of headParts()) m.visible = !on && (m !== hoodUp); hoodDown.visible = !on; },
+    dispose() { geo.dispose(); fpGeo.dispose(); mBody.dispose(); group.traverse((o) => o.geometry?.dispose?.()); for (const m of mats) m.dispose(); skeleton.dispose(); },
   };
 }
 

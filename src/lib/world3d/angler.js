@@ -28,7 +28,23 @@ export const OUTFITS = [
   { jacket: 0xe0b52a, trousers: 0x2a3138, hat: 0xb7322b, name: "Yellow waterproof" },
   { jacket: 0x1f6b67, trousers: 0x2e2a26, hat: 0xe8e4da, name: "Teal fleece" },
 ];
-const ROD = { beach: { len: 4.2, col: 0xd6a63c, flex: 0.78 }, pier: { len: 3.6, col: 0x2870ec, flex: 1 }, estuary: { len: 3.3, col: 0x2870ec, flex: 1.05 }, river: { len: 3.9, col: 0xd63434, flex: 1.35 }, lake: { len: 3.6, col: 0x2ea060, flex: 1.15 } };
+// ---- the rod and reel for each kind of fishing ----
+// len (m), col (the whippings and spool), flex (softer bends more), the blank's radius at the butt and tip, the handle
+// as [from, to, radius, part] along the rod (seat: metal; grip: EVA foam; cork), where the reel sits, the rings
+// (where, and the first ring's size: bigger on a beachcaster), the reel's size, and a quiver tip on a feeder rod
+const ROD = {
+  beach: { name: "Beachcaster", len: 4.2, col: 0xd6a63c, flex: 0.78, r0: 0.0125, r1: 0.0026, seat: 0.68, g0: 0.028, reel: 1.3,
+    handle: [[0, 0.03, 0.018, "seat"], [0.03, 0.62, 0.0165, "grip"], [0.62, 0.74, 0.014, "seat"], [0.74, 0.92, 0.0155, "grip"], [0.92, 0.95, 0.013, "seat"]], guides: [0.36, 0.5, 0.62, 0.72, 0.81, 0.88, 0.94, 0.98] },
+  pier: { name: "Pier rod", len: 3.6, col: 0x2870ec, flex: 1, r0: 0.0108, r1: 0.0022, seat: 0.45, g0: 0.021, reel: 1,
+    handle: [[0, 0.02, 0.016, "seat"], [0.02, 0.4, 0.0152, "grip"], [0.4, 0.5, 0.0128, "seat"], [0.5, 0.66, 0.0142, "grip"], [0.66, 0.69, 0.0122, "seat"]], guides: [0.25, 0.37, 0.49, 0.6, 0.7, 0.8, 0.89, 0.96] },
+  estuary: { name: "Spinning rod", len: 3.0, col: 0x2870ec, flex: 1.05, r0: 0.0098, r1: 0.002, seat: 0.35, g0: 0.02, reel: 0.9,
+    handle: [[0, 0.02, 0.015, "seat"], [0.02, 0.3, 0.0145, "cork"], [0.3, 0.4, 0.0125, "seat"], [0.4, 0.52, 0.0138, "cork"], [0.52, 0.55, 0.012, "seat"]], guides: [0.2, 0.33, 0.45, 0.57, 0.68, 0.78, 0.87, 0.95] },
+  river: { name: "Float rod", len: 3.9, col: 0xd63434, flex: 1.35, r0: 0.0085, r1: 0.0015, seat: 0.29, g0: 0.012, reel: 0.8,
+    handle: [[0, 0.02, 0.014, "seat"], [0.02, 0.25, 0.0135, "cork"], [0.25, 0.33, 0.012, "seat"], [0.33, 0.55, 0.013, "cork"], [0.55, 0.57, 0.0115, "seat"]], guides: [0.17, 0.24, 0.31, 0.38, 0.45, 0.52, 0.59, 0.66, 0.73, 0.8, 0.87, 0.93, 0.98] },
+  lake: { name: "Feeder rod", len: 3.6, col: 0x2ea060, flex: 1.15, r0: 0.0095, r1: 0.0018, seat: 0.4, g0: 0.018, reel: 1, tip: { from: 0.86, col: 0xff4a2a },
+    handle: [[0, 0.02, 0.015, "seat"], [0.02, 0.35, 0.0142, "grip"], [0.35, 0.45, 0.0125, "seat"], [0.45, 0.58, 0.0135, "grip"], [0.58, 0.61, 0.012, "seat"]], guides: [0.22, 0.34, 0.46, 0.57, 0.67, 0.76, 0.84, 0.9, 0.95, 0.985] },
+};
+export const rodFor = (venue) => ROD[venue] || ROD.pier;
 
 // ---- the water's height, the same big waves as the shader, so floats and fish ride them ----
 export function waveHeight(x, z, t, { swell = 0.3, wind = 0.3, windDir = [0.3, -1], kind = 0 } = {}) {
@@ -110,12 +126,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const mReel = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.35, metalness: 0.6 });
   const unitCyl = new THREE.CylinderGeometry(1, 1, 1, 12);
   const NSEG = 16;
-  const rodSegs = Array.from({ length: NSEG }, (_, i) => { const m = new THREE.Mesh(unitCyl, mBlank); m.castShadow = true; root.add(m); return { m, r: lerp(0.0108, 0.0022, (i / (NSEG - 1)) ** 0.8) }; });
-  const HANDLE = [[0, 0.02, 0.016, mSeat], [0.02, 0.4, 0.0152, mGrip], [0.4, 0.5, 0.0128, mSeat], [0.5, 0.66, 0.0142, mGrip], [0.66, 0.69, 0.0122, mSeat]];
-  const handleParts = HANDLE.map(([a, b, r, mat]) => { const m = new THREE.Mesh(unitCyl, mat); m.castShadow = true; root.add(m); return { m, a, b, r }; });
-  const GUIDES = [0.25, 0.37, 0.49, 0.6, 0.7, 0.8, 0.89, 0.96];
+  const mCork = new THREE.MeshStandardMaterial({ color: 0xc49a62, roughness: 0.9 });
+  // a feeder rod's quiver tip: the last part of the blank painted bright, so bites show
+  const mTip = R.tip ? new THREE.MeshStandardMaterial({ color: R.tip.col, roughness: 0.4, emissive: R.tip.col, emissiveIntensity: 0.15 }) : null;
+  const rodSegs = Array.from({ length: NSEG }, (_, i) => { const m = new THREE.Mesh(unitCyl, mTip && (i + 0.5) / NSEG >= R.tip.from ? mTip : mBlank); m.castShadow = true; root.add(m); return { m, r: lerp(R.r0, R.r1, (i / (NSEG - 1)) ** 0.8) }; });
+  const PART = { seat: mSeat, grip: mGrip, cork: mCork };
+  const handleParts = R.handle.map(([a, b, r, part]) => { const m = new THREE.Mesh(unitCyl, PART[part]); m.castShadow = true; root.add(m); return { m, a, b, r }; });
+  const GUIDES = R.guides;
   const guides = GUIDES.map((s, i) => {
-    const r = lerp(0.021, 0.0045, i / (GUIDES.length - 1)), g = new THREE.Group(); root.add(g);
+    const r = lerp(R.g0, Math.min(R.g0, 0.0045), i / (GUIDES.length - 1)), g = new THREE.Group(); root.add(g);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.0013, r * 0.15), 6, 18), mRing); ring.position.y = -(r * 1.35 + 0.006); g.add(ring);
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.0013, 0.0013, r * 0.4 + 0.008, 4), mRing); leg.position.y = -(r * 0.2 + 0.004); g.add(leg);
     const wrap = new THREE.Mesh(unitCyl, mWhip); wrap.rotation.x = Math.PI / 2; wrap.scale.set(0.0001, 0.026, 0.0001); g.add(wrap);
@@ -139,6 +158,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     at(new THREE.CylinderGeometry(0.0075, 0.0075, 0.022, 10), mGrip, -0.016, -0.048, 0, 0, Math.PI / 2, crank); // the knob
   }
   const handle = reel.userData.crank;
+  reel.scale.setScalar(R.reel);
   // the line from the spool up through the rings to the tip
   const guideLinePos = new Float32Array((GUIDES.length + 2) * 3), guideLineGeo = new THREE.BufferGeometry(); guideLineGeo.setAttribute("position", new THREE.BufferAttribute(guideLinePos, 3));
   const guideLine = new THREE.Line(guideLineGeo, new THREE.LineBasicMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.7 })); guideLine.frustumCulled = false; root.add(guideLine);
@@ -238,7 +258,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let events = [];
   // the fight as you reel it (tap reeling, reelModel.js), for your own angler: how far in the fish is, the line's
   // tension, the drag slipping, the handle's turns. Others' fights follow their events' times
-  let fightIn = null, lastTurns = 0, lastDragSound = 0;
+  let fightIn = null, lastTurns = 0, lastDragSound = 0, viewIn = null;
   let face = 0, at = new THREE.Vector3(), castAt = new THREE.Vector3(), nearAt = new THREE.Vector3(), edge = 1;
   // `edge`: how far in front of the angler the pier, quay or bank ends (the water starts). The fish comes up a little
   // beyond it, never under the deck, so it can be seen being landed
@@ -463,8 +483,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const sway = n1(t * 0.4 + id.length) * 0.02 * (1 + env.wind), breath = Math.sin(t * 1.6 + id.length) * 0.008;
     let butt, dir;
     if (held) {
-      butt = new THREE.Vector3(0.18, 0.95, -0.12);
       dir = new THREE.Vector3(Math.sin(yawOff) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yawOff) * Math.cos(pitch)).normalize();
+      // the reel always ends up in the same comfortable place for the hand: a long beachcaster's butt reaches back
+      // under the arm, a short spinning rod's doesn't
+      butt = new THREE.Vector3(0.18, 0.95, -0.12).addScaledVector(dir, 0.45 - R.seat);
       if (ph === "waiting" || ph === "bite") { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     } else { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     if (!held || (ph !== "cast" && ph !== "hooked" && ph !== "landing" && ph !== "lost")) { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); held = false; }
@@ -474,8 +496,18 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
     if (fp && !(ph === "landing" && age >= LT.swingIn)) {
-      held = true; butt = new THREE.Vector3(0.17, 1.1, -0.34); // the reel about chest height, in the lower right of the view
-      dir = new THREE.Vector3(Math.sin(fpYaw) * Math.cos(fpE), Math.sin(fpE), -Math.cos(fpYaw) * Math.cos(fpE));
+      held = true;
+      // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
+      // lower right of the view, the rod rising from there at its angle for the moment (higher at a cast, lower to
+      // land), so turning to watch the fish never loses the reel your hand is winding
+      const vy = viewIn ? Math.atan2(Math.sin(viewIn.yaw - face), Math.cos(viewIn.yaw - face)) : 0, vp = viewIn ? clamp(viewIn.pitch, -0.9, 0.7) : -0.12;
+      const vf = new THREE.Vector3(Math.sin(vy) * Math.cos(vp), Math.sin(vp), -Math.cos(vy) * Math.cos(vp)), vr = new THREE.Vector3(Math.cos(vy), 0, Math.sin(vy)), vu = new THREE.Vector3().crossVectors(vr, vf);
+      // the reel stays put in the view (lower right, from the eye where it is now: leaning over the rail moves it); the
+      // rod swings about it, up for a cast, after a running fish, down to land it
+      const e = fpE - 0.12, sw = fpYaw - 0.05;
+      dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
+      const reelAt = fpEye().addScaledVector(vr, 0.11).addScaledVector(vu, -0.22).addScaledVector(vf, 0.45);
+      butt = reelAt.addScaledVector(dir, -R.seat);
     }
     dir.x += sway; dir.y += breath; dir.normalize();
     // the bend is towards the line
@@ -492,9 +524,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const along = (m) => { const s2 = Math.min(1, m / R.len) * NSEG, i = Math.min(NSEG - 1, Math.floor(s2)), f = s2 - i; return { p: pts[i].clone().lerp(pts[i + 1], f), t: pts[i + 1].clone().sub(pts[i]).normalize() }; };
     const frame = (t) => { const up = tmpUp.set(0, 1, 0).addScaledVector(t, -t.y); if (up.lengthSq() < 1e-4) up.set(1, 0, 0); up.normalize(); const x = new THREE.Vector3().crossVectors(up, t); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, t)); };
     for (const hp of handleParts) { const a = along(hp.a).p, b = along(hp.b).p; between(hp.m, a, b, hp.r); }
-    const seat = along(0.45); reel.position.copy(seat.p); reel.quaternion.copy(frame(seat.t));
+    const seat = along(R.seat); reel.position.copy(seat.p); reel.quaternion.copy(frame(seat.t));
     handle.rotation.x = -(reel.userData.spin || 0); reel.userData.rotor.rotation.z = (reel.userData.spin || 0) * 1.6;
-    guideLinePos.set(seat.p.clone().add(new THREE.Vector3(0, -0.072, 0.06).applyQuaternion(reel.quaternion)).toArray(), 0);
+    guideLinePos.set(seat.p.clone().add(new THREE.Vector3(0, -0.072, 0.06).multiplyScalar(R.reel).applyQuaternion(reel.quaternion)).toArray(), 0);
     guides.forEach((gd, i) => {
       const a = along(gd.s * R.len); gd.g.position.copy(a.p); gd.g.quaternion.copy(frame(a.t));
       const br = rodSegs[Math.min(NSEG - 1, Math.floor(gd.s * NSEG))].r; gd.wrap.scale.set(br * 1.3, 0.024, br * 1.3);
@@ -514,10 +546,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the reel's handle, for the left hand to wind (it's on the left of a spinning reel)
     reel.updateMatrixWorld(true);
     const knob = toLocal(handle.localToWorld(V3(-0.016, -0.048, 0))), knobAx = toLocal(handle.localToWorld(V3(0.01, -0.048, 0))).sub(knob);
-    if (walking) hands[1] = rodGrip(0.3, V3(-1, 0, 0.2), "carry");
+    if (walking) hands[1] = rodGrip(R.seat * 0.7, V3(-1, 0, 0.2), "carry");
     else if (held) {
-      hands[1] = rodGrip(0.42, V3(-0.35, 1, 0), "seat"); // under the rod at the reel seat, the reel's stem between the fingers
-      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : { at: knob, axis: knobAx, palm: V3(1, 0, 0), kind: "crank" };
+      hands[1] = rodGrip(R.seat - 0.03, V3(-0.35, 1, 0), "seat"); // under the rod at the reel seat, the reel's stem between the fingers
+      // the other hand: on the butt to cast, on the reel's handle to wind (while a fish is on and landing it); free
+      // while you wait
+      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "hooked" || ph === "landing" || ph === "lost" ? { at: knob, axis: knobAx, palm: V3(1, 0, 0), kind: "crank" } : null;
     }
     if (ph === "bite" && !held) {
       // a hand out over the rod, ready to strike: to the nearest part of it within reach, bending down to it if it's low
@@ -560,6 +594,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (emoting && emoting.t0 == null) emoting.t0 = t;
     const emote = emoting && t - emoting.t0 < EMOTE_S[emoting.kind] ? { kind: emoting.kind, u: t - emoting.t0, hand: hands[1] ? 0 : 1 } : null;
     if (!emote) emoting = null;
+    // leaning out over the rail in first person: the body goes with the eye, so the hands still reach the rod
+    if (fp) { brace = 0; crouch = 0; lean = Math.max(0, lean) + 0.06 + leanNow * 0.9; }
     fig.pose({ t, dt, emote, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toLocal(lookAtW) : null, speaking, hood: (env.rain || 0) > 0.35 });
 
     // ---- line, rig, fish, net ----
@@ -622,8 +658,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     prevAge = age;
     const leanTo = fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
     leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * 2.5));
-    return { phase: ph, age, info, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
+    return { phase: ph, age, info, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? fpEye() : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
+  // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
+  // shoulders and your arms together, and your hands still reach the rod
+  function fpEye() { return fig.eyeAt.add(new THREE.Vector3(0, 0, -0.02)); }
   function tipWorld() { root.updateMatrixWorld(true); return toWorld(pts[NSEG]); }
 
   return {
@@ -631,6 +670,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     get local() { return local; },
     setEvents(list) { const before = events; events = list || []; if (events.length !== before.length) castFromEvents(); },
     setFight(f) { fightIn = f ? { ...f, at: performance.now() } : null; },
+    /** where the camera looks (world yaw, pitch): your rod in first person follows the view */
+    setView(yaw, pitch) { viewIn = { yaw, pitch }; },
     setHint(h) { hintFish = h || null; },
     setName(n) { const old = tag; const s = label(n || "Angler", local ? "#7ee8de" : "#ffffff"); s.position.copy(old.position); s.visible = old.visible; root.remove(old); old.material.map.dispose(); old.material.dispose(); root.add(s); tag = s; },
     place,
