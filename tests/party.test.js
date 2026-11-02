@@ -259,6 +259,8 @@ test("walking about in a virtual party: poses go to the others only, cleaned, ne
   assert.equal(cleanPose({ x: 1e6, y: 0, z: 0, face: 0 }), undefined, "out of the place");
   assert.equal(cleanPose({ x: "1", y: 0, z: 0, face: 0 }), undefined);
   assert.equal(cleanPose("hi"), undefined);
+  assert.deepEqual(cleanPose({ emote: "wave", x: 5 }), { emote: "wave" }, "an emote is just its name");
+  assert.equal(cleanPose({ emote: "dance<script>" }), undefined);
   const room = new PartyRoom();
   await room.init({ code: "ABC234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
   const host = Object.values(room.s.members)[0];
@@ -271,4 +273,18 @@ test("walking about in a virtual party: poses go to the others only, cleaned, ne
   const real = new PartyRoom(); await real.init({ code: "DEF234", mode: "real", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
   const rh = Object.values(real.s.members)[0]; rh.spot = rh.spot || 1;
   assert.equal(real.message(rh.id, { t: "pose", p: { x: 3, y: 2.2, z: -7, face: 0.4 } }, 2000).out.length, 0, "no walking on a real trip");
+});
+
+test("an angler's look: small whole numbers, cleaned, shared with the party; anything else is dropped", async (t) => {
+  const h = harness(t);
+  const look = { skin: 4, hair: 0, hat: 1, beard: 2, build: 2 };
+  const r = await start(h.c, { look: { ...look, extra: "x" } });
+  assert.equal(r.status, 200, r.text);
+  const me = await h.sock(r.body.code, r.body.member.key);
+  assert.deepEqual(me.last("hello").members[0].look, look);
+  const j = await h.c("POST", `/${r.body.code}/join`, { body: { secret: r.body.secret, name: "Sam", role: "angler", look: { skin: 99, hair: 0, hat: 0, beard: 0, build: 0 } } });
+  assert.equal(j.status, 200, j.text);
+  const them = await h.sock(r.body.code, j.body.member.key);
+  const sam = them.last("hello").members.find((m) => m.name === "Sam");
+  assert.equal(sam.look, null, "an out-of-range look isn't kept");
 });

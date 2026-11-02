@@ -348,7 +348,8 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 .beta-pill { display: inline-block; vertical-align: middle; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; color: var(--action); border: 1px solid color-mix(in srgb, var(--action) 50%, transparent); background: color-mix(in srgb, var(--action) 14%, transparent); }
 .tg-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--elev); color: var(--text); }
 .tg-card.on { border-color: color-mix(in srgb, var(--action) 60%, transparent); }
-.tg-card .grow { display: flex; flex-direction: column; gap: 2px; }
+.tg-card .grow { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tg-card > svg { width: 18px; height: 18px; flex: none; color: var(--text-2); }
 .tg-card .grow span { font-size: 13px; color: var(--text-2); }
 .tg-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--action) 16%, transparent); color: var(--action); flex: none; }
 .tg-form { display: flex; flex-direction: column; gap: 12px; padding: 4px 4px 12px; }
@@ -425,3 +426,17 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 /* ---- the mic button (Fish Together): off, on (teal) and a ring while you're talking ---- */
 .fs-btn.mic.on { background: var(--action); color: #04201d; }
 .fs-btn.mic.talking { box-shadow: 0 0 0 3px #7ee8de88; }
+
+/* ---- choosing your angler's look ---- */
+.look-picker { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: start; }
+.look-preview { width: 112px; height: 168px; border-radius: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--action) 12%, var(--elev)), var(--elev)); border: 1px solid var(--line); }
+.look-opts { display: grid; gap: 10px; min-width: 0; }
+.look-row { display: grid; gap: 5px; }
+.look-row .lbl { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.look-row .outfits { gap: 8px; flex-wrap: wrap; }
+.look-row .outfit { width: 34px; height: 34px; }
+.look-row .outfit i { top: 4px; width: 13px; height: 7px; }
+.look-swatches { display: flex; gap: 7px; flex-wrap: wrap; }
+.look-sw { width: 28px; height: 28px; border-radius: 50%; background: var(--c); border: 2px solid transparent; box-shadow: inset 0 0 0 1px #0000002a; }
+.look-sw.on { border-color: var(--action); box-shadow: 0 0 0 2px var(--bg) inset; }
+@media (max-width: 360px) { .look-picker { grid-template-columns: 1fr; } .look-preview { justify-self: center; } }

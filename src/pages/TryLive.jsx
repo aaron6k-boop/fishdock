@@ -17,6 +17,8 @@ import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import FishTray from "../components/FishTray.jsx";
 import Stage3D from "../components/Stage3D.jsx";
 import InviteHere from "../components/InviteHere.jsx";
+import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
+import { saveLook } from "../lib/world3d/people.js";
 import { landedCatches } from "../lib/landed.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -66,6 +68,8 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [uiHidden, setUiHidden] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [invite, setInvite] = useState(false);
+  const [lookOpen, setLookOpen] = useState(false), [look, setLookNow] = useState(myLook);
+  const setLook = (v) => { setLookNow(v); saveLook(v); };
   const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
   const [view3d, setView3d] = useState(() => /\/3d$/.test(location.hash)); // the 360° 3D view (Beta)
   const sceneRef = useRef(null);
@@ -123,7 +127,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
 
   const venue = from === "auto" ? venueOf(place) : from;
   const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
-  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: 0, local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length]);
+  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length, look]);
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (
     <>
@@ -134,6 +138,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
               <span className="grow" />
               <button type="button" className={`fs-btn${view3d ? " on" : ""}`} onClick={() => setView3d(!view3d)} aria-pressed={view3d} aria-label={view3d ? "Back to the photo view" : "Look around in 3D (Beta)"} title="360° look-around (Beta)"><Icon name="compass" /></button>
+              {view3d ? <button type="button" className="fs-btn" onClick={() => setLookOpen(true)} aria-label="Your angler" title="Your angler"><Icon name="person" /></button> : null}
               <button type="button" className="fs-btn" onClick={() => setInvite(true)} aria-label="Invite a friend here" title="Invite a friend here"><Icon name="users" /></button>
               <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
               <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
@@ -157,6 +162,16 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             </FishingScene>
           )}
         </div>
+        {lookOpen ? <>
+          <div className="sheet-scrim" onClick={() => setLookOpen(false)} />
+          <aside className="watch-panel sheet open look-sheet" aria-label="Your angler">
+            <div className="sheet-head">
+              <div className="try-head"><h1>Your angler</h1><p className="small muted">How you look in the 3D view, and to friends in Fish Together. Saved on this phone.</p></div>
+              <button type="button" className="xbtn sheet-x" onClick={() => setLookOpen(false)} aria-label="Close"><Icon name="close" /></button>
+            </div>
+            <section className="watch-sec"><LookPicker value={look} onChange={setLook} /></section>
+          </aside>
+        </> : null}
         <InviteHere open={invite} onClose={() => setInvite(false)} markId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} />
         {sheet ? <div className="sheet-scrim" onClick={() => setSheet(false)} /> : null}
         <aside className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Demo settings">

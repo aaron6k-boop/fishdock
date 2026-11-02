@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { startParty, remember } from "../lib/party.js";
 import { Icon } from "./ui.jsx";
+import { myLook, lookOnly } from "./LookPicker.jsx";
 
 export default function InviteHere({ markId, placeName, venue, open, onClose }) {
   const [name, setName] = useState(() => { try { return localStorage.getItem("fishdock.party.name") || ""; } catch { return ""; } });
@@ -14,7 +15,7 @@ export default function InviteHere({ markId, placeName, venue, open, onClose }) 
     setBusy(true); setErr("");
     try {
       try { localStorage.setItem("fishdock.party.name", name.trim()); } catch { /* ignore */ }
-      const r = await startParty({ mode: "virtual", venue, place: { label: placeName, mark: markId }, name: name.trim() || "Host", outfit: 0, hours: 12 });
+      const r = await startParty({ mode: "virtual", venue, place: { label: placeName, mark: markId }, name: name.trim() || "Host", outfit: myLook().outfit, look: lookOnly(myLook()), hours: 12 });
       remember(r.code, { key: r.member.key, member: r.member.id, mode: "virtual", venue, expiresAt: r.expiresAt, host: true, secret: r.secret });
       setMade({ code: r.code, link: `${location.origin}${location.pathname}#party/${r.code}/${r.secret}` });
     } catch (e) { setErr(e?.message || "Couldn't start the party just now. Try again in a moment."); }

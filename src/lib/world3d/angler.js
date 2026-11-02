@@ -9,6 +9,8 @@ import { biteTaps, fightProfile, fightStyle, fishLoad, landingTimes, landingTech
 import { fishShape, buildFishMesh, bodyWidth } from "../fish3d.js";
 import { hasArt, artUrl } from "../../data/fishart.js";
 import { castPoint, dirOf } from "./spots.js";
+import { createFigure } from "./figure3d.js";
+import { lookFor } from "./people.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -79,30 +81,21 @@ function genericFishGeometry() {
   return g;
 }
 
-export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, local = false, real = false, rail = false, onSound, onFeel } = {}) {
+export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, look = null, local = false, real = false, rail = false, onSound, onFeel } = {}) {
   const root = new THREE.Group(); world.add(root);
-  const body = new THREE.Group(); root.add(body);
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
-  const mJacket = new THREE.MeshStandardMaterial({ color: O.jacket, roughness: 0.8 });
-  const mTrousers = new THREE.MeshStandardMaterial({ color: O.trousers, roughness: 0.9 });
-  const mSkin = new THREE.MeshStandardMaterial({ color: 0xd9a888, roughness: 0.7 });
-  const mHat = new THREE.MeshStandardMaterial({ color: O.hat, roughness: 0.9 });
-  const mBoot = new THREE.MeshStandardMaterial({ color: 0x1d2a22, roughness: 0.6 });
-  const part = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
-  const legL = part(new THREE.CapsuleGeometry(0.085, 0.7, 4, 8), mTrousers, -0.11, 0.47, 0);
-  const legR = part(new THREE.CapsuleGeometry(0.085, 0.7, 4, 8), mTrousers, 0.11, 0.47, 0);
-  const bootL = part(new THREE.BoxGeometry(0.14, 0.12, 0.28), mBoot, -0.11, 0.06, -0.05), bootR = part(new THREE.BoxGeometry(0.14, 0.12, 0.28), mBoot, 0.11, 0.06, -0.05);
-  const torso = part(new THREE.CapsuleGeometry(0.2, 0.42, 4, 10), mJacket, 0, 1.12, 0); torso.scale.z = 0.72;
-  const head = part(new THREE.SphereGeometry(0.115, 14, 10), mSkin, 0, 1.6, -0.01);
-  const hat = part(new THREE.SphereGeometry(0.125, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mHat, 0, 1.63, -0.01);
-  const limb = (r, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 1, 8), mat); m.castShadow = true; body.add(m); return m; };
-  const arms = [0, 1].map(() => ({ up: limb(0.06, mJacket), lo: limb(0.05, mJacket), hand: part(new THREE.SphereGeometry(0.05, 8, 6), mSkin, 0, 0, 0) }));
-  let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, 2.05, 0); root.add(tag);
+  // the person (figure3d.js): their own look if they chose one, otherwise a steady one from their id
+  const fig = createFigure({ id, look: lookFor(id, look), outfit: O, venue }); root.add(fig.group);
+  const part = (geo, mat, x, y, z, parent = root) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
+  const tagY = fig.look.height + 0.3;
+  let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, tagY, 0); root.add(tag);
   // talking in voice chat: sound waves above the name, pulsing
   const talkTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); g.strokeStyle = "#7ee8de"; g.lineWidth = 5; g.lineCap = "round"; for (const r of [10, 19, 28]) { g.beginPath(); g.arc(32, 40, r, -Math.PI * 0.8, -Math.PI * 0.2); g.stroke(); } g.fillStyle = "#7ee8de"; g.beginPath(); g.arc(32, 40, 4, 0, Math.PI * 2); g.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
-  const talk = new THREE.Sprite(new THREE.SpriteMaterial({ map: talkTex, depthTest: false, transparent: true })); talk.scale.set(0.32, 0.32, 1); talk.position.set(0, 2.36, 0); talk.visible = false; talk.renderOrder = 10; root.add(talk);
+  const talk = new THREE.Sprite(new THREE.SpriteMaterial({ map: talkTex, depthTest: false, transparent: true })); talk.scale.set(0.32, 0.32, 1); talk.position.set(0, tagY + 0.31, 0); talk.visible = false; talk.renderOrder = 10; root.add(talk);
   let speaking = false;
-  const lift = { legL, legR, torso, head, hat };
+  // an emote (Fish Together): a wave, a cheer or a clap for a couple of seconds
+  const EMOTE_S = { wave: 2.2, cheer: 1.8, clap: 2.0 };
+  let emoting = null;
 
   // ---- the rod: sections along a bending curve, a reel, a rest or tripod ----
   const R = ROD[venue] || ROD.pier;
@@ -490,38 +483,63 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     guideLine.visible = showLine !== false;
     rest.visible = !walking && (!held || venue === "beach");
 
-    // ---- the body: stand, breathe, hands on the rod when it's held ----
-    // a stride when walking: legs swing from the hips, arms swing the other way, the body bobs; tucked in a jump
-    const wk = walking ? Math.min(1, walking.speed / 4) : 0, stride = walking ? walking.phase : 0;
-    const bob = Math.sin(t * 1.4 + id.length) * 0.01 + Math.abs(Math.sin(stride)) * 0.05 * wk;
-    for (const [leg, boot, x, sgn] of [[legL, bootL, -0.11, 1], [legR, bootR, 0.11, -1]]) {
-      const a = walking ? (walking.air ? 0.5 * sgn * 0.4 + 0.35 : Math.sin(stride) * 0.6 * wk * sgn) : 0;
-      leg.rotation.x = a; leg.position.set(x, 0.86 - 0.39 * Math.cos(a), -0.39 * Math.sin(a));
-      boot.rotation.x = a * 0.6; boot.position.set(x, 0.86 - 0.8 * Math.cos(a), -0.8 * Math.sin(a) - 0.05);
+    // ---- the person: hands on the rod, the reel's handle, the drop net's rope or the fish; braced against a fight,
+    // leaning over the rail to land it, watching the rod tip or the float while they wait ----
+    const hands = [null, null];
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const rodGrip = (m, palm, kind) => { const a = along(m); return { at: a.p, axis: a.t, palm, kind }; };
+    let lean = 0, brace = 0, crouch = 0, twist = 0, idleMode = "hang", lookAtW = null;
+    const tension = ph === "hooked" ? clamp(P.tension || 0.6, 0, 1.6) : 0;
+    // the reel's handle, for the left hand to wind (it's on the left of a spinning reel)
+    reel.updateMatrixWorld(true);
+    const knob = toLocal(handle.localToWorld(V3(-0.016, -0.048, 0))), knobAx = toLocal(handle.localToWorld(V3(0.01, -0.048, 0))).sub(knob);
+    if (walking) hands[1] = rodGrip(0.3, V3(-1, 0, 0.2), "carry");
+    else if (held) {
+      hands[1] = rodGrip(0.42, V3(-0.35, 1, 0), "seat"); // under the rod at the reel seat, the reel's stem between the fingers
+      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : { at: knob, axis: knobAx, palm: V3(1, 0, 0), kind: "crank" };
     }
-    torso.position.y = 1.12 + bob; head.position.y = 1.6 + bob; hat.position.y = 1.63 + bob;
-    const lean = held && (ph === "hooked" || ph === "landing") ? 0.12 : 0;
-    body.rotation.x = -lean;
-    const shoulders = [new THREE.Vector3(-0.24, 1.38 + bob, 0), new THREE.Vector3(0.24, 1.38 + bob, 0)];
-    const hands = walking ? [new THREE.Vector3(-0.28, 0.86, -0.05 + Math.sin(stride) * 0.22 * wk), pts[0].clone().addScaledVector(dir, 0.3)]
-      : held ? [pts[0].clone().addScaledVector(dir, 0.55), pts[0].clone().addScaledVector(dir, 0.12)] : [new THREE.Vector3(-0.28, 0.85, -0.05), new THREE.Vector3(0.28, 0.85, -0.05)];
-    if (tech === "net" && netOn && ph === "landing") hands[0] = toLocal(netAt ? poleFrom : hands[0]);
-    if (tech === "dropnet" && netOn && ph === "landing" && age >= LT.T2 - 0.5 && netRest < 0.98) {
-      // hand over hand on the rope, at the rail; reaching out over it to swing the net in
-      const k = (age - LT.T3) * 5.5, out = netRest > 0 ? toLocal(netAt).add(new THREE.Vector3(0, 0.6, 0)) : null;
-      const base = new THREE.Vector3(-0.18, 1.18, -0.5);
-      hands[0] = out ? base.clone().lerp(out, 0.5) : base.clone().add(new THREE.Vector3(-0.06, Math.sin(k) * 0.14, 0));
-      hands[1] = out ? base.clone().lerp(out, 0.45).add(new THREE.Vector3(0.12, 0, 0)) : base.clone().add(new THREE.Vector3(0.1, Math.sin(k + Math.PI) * 0.14, 0));
+    if (ph === "bite" && !held) {
+      // a hand out over the rod, ready to strike: to the nearest part of it within reach, bending down to it if it's low
+      const want = V3(0.24, 1.0, -0.38); let best = null;
+      for (let m = 0.1; m <= R.len * 0.6; m += 0.05) { const a = along(m), d = a.p.distanceTo(want); if (!best || d < best.d) best = { d, p: a.p }; }
+      hands[1] = { at: best.p.clone().add(V3(0, 0.07, 0)), kind: "ready", palm: V3(-0.4, -1, 0) };
+      crouch = clamp((0.95 - best.p.y) * 0.7, 0.08, 0.45); lean = 0.15 + crouch * 0.4; lookAtW = tipWorld();
     }
-    if (keptPose?.centre && kept?.state === "inspect") { hands[0] = toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.18)); hands[1] = toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.72)); }
-    handsNow = hands;
-    for (let i = 0; i < 2; i++) {
-      const s = shoulders[i], h = hands[i], d = s.distanceTo(h), L1 = 0.3, L2 = 0.29;
-      const mid = s.clone().lerp(h, 0.5), bend = Math.sqrt(Math.max(0, L1 * L1 - (Math.min(d, L1 + L2) / 2) ** 2));
-      const out = new THREE.Vector3(i ? 0.6 : -0.6, -0.8, 0.3).normalize();
-      const elbow = mid.addScaledVector(out, bend);
-      between(arms[i].up, s, elbow, 1); between(arms[i].lo, elbow, h, 1); arms[i].hand.position.copy(h);
+    else if (ph === "waiting" || ph === "missed") {
+      // watching the tip (or the float) most of the time; standing about, hands in pockets or arms folded
+      const watch = n1(t * 0.07 + id.length * 3.1) > -0.35;
+      if (watch) lookAtW = floatRig ? castAt.clone() : tipWorld();
+      const m = Math.floor(t / 23 + (hashSeed(id) % 7)) % 3; idleMode = ["pockets", "fold", "hang"][m];
+    } else if (ph === "idle" || ph === "ended" || ph === "paused") idleMode = (hashSeed(id) % 2) ? "pockets" : "hang";
+    if (ph === "cast") { lookAtW = age > 0.7 ? (rigAt || castAt).clone() : null; lean = age > 0.6 && age < 1.1 ? 0.22 : age < 0.6 ? -0.08 : 0; twist = age < 0.6 ? 0.3 * ease(age / 0.6) : 0.3 * (1 - ease(seg(age, 0.6, 0.9))); }
+    if (ph === "hooked") { brace = clamp(0.35 + 0.45 * tension, 0, 1); lean = -0.04 - 0.08 * tension; crouch = 0.08 + 0.08 * tension; twist = yawOff * 0.6; lookAtW = rigAt ? rigAt.clone() : null; }
+    if (ph === "landing") {
+      lookAtW = (fish.visible ? fish.position : rigAt)?.clone() || null; brace = age < LT.T1 ? 0.5 : 0.2; lean = 0.08;
+      if (tech === "net" && netOn && poleFrom && netAt) { hands[0] = { at: toLocal(poleFrom), axis: toLocal(netAt).sub(toLocal(poleFrom)), palm: V3(0, 1, 0), kind: "pole" }; lean = 0.2; }
+      if (tech === "dropnet" && netOn && age >= LT.T2 - 0.5 && netRest < 0.98) {
+        // hand over hand on the rope at the rail, leaning over; then reaching out over it to swing the net in
+        const k = (age - LT.T3) * 5.5, out = netRest > 0 ? toLocal(netAt).add(V3(0, 0.6, 0)) : null, base = V3(-0.16, 1.16, -0.5);
+        const a0 = out ? base.clone().lerp(out, 0.5) : base.clone().add(V3(-0.06, Math.sin(k) * 0.14, 0));
+        const a1 = out ? base.clone().lerp(out, 0.45).add(V3(0.12, 0, 0)) : base.clone().add(V3(0.1, Math.sin(k + Math.PI) * 0.14, 0));
+        hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope" }; hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope" };
+        lean = out ? 0.12 : 0.3; crouch = out ? 0.05 : 0.15; brace = 0;
+      }
+      if (rigAt && age >= LT.card - 0.3 && tech !== "dropnet" && tech !== "net") hands[0] = { at: toLocal(rigAt).add(V3(0, 0.05, 0)), axis: V3(0, 1, 0), palm: V3(1, 0, 0), kind: "line" };
     }
+    if (ph === "lost") { lean = 0.05; lookAtW = rigAt ? rigAt.clone() : null; }
+    if (keptPose?.centre && kept?.state === "inspect") {
+      // holding it up for a look: one hand under its head, the other under the tail
+      const d = toLocal(keptPose.mouth.clone().add(keptPose.dir)).sub(toLocal(keptPose.mouth));
+      hands[0] = { at: toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.2)).add(V3(0, -0.035, 0)), axis: d, palm: V3(0, 1, 0), kind: "fish" };
+      hands[1] = { at: toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.74)).add(V3(0, -0.03, 0)), axis: d, palm: V3(0, 1, 0), kind: "fish" };
+      lookAtW = keptPose.centre.clone();
+    }
+    if (kept?.state === "deck" && !walking) lookAtW = fish.visible ? fish.position.clone() : lookAtW;
+    handsNow = hands.map((h, i) => (h ? h.at.clone() : V3(i ? 0.28 : -0.28, 0.85, -0.05)));
+    if (emoting && emoting.t0 == null) emoting.t0 = t;
+    const emote = emoting && t - emoting.t0 < EMOTE_S[emoting.kind] ? { kind: emoting.kind, u: t - emoting.t0, hand: hands[1] ? 0 : 1 } : null;
+    if (!emote) emoting = null;
+    fig.pose({ t, dt, emote, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toLocal(lookAtW) : null, speaking, hood: (env.rain || 0) > 0.35 });
 
     // ---- line, rig, fish, net ----
     line.visible = showLine;
@@ -600,6 +618,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       else if (walking) { walking = null; place(curSpot); }
     },
     setSpeaking(on) { speaking = !!on; },
+    /** Wave, cheer or clap (Fish Together). Only free hands join in: not while fighting a fish. */
+    emote(kind) { if (EMOTE_S[kind]) emoting = { kind, t0: null }; },
     get walking() { return !!walking; },
     /** The landed fish, until you decide: "deck" (in the net or on the deck), "inspect" (held up), "release", "gone". */
     keepFish(state) { kept = state ? { state, t0: null } : null; }, // (its clock starts at the next frame)
@@ -607,10 +627,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     get fishMesh() { return fish; },
     get spot() { return curSpot; },
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
-    setFirstPerson(on) { fp = !!on; head.visible = hat.visible = !on; tag.visible = !on; torso.visible = !on; lift.legL.visible = lift.legR.visible = !on; for (const a of arms) { a.up.visible = a.lo.visible = a.hand.visible = !on; } },
+    setFirstPerson(on) { if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on; },
     onSplash(f) { splashCb = f; }, onRipple(f) { rippleCb = f; },
     frame,
     real,
-    dispose() { world.remove(root, kit, line, rig, fish, net, pole, ...ropes); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },
+    dispose() { world.remove(root, kit, line, rig, fish, net, pole, ...ropes); fig.dispose(); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },
   };
 }

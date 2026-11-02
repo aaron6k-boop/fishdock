@@ -8,7 +8,7 @@ import { speciesById } from "../data/species.js";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null }) {
+export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -19,6 +19,10 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
   const [sprint, setSprint] = useState(false);
+  // emotes: wave, cheer or clap (the others in a Fish Together party see it too)
+  const [emotes, setEmotes] = useState(false);
+  const emote = (k) => { w.current?.emote(k); onEmote?.(k); setEmotes(false); };
+  const hasMe = anglers.some((a) => a.local);
   // voice chat: a light above whoever's talking
   const spokeRef = useRef(new Set());
   useEffect(() => { const now = speaking || new Set(); for (const id of spokeRef.current) if (!now.has(id)) w.current?.setSpeaking(id, false); for (const id of now) w.current?.setSpeaking(id, true); spokeRef.current = new Set(now); }, [speaking]);
@@ -93,7 +97,13 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
           ) : null}
-          <button type="button" className={`fs-btn${menu ? " on" : ""}`} onClick={() => setMenu(!menu)} aria-label="Camera" aria-expanded={menu}><Icon name="camera" /></button>
+          {emotes ? (
+            <div className="cam-menu" role="menu" aria-label="Emotes">
+              {[["wave", "Wave"], ["cheer", "Cheer"], ["clap", "Clap"]].map(([k, l]) => <button key={k} type="button" role="menuitem" className="ft-pill" onClick={() => emote(k)}>{l}</button>)}
+            </div>
+          ) : null}
+          {hasMe ? <button type="button" className={`fs-btn${emotes ? " on" : ""}`} onClick={() => { setEmotes(!emotes); setMenu(false); }} aria-label="Emotes" aria-expanded={emotes} title="Wave, cheer or clap"><Icon name="hand" /></button> : null}
+          <button type="button" className={`fs-btn${menu ? " on" : ""}`} onClick={() => { setMenu(!menu); setEmotes(false); }} aria-label="Camera" aria-expanded={menu}><Icon name="camera" /></button>
           {others.length ? <button type="button" className="fs-btn" onClick={watchNext} aria-label={`Watch ${others.find((a) => a.id === watch)?.name || others[0].name}`} title="Watch a friend"><Icon name="users" /></button> : null}
           <button type="button" className="fs-btn" onClick={() => w.current?.lookAtRod()} aria-label="Look at my rod" title="Look at my rod"><Icon name="rod" /></button>
         </div>

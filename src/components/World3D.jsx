@@ -153,7 +153,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
     inspectFish: (on) => W.current?.inspectFish(on), keepFish: () => W.current?.keepFish(), releaseFish: () => W.current?.releaseFish(),
     setSpeaking: (id, on) => W.current?.setSpeaking(id, on),
     walk: (on) => W.current?.walk(on), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
-    onPose: (f) => W.current?.onPose(f), setRemotePose: (id, p) => W.current?.setRemotePose(id, p),
+    onPose: (f) => W.current?.onPose(f), emote: (k) => W.current?.emote(k), setRemotePose: (id, p) => W.current?.setRemotePose(id, p),
     get walkState() { return walk; },
     focus: (id) => W.current?.focus(id), follow: (id, sec) => W.current?.follow(id, sec), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),
     get mode() { return mode; },

@@ -8,7 +8,8 @@ import { haptics } from "../lib/haptics.js";
 import Stage3D from "../components/Stage3D.jsx";
 import FishTray from "../components/FishTray.jsx";
 import { Icon } from "../components/ui.jsx";
-import { OutfitPicker } from "./Together.jsx";
+import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
+import { saveLook } from "../lib/world3d/people.js";
 import { useParty, previewParty, joinParty, remember, membershipOf, forget, partyLink, momentText, uploadPartyPhoto, partyPhotoUrl } from "../lib/party.js";
 import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import { phaseAt } from "../lib/liveEvents.js";
@@ -33,13 +34,14 @@ function JoinScreen({ code, secret, onJoined }) {
   const viaCode = secret === "code";
   const [pv, setPv] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
   const [name, setName] = useState(() => { try { return localStorage.getItem("fishdock.party.name") || ""; } catch { return ""; } });
-  const [role, setRole] = useState("angler"), [outfit, setOutfit] = useState(1);
+  const [role, setRole] = useState("angler"), [look, setLookNow] = useState(myLook);
+  const setLook = (v) => { setLookNow(v); saveLook(v); };
   useEffect(() => { previewParty(code, viaCode ? { viaCode: true } : { secret }).then((r) => { setPv(r.party); if (!r.party.anglersOn || r.party.spotsFree <= 0) setRole("spectator"); }).catch((e) => setErr(e.message)); }, [code, secret]); // eslint-disable-line react-hooks/exhaustive-deps
   async function join() {
     setBusy(true); setErr("");
     try {
       try { localStorage.setItem("fishdock.party.name", name.trim()); } catch { /* ignore */ }
-      const r = await joinParty(code, { secret: viaCode ? null : secret, viaCode, name: name.trim() || (role === "angler" ? "Angler" : "Watching"), role, outfit });
+      const r = await joinParty(code, { secret: viaCode ? null : secret, viaCode, name: name.trim() || (role === "angler" ? "Angler" : "Watching"), role, outfit: look.outfit, look: lookOnly(look) });
       remember(code, { key: r.member.key, member: r.member.id, mode: pv.mode, venue: pv.venue, expiresAt: pv.expiresAt });
       history.replaceState(null, "", `#party/${code}`);
       onJoined();
@@ -59,7 +61,7 @@ function JoinScreen({ code, secret, onJoined }) {
           <button type="button" disabled={!pv.anglersOn || pv.spotsFree <= 0} className={`tg-mode${role === "angler" ? " on" : ""}`} onClick={() => setRole("angler")}><b>{pv.mode === "real" ? "An angler" : "An angler"}</b><span>{pv.spotsFree > 0 ? `Your own spot and rod. ${pv.spotsFree} free.` : "All four spots are taken."}</span></button>
           <button type="button" className={`tg-mode${role === "spectator" ? " on" : ""}`} onClick={() => setRole("spectator")}><b>A spectator</b><span>Watch, chat and cheer; you don't fish.</span></button>
         </div></div>
-        {role === "angler" ? <div className="field"><span className="lbl">Your clothes</span><OutfitPicker value={outfit} onChange={setOutfit} /></div> : null}
+        {role === "angler" ? <div className="field"><span className="lbl">Your angler</span><LookPicker value={look} onChange={setLook} /></div> : null}
         <button type="button" className="btn primary block" disabled={busy || pv.locked} onClick={join}>{pv.locked ? "The host has locked this party" : busy ? "Joining…" : "Join the party"}</button>
         {err ? <p className="notice warn small"><Icon name="info" /><span>{err}</span></p> : null}
         <p className="tiny">No account needed. Your name is only shown in this party. Voice chat is off until you choose to join it.</p>
@@ -194,7 +196,7 @@ function PartyLive({ code, mkey }) {
   const anglers = useMemo(() => P.members.filter((m) => m.spot).map((m) => {
     let events = m.id === me?.id && mode === "virtual" ? vf.events : P.events.filter((e) => e.who === m.id);
     if (replay?.who === m.id && Date.now() - replay.start < 12000) events = [{ ...replay.ev, t: replay.start }];
-    return { id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, local: m.id === me?.id, inspect: m.id === me?.id && mode === "virtual", real: mode === "real", events, fishHint: m.id === me?.id && mode === "virtual" ? fishFor : null };
+    return { id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, look: m.look || null, local: m.id === me?.id, inspect: m.id === me?.id && mode === "virtual", real: mode === "real", events, fishHint: m.id === me?.id && mode === "virtual" ? fishFor : null };
   }), [P.members, P.events, vf.events, me?.id, mode, replay, fishFor]);
 
   // the light: a real trip is always now; a virtual party at whatever time of day the host picks (midday to start)
@@ -226,7 +228,7 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D feel={haptics.feel} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D feel={haptics.feel} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>

@@ -84,13 +84,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const spot = spotOf(a.spot);
       // a new name (someone going "away" and coming back) only changes the label: rebuilding the angler would make
       // them jump and could play the moment they're in again
-      if (x && x.spotId === a.spot && x.outfit === a.outfit && x.name !== a.name) { x.a.setName(a.name); x.name = a.name; }
-      if (!x || x.spotId !== a.spot || x.outfit !== a.outfit) {
+      const lookKey = a.look ? JSON.stringify(a.look) : "";
+      if (x && x.spotId === a.spot && x.outfit === a.outfit && x.lookKey === lookKey && x.name !== a.name) { x.a.setName(a.name); x.name = a.name; }
+      if (!x || x.spotId !== a.spot || x.outfit !== a.outfit || x.lookKey !== lookKey) {
         if (x) x.a.dispose();
         // only your own angler is felt (other people's catches arrive as a party notification instead)
-        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, local: !!a.local, real: !!a.real, rail: !!real && (venue === "pier" || venue === "estuary"), onSound: (n, p) => onSound?.(n, p, a.id), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
+        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, look: a.look || null, local: !!a.local, real: !!a.real, rail: !!real && (venue === "pier" || venue === "estuary"), onSound: (n, p) => onSound?.(n, p, a.id), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
         made.onSplash(splash); made.onRipple(ripple);
-        x = { a: made, spotId: a.spot, outfit: a.outfit, name: a.name, out: null };
+        x = { a: made, spotId: a.spot, outfit: a.outfit, lookKey, name: a.name, out: null };
         anglers.set(a.id, x);
       }
       x.a.setEvents(a.events); x.a.setHint(a.fishHint || null); x.inspect = !!a.inspect && !!a.local;
@@ -266,6 +267,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       buildMs,
       at(x, y, z) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); },
       get walker() { return W ? { x: W.x, y: W.y, z: W.z, face: W.face } : null; },
+      get lag() { return film ? nowFn() - film.now : 0; },
+      get me() { const x = anglers.get(localId); return x?.out ? { at: x.out.at.toArray(), face: x.out.face, phase: x.out.phase } : null; },
       ground: env.ground,
     };
   }
@@ -330,7 +333,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const s = env.setEnv({ light, cond, facing });
       skyLight(s);
       renderer.toneMappingExposure = 1 + 0.3 * s.dusk + 0.45 * s.night; // eyes adapt: dusk and night aren't black
-      envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind };
+      envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind, rain: s.rain || 0 };
       return s;
     },
     /** Walk about (true) or stand at your spot again (false). Returns null when it worked, or why not. */
@@ -355,6 +358,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     get walking() { return !!W; },
     /** Someone talking (voice chat): a light above their head. */
     setSpeaking(id, on) { anglers.get(id)?.a.setSpeaking(on); },
+    /** Your own angler waves, cheers or claps. */
+    emote(kind) { anglers.get(localId)?.a.emote(kind); },
     /** Your landed fish: hold it up for a look (inspect), keep it, or put it back. */
     inspectFish(on = true) { anglers.get(localId)?.a.keepFish(on ? "inspect" : "deck"); },
     keepFish() { anglers.get(localId)?.a.keepFish("gone"); },
@@ -382,6 +387,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     /** Someone else walking about (Fish Together): their pose, or null when they're back at their spot. */
     setRemotePose(id, pose) {
       if (id === localId) return;
+      if (pose?.emote) { anglers.get(id)?.a.emote(pose.emote); return; }
       if (pose?.spotAt) { const x = anglers.get(id); remote.delete(id); if (x) { x.a.setWalk(null); x.a.place({ ...x.a.spot, at: pose.at, face: pose.face, edge: pose.edge, cast: pose.cast }); } return; }
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },

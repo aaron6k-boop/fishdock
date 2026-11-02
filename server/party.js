@@ -11,6 +11,8 @@
 // - No positions: a party knows the kind of place (pier, beach, ...) and a place label the host typed or picked, at
 //   most an area, or (a virtual party started from the 3D demo) one of FishDock's own public, documented marks by id,
 //   so everyone fishes that real place's 3D reconstruction. Never anyone's coordinates. Member keys are stored hashed. Network addresses are never stored.
+// - Looks: an angler's figure in the 3D view (skin tone, hair, hat, beard, build: small whole numbers chosen in the
+//   app, or none). It's how their character looks in the simulation, nothing more.
 // - Voice: the server only relays the connection set-up (WebRTC signalling) between members; audio goes phone to
 //   phone and never through FishDock.
 
@@ -19,11 +21,16 @@ import { needDb, enforce } from "./db.js";
 import { ipKey } from "./ipKey.js";
 import { assignSpots, layoutFor, MAX_ANGLERS } from "../src/lib/world3d/spots.js";
 import { markFor } from "./place3d.js";
+import { cleanLook } from "../src/lib/world3d/people.js";
 
-/** A walking pose: { x, y, z, face, air } within the 3D place, or null (back at their spot); undefined if it's not one. */
+/** A walking pose: { x, y, z, face, air } within the 3D place, null (back at their spot), or an emote ({ emote });
+ * undefined if it's not one. */
+export const EMOTES = ["wave", "cheer", "clap"];
 export function cleanPose(p) {
   if (p === null) return null;
   if (!p || typeof p !== "object") return undefined;
+  // a wave, cheer or clap: just its name
+  if ("emote" in p) return EMOTES.includes(p.emote) ? { emote: p.emote } : undefined;
   const n = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? Math.round(v * 100) / 100 : NaN);
   // fishing from somewhere they walked to: where they now stand, which way they face, the edge and the cast
   if (p.spotAt) {
@@ -65,7 +72,7 @@ export class PartyRoom {
   constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); this.poseRate = new Map(); }
   get ready() { return !!this.s; }
 
-  async init({ code, mode, venue, place, name, outfit, hours }, now) {
+  async init({ code, mode, venue, place, name, outfit, look, hours }, now) {
     if (this.s) throw new Error("exists");
     const h = PARTY.hours.includes(Number(hours)) ? Number(hours) : PARTY.defaultHours;
     this.s = {
@@ -74,14 +81,14 @@ export class PartyRoom {
       light: mode === "real" ? "now" : "midday", secret: randomId(12), codeOn: true, locked: false, chatOn: true, voiceOn: true, anglersOn: true,
       members: {}, events: [], seq: 0, chat: [], challenge: null, reports: [], photos: [],
     };
-    const host = await this.addMember({ name, role: "host", outfit }, now);
+    const host = await this.addMember({ name, role: "host", outfit, look }, now);
     return host;
   }
-  async addMember({ name, role, outfit }, now) {
+  async addMember({ name, role, outfit, look }, now) {
     const id = randomId(6), key = randomId(24);
     const angler = role === "host" || role === "angler";
     const m = { id, keyHash: await hashKey(key), name: nameOf(name, angler ? "Angler" : "Spectator"), role: role === "host" ? "host" : angler ? "angler" : "spectator",
-      outfit: Number.isInteger(outfit) ? ((outfit % 5) + 5) % 5 : Object.keys(this.s.members).length % 5, spot: null, presence: this.s.mode === "virtual" ? "virtual" : "remote",
+      outfit: Number.isInteger(outfit) ? ((outfit % 5) + 5) % 5 : Object.keys(this.s.members).length % 5, look: cleanLook(look), spot: null, presence: this.s.mode === "virtual" ? "virtual" : "remote",
       joinedAt: now, seenAt: now, left: false, kicked: false, voice: { on: false, muted: true } };
     this.s.members[id] = m;
     if (m.role !== "spectator") this.placeAnglers(now, m.id);
@@ -120,7 +127,7 @@ export class PartyRoom {
     const host = Object.values(S.members).find((m) => m.role === "host");
     return { ok: true, party: { code: S.code, mode: S.mode, venue: S.venue, place: S.place, host: host?.name || "The host", anglers: this.anglerCount(), maxAnglers: PARTY.maxAnglers, locked: S.locked, anglersOn: S.anglersOn, spotsFree: PARTY.maxAnglers - this.anglerCount(), expiresAt: S.expiresAt } };
   }
-  async join({ secret, viaCode, name, role, outfit }, now) {
+  async join({ secret, viaCode, name, role, outfit, look }, now) {
     const pv = this.preview(now, { secret, viaCode });
     if (!pv.ok) return { error: pv.why };
     const S = this.s;
@@ -130,12 +137,12 @@ export class PartyRoom {
     // over can't grow the party's saved record without limit
     if (Object.keys(S.members).length >= PARTY.maxEverMembers) return { error: "full" };
     const wants = role === "angler" && S.anglersOn && this.anglerCount() < PARTY.maxAnglers ? "angler" : "spectator";
-    const m = await this.addMember({ name, role: wants, outfit }, now);
+    const m = await this.addMember({ name, role: wants, outfit, look }, now);
     return { member: m, role: S.members[m.id].role };
   }
 
   // ---- what each member sees ----
-  memberOut(m) { return { id: m.id, name: m.name, role: m.role, outfit: m.outfit, spot: m.spot, presence: m.presence, online: !!this.online.get(m.id), voice: m.voice, left: m.left }; }
+  memberOut(m) { return { id: m.id, name: m.name, role: m.role, outfit: m.outfit, look: m.look || null, spot: m.spot, presence: m.presence, online: !!this.online.get(m.id), voice: m.voice, left: m.left }; }
   members() { return Object.values(this.s.members).filter((m) => !m.kicked && !m.left).map((m) => this.memberOut(m)); }
   hello(mid, now) {
     const S = this.s, me = S.members[mid];
@@ -427,7 +434,7 @@ export async function handleParty(request, env, now = Date.now()) {
     if (!code && request.method === "POST") {
       await enforce(db, `party:new:${who}`, PARTY.createPerDay, now, { daily: true }, "That's as many parties as can be started from here today.");
       const b = await readJson(request, 4096);
-      const body = { mode: b.mode === "real" ? "real" : "virtual", venue: VENUES.includes(b.venue) ? b.venue : "pier", place: cleanPlace(b.place, b.mode), name: nameOf(b.name, "Host"), outfit: Number(b.outfit) || 0, hours: Number(b.hours) || PARTY.defaultHours };
+      const body = { mode: b.mode === "real" ? "real" : "virtual", venue: VENUES.includes(b.venue) ? b.venue : "pier", place: cleanPlace(b.place, b.mode), name: nameOf(b.name, "Host"), outfit: Number(b.outfit) || 0, look: cleanLook(b.look), hours: Number(b.hours) || PARTY.defaultHours };
       for (let i = 0; i < 4; i++) {
         const c = makeCode();
         const r = await inner(c, "init", { method: "POST", body: JSON.stringify({ ...body, code: c }) });
@@ -448,7 +455,7 @@ export async function handleParty(request, env, now = Date.now()) {
     if (op === "join" && request.method === "POST") {
       await enforce(db, `party:join:${who}`, PARTY.joinsPerMinute, now, { windowMs: 60e3 }, "That's a lot of tries. Wait a minute and try again.");
       const b = await readJson(request, 4096);
-      const r = await inner(code, "join", { method: "POST", body: JSON.stringify({ secret: typeof b.secret === "string" ? b.secret.slice(0, 40) : null, viaCode: !!b.viaCode, name: b.name, role: b.role === "spectator" ? "spectator" : "angler", outfit: Number(b.outfit) || 0 }) });
+      const r = await inner(code, "join", { method: "POST", body: JSON.stringify({ secret: typeof b.secret === "string" ? b.secret.slice(0, 40) : null, viaCode: !!b.viaCode, name: b.name, role: b.role === "spectator" ? "spectator" : "angler", outfit: Number(b.outfit) || 0, look: cleanLook(b.look) }) });
       const out = await r.json();
       if (!r.ok) return err(r.status, out.error || "not_found", { not_found: "There's no party with that code, or its invitation has changed.", ended: "That party has ended.", locked: "The host has locked this party.", full: "This party is full." }[out.error] || "Couldn't join.");
       return json(out);

@@ -5,30 +5,24 @@ import { useState } from "react";
 import HapticSettings from "../components/HapticSettings.jsx";
 import { Icon } from "../components/ui.jsx";
 import { startParty, previewParty, remember, myParties, cleanCode, CODE_RE } from "../lib/party.js";
-import { OUTFITS } from "../lib/world3d/angler.js";
+import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
+import { saveLook } from "../lib/world3d/people.js";
 
 const VENUES = [["pier", "Pier"], ["beach", "Beach"], ["estuary", "Estuary"], ["river", "River"], ["lake", "Lake"]];
 const go = (h) => { location.hash = h; };
-
-export function OutfitPicker({ value, onChange }) {
-  return (
-    <div className="outfits" role="radiogroup" aria-label="Clothes">
-      {OUTFITS.map((o, i) => <button key={o.name} type="button" role="radio" aria-checked={value === i} aria-label={o.name} title={o.name} className={`outfit${value === i ? " on" : ""}`} style={{ "--jk": `#${o.jacket.toString(16).padStart(6, "0")}`, "--ht": `#${o.hat.toString(16).padStart(6, "0")}` }} onClick={() => onChange(i)}><i /></button>)}
-    </div>
-  );
-}
 
 export default function Together() {
   const [panel, setPanel] = useState(null);
   const [mode, setMode] = useState("virtual"), [venue, setVenue] = useState("pier"), [label, setLabel] = useState(""), [hours, setHours] = useState(12);
   const [name, setName] = useState(() => { try { return localStorage.getItem("fishdock.party.name") || ""; } catch { return ""; } });
-  const [outfit, setOutfit] = useState(0), [code, setCode] = useState(""), [link, setLink] = useState(""), [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
+  const [look, setLookNow] = useState(myLook), [code, setCode] = useState(""), [link, setLink] = useState(""), [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
+  const setLook = (v) => { setLookNow(v); saveLook(v); };
   const saveName = (n) => { setName(n); try { localStorage.setItem("fishdock.party.name", n); } catch { /* ignore */ } };
   const mine = myParties();
   async function start() {
     setBusy(true); setMsg("");
     try {
-      const r = await startParty({ mode, venue, place: { label: label.trim() || null }, name: name.trim() || "Host", outfit, hours });
+      const r = await startParty({ mode, venue, place: { label: label.trim() || null }, name: name.trim() || "Host", outfit: look.outfit, look: lookOnly(look), hours });
       remember(r.code, { key: r.member.key, member: r.member.id, mode, venue, expiresAt: r.expiresAt, host: true, secret: r.secret });
       go(`#party/${r.code}/${r.secret}`);
     } catch (e) { setMsg(e.message); } finally { setBusy(false); }
@@ -70,7 +64,7 @@ export default function Together() {
             <label className="field"><span className="lbl">Name the place (optional)</span><input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={60} placeholder="e.g. Norfolk coast" /><span className="tiny">Shown to everyone in the party. An area is enough: the party never knows exactly where anyone is.</span></label>
             <div className="field"><span className="lbl">How long it stays open</span><div className="moments">{[2, 6, 12, 24].map((h) => <button key={h} type="button" className={`chip${hours === h ? " on" : ""}`} onClick={() => setHours(h)}>{h} hours</button>)}</div></div>
             <label className="field"><span className="lbl">Your name</span><input value={name} onChange={(e) => saveName(e.target.value)} maxLength={24} placeholder="Shown above your angler" /></label>
-            <div className="field"><span className="lbl">Your clothes</span><OutfitPicker value={outfit} onChange={setOutfit} /></div>
+            <div className="field"><span className="lbl">Your angler</span><LookPicker value={look} onChange={setLook} /></div>
             <button type="button" className="btn primary block" disabled={busy} onClick={start}><Icon name="users" />{busy ? "Starting…" : "Start the party"}</button>
           </section>
         ) : null}
