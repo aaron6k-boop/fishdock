@@ -1,4 +1,4 @@
-# Temporary: the mobile audit of the live site, in phone-sized Chromium. Screenshots go to the audit-shots branch.
+# Temporary: fetch the live map data for the demo places (to check the 3D layouts). Saved to the osm-data branch.
 name: Live party check
 on:
   push:
@@ -6,19 +6,15 @@ on:
 permissions:
   contents: write
 jobs:
-  audit:
+  osm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm install --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
-      - run: node tools/mobile-audit.mjs https://fishdock.aaron6k.workers.dev
-        continue-on-error: true
-      - name: Save the screenshots to the audit-shots branch
+      - name: Fetch /api/place for each demo place
         run: |
-          cd audit && git init -q -b audit-shots && git add -A
-          git -c user.name=audit -c user.email=audit@localhost commit -qm "mobile audit $(date -u +%FT%TZ)"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" audit-shots
+          mkdir osm && cd osm
+          for id in gorleston-south-pier cromer-pier chesil-beach-ferry-bridge whitby-piers brixham-breakwater st-ives-the-island holyhead-breakwater loch-ryan-leffnol river-wye-ross royalty-fishery-avon rutland-water lough-erne-enniskillen mumbles-head deal-pier southend-pier; do
+            curl -s -D $id.h -H 'x-fishdock: 1' -o $id.json "https://fishdock.aaron6k.workers.dev/api/place?spot=$id"; echo "$id $(head -1 $id.h) $(grep -i x-mark $id.h) $(wc -c < $id.json)"; sleep 2
+          done
+          git init -q -b osm-data && git add -A
+          git -c user.name=audit -c user.email=audit@localhost commit -qm "osm data $(date -u +%FT%TZ)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" osm-data
