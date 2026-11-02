@@ -1,10 +1,12 @@
-# Temporary: a second real browser joins a live test party through the app (with a host in another browser).
+# Temporary: the mobile audit of the live site, in phone-sized Chromium. Screenshots go to the audit-shots branch.
 name: Live party check
 on:
   push:
     branches: [live-check]
+permissions:
+  contents: write
 jobs:
-  guest:
+  audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,10 +15,10 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
-      - run: node tools/party-browser-guest.mjs "https://fishdock.aaron6k.workers.dev/#party/UUBKCQ/zBJMQ-F7Az0lX0sz" 7
-      - if: always()
-        uses: actions/upload-artifact@v4
+      - run: node tools/mobile-audit.mjs https://fishdock.aaron6k.workers.dev
         continue-on-error: true
-        with:
-          name: guest-shots
-          path: shots/
+      - name: Save the screenshots to the audit-shots branch
+        run: |
+          cd audit && git init -q -b audit-shots && git add -A
+          git -c user.name=audit -c user.email=audit@localhost commit -qm "mobile audit $(date -u +%FT%TZ)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" audit-shots
