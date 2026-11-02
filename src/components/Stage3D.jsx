@@ -15,7 +15,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   // ---- walking about (Roblox-style): a thumbstick, jump, sprint, and "Fish here" at the water's edge ----
   const [walk, setWalk] = useState(null), [walkMsg, setWalkMsg] = useState("");
   const say = (m) => { setWalkMsg(m); setTimeout(() => setWalkMsg((x) => (x === m ? "" : x)), 3200); };
-  const startWalk = () => { const why = w.current?.walk(true); if (why) say(why); else { setMenu(false); say("Walk with the stick; drag to look round. Find the water's edge to fish."); } };
+  const startWalk = () => { const why = w.current?.walk(true); if (why) say(why); else { setMenu(false); say("Walking (Beta): use the stick, drag to look round, pinch to zoom. Find the water's edge to fish."); } };
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
   const [sprint, setSprint] = useState(false);
@@ -72,7 +72,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
             </div>
             <div className="walk-top">
               {walk.canFish ? <button type="button" className="walk-prompt" onClick={fishHere}><span className="key">Tap</span>Fish here</button> : null}
-              <button type="button" className="walk-done" onClick={stopWalk}>Back to my spot</button>
+              <button type="button" className="walk-done" onClick={stopWalk}>Back to my spot <span className="beta-pill">Beta</span></button>
             </div>
           </>
         ) : null}
@@ -80,7 +80,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
         {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is in the net: have a look</button></div> : null}
         {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
         <div className="w3d-tools">
-          {!walk ? <button type="button" className="fs-btn" onClick={startWalk} aria-label="Walk about" title="Walk about"><Icon name="walk" /></button> : null}
+          {!walk ? <button type="button" className="fs-btn" onClick={startWalk} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
           {menu ? (
             <div className="cam-menu" role="menu" aria-label="Camera">
               {MODES.filter(([m]) => m !== "spectator" || others.length).map(([m, l]) => <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} className={`ft-pill${mode === m ? " on" : ""}`} onClick={() => pick(m)}>{l}</button>)}
