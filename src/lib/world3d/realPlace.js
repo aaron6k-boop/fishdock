@@ -21,6 +21,11 @@ const windowTex = () => tex((g, n) => {
   g.fillStyle = "#e8e4dc"; g.fillRect(n * 0.28, n * 0.7, n * 0.44, n * 0.04);
 }, 64);
 
+// rough grass for the land along rivers and lakes (paving is for harbours and promenades)
+const grassTex = () => tex((g, n) => {
+  g.fillStyle = "#7d8f5a"; g.fillRect(0, 0, n, n);
+  for (let i = 0; i < 2600; i++) { const v = Math.random(); g.fillStyle = `rgba(${v > 0.5 ? 200 : 30},${v > 0.5 ? 220 : 60},${v > 0.5 ? 120 : 20},${Math.random() * 0.16})`; g.fillRect(Math.random() * n, Math.random() * n, 1.5, 3); }
+});
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 const COL_OF = [[0.25, 0.3, 0.28], [0.52, 0.52, 0.46], [0.84, 0.76, 0.56], [0.36, 0.5, 0.26]];
 
@@ -30,6 +35,9 @@ const NEAR_SOLID = 45;
 export function buildRealPlace(group, place, M, solids = []) {
   const spots = place.spots || [], nearSpot = (x, z, r = NEAR_SOLID) => spots.some((sp) => Math.hypot(x - sp.at[0], z - sp.at[2]) < r);
   const xs = place.grid.xs, n = xs.length, cls = unrle(place.grid.cls, n * n);
+  // inland (rivers, lakes) the land not mapped as anything else is fields and banks, not paving
+  const inland = place.venue === "river" || place.venue === "lake";
+  const colOf = inland ? [COL_OF[0], [0.95, 0.97, 0.9], COL_OF[2], [0.9, 0.95, 0.85]] : COL_OF; // (the grass texture brings the green)
   // ---- the ground ----
   const h = new Float32Array(n * n);
   for (let k = 0; k < n * n; k++) h[k] = H_OF[cls[k]];
@@ -47,7 +55,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   }
   const pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const k = j * n + i, c = COL_OF[cls[k]], v = 0.92 + ((i * 7919 + j * 104729) % 97) / 97 * 0.16;
+    const k = j * n + i, c = colOf[cls[k]], v = 0.92 + ((i * 7919 + j * 104729) % 97) / 97 * 0.16;
     pos.set([xs[i], h[k], xs[j]], k * 3); col.set([c[0] * v, c[1] * v, c[2] * v], k * 3);
   }
   const uv = new Float32Array(n * n * 2);
@@ -61,7 +69,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1)); g.computeVertexNormals();
-  const ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, map: pavingTex() }));
+  const ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, map: inland ? grassTex() : pavingTex() }));
   ground.receiveShadow = true; group.add(ground);
 
   // ---- harbour walls: upright faces along the real water's edge (not on beaches) ----
