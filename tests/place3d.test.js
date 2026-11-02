@@ -53,19 +53,22 @@ test("the place route: only FishDock's documented marks, OpenStreetMap's answer 
   assert.equal(calls.calls.length, 1);
 });
 
-test("360° photos: off without a Mapillary token; otherwise the nearest panorama, credited", async (t) => {
+test("360° photos: off without a Mapillary token, hidden until made public; otherwise the nearest panorama, credited", async (t) => {
   const s = setup();
   const c = s.call(handlePano, "/api/pano");
   assert.equal((await c("GET", "?spot=gorleston-south-pier")).status, 503);
   const im = (id, lon, lat, pano = true) => ({ id, is_pano: pano, thumb_2048_url: `https://scontent.example/${id}.jpg`, computed_compass_angle: 95, computed_geometry: { type: "Point", coordinates: [lon, lat] }, captured_at: 1693526400000, creator: { username: "pierphotos" } });
   const answer = { data: [im("far", 1.7383, 52.575), im("flat", 1.7384, 52.5721, false), im("near", 1.7385, 52.5722), im("nearer", 1.7383, 52.57211)] };
   const p = pickPano(answer, 52.5721, 1.7383);
-  assert.equal(p.id, "nearer"); assert.equal(p.heading, 95); assert.equal(p.author, "pierphotos"); assert.equal(p.licence, "CC BY-SA 4.0"); assert.match(p.page, /mapillary\.com/);
+  assert.equal(p.id, "nearer"); assert.equal(p.heading, 95); assert.equal(p.author, "pierphotos"); assert.equal(p.licence, "CC BY-SA 4.0"); assert.match(p.page, /mapillary\.com/); assert.equal(p.profile, "https://www.mapillary.com/profile/pierphotos");
   assert.equal(pickPano({ data: [im("far", 1.7383, 52.58)] }, 52.5721, 1.7383), null);
   s.env.MAPILLARY_TOKEN = "MLY|test";
   const calls = stubFetch(t, [[/graph\.mapillary\.com\/images\?access_token=MLY%7Ctest&.*is_pano=true/, () => answer]]);
-  const r = await c("GET", "?spot=gorleston-south-pier");
+  assert.equal((await c("GET", "?spot=gorleston-south-pier")).status, 503, "hidden until PANO_PUBLIC is set");
+  const r = await c("GET", "?spot=gorleston-south-pier&preview=1");
   assert.equal(r.status, 200, r.text); assert.equal(r.body.pano.id, "nearer");
+  s.env.PANO_PUBLIC = "1";
+  assert.equal((await c("GET", "?spot=gorleston-south-pier")).status, 200, "public once switched on");
   assert.doesNotMatch(r.text, /MLY/, "the token never reaches the phone");
   assert.equal(calls.calls.length, 1);
 });

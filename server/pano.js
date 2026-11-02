@@ -5,6 +5,8 @@
 // - Only FishDock's public, documented marks, never an arbitrary position. The nearest panorama within about 250 m
 //   is chosen; photos are CC BY-SA 4.0 and shown with the photographer's name and a link to the photo.
 // - Kept for 12 hours (Mapillary's image links are signed and expire).
+// - Hidden from everyone until PANO_PUBLIC is "1" (a plain variable, set once coverage has been checked). Before that,
+//   ?preview=1 answers too: that's what tools/pano-coverage.mjs and the in-app preview (see World3D) use.
 
 import { json, err, guard, toResponse } from "./http.js";
 import { ensureSchema } from "./db.js";
@@ -30,6 +32,7 @@ export function pickPano(answer, lat, lon) {
     id: String(im.id), url: im.thumb_2048_url, heading: Number.isFinite(heading) ? heading : 0, metres: Math.round(d),
     at: [Math.round(c[1] * 1e5) / 1e5, Math.round(c[0] * 1e5) / 1e5], capturedAt: Number(im.captured_at) || null,
     author: String(im.creator?.username || "a Mapillary contributor").slice(0, 60), licence: "CC BY-SA 4.0", page: `https://www.mapillary.com/app/?pKey=${encodeURIComponent(im.id)}`,
+    profile: im.creator?.username ? `https://www.mapillary.com/profile/${encodeURIComponent(String(im.creator.username).slice(0, 60))}` : null,
   };
 }
 
@@ -38,10 +41,11 @@ export async function handlePano(request, env, now = Date.now(), deps = {}) {
   if (blocked) return blocked;
   if (request.method !== "GET") return err(405, "method", "Use GET.");
   try {
-    const id = new URL(request.url).searchParams.get("spot") || "";
+    const url = new URL(request.url), id = url.searchParams.get("spot") || "";
     const mark = markFor(id);
     if (!mark) return err(404, "not_found", "That place isn't one of FishDock's documented marks.");
     if (!env?.MAPILLARY_TOKEN) return err(503, "not_configured", "Real 360° photos aren't switched on yet.");
+    if (env.PANO_PUBLIC !== "1" && url.searchParams.get("preview") !== "1") return err(503, "not_public", "Real 360° photos aren't switched on yet.");
     if (env.DB) await ensureSchema(env.DB);
     const ctx = upstreamCtx(env.DB, now, deps);
     const dLat = 250 / 111320, dLon = 250 / (111320 * Math.cos((mark.lat * Math.PI) / 180));

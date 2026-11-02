@@ -126,6 +126,10 @@ function PartyLive({ code, mkey }) {
   const myPhase = phaseAt(myEvents, now);
   const [, tick] = useState(0);
   useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 500); return () => clearInterval(id); }, []);
+  // once you're in, the invite secret leaves the address bar: it can't be copied, screenshotted or kept in history by
+  // mistake, and a link replaced by the host is never left showing (Invite has the current link; coming back to
+  // #party/<code> works with this phone's member key)
+  useEffect(() => { if (location.hash.startsWith(`#party/${code}/`)) history.replaceState(null, "", `${location.pathname}${location.search}#party/${code}`); }, [code]);
 
   // ---- notifications: what the others are doing (from their recorded events only) ----
   const seen = useRef(new Set()), firstLoad = useRef(true);
