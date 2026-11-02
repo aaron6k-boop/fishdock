@@ -1,14 +1,21 @@
-# Temporary: the Fish Together smoke test against the live site (one short party, closed at the end).
+# Temporary: a second real browser joins a live test party through the app (with a host in another browser).
 name: Live party check
 on:
   push:
     branches: [live-check]
 jobs:
-  live:
+  guest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node tools/party-smoke.mjs https://fishdock.aaron6k.workers.dev
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node tools/party-browser-guest.mjs "https://fishdock.aaron6k.workers.dev/#party/UUBKCQ/zBJMQ-F7Az0lX0sz" 7
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guest-shots
+          path: shots/
