@@ -265,6 +265,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       get camera() { return camera; },
       buildMs,
       at(x, y, z) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); },
+      get walker() { return W ? { x: W.x, y: W.y, z: W.z, face: W.face } : null; },
+      ground: env.ground,
     };
   }
   function tick(t, now, dt, draw = true) {
@@ -277,7 +279,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const me = anglers.get(localId);
       if (!me) W = null;
       else {
-        W = stepWalker(W, { ...walkIn, camYaw: look.yaw, jump: walkJump }, Math.min(0.05, dt || 0.016), env.ground); walkJump = false;
+        // in small steps (never through a railing), however slowly the phone draws
+        let rem = Math.min(0.25, dt || 0.016);
+        while (rem > 1e-4) { const h = Math.min(0.05, rem); W = stepWalker(W, { ...walkIn, camYaw: look.yaw, jump: walkJump }, h, env.ground); walkJump = false; rem -= h; }
         me.a.setWalk(W);
         if (++fishTest % 8 === 0) canFish = !!env.ground.fishHere(W.x, W.z);
         walkInfo = { on: true, canFish, sprint: !!walkIn.sprint };
@@ -349,6 +353,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       return null;
     },
     get walking() { return !!W; },
+    /** Someone talking (voice chat): a light above their head. */
+    setSpeaking(id, on) { anglers.get(id)?.a.setSpeaking(on); },
     /** Your landed fish: hold it up for a look (inspect), keep it, or put it back. */
     inspectFish(on = true) { anglers.get(localId)?.a.keepFish(on ? "inspect" : "deck"); },
     keepFish() { anglers.get(localId)?.a.keepFish("gone"); },

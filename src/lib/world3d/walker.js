@@ -33,8 +33,10 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
   let moved = 0;
   if (v > 0) {
     const sx = dx / (mag || 1) * v * dt, sz = dz / (mag || 1) * v * dt;
-    // straight on, or slide along whatever's in the way
-    for (const [mx, mz] of [[sx, sz], [sx, 0], [0, sz]]) {
+    // straight on, or slide along whatever's in the way: turned a little either way first (round a curved railing),
+    // then along the map's own axes
+    const turned = [0.4, -0.4, 0.8, -0.8, 1.2, -1.2].map((r) => { const c = Math.cos(r), sn = Math.sin(r); return [(sx * c - sz * sn) * c, (sx * sn + sz * c) * c]; });
+    for (const [mx, mz] of [[sx, sz], ...turned, [sx, 0], [0, sz]]) {
       if (Math.abs(mx) + Math.abs(mz) < 1e-6) continue;
       if (can(n.x + mx, n.z + mz)) { n.x += mx; n.z += mz; moved = Math.hypot(mx, mz); break; }
     }

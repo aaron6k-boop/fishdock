@@ -14,7 +14,7 @@ import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import { phaseAt } from "../lib/liveEvents.js";
 import { isLanded } from "../lib/landed.js";
 import { standings, CHALLENGES } from "../lib/partyStats.js";
-import { createVoice } from "../lib/voice.js";
+import { createVoice, proximityOf } from "../lib/voice.js";
 import { qrSvg } from "../lib/qr.js";
 import { SPECIES, speciesById } from "../data/species.js";
 import { hasArt, artUrl } from "../data/fishart.js";
@@ -178,6 +178,16 @@ function PartyLive({ code, mkey }) {
     try { await voice.current.join(P.members.filter((m) => m.id !== me.id && m.voice?.on && !blocked.has(m.id)).map((m) => m.id)); }
     catch { toast("Voice needs the microphone. It wasn't allowed, so text chat is there instead."); }
   }
+  // the mic button on the fishing screen: the first tap joins voice (the phone asks for the microphone then, not
+  // before); after that it mutes and unmutes you
+  const micTap = async () => {
+    if (!voiceState.on) { await joinVoice(); if (voice.current?.state().on) toast("Voice on. People near you sound louder. Tap the mic to mute."); return; }
+    voice.current?.mute(!voiceState.muted);
+  };
+  // proximity chat: everyone's loudness and side from where they stand in the 3D place
+  const onHear = (h) => { const v = voice.current; if (!v || !v.state().on) return; for (const p of v.state().peers) { const r = proximityOf(h.me, h.others[p.id], h.yaw); v.setPlace(p.id, r.near, r.pan); } };
+  const speakingKey = [...(voiceState.peers || []).filter((p) => p.speaking && !p.muted).map((p) => p.id), ...(voiceState.on && voiceState.talking && voiceState.level > 0.05 && me ? [me.id] : [])].sort().join(",");
+  const speaking = useMemo(() => new Set(speakingKey ? speakingKey.split(",") : []), [speakingKey]);
   const block = (id, on) => { const s = new Set(blocked); if (on) { s.add(id); voice.current?.drop(id); } else s.delete(id); setBlocked(s); try { localStorage.setItem(BLOCK_KEY, JSON.stringify([...s])); } catch { /* ignore */ } };
 
   // ---- the anglers in the 3D place ----
@@ -216,7 +226,7 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D feel={haptics.feel} poseBus={poseBus} onPose={mode === "virtual" ? sendPose : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D feel={haptics.feel} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>
@@ -224,6 +234,7 @@ function PartyLive({ code, mkey }) {
             <button type="button" className="fs-chip" onClick={() => setSheet("people")}><Icon name="users" />{P.members.filter((m) => m.spot).length}{P.members.some((m) => !m.spot) ? ` + ${P.members.filter((m) => !m.spot).length} watching` : ""}</button>
             {P.status === "reconnecting" ? <span className="fs-chip">Reconnecting…</span> : null}
             <span className="grow" />
+            {party.voiceOn ? <button type="button" className={`fs-btn mic${voiceState.on && !voiceState.muted ? " on" : ""}${voiceState.on && voiceState.talking && voiceState.level > 0.05 ? " talking" : ""}`} onClick={micTap} aria-pressed={voiceState.on && !voiceState.muted} aria-label={!voiceState.on ? "Turn on your microphone (voice chat)" : voiceState.muted ? "Unmute your microphone" : "Mute your microphone"} title={!voiceState.on ? "Voice chat: tap to turn your mic on" : voiceState.muted ? "Muted: tap to talk" : "Mic on: tap to mute"}><Icon name={voiceState.on && !voiceState.muted ? "mic" : "micoff"} /></button> : null}
             <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
             <button type="button" className={`fs-btn${sheet ? " on" : ""}`} onClick={() => setSheet(sheet ? null : "people")} aria-label="Party: people, voice, chat, catches, invite"><Icon name="users" /></button>
           </div>
@@ -247,7 +258,8 @@ function PartyLive({ code, mkey }) {
               {!voiceState.on ? <button type="button" className="btn small primary" disabled={!party.voiceOn} onClick={joinVoice}><Icon name="mic" />{party.voiceOn ? "Join voice" : "Voice is off"}</button>
                 : <><button type="button" className="btn small" onClick={() => voice.current?.leave()}>Leave voice</button>
                   <button type="button" className={`btn small${voiceState.muted ? " primary" : ""}`} onClick={() => voice.current?.mute(!voiceState.muted)}><Icon name={voiceState.muted ? "mute" : "mic"} />{voiceState.muted ? "Unmute" : "Mute me"}</button>
-                  <label className="check small"><input type="checkbox" checked={voiceState.ptt} onChange={(e) => voice.current?.setPushToTalk(e.target.checked)} /> Push to talk</label></>}
+                  <label className="check small"><input type="checkbox" checked={voiceState.ptt} onChange={(e) => voice.current?.setPushToTalk(e.target.checked)} /> Push to talk</label>
+                  <label className="check small"><input type="checkbox" checked={voiceState.proximity !== false} onChange={(e) => voice.current?.setProximity(e.target.checked)} /> Proximity chat (people near you are louder, from their side; off: hear everyone)</label></>}
             </div>
             <p className="tiny">Voice goes phone to phone. It asks for the microphone only when you join. On some mobile networks someone may not connect; text chat always works.</p>
             <div className="list">{P.members.map((m) => {
@@ -256,7 +268,7 @@ function PartyLive({ code, mkey }) {
                 <div key={m.id} className="li party-person">
                   <span className={`speak${(isMe ? voiceState.talking && voiceState.level > 0.05 : vp?.speaking) ? " on" : ""}`} aria-hidden="true" />
                   <span className="grow"><span className="t">{m.name}{isMe ? " (you)" : ""}{m.role === "host" ? " · host" : ""}</span>
-                    <span className="s">{m.spot ? `${spotById(venue, m.spot).name} · ${mode === "real" ? (m.presence === "water" ? "At the water" : "Not at the water") : "Fishing virtually"}` : "Watching"}{m.online ? "" : " · away"}{m.voice?.on ? (m.voice.muted ? " · voice (muted)" : " · in voice") : ""}{vp ? (vp.connected ? " · you can hear each other" : vp.failed ? " · voice couldn't connect" : " · connecting voice…") : ""}</span></span>
+                    <span className="s">{m.spot ? `${spotById(venue, m.spot).name} · ${mode === "real" ? (m.presence === "water" ? "At the water" : "Not at the water") : "Fishing virtually"}` : "Watching"}{m.online ? "" : " · away"}{m.voice?.on ? (m.voice.muted ? " · voice (muted)" : " · in voice") : ""}{vp ? (vp.connected ? (voiceState.proximity !== false && vp.near < 0.05 ? " · too far away to hear" : " · you can hear each other") : vp.failed ? " · voice couldn't connect" : " · connecting voice…") : ""}</span></span>
                   {!isMe && vp ? <input type="range" min="0" max="1" step="0.1" value={vp.volume} onChange={(e) => voice.current?.setVolume(m.id, Number(e.target.value))} aria-label={`${m.name}'s volume`} className="vol-mini" /> : null}
                   {!isMe && vp ? <button type="button" className="xbtn" onClick={() => voice.current?.muteOther(m.id, !vp.muted)} aria-label={vp.muted ? `Unmute ${m.name}` : `Mute ${m.name}`}><Icon name={vp.muted ? "mute" : "volume"} /></button> : null}
                   {!isMe && m.spot ? <button type="button" className="xbtn" onClick={() => { setSheet(null); }} aria-label={`Watch ${m.name}`} title="Watch"><Icon name="eye" /></button> : null}

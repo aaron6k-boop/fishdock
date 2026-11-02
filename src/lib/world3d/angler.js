@@ -98,6 +98,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const limb = (r, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 1, 8), mat); m.castShadow = true; body.add(m); return m; };
   const arms = [0, 1].map(() => ({ up: limb(0.06, mJacket), lo: limb(0.05, mJacket), hand: part(new THREE.SphereGeometry(0.05, 8, 6), mSkin, 0, 0, 0) }));
   let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, 2.05, 0); root.add(tag);
+  // talking in voice chat: sound waves above the name, pulsing
+  const talkTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); g.strokeStyle = "#7ee8de"; g.lineWidth = 5; g.lineCap = "round"; for (const r of [10, 19, 28]) { g.beginPath(); g.arc(32, 40, r, -Math.PI * 0.8, -Math.PI * 0.2); g.stroke(); } g.fillStyle = "#7ee8de"; g.beginPath(); g.arc(32, 40, 4, 0, Math.PI * 2); g.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const talk = new THREE.Sprite(new THREE.SpriteMaterial({ map: talkTex, depthTest: false, transparent: true })); talk.scale.set(0.32, 0.32, 1); talk.position.set(0, 2.36, 0); talk.visible = false; talk.renderOrder = 10; root.add(talk);
+  let speaking = false;
   const lift = { legL, legR, torso, head, hat };
 
   // ---- the rod: sections along a bending curve, a reel, a rest or tripod ----
@@ -544,6 +548,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the bag hangs heavy with a fish in it, and slumps flat once it's set down
     bag.scale.y = lerp(inNet ? 1 + 0.25 * Math.min(1, load) : 1, 0.35, netRest);
     tag.visible = !fp && !(kept && (kept.state === "inspect" || kept.state === "release")); // (no name label in your catch photo)
+    talk.visible = speaking && !fp; if (speaking) { const k = 0.3 + Math.abs(Math.sin(t * 6)) * 0.08; talk.scale.set(k, k, 1); }
     if (keptPose) poseFish(keptPose.mouth, keptPose.dir, t, { beat: keptPose.beat, curl: keptPose.curl, roll: keptPose.roll });
     else if (showFish && rigAt && inNet && netAt) {
       // in the net: lying across the bag, curled to fit, its middle at the middle of the net, sagging into the mesh
@@ -594,6 +599,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (w) { walking = w; root.position.set(w.x, w.y, w.z); root.rotation.y = -w.face; }
       else if (walking) { walking = null; place(curSpot); }
     },
+    setSpeaking(on) { speaking = !!on; },
     get walking() { return !!walking; },
     /** The landed fish, until you decide: "deck" (in the net or on the deck), "inspect" (held up), "release", "gone". */
     keepFish(state) { kept = state ? { state, t0: null } : null; }, // (its clock starts at the next frame)

@@ -50,3 +50,12 @@ test("a ramp lets you walk up onto a higher deck (a pier from the promenade) wit
   let s = walker(0, 2, 0, 2.2); s = run(s, { x: 0, y: 1, camYaw: 0 }, 2, g);
   assert.ok(s.z < -3, `walked onto the pier (z ${s.z})`); assert.ok(Math.abs(s.y - 4.2) < 0.05, `up on its deck (y ${s.y})`);
 });
+
+test("a curved railing guides you round it rather than trapping you", () => {
+  // a round pier head, 10 m across: walking "east" from the west side, pressed against the rail, carries you round
+  const g = { walkable: (x, z) => Math.hypot(x, z) <= 5, heightAt: () => 2 };
+  let s = walker(0, 4.9, 0, 2);
+  s = run(s, { x: 1, y: 0, camYaw: 0 }, 3, g);
+  assert.ok(s.x > 3, `went round the curve (${s.x.toFixed(2)}, ${s.z.toFixed(2)})`);
+  assert.ok(Math.hypot(s.x, s.z) <= 5 + 1e-9, "never through the rail");
+});

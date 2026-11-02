@@ -421,3 +421,7 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 .fish-look .row { margin-top: 6px; gap: 10px; }
 .fish-look-x { position: absolute; top: 8px; right: 8px; }
 .stage3d .fish-look ~ .w3d-tools { display: none; }
+
+/* ---- the mic button (Fish Together): off, on (teal) and a ring while you're talking ---- */
+.fs-btn.mic.on { background: var(--action); color: #04201d; }
+.fs-btn.mic.talking { box-shadow: 0 0 0 3px #7ee8de88; }
