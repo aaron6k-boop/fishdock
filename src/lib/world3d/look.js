@@ -9,7 +9,7 @@ export const wrap = (a) => ((a % TAU) + TAU + Math.PI) % TAU - Math.PI; // -π..
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { yaw: 0, pitch: -0.08 } } = {}) {
-  const s = { yaw, pitch, fov, vyaw: 0, vpitch: 0, aim: null, home: { ...home }, dragging: false, moved: 0, lastTap: 0, touched: -1e9 };
+  const s = { yaw, pitch, fov, vyaw: 0, vpitch: 0, aim: null, home: { ...home }, dragging: false, moved: 0, lastTap: 0, touched: -1e9, sens: 1, smooth: true };
   const api = {
     get yaw() { return s.yaw; }, get pitch() { return s.pitch; }, get fov() { return s.fov; }, get dragging() { return s.dragging; },
     /** when the person last turned or zoomed the view themselves (performance.now() ms): the camera doesn't steer itself for a while after */
@@ -17,12 +17,14 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     get home() { return { ...s.home }; },
     /** degrees per screen pixel follow the zoom, so a drag moves the view by about the same distance at any zoom */
     drag(dx, dy, viewH = 800) {
-      const k = ((s.fov * Math.PI) / 180) / Math.max(200, viewH);
+      const k = (((s.fov * Math.PI) / 180) / Math.max(200, viewH)) * s.sens;
       s.yaw = wrap(s.yaw - dx * k); s.pitch = clamp(s.pitch + dy * k, -1.25, 1.1);
       s.vyaw = -dx * k * 60; s.vpitch = dy * k * 60; s.aim = null; s.moved += Math.abs(dx) + Math.abs(dy); s.touched = performance.now();
     },
     start() { s.dragging = true; s.moved = 0; s.vyaw = 0; s.vpitch = 0; s.aim = null; },
-    end() { s.dragging = false; },
+    end() { s.dragging = false; if (!s.smooth) { s.vyaw = 0; s.vpitch = 0; } },
+    /** how the view feels: sensitivity (0.5..2, 1 normal) and smoothing (the turn carries on a little after a flick) */
+    setFeel({ sens, smooth } = {}) { if (Number.isFinite(sens)) s.sens = clamp(sens, 0.4, 2.5); if (smooth != null) s.smooth = !!smooth; },
     zoom(factor) { s.fov = clamp(s.fov / factor, FOV.min, FOV.max); s.touched = performance.now(); },
     setFov(f) { s.fov = clamp(f, FOV.min, FOV.max); },
     /** turn smoothly to look at a heading (and pitch) */

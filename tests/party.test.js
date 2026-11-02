@@ -299,3 +299,16 @@ test("a virtual cast keeps its distance and aim (cleaned); a real trip's cast ca
   const rh = Object.values(real.s.members)[0]; rh.spot = rh.spot || 1;
   assert.equal(real.message(rh.id, { t: "event", ev: { type: "cast", data: { dist: 30 } } }, 2000).out[0].msg.ev.data, null);
 });
+
+test("walking poses must be possible: a jump across the place is ignored, ordinary walking isn't", async () => {
+  const room = new PartyRoom();
+  await room.init({ code: "NPQ234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const host = Object.values(room.s.members)[0]; host.spot = host.spot || 1;
+  const send = (x, at) => room.message(host.id, { t: "pose", p: { x, y: 2, z: 0, face: 0 } }, at).out.length;
+  assert.equal(send(0, 2000), 1);
+  assert.equal(send(1.5, 2300), 1, "5 m/s: fine");
+  assert.equal(send(60, 2600), 0, "195 m/s: ignored");
+  assert.equal(send(3, 2900), 1, "carries on from the last believable pose");
+  room.message(host.id, { t: "pose", p: null }, 3000);
+  assert.equal(send(200, 3100), 1, "back at a spot, then walking from somewhere new, starts afresh");
+});

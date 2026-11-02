@@ -12,7 +12,8 @@ import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.j
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
 // from where they happen: your friend's reel from their side, quieter further away) ----
 const VIEW_KEY = "fishdock.view3d.v1";
-export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left" };
+export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left", look: "normal", smooth: true, stick: "m", stickFloat: false };
+export const LOOK_SENS = { low: 0.65, normal: 1, high: 1.5 };
 export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
@@ -87,7 +88,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
-          setWalk((o) => (!wk ? (o ? null : o) : !o || o.canFish !== wk.canFish || o.sprint !== wk.sprint ? wk : o));
+          setWalk((o) => (!wk ? (o ? null : o) : !o || o.canFish !== wk.canFish || o.sprint !== wk.sprint || o.auto !== wk.auto || o.going !== wk.going ? wk : o));
           setHeading((h) => { const deg = Math.round(((props.current.facing + (view.yaw * 180) / Math.PI) % 360 + 360) % 360); return Math.abs(deg - h) >= 2 ? deg : h; });
           for (const [id, o] of Object.entries(outs)) {
             const key = `${o.phase}|${o.info.since}`, prev = phases.current[id];
@@ -95,6 +96,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
             if (o.landed && !phases.current[id].landed) { phases.current[id].landed = true; props.current.onLanded?.(id, o.info.ev); }
           }
         });
+        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); }
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();
@@ -131,7 +133,12 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
         const L = W.current?.look; L?.end();
         // a tap on your landed fish: have a look at it
         if (L && L.state().moved < 8 && props.current.onFishTap) { const r = el.getBoundingClientRect(); if (W.current?.tapFish(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1))) { props.current.onFishTap(); pinch = 0; return; } }
-        if (L && L.state().moved < 8 && !stopping) { clearTimeout(tapTimer); if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330); }
+        if (L && L.state().moved < 8 && !stopping) {
+          clearTimeout(tapTimer);
+          // walking about: a tap on the ground walks you there (a double tap still recentres the view)
+          if (W.current?.walking) { const r = el.getBoundingClientRect(), nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1); if (!L.tap(performance.now())) tapTimer = setTimeout(() => { if (!W.current?.walkTo(nx, ny)) props.current.onTap?.(); }, 260); }
+          else if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330);
+        }
       }
       pinch = 0;
     };
@@ -155,6 +162,8 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
     setSpeaking: (id, on) => W.current?.setSpeaking(id, on),
     walk: (on) => W.current?.walk(on), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
     onPose: (f) => W.current?.onPose(f), emote: (k) => W.current?.emote(k),
+    setLookFeel: (v) => W.current?.look.setFeel({ sens: LOOK_SENS[v.look] ?? 1, smooth: v.smooth !== false }),
+    autoWalk: (on) => W.current?.autoWalk(on), get autoWalking() { return !!W.current?.autoWalking; },
     aimCast: (p) => W.current?.aimCast(p), castParams: (p) => W.current?.castParams(p), setRemotePose: (id, p) => W.current?.setRemotePose(id, p),
     get walkState() { return walk; },
     focus: (id) => W.current?.focus(id), follow: (id, sec) => W.current?.follow(id, sec), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),

@@ -136,6 +136,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   }
   let camOverride = null, inspectFrom = null;
   // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
+  // auto-walk (keeps walking where you look until you touch the stick) and tap-to-move (walks to a point you tapped)
+  let autoWalk = false, walkTarget = null, walkStuck = 0, modeSince = -10, lastMode = "first";
   let W = null, walkIn = { x: 0, y: 0, sprint: false }, walkJump = false, canFish = false, fishTest = 0, modeBeforeWalk = "first", fovBeforeWalk = null, onPose = null;
   // other people walking (Fish Together): their latest pose, eased towards
   const remote = new Map();
@@ -190,7 +192,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // Roblox-style: the camera orbits behind you as you drag, closer or further as you pinch; very close is first person
       const dist = Math.max(0, ((look.fov - 28) / 50) * 9 + 0.4), tgt = new THREE.Vector3(W.x, W.y + 1.55, W.z);
       const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
-      if (dist < 1.1) { pos.copy(tgt).add(new THREE.Vector3(0, 0.07, 0)); anglers.get(localId)?.a.setFirstPerson(true); }
+      if (dist < 1.1) {
+        // first person: a subtle bob and sway with your steps (none with reduced motion)
+        const sp = Math.min(1, (W.speed || 0) / 4), ph = (W.phase || 0) * 2;
+        pos.copy(tgt).add(new THREE.Vector3(0, 0.07 + (reduceMotion ? 0 : Math.abs(Math.sin(ph)) * 0.035 * sp - 0.015 * sp), 0));
+        if (!reduceMotion) { const sx = Math.cos(yaw), sz = Math.sin(yaw), w = Math.sin(ph * 0.5) * 0.02 * sp; pos.x += sx * w; pos.z += sz * w; }
+        anglers.get(localId)?.a.setFirstPerson(true);
+      }
       else { pos.copy(tgt).addScaledVector(d, -dist); pivot.copy(tgt); pos = unblocked(pivot, pos); anglers.get(localId)?.a.setFirstPerson(false); }
       camPos.copy(pos); camera.position.copy(camPos); camera.fov = 62 * (camera.aspect < 0.8 ? 1.1 : 1); camera.updateProjectionMatrix();
       camera.lookAt(camera.position.clone().add(d));
@@ -223,7 +231,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       yaw = cineShot.yaw; pitch = cineShot.pitch;
     }
     // switching who you watch glides the camera across rather than cutting
-    if (mode !== "cinematic") { camPos.lerp(pos, mode === "first" || mode === "free" ? 1 : 1 - Math.exp(-dt * (mode === "spectator" ? 2.5 : 6))); cineShot = null; }
+    if (mode !== lastMode) { lastMode = mode; modeSince = t; }
+    // switching between first and third person glides over half a second rather than cutting
+    const settling = t - modeSince < 0.6;
+    if (mode !== "cinematic") { camPos.lerp(pos, (mode === "first" || mode === "free") && !settling ? 1 : 1 - Math.exp(-dt * (mode === "spectator" ? 2.5 : settling ? 9 : 6))); cineShot = null; }
     if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(-1.2, Math.min(0.6, l.pitch))); steering = true; }
     else if (steering && idle && !steerTo) { steering = false; const h = look.home; if (mode === "first" || mode === "third") look.aim(h.yaw, h.pitch); }
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
@@ -300,10 +311,23 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       else {
         // in small steps (never through a railing), however slowly the phone draws
         let rem = Math.min(0.25, dt || 0.016);
-        while (rem > 1e-4) { const h = Math.min(0.05, rem); W = stepWalker(W, { ...walkIn, camYaw: look.yaw, jump: walkJump }, h, env.ground); walkJump = false; rem -= h; }
+        // what moves you: the stick, else auto-walk (straight ahead where you look), else a point you tapped
+        let input = walkIn, camYaw = look.yaw;
+        const stick = Math.hypot(walkIn.x, walkIn.y) > 0.12;
+        if (stick) { autoWalk = false; walkTarget = null; }
+        else if (autoWalk) input = { x: 0, y: 1, sprint: walkIn.sprint };
+        else if (walkTarget) {
+          const dx = walkTarget.x - W.x, dz = walkTarget.z - W.z, d = Math.hypot(dx, dz);
+          if (d < 0.45) walkTarget = null;
+          else { camYaw = Math.atan2(dx, -dz); input = { x: 0, y: Math.min(1, 0.45 + d * 0.25), sprint: false }; }
+        }
+        const x0 = W.x, z0 = W.z;
+        while (rem > 1e-4) { const h = Math.min(0.05, rem); W = stepWalker(W, { ...input, camYaw, jump: walkJump }, h, env.ground); walkJump = false; rem -= h; }
+        // tapped somewhere you can't get to: give up rather than push against the rail for ever
+        if (walkTarget || autoWalk) { walkStuck = Math.hypot(W.x - x0, W.z - z0) < 0.004 ? walkStuck + (dt || 0.016) : 0; if (walkStuck > 0.6) { walkTarget = null; autoWalk = false; walkStuck = 0; } }
         me.a.setWalk(W);
         if (++fishTest % 8 === 0) canFish = !!env.ground.fishHere(W.x, W.z);
-        walkInfo = { on: true, canFish, sprint: !!walkIn.sprint };
+        walkInfo = { on: true, canFish, sprint: !!walkIn.sprint, auto: autoWalk, going: !!walkTarget };
         onPose?.({ x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed, air: W.air });
       }
     }
@@ -368,7 +392,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         return null;
       }
       if (!W) return null;
-      W = null; me?.a.setWalk(null); onPose?.(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
+      W = null; autoWalk = false; walkTarget = null; me?.a.setWalk(null); onPose?.(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       const s2 = me?.a.spot; if (s2) { look.setHome(s2.face, HOME_PITCH); look.aim(s2.face, HOME_PITCH); }
       return null;
     },
@@ -396,13 +420,26 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const p = me.a.fishMesh.position.clone().project(camera); return Math.hypot(p.x - nx, (p.y - ny) * camera.aspect) < 0.16 && p.z < 1;
     },
     setWalkInput(i) { walkIn = { x: i.x || 0, y: i.y || 0, sprint: !!i.sprint }; },
+    /** Keep walking ahead (where you look) until you touch the stick or bump into something. */
+    autoWalk(on) { autoWalk = !!on && !!W; walkTarget = null; walkStuck = 0; },
+    get autoWalking() { return autoWalk; },
+    /** A tap while walking about (-1..1 each way): walk to that point on the ground. True if it was somewhere to go. */
+    walkTo(nx, ny) {
+      if (!W || !env.ground) return false;
+      const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(nx, ny), camera);
+      const hit = solids.length ? rc.intersectObjects(solids, false).find((h) => (h.face?.normal ? h.face.normal.clone().transformDirection(h.object.matrixWorld).y > 0.6 : true)) : null;
+      let p = hit?.point;
+      if (!p) { const t2 = (W.y - rc.ray.origin.y) / (rc.ray.direction.y || -1e-6); if (t2 > 0 && t2 < 60) p = rc.ray.origin.clone().addScaledVector(rc.ray.direction, t2); }
+      if (!p || !env.ground.walkable(p.x, p.z) || Math.hypot(p.x - W.x, p.z - W.z) > 40) return false;
+      walkTarget = { x: p.x, z: p.z }; autoWalk = false; walkStuck = 0; return true;
+    },
     jump() { if (W) walkJump = true; },
     /** Fish from where you're standing: turns to the water's edge and makes it your spot. Returns the spot, or null. */
     fishHere() {
       const me = anglers.get(localId); if (!W || !me) return null;
       const sp = env.ground.fishHere(W.x, W.z); if (!sp) return null;
       const spot = { ...me.a.spot, ...sp, id: me.a.spot?.id ?? 1, name: "Where you chose" };
-      me.a.place(spot); W = null; me.a.setWalk(null); onPose?.({ ...spot, spotAt: true }); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
+      me.a.place(spot); W = null; autoWalk = false; walkTarget = null; me.a.setWalk(null); onPose?.({ ...spot, spotAt: true }); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       look.setHome(spot.face, HOME_PITCH); look.aim(spot.face, HOME_PITCH);
       return spot;
     },

@@ -38,7 +38,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   useEffect(() => { if (kept === null && landed && !looking) setLanded(null); }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!walk) setSprint(false); }, [walk]);
   const [view, setView] = useState(loadView);
-  const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "hand") { if (v === "right") document.documentElement.dataset.hand = "right"; else delete document.documentElement.dataset.hand; } };
+  const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "look" || k === "smooth") w.current?.setLookFeel(next); if (k === "hand") { if (v === "right") document.documentElement.dataset.hand = "right"; else delete document.documentElement.dataset.hand; } };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
   useEffect(() => { if (watching && mode !== "spectator" && mode !== "cinematic") { const t = setTimeout(() => pick("spectator"), 600); return () => clearTimeout(t); } return undefined; }, [watching]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -73,8 +73,9 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
         </div>
         {walk ? (
           <>
-            <Joystick onMove={(x, y) => w.current?.setWalkInput({ x, y, sprint })} />
+            <Joystick size={view.stick} float={view.stickFloat} onMove={(x, y) => w.current?.setWalkInput({ x, y, sprint })} />
             <div className="walk-buttons">
+              <button type="button" className={`walk-btn small${walk.auto ? " on" : ""}`} aria-pressed={!!walk.auto} onClick={() => w.current?.autoWalk(!walk.auto)} title="Keep walking where you look; touch the stick to stop">Auto</button>
               <button type="button" className={`walk-btn small${sprint ? " on" : ""}`} aria-pressed={sprint} onClick={() => setSprint(!sprint)}>Sprint</button>
               <button type="button" className="walk-btn jump" onPointerDown={(e) => { e.preventDefault(); w.current?.jump(); }} aria-label="Jump"><Icon name="jump" /></button>
             </div>
@@ -95,6 +96,11 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               <hr className="cam-sep" />
               <button type="button" role="menuitemcheckbox" aria-checked={view.track} className={`ft-pill${view.track ? " on" : ""}`} onClick={() => setOpt("track", !view.track)} title="The camera turns to a leaping fish, unless you're moving the view yourself">Follow jumps</button>
               <button type="button" role="menuitemcheckbox" aria-checked={view.hand === "right"} className={`ft-pill${view.hand === "right" ? " on" : ""}`} onClick={() => setOpt("hand", view.hand === "right" ? "left" : "right")} title="Cast, Strike and Reel at the bottom right, for your right thumb">Controls on the right</button>
+              <hr className="cam-sep" />
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("look", { low: "normal", normal: "high", high: "low" }[view.look] || "normal")} title="How far the view turns for a drag">Look speed: {{ low: "Low", normal: "Normal", high: "High" }[view.look] || "Normal"}</button>
+              <button type="button" role="menuitemcheckbox" aria-checked={view.smooth !== false} className={`ft-pill${view.smooth !== false ? " on" : ""}`} onClick={() => setOpt("smooth", view.smooth === false)} title="The view carries on turning a little after a flick">Smooth camera</button>
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("stick", { s: "m", m: "l", l: "s" }[view.stick] || "m")} title="The walking stick's size">Stick size: {{ s: "Small", m: "Medium", l: "Large" }[view.stick] || "Medium"}</button>
+              <button type="button" role="menuitemcheckbox" aria-checked={!!view.stickFloat} className={`ft-pill${view.stickFloat ? " on" : ""}`} onClick={() => setOpt("stickFloat", !view.stickFloat)} title="Touch anywhere in the lower left to walk, instead of a stick in the corner">Floating stick</button>
               {reelOpts ? <>
                 <hr className="cam-sep" />
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.assisted} className={`ft-pill${reelOpts.assisted ? " on" : ""}`} onClick={() => onReelOpts?.({ assisted: !reelOpts.assisted })} title="One tap starts winding at a steady rate, another stops it, instead of tapping again and again">Assisted reeling</button>
@@ -120,21 +126,29 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
 }
 
 // ---- the thumbstick: drag from its middle; how far you push sets the speed ----
-function Joystick({ onMove }) {
-  const base = useRef(null), [knob, setKnob] = useState([0, 0]), id = useRef(null);
-  const R = 46;
-  const move = (e) => {
-    const r = base.current.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; }
+function Joystick({ onMove, size = "m", float = false }) {
+  // fixed: a stick in the bottom-left corner; floating: touch anywhere in the lower left and the stick appears under
+  // your thumb. It fades back when you're not using it
+  const zone = useRef(null), [knob, setKnob] = useState([0, 0]), [at, setAt] = useState(null), [busy, setBusy] = useState(false), id = useRef(null);
+  const R = { s: 38, m: 46, l: 56 }[size] || 46;
+  const centre = () => { if (float && at) return at; const r = zone.current.querySelector(".joystick").getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+  const move = (e, c = centre()) => {
+    let dx = e.clientX - c[0], dy = e.clientY - c[1]; const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; }
     setKnob([dx, dy]); onMove(dx / R, -dy / R);
   };
-  const end = () => { id.current = null; setKnob([0, 0]); onMove(0, 0); };
+  const end = (e) => { if (e && id.current !== e.pointerId) return; id.current = null; setBusy(false); setKnob([0, 0]); setAt(null); onMove(0, 0); };
+  const down = (e) => {
+    if (id.current != null) return;
+    e.preventDefault(); id.current = e.pointerId; setBusy(true); e.currentTarget.setPointerCapture(e.pointerId);
+    if (float) { const r = zone.current.getBoundingClientRect(); zone.current.style.setProperty("--jx", `${e.clientX - r.left}px`); zone.current.style.setProperty("--jy", `${e.clientY - r.top}px`); setAt([e.clientX, e.clientY]); move(e, [e.clientX, e.clientY]); }
+    else move(e);
+  };
+  const handlers = { onPointerDown: down, onPointerMove: (e) => { if (id.current === e.pointerId) move(e); }, onPointerUp: end, onPointerCancel: end };
   return (
-    <div ref={base} className="joystick" role="application" aria-label="Walk: drag the stick"
-      onPointerDown={(e) => { e.preventDefault(); id.current = e.pointerId; base.current.setPointerCapture(e.pointerId); move(e); }}
-      onPointerMove={(e) => { if (id.current === e.pointerId) move(e); }}
-      onPointerUp={end} onPointerCancel={end}>
-      <div className="joystick-knob" style={{ transform: `translate(${knob[0]}px, ${knob[1]}px)` }} />
+    <div ref={zone} className={`joystick-zone stick-${size}${float ? " floating" : ""}${busy ? " active" : ""}`} {...(float ? handlers : {})}>
+      <div className={`joystick${float && at ? " placed" : ""}`} role="application" aria-label="Walk: drag the stick" {...(float ? {} : handlers)}>
+        <div className="joystick-knob" style={{ transform: `translate(${knob[0]}px, ${knob[1]}px)` }} />
+      </div>
     </div>
   );
 }

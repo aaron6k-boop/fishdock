@@ -15,7 +15,7 @@ const run = (s, input, secs, g = ground) => { for (let t = 0; t < secs; t += 1 /
 test("the stick moves you the way the camera looks, at walking or sprinting speed, and you turn to face it", () => {
   let s = walker(0, 10, 0, 2);
   s = run(s, { x: 0, y: 1, camYaw: 0 }, 1);
-  assert.ok(Math.abs(s.z - (10 - WALK.speed)) < 0.15, `walked north about ${WALK.speed} m (z ${s.z})`);
+  assert.ok(Math.abs(s.z - (10 - WALK.speed)) < 0.45, `walked north about ${WALK.speed} m (z ${s.z})`);
   assert.ok(Math.abs(s.x) < 1e-6);
   let t = walker(0, 10, 0, 2); t = run(t, { x: 0, y: 1, camYaw: 0, sprint: true }, 1);
   assert.ok(10 - t.z > 10 - s.z + 2, "sprinting is quicker");
@@ -58,4 +58,16 @@ test("a curved railing guides you round it rather than trapping you", () => {
   s = run(s, { x: 1, y: 0, camYaw: 0 }, 3, g);
   assert.ok(s.x > 3, `went round the curve (${s.x.toFixed(2)}, ${s.z.toFixed(2)})`);
   assert.ok(Math.hypot(s.x, s.z) <= 5 + 1e-9, "never through the rail");
+});
+
+test("starting and stopping are smooth: a moment to get going, a short glide to a stop; a touch of the stick does nothing", () => {
+  let s = walker(0, 10, 0, 2);
+  s = stepWalker(s, { x: 0, y: 1, camYaw: 0 }, 1 / 60, ground);
+  assert.ok(s.speed < WALK.speed * 0.4, `not full speed at once (${s.speed.toFixed(2)})`);
+  s = run(s, { x: 0, y: 1, camYaw: 0 }, 1);
+  assert.ok(s.speed > WALK.speed * 0.95, "up to speed within a second");
+  const z0 = s.z; s = run(s, { x: 0, y: 0, camYaw: 0 }, 0.5);
+  assert.ok(z0 - s.z > 0.05 && z0 - s.z < 0.5, `glides a little after letting go (${(z0 - s.z).toFixed(2)} m)`);
+  assert.equal(s.speed, 0, "and stops");
+  let d = walker(0, 10, 0, 2); d = run(d, { x: 0.08, y: 0.05, camYaw: 0 }, 1); assert.ok(Math.hypot(d.x, d.z - 10) < 1e-9, "inside the dead zone");
 });

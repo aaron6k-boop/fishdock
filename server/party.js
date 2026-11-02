@@ -50,7 +50,7 @@ export function cleanPlace(place, mode) {
 
 export const PARTY = {
   maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
-  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, signalBytes: 16000, photoBytes: 400e3,
+  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, maxSpeed: 12, signalBytes: 16000, photoBytes: 400e3,
 };
 export const VENUES = ["pier", "beach", "estuary", "river", "lake"];
 export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch"];
@@ -69,7 +69,7 @@ const nameOf = (v, d) => cleanLine(v, 24) || d;
 
 // ---- the party itself: pure state and rules (tested without Cloudflare) ----
 export class PartyRoom {
-  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); this.poseRate = new Map(); }
+  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); this.poseRate = new Map(); this.lastPose = new Map(); }
   get ready() { return !!this.s; }
 
   async init({ code, mode, venue, place, name, outfit, look, hours }, now) {
@@ -212,6 +212,13 @@ export class PartyRoom {
       if (r.n > PARTY.posesPer10s) return res();
       const p = cleanPose(msg.p);
       if (p === undefined) return res();
+      // movement has to be possible: nobody covers more than a sprint's worth between two poses (a phone that sends
+      // a jump across the place is ignored; the next believable pose carries on). Back at a spot starts afresh
+      if (p && !p.emote && !p.spotAt) {
+        const lp = this.lastPose.get(mid);
+        if (lp) { const dt = Math.max(0.05, (now - lp.at) / 1000), d = Math.hypot(p.x - lp.x, p.z - lp.z); if (dt < 5 && d / dt > PARTY.maxSpeed) return res(); }
+        this.lastPose.set(mid, { x: p.x, z: p.z, at: now });
+      } else if (!p || p.spotAt) this.lastPose.delete(mid);
       out.push({ to: "others", msg: { t: "pose", who: mid, p } });
       return res();
     }

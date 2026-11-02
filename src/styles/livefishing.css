@@ -418,7 +418,14 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 
 /* ---- walking about (Stage3D): thumbstick bottom left, jump and sprint bottom right, prompts at the top ---- */
 .stage3d.walking .fs-bottom, .stage3d.walking .w3d-card, .stage3d.walking .w3d-tools { display: none; }
-.joystick { position: absolute; z-index: 6; left: max(18px, env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 128px; height: 128px; border-radius: 50%; background: radial-gradient(circle, #ffffff1f, #ffffff0d 70%); border: 2px solid #ffffff40; touch-action: none; display: grid; place-items: center; }
+.joystick-zone { position: absolute; z-index: 6; left: 0; bottom: 0; width: 1px; height: 1px; }
+.joystick-zone.floating { width: 46vw; height: 42vh; touch-action: none; }
+.joystick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); width: var(--js, 128px); height: var(--js, 128px); border-radius: 50%; background: radial-gradient(circle, #ffffff1f, #ffffff0d 70%); border: 2px solid #ffffff40; touch-action: none; display: grid; place-items: center; opacity: .45; transition: opacity .25s; }
+.joystick-zone.active .joystick { opacity: 1; }
+.joystick-zone.floating .joystick.placed { left: calc(var(--jx) - var(--js, 128px) / 2); bottom: auto; top: calc(var(--jy) - var(--js, 128px) / 2); }
+.joystick-zone.floating .joystick { pointer-events: none; }
+.stick-s { --js: 104px; } .stick-m { --js: 128px; } .stick-l { --js: 156px; }
+.stick-s .joystick-knob { width: 48px; height: 48px; } .stick-l .joystick-knob { width: 68px; height: 68px; }
 .joystick-knob { width: 58px; height: 58px; border-radius: 50%; background: #ffffffd9; box-shadow: 0 4px 14px #0006; transition: transform .05s; pointer-events: none; }
 .walk-buttons { position: absolute; z-index: 6; right: max(18px, env(safe-area-inset-right)); bottom: calc(30px + env(safe-area-inset-bottom)); display: flex; align-items: flex-end; gap: 12px; }
 .walk-btn { border: 2px solid #ffffff55; background: #0a141bb3; color: #fff; border-radius: 50%; width: 74px; height: 74px; display: grid; place-items: center; font-weight: 700; touch-action: none; }
