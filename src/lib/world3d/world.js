@@ -344,7 +344,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         return null;
       }
       if (!W) return null;
-      W = null; me?.a.setWalk(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
+      W = null; me?.a.setWalk(null); onPose?.(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       const s2 = me?.a.spot; if (s2) { look.setHome(s2.face, HOME_PITCH); look.aim(s2.face, HOME_PITCH); }
       return null;
     },
@@ -368,13 +368,17 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const me = anglers.get(localId); if (!W || !me) return null;
       const sp = env.ground.fishHere(W.x, W.z); if (!sp) return null;
       const spot = { ...me.a.spot, ...sp, id: me.a.spot?.id ?? 1, name: "Where you chose" };
-      me.a.place(spot); W = null; me.a.setWalk(null); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
+      me.a.place(spot); W = null; me.a.setWalk(null); onPose?.({ ...spot, spotAt: true }); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       look.setHome(spot.face, HOME_PITCH); look.aim(spot.face, HOME_PITCH);
       return spot;
     },
     onPose(f) { onPose = f; },
     /** Someone else walking about (Fish Together): their pose, or null when they're back at their spot. */
-    setRemotePose(id, pose) { if (id === localId) return; const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r); },
+    setRemotePose(id, pose) {
+      if (id === localId) return;
+      if (pose?.spotAt) { const x = anglers.get(id); remote.delete(id); if (x) { x.a.setWalk(null); x.a.place({ ...x.a.spot, at: pose.at, face: pose.face, edge: pose.edge, cast: pose.cast }); } return; }
+      const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
+    },
     setTrack(on) { track = !!on && !reduceMotion; },
     get track() { return track; },
     setMode(m) { mode = CAMERA_MODES.some((x) => x.id === m) ? m : "first"; if (mode === "first" || mode === "free") { const me = anglers.get(localId) || anglers.get(focusId); if (me?.out) look.aim(me.out.face, -0.12); } },

@@ -100,9 +100,20 @@ function PartyLive({ code, mkey }) {
   const [replay, setReplay] = useState(null), [logging, setLogging] = useState(false), [chatText, setChatText] = useState(""), [copied, setCopied] = useState(false);
   const voice = useRef(null);
   const toast = (text, kind = "") => { const id = Math.random().toString(36).slice(2); setToasts((t) => [...t.slice(-4), { id, text, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200); };
+  // walking about: others' poses go straight to the 3D view; yours are sent a few times a second while you move
+  const poseBus = useMemo(() => new EventTarget(), []);
+  const poseSent = useRef({ at: 0, p: null });
+  const sendPose = (p) => {
+    const now = Date.now(), last = poseSent.current;
+    if (p && !p.spotAt && last.p && now - last.at < 300) return;
+    if (p && !p.spotAt && last.p && Math.hypot(p.x - last.p.x, p.z - last.p.z) < 0.05 && Math.abs(p.face - last.p.face) < 0.05 && p.air === last.p.air && now - last.at < 2000) return;
+    poseSent.current = { at: now, p: p && !p.spotAt ? p : null };
+    P_ref.current?.send({ t: "pose", p: p ? (p.spotAt ? { spotAt: true, at: p.at, face: p.face, edge: p.edge, cast: p.cast } : { x: p.x, y: p.y, z: p.z, face: p.face, air: p.air }) : null });
+  };
   const P = useParty(code, mkey, {
     onMessage: (m) => {
       const name = (id) => P_ref.current?.members.find((x) => x.id === id)?.name || "Someone";
+      if (m.t === "pose") { poseBus.dispatchEvent(new CustomEvent("pose", { detail: { who: m.who, p: m.p } })); return; }
       if (m.t === "react" && !blocked.has(m.from)) { toast(`${name(m.from)}: ${REACT.find((r) => r[0] === m.r)?.[1] || "Nice"}`, "react"); if (m.from !== P_ref.current?.me?.id) haptics.feel("reaction"); }
       if (m.t === "chat" && m.c.who !== P_ref.current?.me?.id && !blocked.has(m.c.who) && sheetRef.current !== "chat") toast(`${name(m.c.who)}: ${m.c.text}`, "chat");
       if (m.t === "signal") voice.current?.signal(m.from, m.data);
@@ -205,7 +216,7 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D feel={haptics.feel} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D feel={haptics.feel} poseBus={poseBus} onPose={mode === "virtual" ? sendPose : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>

@@ -8,7 +8,7 @@ import { speciesById } from "../data/species.js";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, onToast }) {
+export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -19,6 +19,8 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
   const [sprint, setSprint] = useState(false);
+  // other people walking about (Fish Together): their poses straight to the 3D view
+  useEffect(() => { if (!poseBus) return undefined; const f = (e) => w.current?.setRemotePose(e.detail.who, e.detail.p); poseBus.addEventListener("pose", f); return () => poseBus.removeEventListener("pose", f); }, [poseBus]);
   // ---- your landed fish: it waits in the net; tap it (or Look at it) to hold it up, then keep it or put it back ----
   const [kept, setKept] = useState(null), [landed, setLanded] = useState(null), [looking, setLooking] = useState(false);
   const openInspect = () => { if (!landed) return; w.current?.inspectFish(true); setLooking(true); };
@@ -47,7 +49,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   return (
     <div className={`stage3d${walk ? " walking" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
-      <World3D ref={w} startMode="first" feel={feel} onWalk={setWalk} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+      <World3D ref={w} startMode="first" feel={feel} onWalk={setWalk} onPose={onPose} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
         onPhase={(id, phase, info) => {
           onPhase?.(id, phase, info);
           if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); return; }

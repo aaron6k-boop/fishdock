@@ -20,6 +20,21 @@ import { ipKey } from "./ipKey.js";
 import { assignSpots, layoutFor, MAX_ANGLERS } from "../src/lib/world3d/spots.js";
 import { markFor } from "./place3d.js";
 
+/** A walking pose: { x, y, z, face, air } within the 3D place, or null (back at their spot); undefined if it's not one. */
+export function cleanPose(p) {
+  if (p === null) return null;
+  if (!p || typeof p !== "object") return undefined;
+  const n = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? Math.round(v * 100) / 100 : NaN);
+  // fishing from somewhere they walked to: where they now stand, which way they face, the edge and the cast
+  if (p.spotAt) {
+    const at = Array.isArray(p.at) ? [n(p.at[0], -700, 700), n(p.at[1], -5, 60), n(p.at[2], -700, 700)] : [NaN];
+    const o = { spotAt: true, at, face: n(p.face, -7, 7), edge: n(p.edge, 0, 10), cast: n(p.cast, 1, 120) };
+    return [...at, o.face, o.edge, o.cast].some(Number.isNaN) ? undefined : o;
+  }
+  const out = { x: n(p.x, -700, 700), y: n(p.y, -5, 60), z: n(p.z, -700, 700), face: n(p.face, -7, 7), air: !!p.air };
+  return [out.x, out.y, out.z, out.face].some(Number.isNaN) ? undefined : out;
+}
+
 /** A party's place: a label, and for a virtual party only, a documented FishDock mark id (a public place) or nothing. */
 export function cleanPlace(place, mode) {
   const mark = mode !== "real" && typeof place?.mark === "string" && markFor(place.mark) ? place.mark : null;
@@ -28,7 +43,7 @@ export function cleanPlace(place, mode) {
 
 export const PARTY = {
   maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
-  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, signalBytes: 16000, photoBytes: 400e3,
+  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, signalBytes: 16000, photoBytes: 400e3,
 };
 export const VENUES = ["pier", "beach", "estuary", "river", "lake"];
 export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch"];
@@ -47,7 +62,7 @@ const nameOf = (v, d) => cleanLine(v, 24) || d;
 
 // ---- the party itself: pure state and rules (tested without Cloudflare) ----
 export class PartyRoom {
-  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); }
+  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); this.poseRate = new Map(); }
   get ready() { return !!this.s; }
 
   async init({ code, mode, venue, place, name, outfit, hours }, now) {
@@ -176,6 +191,18 @@ export class PartyRoom {
     me.seenAt = now;
     if (msg?.t === "ping") { out.push({ to: mid, msg: { t: "pong", now } }); return res(); }
     if (this.ended(now)) { out.push({ to: mid, msg: { t: "closed", why: S.closed ? "closed" : "ended" } }); return res({ close: [mid] }); }
+    // walking about (virtual parties): where an angler is in the 3D place, a few times a second, passed straight on to
+    // the others and never saved. Scene coordinates of the shared 3D place, not anyone's real position. Its own limit,
+    // so walking never crowds out casts and chat
+    if (msg?.t === "pose") {
+      if (S.mode !== "virtual" || !me.spot) return res();
+      const r = this.poseRate.get(mid) || { n: 0, at: now }; if (now - r.at > 10e3) { r.n = 0; r.at = now; } r.n++; this.poseRate.set(mid, r);
+      if (r.n > PARTY.posesPer10s) return res();
+      const p = cleanPose(msg.p);
+      if (p === undefined) return res();
+      out.push({ to: "others", msg: { t: "pose", who: mid, p } });
+      return res();
+    }
     if (this.limited(mid, now)) { out.push({ to: mid, msg: { t: "error", code: "slow", message: "That's a lot at once. Give it a moment." } }); return res(); }
     const host = me.role === "host";
     const bcastMembers = () => out.push({ to: "*", msg: { t: "members", members: this.members() } });

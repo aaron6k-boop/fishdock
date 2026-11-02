@@ -16,13 +16,13 @@ export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left" };
 export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, onPose, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
   const [walk, setWalk] = useState(null); // { on, canFish, sprint } while walking about
   useEffect(() => { props.current.onWalk?.(walk); }, [walk]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk, onKept, onFishTap };
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk, onKept, onFishTap, onPose };
   const phases = useRef({});
   // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
   const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
@@ -77,6 +77,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
         // the real place as built failed its scene check (sceneCheck.js): don't serve it as a real scene
         if (real && w.realCheck && !w.realCheck.ok) { w.dispose(); if (!gone) setReal(null); return; }
         if (canvas.current) canvas.current.dataset.check = w.realCheck ? (w.realCheck.ok ? "ok" : "failed") : "drawn";
+        w.onPose((p) => props.current.onPose?.(p));
         W.current = w;
         w.setNow(() => props.current.now());
         w.setAnglers(props.current.anglers);

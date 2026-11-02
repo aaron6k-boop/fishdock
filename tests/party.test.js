@@ -251,3 +251,24 @@ test("a party started from the 3D demo can be at a documented FishDock mark, nev
   assert.deepEqual(cleanPlace({ label: "Gorleston", mark: "gorleston-south-pier" }, "real"), { label: "Gorleston" }, "a real trip never names a mark");
   assert.deepEqual(cleanPlace({ label: "  " }, "virtual"), { label: null });
 });
+
+test("walking about in a virtual party: poses go to the others only, cleaned, never saved, with their own limit", async () => {
+  const { cleanPose } = await import("../server/party.js");
+  assert.deepEqual(cleanPose({ x: 1.234, y: 2.2, z: -7.5, face: 0.4, air: 1, extra: "x" }), { x: 1.23, y: 2.2, z: -7.5, face: 0.4, air: true });
+  assert.equal(cleanPose(null), null, "back at their spot");
+  assert.equal(cleanPose({ x: 1e6, y: 0, z: 0, face: 0 }), undefined, "out of the place");
+  assert.equal(cleanPose({ x: "1", y: 0, z: 0, face: 0 }), undefined);
+  assert.equal(cleanPose("hi"), undefined);
+  const room = new PartyRoom();
+  await room.init({ code: "ABC234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const host = Object.values(room.s.members)[0];
+  host.spot = host.spot || 1;
+  const r = room.message(host.id, { t: "pose", p: { x: 3, y: 2.2, z: -7, face: 0.4 } }, 2000);
+  assert.equal(r.save, false); assert.deepEqual(r.out, [{ to: "others", msg: { t: "pose", who: host.id, p: { x: 3, y: 2.2, z: -7, face: 0.4, air: false } } }]);
+  let sent = 0; for (let i = 0; i < 80; i++) sent += room.message(host.id, { t: "pose", p: { x: i, y: 2, z: 0, face: 0 } }, 3000 + i).out.length;
+  assert.ok(sent <= PARTY.posesPer10s, `${sent} poses in a burst`);
+  assert.equal(room.message(host.id, { t: "chat", text: "still fine" }, 3200).out.length, 1, "walking doesn't use up the chat and cast limit");
+  const real = new PartyRoom(); await real.init({ code: "DEF234", mode: "real", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const rh = Object.values(real.s.members)[0]; rh.spot = rh.spot || 1;
+  assert.equal(real.message(rh.id, { t: "pose", p: { x: 3, y: 2.2, z: -7, face: 0.4 } }, 2000).out.length, 0, "no walking on a real trip");
+});
