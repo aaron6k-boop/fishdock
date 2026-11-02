@@ -1,0 +1,101 @@
+// ---- World3D: the 360° 3D view of a representative place, with one or more anglers (Beta) ----
+// three.js loads only when this opens. Drag to look round (all the way), up and down; pinch or scroll to zoom;
+// double tap to face your rod again. A small compass, camera modes, Look at my rod and Watch a friend. It is drawn,
+// not filmed: the label says it's a representative 3D scene, never the real place or a camera.
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { Icon } from "./ui.jsx";
+import { compassPoint } from "../lib/world3d/look.js";
+import { layoutFor } from "../lib/world3d/spots.js";
+import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.js";
+
+const World3D = forwardRef(function World3D({ onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+  const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
+  const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
+  const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing, now, onTap };
+  const phases = useRef({});
+
+  // ---- start the renderer (and three.js) once per place ----
+  useEffect(() => {
+    let gone = false, w = null;
+    (async () => {
+      try {
+        const mod = await import("../lib/world3d/world.js");
+        if (gone) return;
+        const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
+        const q = quality === "auto" ? mod.autoQuality3d() : quality;
+        w = mod.createWorld(canvas.current, {
+          venue, quality: q, reduceMotion: reduce,
+          onSound: (name, pos) => { if (!props.current.sound) return; const cam = W.current?.camera; if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name); },
+        });
+        W.current = w;
+        w.setNow(() => props.current.now());
+        w.setAnglers(props.current.anglers);
+        w.onFrame(({ outs, view }) => {
+          setHeading((h) => { const deg = Math.round(((props.current.facing + (view.yaw * 180) / Math.PI) % 360 + 360) % 360); return Math.abs(deg - h) >= 2 ? deg : h; });
+          for (const [id, o] of Object.entries(outs)) {
+            const key = `${o.phase}|${o.info.since}`, prev = phases.current[id];
+            if (!prev || prev.key !== key) { phases.current[id] = { key, landed: false }; props.current.onPhase?.(id, o.phase, o.info); }
+            if (o.landed && !phases.current[id].landed) { phases.current[id].landed = true; props.current.onLanded?.(id, o.info.ev); }
+          }
+        });
+        setReady(true);
+      } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
+    })();
+    return () => { gone = true; w?.dispose(); W.current = null; setReady(false); };
+  }, [venue, quality]);
+
+  useEffect(() => { W.current?.setAnglers(anglers); setOthers(anglers.filter((a) => !a.local).map((a) => ({ id: a.id, name: a.name }))); }, [anglers, ready]);
+  useEffect(() => { if (ready) W.current?.setEnv({ light, cond, facing }); }, [ready, JSON.stringify(light), JSON.stringify(cond), facing]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the same sound as the photo view: the water, wind, rain and gulls for these conditions
+  const heard = { kind: venue === "river" ? "river" : venue === "lake" ? "still" : "sea", wind: Math.min(1, (cond?.windKph ?? 12) / 45), rain: cond?.precipMm > 0 ? Math.min(1, 0.25 + cond.precipMm / 3) : 0, night: (light?.sunAlt ?? 30) < -6 ? 1 : 0, venue };
+  useEffect(() => { if (sound) soundOn(heard); else soundOff(); return () => soundOff(); }, [sound]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { soundEnv(heard); }, [JSON.stringify(heard)]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!ready) return undefined; const ro = new ResizeObserver(() => W.current?.resize()); ro.observe(wrap.current); return () => ro.disconnect(); }, [ready]);
+
+  // ---- touch and mouse: drag to look, pinch or wheel to zoom, double tap to recentre ----
+  useEffect(() => {
+    const el = canvas.current; if (!el) return undefined;
+    const pts = new Map(); let pinch = 0;
+    const down = (e) => { el.setPointerCapture?.(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) W.current?.look.start(); if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
+    const move = (e) => {
+      if (!pts.has(e.pointerId)) return;
+      const p = pts.get(e.pointerId), dx = e.clientX - p[0], dy = e.clientY - p[1]; pts.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pts.size === 1) W.current?.look.drag(dx, dy, el.clientHeight);
+      else if (pts.size === 2) { const [a, b] = [...pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) W.current?.look.zoom(d / pinch); pinch = d; }
+    };
+    // a tap (no drag) shows or hides the controls, unless a second tap follows (that recentres instead)
+    let tapTimer = 0;
+    const up = (e) => {
+      if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId);
+      if (pts.size === 0) {
+        const L = W.current?.look; L?.end();
+        if (L && L.state().moved < 8) { clearTimeout(tapTimer); if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330); }
+      }
+      pinch = 0;
+    };
+    const wheel = (e) => { e.preventDefault(); W.current?.look.zoom(e.deltaY < 0 ? 1.08 : 1 / 1.08); };
+    const key = (e) => { const L = W.current?.look; if (!L) return; const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -30], ArrowDown: [0, 30] }[e.key]; if (k) { e.preventDefault(); L.start(); L.drag(-k[0], -k[1], el.clientHeight); L.end(); } if (e.key === "Home") L.recenter(); };
+    el.addEventListener("pointerdown", down); el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("wheel", wheel, { passive: false }); el.addEventListener("keydown", key);
+    return () => { el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", key); };
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
+    lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
+    focus: (id) => W.current?.focus(id), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),
+    get mode() { return mode; },
+  }), [mode]);
+
+  return (
+    <div ref={wrap} className={`w3d ${className}`}>
+      <canvas ref={canvas} className="w3d-canvas" tabIndex={0} aria-label="3D view: drag to look round, pinch to zoom, double tap to face your rod" />
+      {!ready && !failed ? <div className="fs-loading"><span className="loading-dots" aria-label="Loading the 3D view" /></div> : null}
+      {failed ? <div className="w3d-fail">This browser can't draw the 3D view. The photo view still works.</div> : null}
+      <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b>N</b></span><i>{compassPoint(heading)}</i></div>
+      <div className="w3d-label">{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></div>
+      {children}
+    </div>
+  );
+});
+export default World3D;

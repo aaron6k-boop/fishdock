@@ -6,6 +6,10 @@
 // conditions, so what you hear matches what you see. One level control and mute.
 
 let ac = null, master = null, reelTimer = null, gullTimer = null;
+// three groups with their own levels (environment, equipment, fishing events), and a panner so another angler's
+// reel or splash comes from their side
+let envG = null, gearG = null, evG = null, pan = null, nearG = null;
+const groupLevel = { environment: 1, equipment: 1, events: 1 };
 const layers = {}; // wash, wind, rain: { src, gain, ... }
 let env = { kind: "sea", wind: 0.3, rain: 0, night: 0, venue: "pier" };
 let level = 0.7, on = false;
@@ -16,6 +20,11 @@ function ensure() {
   if (!AC) return null;
   ac = new AC();
   master = ac.createGain(); master.gain.value = 0; master.connect(ac.destination);
+  envG = ac.createGain(); envG.connect(master);
+  pan = ac.createStereoPanner ? ac.createStereoPanner() : null; nearG = ac.createGain();
+  if (pan) { nearG.connect(pan); pan.connect(master); } else nearG.connect(master);
+  gearG = ac.createGain(); gearG.connect(nearG); evG = ac.createGain(); evG.connect(nearG);
+  applyGroups();
   return ac;
 }
 // brown-ish noise (soft, like water) or white noise (hiss, like rain)
@@ -37,7 +46,7 @@ function bed(name, { white = false, type = "lowpass", freq = 600, q = 0.7, lfoHz
   const lfo = ac.createOscillator(); lfo.frequency.value = lfoHz;
   const depth = ac.createGain(); depth.gain.value = 0;
   lfo.connect(depth); depth.connect(swell.gain);
-  src.connect(f); f.connect(swell); swell.connect(gain); gain.connect(master);
+  src.connect(f); f.connect(swell); swell.connect(gain); gain.connect(envG);
   src.start(); lfo.start();
   layers[name] = { src, f, gain, depth, lfo };
   return layers[name];
@@ -92,28 +101,38 @@ export function soundOff() {
   clearTimeout(gullTimer); gullTimer = null;
   apply();
 }
+function applyGroups() { if (!ac) return; envG.gain.value = groupLevel.environment; gearG.gain.value = groupLevel.equipment; evG.gain.value = groupLevel.events; }
+/** Levels for the three groups, each 0..1: { environment, equipment, events }. */
+export function setVolumes(v = {}) { for (const k of Object.keys(groupLevel)) if (v[k] != null) groupLevel[k] = Math.max(0, Math.min(1, Number(v[k]) || 0)); applyGroups(); }
+/** Where the next effect comes from: pan -1 (left) .. 1 (right), and how near (0..1). Resets to centre after. */
+let panReset = null;
+export function soundPan(p = 0, near = 1) {
+  if (!ac) return;
+  try { if (pan) pan.pan.setValueAtTime(Math.max(-1, Math.min(1, p)), ac.currentTime); nearG.gain.setValueAtTime(near, ac.currentTime); } catch { /* ignore */ }
+  clearTimeout(panReset); panReset = setTimeout(() => { try { if (pan) pan.pan.setValueAtTime(0, ac.currentTime); nearG.gain.setValueAtTime(1, ac.currentTime); } catch { /* ignore */ } }, 1500);
+}
 /** The overall level, 0..1. */
 export function setVolume(v) {
   level = Math.max(0, Math.min(1, Number(v) || 0));
   if (ac && on) to(master.gain, level, 0.1);
 }
 
-function tone(f, g, d, type = "sine", at = 0) {
+function tone(f, g, d, type = "sine", at = 0, out = evG) {
   const t = ac.currentTime + at, o = ac.createOscillator(), v = ac.createGain();
   o.frequency.value = f; o.type = type;
   v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(g, t + 0.004); v.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  o.connect(v); v.connect(master); o.start(t); o.stop(t + d + 0.02);
+  o.connect(v); v.connect(out || master); o.start(t); o.stop(t + d + 0.02);
 }
 function bell() { for (const [f, g, d] of [[2093, 0.16, 1.4], [3140, 0.07, 0.9], [4186, 0.04, 0.6]]) tone(f, g, d); }
 // an electronic bite alarm: a run of short beeps, quicker for a strong take
 function alarm(n = 4) { for (let i = 0; i < n; i++) tone(1850, 0.09, 0.09, "square", i * 0.16); }
-function burst(dur, freq, gain, q = 0.8, white = false) {
+function burst(dur, freq, gain, q = 0.8, white = false, out = evG) {
   const t = ac.currentTime, src = ac.createBufferSource(); src.buffer = noiseBuffer(dur + 0.1, white);
   const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = freq; bp.Q.value = q;
   const v = ac.createGain(); v.gain.setValueAtTime(gain, t); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  src.connect(bp); bp.connect(v); v.connect(master); src.start(t); src.stop(t + dur + 0.05);
+  src.connect(bp); bp.connect(v); v.connect(out || master); src.start(t); src.stop(t + dur + 0.05);
 }
-function click() { burst(0.025, 3200, 0.12, 4); }
+function click() { burst(0.025, 3200, 0.12, 4, false, gearG); }
 // a herring gull's call: a few falling, slightly harsh cries
 function gull() {
   const n = 2 + Math.floor(Math.random() * 3), base = 1150 + Math.random() * 300, g = 0.012 + Math.random() * 0.012;
@@ -124,7 +143,7 @@ function gull() {
     o2.frequency.value = 38; const fm = ac.createGain(); fm.gain.value = 60; o2.connect(fm); fm.connect(o.frequency);
     const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = base * 1.6; bp.Q.value = 2.5;
     v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(g, t + 0.03); v.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
-    o.connect(bp); bp.connect(v); v.connect(master);
+    o.connect(bp); bp.connect(v); v.connect(envG);
     o.start(t); o2.start(t); o.stop(t + 0.3); o2.stop(t + 0.3);
   }
 }
@@ -137,7 +156,8 @@ export function play(name) {
   else if (name === "plop") burst(0.25, 900, 0.5, 1.2);
   else if (name === "splash") { burst(0.5, 1200, 0.45, 0.6); burst(0.3, 3500, 0.12, 0.8, true); }
   else if (name === "bigsplash") { burst(0.9, 900, 0.8, 0.5); setTimeout(() => { burst(0.6, 1800, 0.35, 0.7); burst(0.5, 4000, 0.12, 0.8, true); }, 120); }
-  else if (name === "whoosh") burst(0.35, 2400, 0.18, 0.4);
+  else if (name === "whoosh") burst(0.35, 2400, 0.18, 0.4, false, gearG);
+  else if (name === "net") { burst(0.4, 700, 0.3, 0.6); setTimeout(() => burst(0.25, 1500, 0.15, 0.8, true), 150); }
   else if (name === "reelOn") { clearInterval(reelTimer); reelTimer = setInterval(click, 70); setTimeout(() => { clearInterval(reelTimer); reelTimer = null; }, 20000); }
   else if (name === "reelOff") { clearInterval(reelTimer); reelTimer = null; }
 }

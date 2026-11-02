@@ -81,8 +81,9 @@ function fmtWeight(kg) {
 }
 
 /** The close-up of a landed fish: the angler's own photo when shared, otherwise FishDock's picture of the species. */
-export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = false }) {
+export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = false, who = null }) {
   const d = ev?.data || {};
+  const sim = !demo && !!d.simulated; // a virtual Fish Together catch: never a real record
   const sp = speciesById(d.species);
   const name = d.name || sp?.name || "Fish";
   const art = sp && hasArt(sp.id) ? artUrl(sp.id, "l") : null;
@@ -95,11 +96,11 @@ export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = 
         {art ? <img className={`cc-art${own ? " small" : ""}`} src={art} alt="" /> : ph ? <img className={`cc-art photo${own ? " small" : ""}`} src={photoUrl(ph, 500)} alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" /> : null}
       </div>
       <div className="cc-body">
-        <span className="cc-kicker">{demo ? "Demo catch · not logged" : `Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
+        <span className="cc-kicker">{demo ? "Demo catch · not logged" : sim ? `${who ? `${who}'s simulated` : "Simulated"} catch · not a real record` : `${who ? `${who} · ` : ""}Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
         <h3>{name}</h3>
-        <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released && !demo ? " · Released" : ""}</p>
+        <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released && !demo && !sim ? " · Released" : ""}</p>
         {d.bait ? <p className="tiny">On {d.bait}</p> : null}
-        <p className="cc-note">{demo ? "Animated for the demo: nothing was caught or logged." : "Animated reconstruction of a logged catch, not a video."}{!own ? (art ? " Picture: FishDock's species picture." : ph ? ` Species photo: ${ph.author}, ${ph.licence}.` : "") : ""}</p>
+        <p className="cc-note">{demo ? "Animated for the demo: nothing was caught or logged." : sim ? "Virtual fishing: a simulated fish, kept apart from real catches." : "Animated reconstruction of a logged catch, not a video."}{!own ? (art ? " Picture: FishDock's species picture." : ph ? ` Species photo: ${ph.author}, ${ph.licence}.` : "") : ""}</p>
         {onClip ? <button type="button" className="btn small cc-clip" onClick={onClip}><Icon name="play" />Highlight clip</button> : null}
       </div>
     </div>

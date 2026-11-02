@@ -13,6 +13,7 @@ import { shrinkImage } from "../lib/storage.js";
 import { DRAW_CM, phaseAt } from "../lib/liveEvents.js";
 import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import FishTray from "../components/FishTray.jsx";
+import Stage3D from "../components/Stage3D.jsx";
 import { landedCatches } from "../lib/landed.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -70,13 +71,14 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [copied, setCopied] = useState("");
   const [uiHidden, setUiHidden] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [view3d, setView3d] = useState(() => /\/3d$/.test(location.hash)); // the 360° 3D view (Beta)
   const sceneRef = useRef(null);
   const vfReset = useRef(null); // a new place starts afresh
 
   useEffect(() => { // address bar follows the choice, so the page can be shared or bookmarked
-    const h = `#try/${placeId}/${species}`;
+    const h = `#try/${placeId}/${species}${view3d ? "/3d" : ""}`;
     if (location.hash !== h) history.replaceState(null, "", h);
-  }, [placeId, species]);
+  }, [placeId, species, view3d]);
   useEffect(() => { vfReset.current?.(); setPhotos(null); setPick(0); setView(defaultView()); setCond(null); setOwn(null);
     // the photo that best suits a rod at the water's edge here; if none does (only views from high up, no water
     // where the line lands, a blocked foreground), the drawn scene, labelled as representative
@@ -123,24 +125,38 @@ export default function TryLive({ initialPlace, initialSpecies }) {
 
   const venue = from === "auto" ? venueOf(place) : from;
   const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
-  return (
-    <div className={`watch-shell try-shell immersive${uiHidden ? " ui-hidden" : ""}`}>
-      <div className="watch">
-        <div className="watch-stage">
-          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
-            <div className="fs-top">
+  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: 0, local: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length]);
+  const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
+  const overlay = (
+    <>
+      <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
               {c?.windKph != null ? <span className="fs-chip"><Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</span> : null}
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
               <span className="grow" />
+              <button type="button" className={`fs-btn${view3d ? " on" : ""}`} onClick={() => setView3d(!view3d)} aria-pressed={view3d} aria-label={view3d ? "Back to the photo view" : "Look around in 3D (Beta)"} title="360° look-around (Beta)"><Icon name="compass" /></button>
               <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
               <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
             </div>
             <div className="fs-bottom">
               <FishTray phase={p.phase} last={last} reel={vf.reel} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onHold={vf.hold} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
-          </FishingScene>
+    </>
+  );
+  return (
+    <div className={`watch-shell try-shell immersive${uiHidden ? " ui-hidden" : ""}`}>
+      <div className="watch">
+        <div className="watch-stage">
+          {view3d ? (
+            <Stage3D venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+              {overlay}
+            </Stage3D>
+          ) : (
+            <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
+              {overlay}
+            </FishingScene>
+          )}
         </div>
         {sheet ? <div className="sheet-scrim" onClick={() => setSheet(false)} /> : null}
         <aside className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Demo settings">

@@ -296,3 +296,31 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .vt-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .view-tray .mini-tl { min-width: 180px; max-width: 320px; }
 .test-panel .chip[disabled] { opacity: .4; }
+
+/* ---- the 3D view (Beta) ---- */
+.w3d { position: relative; width: 100%; height: 100%; min-height: 320px; overflow: hidden; background: #0b1620; touch-action: none; }
+.w3d-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; cursor: grab; }
+.w3d-canvas:active { cursor: grabbing; }
+.w3d .fs-overlay { pointer-events: none; }
+.w3d-fail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #fff; background: #0b1620; }
+.w3d-compass { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 96px); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #0a141bb3; border: 1px solid #ffffff26; color: #fff; pointer-events: none; }
+.w3d-compass span { position: absolute; inset: 3px; display: grid; justify-items: center; transition: transform .15s linear; }
+.w3d-compass span b { font-size: 10px; color: #ff6b5e; line-height: 1; }
+.w3d-compass i { font-style: normal; font-size: 10px; font-weight: 700; margin-top: 10px; }
+.w3d-label { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom)); font-size: 10.5px; color: #dbe6ec; text-shadow: 0 1px 2px #000; white-space: nowrap; pointer-events: none; opacity: .85; }
+.w3d-label b { color: var(--action); }
+.w3d-tools { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: auto; }
+.immersive.ui-hidden .w3d-tools, .immersive.ui-hidden .w3d-compass { opacity: 0; pointer-events: none; }
+.fs-btn.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: color-mix(in srgb, var(--action) 60%, transparent); }
+.cam-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: #0a141be6; border: 1px solid #ffffff26; }
+.cam-menu button { text-align: left; }
+.w3d-card { position: absolute; z-index: 6; left: 0; right: 0; bottom: 0; padding: 0 12px calc(14px + env(safe-area-inset-bottom)); pointer-events: none; }
+.w3d-card .catch-card { pointer-events: auto; }
+.w3d-toasts { position: absolute; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 52px); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
+.w3d-toast { padding: 7px 14px; border-radius: 999px; background: #0a141bd9; border: 1px solid #ffffff26; color: #fff; font-size: 13px; font-weight: 650; animation: fs-pop .3s ease both; white-space: nowrap; }
+.w3d-toast.catch { border-color: #f2b84b88; }
+.stage3d { position: relative; width: 100%; aspect-ratio: 4 / 3.3; max-height: 72vh; border-radius: var(--r-l); overflow: hidden; background: #0b1620; box-shadow: 0 18px 40px #0008; }
+.stage3d .w3d { position: absolute; inset: 0; min-height: 0; }
+@media not ((min-width: 960px) and (orientation: landscape)) {
+  .immersive .watch-stage .stage3d { height: 100%; aspect-ratio: auto; max-height: none; border-radius: 0; box-shadow: none; }
+}

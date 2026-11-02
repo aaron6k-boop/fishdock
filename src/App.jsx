@@ -65,8 +65,9 @@ function navFromHash() {
 
 /** A private Live Fishing View link (#watch/<token>) opens the viewer on its own: no onboarding, no tabs. */
 const watchToken = () => (location.hash.match(/^#\/?watch\/([A-Za-z0-9_-]{30,64})$/) || [])[1] || null;
-// The labelled demo of the Live Fishing View: #try, #try/<place>, #try/<place>/<species>.
-const tryRoute = () => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?$/); return m ? { place: m[1] || null, species: m[2] || null } : null; };
+// The labelled demo of the Live Fishing View: #try, #try/<place>, #try/<place>/<species>, and /3d on the end opens
+// the 360° 3D view.
+const tryRoute = () => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?$/); return m ? { place: m[1] === "3d" ? null : m[1] || null, species: m[2] === "3d" ? null : m[2] || null, view3d: !!m[3] } : null; };
 export default function Root() {
   const [token, setToken] = useState(watchToken);
   const [demo, setDemo] = useState(tryRoute);
