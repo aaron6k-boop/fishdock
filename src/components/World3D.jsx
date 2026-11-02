@@ -8,15 +8,43 @@ import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
 import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.js";
 
-const World3D = forwardRef(function World3D({ onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ spotId = null, placeName = "", onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing, now, onTap };
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap };
   const phases = useRef({});
+  // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
+  const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
+  useEffect(() => {
+    setPano(null); if (!spotId) return undefined; let gone = false;
+    fetch(`/api/pano?spot=${encodeURIComponent(spotId)}`, { headers: { accept: "application/json", "x-fishdock": "1" } }).then((r) => (r.ok ? r.json() : null)).then((b) => { if (!gone && b?.pano) setPano(b.pano); }).catch(() => {});
+    return () => { gone = true; };
+  }, [spotId]);
+  const panoOn = !!pano && usePano;
+  // ---- the real place, for FishDock's documented marks: OpenStreetMap's data, built into 3D on this phone ----
+  const [real, setReal] = useState(spotId ? undefined : null); // undefined while loading, null for the drawn place
+  useEffect(() => {
+    if (!spotId) { setReal(null); return undefined; }
+    let gone = false; setReal(undefined);
+    (async () => {
+      try {
+        const r = await fetch(`/api/place?spot=${encodeURIComponent(spotId)}`, { headers: { accept: "application/json", "x-fishdock": "1" } });
+        if (!r.ok) throw new Error("no place");
+        const [lat, lon] = (r.headers.get("x-mark") || "").split(",").map(Number);
+        const osm = await r.json();
+        const { buildPlace } = await import("../lib/world3d/osmPlace.js");
+        const place = buildPlace(osm, lat, lon, venue);
+        if (!gone) setReal(place.grid && place.spots.length === 4 ? place : null);
+      } catch { if (!gone) setReal(null); }
+    })();
+    return () => { gone = true; };
+  }, [spotId, venue]);
+  const facingNow = real || panoOn ? 0 : facing; // a real place is laid out with north ahead
 
   // ---- start the renderer (and three.js) once per place ----
   useEffect(() => {
+    if (real === undefined) return undefined;
     let gone = false, w = null;
     (async () => {
       try {
@@ -25,7 +53,7 @@ const World3D = forwardRef(function World3D({ onTap, venue = "pier", anglers = [
         const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
         const q = quality === "auto" ? mod.autoQuality3d() : quality;
         w = mod.createWorld(canvas.current, {
-          venue, quality: q, reduceMotion: reduce,
+          venue, quality: q, reduceMotion: reduce, real, pano: panoOn ? pano : null,
           onSound: (name, pos) => { if (!props.current.sound) return; const cam = W.current?.camera; if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name); },
         });
         W.current = w;
@@ -43,10 +71,10 @@ const World3D = forwardRef(function World3D({ onTap, venue = "pier", anglers = [
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();
     return () => { gone = true; w?.dispose(); W.current = null; setReady(false); };
-  }, [venue, quality]);
+  }, [venue, quality, real, panoOn]);
 
   useEffect(() => { W.current?.setAnglers(anglers); setOthers(anglers.filter((a) => !a.local).map((a) => ({ id: a.id, name: a.name }))); }, [anglers, ready]);
-  useEffect(() => { if (ready) W.current?.setEnv({ light, cond, facing }); }, [ready, JSON.stringify(light), JSON.stringify(cond), facing]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (ready) W.current?.setEnv({ light, cond, facing: facingNow }); }, [ready, JSON.stringify(light), JSON.stringify(cond), facingNow]); // eslint-disable-line react-hooks/exhaustive-deps
   // the same sound as the photo view: the water, wind, rain and gulls for these conditions
   const heard = { kind: venue === "river" ? "river" : venue === "lake" ? "still" : "sea", wind: Math.min(1, (cond?.windKph ?? 12) / 45), rain: cond?.precipMm > 0 ? Math.min(1, 0.25 + cond.precipMm / 3) : 0, night: (light?.sunAlt ?? 30) < -6 ? 1 : 0, venue };
   useEffect(() => { if (sound) soundOn(heard); else soundOff(); return () => soundOff(); }, [sound]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -93,7 +121,8 @@ const World3D = forwardRef(function World3D({ onTap, venue = "pier", anglers = [
       {!ready && !failed ? <div className="fs-loading"><span className="loading-dots" aria-label="Loading the 3D view" /></div> : null}
       {failed ? <div className="w3d-fail">This browser can't draw the 3D view. The photo view still works.</div> : null}
       <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b>N</b></span><i>{compassPoint(heading)}</i></div>
-      <div className="w3d-label">{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></div>
+      {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
+      <div className="w3d-label">{panoOn ? <>360° photo near here by <a href={pano.page} target="_blank" rel="noopener noreferrer">{pano.author}</a>, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and buildings from OpenStreetMap, drawn in 3D · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</div>
       {children}
     </div>
   );

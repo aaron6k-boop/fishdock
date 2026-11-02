@@ -173,6 +173,20 @@ the live scene. Safe areas are respected, so nothing sits under the iPhone's bar
   camera modes (first person, third person, spectator, cinematic, free look), Look at my rod, Watch a friend,
   splashes and rings, adaptive quality (Performance, Balanced, High Quality) and no drawing while hidden.
 
+### The real place
+
+For FishDock's documented marks the 3D view is built from the real place: `/api/place?spot=<id>` passes
+OpenStreetMap's data for a 1.2 km square round the mark straight through (kept at the edge for 30 days), and the
+phone turns it into the place (`osmPlace.js`, `realPlace.js`): the land and sea from the coastline, rivers and lakes,
+beaches and green spaces as a ground grid (3 m round the mark, coarser to the horizon), harbour walls along the real
+water's edge, every building with its mapped height and windows, and piers, breakwaters and groynes. The anglers
+stand on dry ground at the water's edge (or on a mapped pier), facing open water, at least 9 m apart. Only
+documented marks, never an arbitrary or private position. Map data © OpenStreetMap contributors (ODbL), credited.
+
+Where Mapillary has a 360° photo within 250 m (`/api/pano`, needs the `MAPILLARY_TOKEN` secret), the view can show
+the real photo all round instead, with the rod, line, splashes and fish drawn in front, credited to the
+photographer (CC BY-SA 4.0) and labelled as not a live camera. A switch goes back to the map model.
+
 ## Fish Together (Beta)
 
 `server/party.js`, `worker/party-do.js`, `src/lib/party.js`, `src/pages/Together.jsx`, `src/pages/Party.jsx`.

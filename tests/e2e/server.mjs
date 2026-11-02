@@ -20,6 +20,8 @@ import { handlePlaces } from "../../server/places.js";
 import { handleLive } from "../../server/live.js";
 import { handleScene } from "../../server/scene.js";
 import { handleParty } from "../../server/party.js";
+import { handlePlace3d } from "../../server/place3d.js";
+import { handlePano } from "../../server/pano.js";
 import { localPartyNamespace } from "../helpers/party.js";
 import { acceptWebSocket } from "./ws.mjs";
 
@@ -38,7 +40,7 @@ function staticFile(pathname) {
 }
 const PARTY = localPartyNamespace();
 const env = { PARTY, DB: createD1(":memory:"), ADMIRALTY_API_KEY: "test-key", GEMINI_API_KEY: "test-key", ADMIN_EMAILS: "admin@fishdock.example" };
-const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater, fishinfo: handleFishInfo, places: handlePlaces, live: handleLive, scene: handleScene, party: handleParty };
+const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater, fishinfo: handleFishInfo, places: handlePlaces, live: handleLive, scene: handleScene, party: handleParty, place: handlePlace3d, pano: handlePano };
 
 // ---- outside services, shaped like the real ones ----
 const now = Date.now();
@@ -75,6 +77,7 @@ globalThis.fetch = async (input, init) => {
     return J({ elements: inland ? [{ type: "way", id: 1, tags: { waterway: "river", name: "River Test" } }] : [{ type: "way", id: 2, tags: { natural: "coastline" } }, { type: "way", id: 3, tags: { man_made: "pier", name: "Test Pier" } }] });
   }
   if (url.includes("generativelanguage.googleapis.com")) return J({ candidates: [{ content: { parts: [{ text: JSON.stringify({ summary: "A shingle beach with a gentle swell.", scene: "beach", features: [{ x: 0.55, y: 0.58, kind: "surf", label: "Second breaker line", why: "Waves turn over food here.", how: "Cast just beyond it.", for: ["Bass", "Cod"], confidence: "medium" }], avoid: [], safety: ["Steep shingle: keep well back from the waterline."], candidates: [{ species: "Bass", id: "bass", confidence: "high", why: "Silver, two dorsal fins, spiny gill cover." }] }) }] } }] });
+  if (url.includes("api.openstreetmap.org/api/0.6/map.json")) return new Response(readFileSync(new URL("../fixtures/osm-gorleston.json", import.meta.url)), { headers: { "content-type": "application/json" } });
   if (url.includes("googleapis.com/service_accounts") || url.includes("securetoken")) return J({ keys: [] });
   return new Response("not stubbed", { status: 599 });
 };

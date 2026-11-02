@@ -4,6 +4,7 @@
 // bank or lake. All conditions come in through setEnv, so the sky, light, water, rain and fog agree.
 import * as THREE from "three";
 import { layoutFor } from "./spots.js";
+import { buildRealPlace } from "./realPlace.js";
 
 // ---- shared shader pieces: noise and the sky's colour in any direction ----
 export const GLSL_NOISE = /* glsl */`
@@ -64,7 +65,7 @@ function speckle(g, w, h, base, spread, n = 2600, size = 2) {
   for (let i = 0; i < n; i++) { const v = (Math.random() - 0.5) * spread; g.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v)})`; g.fillRect(Math.random() * w, Math.random() * h, size, size); }
 }
 
-export function createEnvironment(scene, { venue = "pier", quality = 1 } = {}) {
+export function createEnvironment(scene, { venue = "pier", quality = 1, real = null, pano = null } = {}) {
   const L = layoutFor(venue);
   const group = new THREE.Group(); scene.add(group);
   const U = {
@@ -91,7 +92,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1 } = {}) {
   // ---- water ----
   const wU = {
     ...U, uWind: { value: 0.3 }, uWindDir: { value: new THREE.Vector2(0.3, -1).normalize() }, uSwell: { value: 0.3 }, uKind: { value: 0 },
-    uShoreZ: { value: venue === "beach" ? 0 : -1e4 }, uWater: { value: new THREE.Color(0x1d4a56) }, uCam: { value: new THREE.Vector3() },
+    uShoreZ: { value: venue === "beach" && !real ? 0 : -1e4 }, uWater: { value: new THREE.Color(0x1d4a56) }, uCam: { value: new THREE.Vector3() },
     uRip: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uFogC: { value: new THREE.Color(0xb8c8d4) }, uFogFar: { value: 2600 },
   };
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
@@ -233,8 +234,21 @@ export function createEnvironment(scene, { venue = "pier", quality = 1 } = {}) {
   };
   const reeds = (x0, x1, z, y = 0) => { const g = new THREE.CylinderGeometry(0.015, 0.02, 1.4, 3); for (let x = x0; x < x1; x += 0.35) { if (Math.random() < 0.35) continue; const r = new THREE.Mesh(g, M.reed); r.position.set(x + Math.random() * 0.3, y + 0.5, z + (Math.random() - 0.5) * 1.2); r.rotation.z = (Math.random() - 0.5) * 0.3; group.add(r); } };
 
-  // ---- the place itself ----
-  if (venue === "pier") {
+  // ---- a real 360° photo all round (Mapillary): it shows the place, the sky and the water as they were ----
+  if (pano) {
+    const loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
+    const t = loader.load(pano.url); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const geo = new THREE.SphereGeometry(3500, 96, 48); geo.scale(-1, 1, 1);
+    const ph = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: t, fog: false, depthWrite: false, toneMapped: false }));
+    const h = ((pano.heading || 0) * Math.PI) / 180;
+    ph.rotation.y = Math.atan2(-Math.cos(h), -Math.sin(h)); // the photo's middle towards the way the camera faced
+    ph.renderOrder = -9; ph.frustumCulled = false; group.add(ph);
+    sky.visible = false; water.visible = false;
+  }
+  // ---- the place itself: the real one from map data when there is one, otherwise a representative one ----
+  if (pano) { /* the photo is the place */ }
+  else if (real) { buildRealPlace(group, real, M); if (real.buildingMat) lamps.push(real.buildingMat); }
+  else if (venue === "pier") {
     const len = L.from - L.to, mid = (L.from + L.to) / 2;
     box(L.width, 1, len, M.stone, 0, L.deck - 0.5, mid);
     box(L.width + 0.6, L.deck + 3, len, M.wall, 0, (L.deck - 3) / 2 - 0.5, mid);

@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { createEnvironment } from "./environment.js";
 import { createAngler } from "./angler.js";
 import { createLook, lookAt, wrap } from "./look.js";
-import { layoutFor, spotById } from "./spots.js";
+import { layoutFor } from "./spots.js";
 
 export const QUALITY3D = { performance: { dpr: 1, shadows: 0, q: 0.5 }, balanced: { dpr: 1.5, shadows: 1, q: 1 }, high: { dpr: 2, shadows: 1, q: 2 } };
 export function autoQuality3d() {
@@ -19,7 +19,7 @@ export const CAMERA_MODES = [
   { id: "cinematic", label: "Cinematic" }, { id: "free", label: "Free look" },
 ];
 
-export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, reduceMotion = false } = {}) {
+export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, reduceMotion = false, real = null, pano = null } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.q >= 1, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
@@ -27,8 +27,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   renderer.shadowMap.enabled = !!Q.shadows; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 5000);
-  const env = createEnvironment(scene, { venue, quality: Q.q });
-  const L = layoutFor(venue);
+  const env = createEnvironment(scene, { venue, quality: Q.q, real, pano });
+  // a real place brings its own fishing spots (on its pier or along its shore); in a 360° photo everyone stands
+  // where the photo was taken, side by side, facing the water
+  let L = real?.spots?.length === 4 ? { ...layoutFor(venue), spots: real.spots } : layoutFor(venue);
+  if (pano) {
+    const face = real?.spots?.[0]?.face ?? ((pano.heading || 0) * Math.PI) / 180, sx = Math.cos(face), sz = Math.sin(face);
+    L = { ...L, deck: 1, spots: [0, 1, 2, 3].map((k) => { const off = [0, 3.5, -3.5, 7][k]; return { id: k + 1, name: L.spots[k]?.name || `Spot ${k + 1}`, at: [sx * off, 0.9, sz * off], face, cast: 26 }; }) };
+  }
+  const spotOf = (id) => L.spots.find((s) => s.id === id) || L.spots[0];
   const world = new THREE.Group(); scene.add(world);
   const look = createLook({ pitch: -0.12 });
   let homeFor = null;
@@ -56,7 +63,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     for (const a of list) {
       seen.add(a.id);
       let x = anglers.get(a.id);
-      const spot = spotById(venue, a.spot);
+      const spot = spotOf(a.spot);
       if (!x || x.spotId !== a.spot || x.outfit !== a.outfit || x.name !== a.name) {
         if (x) x.a.dispose();
         const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, local: !!a.local, real: !!a.real, onSound: (n, p) => onSound?.(n, p, a.id) });
@@ -70,7 +77,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     for (const [id, x] of anglers) if (!seen.has(id)) { x.a.dispose(); anglers.delete(id); }
     if (!focusId || !anglers.has(focusId)) focusId = localId || [...anglers.keys()][0] || null;
     const me = anglers.get(localId) || anglers.get(focusId);
-    if (me && homeFor !== me.a.id) { homeFor = me.a.id; const s = spotById(venue, me.spotId); look.setHome(s.face, -0.12); look.aim(s.face, -0.12); }
+    if (me && homeFor !== me.a.id) { homeFor = me.a.id; const s = spotOf(me.spotId); look.setHome(s.face, -0.12); look.aim(s.face, -0.12); }
   }
 
   // ---- camera ----

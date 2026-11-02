@@ -18,13 +18,15 @@ import { handlePlaces } from "../server/places.js";
 import { handleLive } from "../server/live.js";
 import { handleScene } from "../server/scene.js";
 import { handleParty } from "../server/party.js";
+import { handlePlace3d } from "../server/place3d.js";
+import { handlePano } from "../server/pano.js";
 export { FishParty } from "./party-do.js";
 import { onRequest as authHelper } from "../functions/_middleware.js";
 
 const API = {
   conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync,
   community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, health: handleHealth, water: handleWater, fishinfo: handleFishInfo, places: handlePlaces,
-  live: handleLive, scene: handleScene, party: handleParty,
+  live: handleLive, scene: handleScene, party: handleParty, place: handlePlace3d, pano: handlePano,
 };
 
 const notFound = () => new Response(JSON.stringify({ error: "not_found", message: "There's nothing here." }), {

@@ -7,7 +7,7 @@ import { Icon } from "./ui.jsx";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase }) {
+export default function Stage3D({ spotId = null, placeName = "", venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -23,7 +23,7 @@ export default function Stage3D({ venue, anglers, light, cond, facing, quality =
   };
   return (
     <div className="stage3d">
-      <World3D ref={w} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+      <World3D ref={w} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
         onPhase={(id, phase, info) => { onPhase?.(id, phase, info); if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); } }}
         onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (a?.local || (mode === "spectator" && watch === id)) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
         <div className="fs-overlay">{children}</div>

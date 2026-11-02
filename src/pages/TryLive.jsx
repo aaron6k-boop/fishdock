@@ -24,7 +24,7 @@ import ASTRO from "../lib/astro.js";
 import { timeFor } from "../lib/timeOfDay.js";
 import { Icon, Seg } from "../components/ui.jsx";
 
-const GORLESTON = { id: "gorleston-south-pier", name: "Gorleston South Pier", region: "Norfolk, East of England", kind: "sea", type: "pier", lat: 52.5733, lon: 1.7375 };
+const GORLESTON = { id: "gorleston-south-pier", name: "Gorleston South Pier", region: "Norfolk, East of England", kind: "sea", type: "pier", lat: 52.5721, lon: 1.7383 };
 export const TRY_PLACES = ["gorleston-south-pier", "cromer-pier", "chesil-beach-ferry-bridge", "whitby-piers", "brixham-breakwater", "st-ives-the-island", "holyhead-breakwater", "loch-ryan-leffnol", "river-wye-ross", "royalty-fishery-avon", "rutland-water", "lough-erne-enniskillen"];
 const placeOf = (id) => (id === GORLESTON.id ? GORLESTON : spotById(id)) || GORLESTON;
 const LIGHT = [{ value: "now", label: "Now" }, { value: "morning", label: "Morning" }, { value: "midday", label: "Midday" }, { value: "dusk", label: "Dusk" }, { value: "night", label: "Night" }];
@@ -139,7 +139,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (
