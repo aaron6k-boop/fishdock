@@ -274,7 +274,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     { const g = new THREE.Mesh(new THREE.PlaneGeometry(400, 260), M.grass); g.rotation.x = -Math.PI / 2; g.position.set(200, 2.9, 160); group.add(g); }
   } else if (venue === "beach") {
     const beach = new THREE.Mesh(new THREE.PlaneGeometry(900, 120, 90, 30), M.sand); beach.rotation.x = -Math.PI / 2;
-    { const p = beach.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const zz = -p.getY(i); p.setZ(i, Math.min(5, zz * 0.06 + 0.4 + Math.sin(p.getX(i) * 0.05) * 0.1)); } beach.geometry.computeVertexNormals(); }
+    // the water's edge runs along z = 0 (where the shader's foam line is), a few metres in front of the anglers; the
+    // beach shelves up behind them (0.9 m where they stand, at z = 6) and on under the water in front
+    { const p = beach.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const z = 40 - p.getY(i); p.setZ(i, Math.max(-2.5, Math.min(5, z * 0.15 + Math.sin(p.getX(i) * 0.05) * 0.1))); } beach.geometry.computeVertexNormals(); }
     beach.position.set(0, 0, 40); beach.receiveShadow = true; group.add(beach);
     for (let x = -360; x <= 360; x += 72) { for (let z = -14; z < 30; z += 1.1) box(0.35, 1.4 - Math.max(0, -z) * 0.04, 0.35, M.wood, x, 0.4 + z * 0.06, z); box(0.15, 0.5, 44, M.wood, x, 0.9, 8); }
     const dunes = new THREE.Mesh(new THREE.PlaneGeometry(900, 60, 60, 8), M.grass); dunes.rotation.x = -Math.PI / 2; { const p = dunes.geometry.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, 4 + Math.sin(p.getX(i) * 0.08) * 1.5 + Math.random() * 0.6); dunes.geometry.computeVertexNormals(); } dunes.position.set(0, 0, 120); group.add(dunes);

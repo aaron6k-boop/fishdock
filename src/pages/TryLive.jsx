@@ -62,6 +62,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [copied, setCopied] = useState("");
   const [uiHidden, setUiHidden] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
   const [view3d, setView3d] = useState(() => /\/3d$/.test(location.hash)); // the 360° 3D view (Beta)
   const sceneRef = useRef(null);
   const vfReset = useRef(null); // a new place starts afresh
@@ -216,6 +217,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               <button type="button" className="chip" disabled={!events.length} onClick={() => { setSheet(false); vf.reset(); }}>Reset</button>
             </div>
             <p className="tiny">Only steps that make sense now are offered: there's no landing a fish before a bite.</p>
+            <label className="check"><input type="checkbox" checked={panoPreview} onChange={(e) => { const on = e.target.checked; setPanoPreview(on); try { if (on) localStorage.setItem("fishdock.panoPreview", "1"); else localStorage.removeItem("fishdock.panoPreview"); } catch { /* no storage */ } }} /><span>Preview real 360° photos in 3D on this phone (not public yet; reopen the 3D view to see it)</span></label>
           </section>
 
           {catches.length ? (

@@ -105,6 +105,7 @@ await audit("3d-gorleston", "/#try/gorleston-south-pier/cod/3d", "Pixel 7", asyn
   await page.mouse.up(); await page.waitForTimeout(1500);
   await page.screenshot({ path: "audit/3d-gorleston-1-dragged.png" });
   P.uiAfterDrag = await page.getByRole("group", { name: "Fishing controls" }).isVisible().catch(() => false);
+  await oneCatch(page, P, "3d-gorleston"); // in the view it starts in
   await page.getByRole("button", { name: "Look at my rod" }).tap({ force: true }); await page.waitForTimeout(1500);
   await page.screenshot({ path: "audit/3d-gorleston-2-rod.png" });
   for (const m of ["Third person", "Cinematic", "Free look", "First person"]) {
@@ -113,9 +114,8 @@ await audit("3d-gorleston", "/#try/gorleston-south-pier/cod/3d", "Pixel 7", asyn
     await page.getByRole("menuitemradio", { name: m }).tap({ force: true }); await page.waitForTimeout(2500);
     await page.screenshot({ path: `audit/3d-gorleston-4-${m.replace(/\s/g, "").toLowerCase()}.png` });
   }
-  await oneCatch(page, P, "3d-gorleston");
 });
-for (const [name, path] of [["3d-whitby", "/#try/whitby-piers/cod/3d"], ["3d-chesil", "/#try/chesil-beach-ferry-bridge/cod/3d"], ["3d-river-avon", "/#try/royalty-fishery-avon/barbel/3d"], ["3d-rocks-mumbles", "/#try/mumbles-head/bass/3d"]]) {
+for (const [name, path] of [["3d-whitby", "/#try/whitby-piers/cod/3d"], ["3d-chesil", "/#try/chesil-beach-ferry-bridge/cod/3d"], ["3d-river-avon", "/#try/royalty-fishery-avon/barbel/3d"], ["3d-rocks-mumbles", "/#try/mumbles-head/bass/3d"], ["3d-deal", "/#try/deal-pier/cod/3d"], ["3d-brixham", "/#try/brixham-breakwater/pollack/3d"]]) {
   await audit(name, path, "Pixel 7", async (page, P) => {
     await page.waitForTimeout(12000); await page.screenshot({ path: `audit/${name}-0.png` });
     P.fps = await fps(page);

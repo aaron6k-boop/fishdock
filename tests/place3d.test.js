@@ -45,6 +45,8 @@ test("the layout check: anglers away from the mark, or looking at land or across
   const pier = { piers: [{ line: [[-50, -18], [50, -18]], width: 8 }], spots: good.spots };
   assert.match(checkLayout(pier, water).why[0], /no open water ahead/, "a pier deck straight ahead");
   assert.equal(checkLayout({ piers: [], spots: good.spots.slice(0, 3) }, water).ok, false, "fewer than four spots");
+  const shed = { piers: [], buildings: [{ ring: [[-3, 3], [3, 3], [3, 9], [-3, 9]], h: 3 }], spots: good.spots };
+  assert.match(checkLayout(shed, water).why[0], /a building in the way/, "a building just behind an angler");
 });
 
 test("the coastline closes into land on its left, round the edge of the area", () => {

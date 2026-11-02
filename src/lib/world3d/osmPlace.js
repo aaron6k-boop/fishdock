@@ -224,6 +224,9 @@ export function checkLayout(L, inWater) {
     const ahead = (m) => [x + f[0] * m, z + f[1] * m], clear = [];
     for (let m = 3; m <= LAYOUT_CHECK.waterAhead[1]; m += 2) clear.push(ahead(m)); // no pier anywhere in the view out to there
     if (!LAYOUT_CHECK.waterAhead.every((m) => inWater(ahead(m))) || clear.some(onPier)) why.push(`${sp.name}: no open water ahead`);
+    // nothing built where the angler stands or just behind (where the camera goes in third person)
+    const around = [[0, 0], [0, -3], [0, -6], [0, -9], [2.5, -4], [-2.5, -4]].map(([side, back]) => [x + f[0] * back - f[1] * side, z + f[1] * back + f[0] * side]);
+    if ((L.buildings || []).some((b) => around.some((q) => Math.abs(q[0] - b.ring[0][0]) < 300 && inside(q, b.ring)))) why.push(`${sp.name}: a building in the way`);
   }
   return { ok: !why.length, why };
 }
