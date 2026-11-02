@@ -1,4 +1,4 @@
-# Temporary: after a deploy, the party smoke test and the mobile audit against the live site.
+# Temporary: the mobile audit of the polish-1 branch in workerd (wrangler dev), before it's deployed.
 name: Live party check
 on:
   push:
@@ -6,22 +6,27 @@ on:
 permissions:
   contents: write
 jobs:
-  live:
+  audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          ref: polish-1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node tools/party-smoke.mjs https://fishdock.aaron6k.workers.dev
       - run: npm install --no-audit --no-fund
+      - run: npm run build
       - run: npx playwright install --with-deps chromium
-      - run: node tools/mobile-audit.mjs https://fishdock.aaron6k.workers.dev
-        continue-on-error: true
-      - name: Save the screenshots to the audit-shots branch
+      - name: Start wrangler dev
         run: |
-          cd audit && git init -q -b audit-shots && git add -A
-          git -c user.name=audit -c user.email=audit@localhost commit -qm "live mobile audit $(date -u +%FT%TZ)"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" audit-shots
+          npx --yes wrangler@4 dev --port 8787 --ip 127.0.0.1 > wrangler.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -H 'x-fishdock: 1' http://127.0.0.1:8787/api/health > /dev/null && break; sleep 2; done
+      - run: node tools/party-smoke.mjs http://127.0.0.1:8787
+      - run: node tools/mobile-audit.mjs http://127.0.0.1:8787
+        continue-on-error: true
+      - name: Save the screenshots to the audit-local branch
+        run: |
+          cd audit && git init -q -b audit-local && git add -A
+          git -c user.name=audit -c user.email=audit@localhost commit -qm "mobile audit (polish-1 in workerd) $(date -u +%FT%TZ)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" audit-local
