@@ -29,7 +29,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   else if (phase === "bite") { act = "strike"; label = "Bite! Strike now"; }
   else if (phase === "hooked") {
     act = fight?.near ? "land" : "reel";
-    const m = fight ? ` · ${Math.round(fight.dist)} m` : "";
+    const m = fight ? `\u00a0· ${Math.round(fight.dist)}\u00a0m` : "";
     label = fight?.near ? "It's close: land it" : fight?.slipping ? `The drag's giving line${m}` : fight?.running ? `It's running! Keep it tight${m}` : opts.assisted ? (fight?.assisted ? `Winding: tap to stop${m}` : "Tap once to start winding") : `Tap to reel${m}`;
   }
   else if (phase === "landing") { busy = true; label = "Landing it"; }
@@ -70,7 +70,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
         <button type="button" className={`ft-main ft-cast${power != null ? " holding" : ""}`} aria-label="Cast: hold to build power, let go to cast"
           onPointerDown={castDown} onPointerUp={castUp} onPointerCancel={castCancel} onContextMenu={(e) => e.preventDefault()}
           onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); onCast?.(world?.current?.castParams?.(0.6) || { power: 0.6 }); } }}>
-          {power != null ? <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring power" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - power) }} /></svg> : null}
+          {power != null ? <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring power" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - power) }} /></svg> : null}
           <Icon name="target" /><span>{power != null ? `${Math.round(power * 100)}%` : "Cast"}</span>
         </button>
       ) : null}
@@ -87,7 +87,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
             <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
               onPointerDown={(e) => { e.preventDefault(); onTap?.(); }} onContextMenu={(e) => e.preventDefault()}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
-              <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - reel) }} /></svg>
+              <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - reel) }} /></svg>
               <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span>Reel</span>
             </button>
           )}

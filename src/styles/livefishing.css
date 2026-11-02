@@ -282,7 +282,7 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .ft-main svg { width: 22px; height: 22px; }
 .ft-strike { background: var(--sun, #f2b84b); color: #2b1a00; animation: ft-pulse 0.9s ease-in-out infinite; }
 .ft-reel { background: #0a141bd0; color: #fff; }
-.ft-reel > svg:first-child { position: absolute; inset: -1px; width: 66px; height: 66px; transform: rotate(-90deg); }
+.ft-reel > svg.ft-ringsvg { position: absolute; inset: -1px; width: 72px; height: 72px; transform: rotate(-90deg); }
 .ft-reel:active { transform: scale(.96); }
 .ft-ring-bg { fill: none; stroke: #ffffff26; stroke-width: 4; }
 .ft-ring { fill: none; stroke: var(--action); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
@@ -291,10 +291,9 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .ft-pill svg { width: 15px; height: 15px; }
 /* hold to cast, tap to reel, the tension gauge, land */
 .ft-main { width: 70px; height: 70px; }
-.ft-main > svg:first-child:not(:only-child) { position: absolute; inset: -1px; width: 72px; height: 72px; transform: rotate(-90deg); }
+.ft-main > svg.ft-ringsvg { position: absolute; inset: -1px; width: 72px; height: 72px; transform: rotate(-90deg); }
 .ft-cast.holding { transform: scale(1.05); }
 .ft-ring.power { stroke: #fff; transition: none; }
-.ft-reel > svg:first-child { width: 72px; height: 72px; }
 .ft-reel.assisted { box-shadow: 0 0 0 3px color-mix(in srgb, var(--action) 55%, transparent), 0 8px 22px #0007; }
 .ft-handle { display: grid; place-items: center; transition: transform .12s ease-out; }
 .ft-land { background: var(--action); animation: ft-pulse 0.9s ease-in-out infinite; }
