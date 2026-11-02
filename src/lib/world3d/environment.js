@@ -168,7 +168,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // rings where a rig lands or a fish breaks the surface, with white churned water at the middle at first
         float churn = 0.;
         for (int i = 0; i < 8; i++) { vec4 r = uRip[i]; if (r.w <= 0.) continue; float d = length(p - r.xy); float fr = (d - r.z*1.4)*7.; n.xz += normalize(p - r.xy + .001)*sin(fr)*exp(-fr*fr*.08)*r.w*.35;
-          churn += r.w*smoothstep(1.8, 0., r.z)*(1. - smoothstep(.25 + r.z*.9, .55 + r.z*1.3, d))*smoothstep(.3, .7, noise(p*5. + uTime*2.)); }
+          churn += r.w*smoothstep(1.8, 0., r.z)*(1. - smoothstep(.25 + r.z*.9, .55 + r.z*1.3, d))*smoothstep(.25, .75, noise(p*2.4 + uTime*1.5)); }
         n = normalize(n);
         vec3 v = normalize(cameraPosition - vW);
         vec3 r = reflect(-v, n); r.y = abs(r.y);

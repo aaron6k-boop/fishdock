@@ -319,6 +319,7 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .fs-btn.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: color-mix(in srgb, var(--action) 60%, transparent); }
 .cam-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: #0a141be6; border: 1px solid #ffffff26; }
 .cam-menu button { text-align: left; }
+.cam-sep { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid #ffffff26; }
 /* the catch card sits under the top bar: the landed fish (in the hands, or the net) is in the lower part of the view */
 .w3d-card { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 50px); padding: 0 12px; pointer-events: none; display: flex; justify-content: center; }
 .w3d-card .catch-card.compact { max-height: 132px; }

@@ -20,7 +20,7 @@ export const CAMERA_MODES = [
   { id: "cinematic", label: "Cinematic" }, { id: "free", label: "Free look" },
 ];
 
-export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, onFeel, reduceMotion = false, real = null, pano = null } = {}) {
+export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, onFeel, reduceMotion = false, real = null, pano = null, trackJumps = true } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.q >= 1, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
@@ -101,6 +101,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     return out;
   }
   let camPos = new THREE.Vector3(0, L.deck + 1.65, 0), camTarget = null, cineShot = null, cineSince = 0, lastPhaseKey = "";
+  // following jumps (optional, on to start): the camera turns to a leap just before it happens and closes in a little
+  // so it reads on a phone, then eases back. Never while you're turning the view yourself, never in Free look, and not
+  // with reduced motion on
+  let track = trackJumps && !reduceMotion, jumpZoom = 1;
   function updateCamera(t, dt) {
     look.step(dt);
     const focus = anglers.get(mode === "spectator" ? focusId : localId) || anglers.get(focusId);
@@ -120,6 +124,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     else if (out && focus?.a.local && (mode === "first" || mode === "third") && (out.phase === "hooked" || out.phase === "landing") && !(out.phase === "landing" && out.landed)) {
       steerTo = out.phase === "landing" ? (out.fishAt || out.rig) : (out.rig ? out.tip.clone().lerp(out.rig, 0.55) : null);
     }
+    const leap = track && mode !== "free" && idle ? (watched && t < followUntil ? watched.jump : (mode === "first" || mode === "third" || mode === "spectator" || mode === "cinematic") ? out?.jump : null) : null;
+    if (leap) steerTo = leap;
+    // closer in for a far leap, so a 50 cm fish 40 m out is more than a few pixels (the camera zooms; the fish isn't scaled)
+    jumpZoom += ((leap ? Math.max(0.4, Math.min(0.8, 12 / Math.max(1, camPos.distanceTo(leap)))) : 1) - jumpZoom) * (1 - Math.exp(-dt * (leap ? 3 : 1.5)));
     if (!out) { camera.position.copy(pos); }
     else if (mode === "first" || mode === "free") {
       pos.copy(out.eye);
@@ -140,8 +148,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       else { const a = out.face + Math.sin((t - cineSince) * 0.05) * 0.5; pos.set(out.at.x - Math.sin(a) * 6, out.at.y + 2.6, out.at.z + Math.cos(a) * 6); yaw = a; pitch = -0.15; }
       pivot.copy(out.at).add(new THREE.Vector3(0, 1.5, 0)); pos = unblocked(pivot, pos);
       camPos.lerp(pos, 1 - Math.exp(-dt * 1.5)); pos = camPos.clone();
+      if (leap) { const l = lookAt(camPos.toArray(), leap.toArray()); yaw = l.yaw; pitch = l.pitch; } // a leap: turn to it, quicker
       if (!cineShot) cineShot = { yaw, pitch };
-      cineShot.yaw = wrap(cineShot.yaw + wrap(yaw - cineShot.yaw) * (1 - Math.exp(-dt * 2))); cineShot.pitch += (pitch - cineShot.pitch) * (1 - Math.exp(-dt * 2));
+      const ck = 1 - Math.exp(-dt * (leap ? 5 : 2));
+      cineShot.yaw = wrap(cineShot.yaw + wrap(yaw - cineShot.yaw) * ck); cineShot.pitch += (pitch - cineShot.pitch) * ck;
       yaw = cineShot.yaw; pitch = cineShot.pitch;
     }
     // switching who you watch glides the camera across rather than cutting
@@ -151,7 +161,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
     camera.position.copy(camPos);
     // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
-    camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1); camera.updateProjectionMatrix();
+    camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1) * jumpZoom; camera.updateProjectionMatrix();
     const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     camera.lookAt(camera.position.clone().add(d));
     for (const [id, x] of anglers) x.a.setFirstPerson((mode === "first" || mode === "free") && id === (focus?.a.id));
@@ -217,6 +227,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind };
       return s;
     },
+    setTrack(on) { track = !!on && !reduceMotion; },
+    get track() { return track; },
     setMode(m) { mode = CAMERA_MODES.some((x) => x.id === m) ? m : "first"; if (mode === "first" || mode === "free") { const me = anglers.get(localId) || anglers.get(focusId); if (me?.out) look.aim(me.out.face, -0.12); } },
     get mode() { return mode; },
     focus(id) { if (anglers.has(id)) focusId = id; },

@@ -9,6 +9,13 @@ import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
 import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.js";
 
+// ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
+// from where they happen: your friend's reel from their side, quieter further away) ----
+const VIEW_KEY = "fishdock.view3d.v1";
+export const VIEW_DEFAULTS = { track: true, spatial: true };
+export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
+export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
+
 const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
@@ -61,9 +68,9 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
         const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
         const q = quality === "auto" ? mod.autoQuality3d() : quality;
         w = mod.createWorld(canvas.current, {
-          venue, quality: q, reduceMotion: reduce, real, pano: panoOn ? pano : null,
+          venue, quality: q, reduceMotion: reduce, real, pano: panoOn ? pano : null, trackJumps: loadView().track,
           onFeel: (n, d) => props.current.feel?.(n, d),
-          onSound: (name, pos) => { if (!props.current.sound) return; const cam = W.current?.camera; if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name); },
+          onSound: (name, pos) => { if (!props.current.sound) return; const cam = W.current?.camera; if (soundPan && !loadView().spatial) soundPan(0, 1); else if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name); },
         });
         W.current = w;
         w.setNow(() => props.current.now());
@@ -121,6 +128,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
   useImperativeHandle(ref, () => ({
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
+    setTrack: (on) => W.current?.setTrack(on),
     focus: (id) => W.current?.focus(id), follow: (id, sec) => W.current?.follow(id, sec), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),
     get mode() { return mode; },
   }), [mode]);

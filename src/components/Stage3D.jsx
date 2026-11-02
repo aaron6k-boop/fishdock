@@ -1,7 +1,7 @@
 // ---- Stage3D: the 3D view with its small tools: camera modes, Look at my rod, Watch a friend, the catch card ----
 // Used by the demo and by Fish Together. The overlay (`children`) is the page's own top bar and fishing tray.
 import { useEffect, useRef, useState } from "react";
-import World3D from "./World3D.jsx";
+import World3D, { loadView, saveView } from "./World3D.jsx";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
 
@@ -11,6 +11,8 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
+  const [view, setView] = useState(loadView);
+  const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
   useEffect(() => { if (watching && mode !== "spectator" && mode !== "cinematic") { const t = setTimeout(() => pick("spectator"), 600); return () => clearTimeout(t); } return undefined; }, [watching]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -46,6 +48,9 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
           {menu ? (
             <div className="cam-menu" role="menu" aria-label="Camera">
               {MODES.filter(([m]) => m !== "spectator" || others.length).map(([m, l]) => <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} className={`ft-pill${mode === m ? " on" : ""}`} onClick={() => pick(m)}>{l}</button>)}
+              <hr className="cam-sep" />
+              <button type="button" role="menuitemcheckbox" aria-checked={view.track} className={`ft-pill${view.track ? " on" : ""}`} onClick={() => setOpt("track", !view.track)} title="The camera turns to a leaping fish, unless you're moving the view yourself">Follow jumps</button>
+              {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
           ) : null}
           <button type="button" className={`fs-btn${menu ? " on" : ""}`} onClick={() => setMenu(!menu)} aria-label="Camera" aria-expanded={menu}><Icon name="camera" /></button>
