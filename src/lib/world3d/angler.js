@@ -258,7 +258,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let events = [];
   // the fight as you reel it (tap reeling, reelModel.js), for your own angler: how far in the fish is, the line's
   // tension, the drag slipping, the handle's turns. Others' fights follow their events' times
-  let fightIn = null, lastTurns = 0, lastDragSound = 0, viewIn = null, figYaw = 0;
+  let fightIn = null, fightPr = null, lastTurns = 0, lastDragSound = 0, viewIn = null, figYaw = 0;
   let face = 0, at = new THREE.Vector3(), castAt = new THREE.Vector3(), nearAt = new THREE.Vector3(), edge = 1;
   // `edge`: how far in front of the angler the pier, quay or bank ends (the water starts). The fish comes up a little
   // beyond it, never under the deck, so it can be seen being landed
@@ -355,7 +355,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // erratically, bass and garfish leap clear, flatfish swing in slow wide arcs, rays sit deep and heavy, eels make
       // the tip pump. The rod follows it, bent by how hard it's pulling
       const fl = fightIn && performance.now() - fightIn.at < 1500 ? fightIn : null;
-      const st = fightStyle(prof), pr = fl ? clamp(fl.progress, 0, 1) : 1 - Math.exp(-age / (16 * prof.long));
+      // the fish comes in as the line does: eased, since a friend's fight arrives a few times a second
+      if (fl) fightPr = fightPr == null ? fl.progress : fightPr + (fl.progress - fightPr) * Math.min(1, dt * (local ? 12 : 4)); else fightPr = null;
+      const st = fightStyle(prof), pr = fl ? clamp(fightPr, 0, 1) : 1 - Math.exp(-age / (16 * prof.long));
       const run = n1(age * 0.22 * prof.tempo * st.runSpeed + P.s1), surge = Math.max(0, Math.sin(age * 0.95 * prof.tempo + n1(age * 0.3 + P.s2) * 2.2)) ** 6;
       const f = castAt.clone().lerp(nearAt, pr * 0.85);
       const [dx, dz] = dirOf(face), side = [-dz, dx];
@@ -387,9 +389,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); feel("hooked", {}, true); }
       if (fl) {
         // the handle turns as you tap; each half turn clicks; the drag giving line ratchets and the tip shivers
-        if (Math.floor(fl.turns * 2) > Math.floor(lastTurns * 2)) onSound?.("reelTap", at);
+        // (your own reel's clicks only: a friend's fight is seen, not heard)
+        if (local && Math.floor(fl.turns * 2) > Math.floor(lastTurns * 2)) onSound?.("reelTap", at);
         lastTurns = fl.turns;
-        if (fl.slipping && t - lastDragSound > 0.3) { lastDragSound = t; onSound?.("drag", at); spr.tipv += 0.6; }
+        if (fl.slipping && t - lastDragSound > 0.3) { lastDragSound = t; if (local) onSound?.("drag", at); spr.tipv += 0.6; }
       }
       if (!st.leaps && prof.splashy > 0.3 && Math.floor(age * 0.5 + P.s1) !== Math.floor((age - dt) * 0.5 + P.s1) && seed() < prof.splashy * 0.5 && age > 2) { const sp = f.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.35 + prof.splashy * 0.4); rippleCb?.(sp, 0.5); onSound?.("splash", sp); }
       if (fl) { const want = fl.turns * Math.PI * 2; reel.userData.spin = (reel.userData.spin || 0) + (want - (reel.userData.spin || 0)) * Math.min(1, dt * 14); }

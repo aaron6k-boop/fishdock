@@ -7,12 +7,16 @@ import { spotById } from "../data/spots.js";
 import { Icon } from "./ui.jsx";
 import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
-import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.js";
+import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/sceneAudio.js";
 
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
 // from where they happen: your friend's reel from their side, quieter further away) ----
 const VIEW_KEY = "fishdock.view3d.v1";
-export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left", look: "normal", smooth: true, stick: "m", stickFloat: false };
+export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto" };
+// sound levels for the three kinds of sound (sceneAudio.js setVolumes), saved on this phone
+const LEVELS_KEY = "fishdock.sound.levels";
+export function loadLevels() { try { return { environment: 0.8, equipment: 0.8, events: 1, ...JSON.parse(localStorage.getItem(LEVELS_KEY) || "{}") }; } catch { return { environment: 0.8, equipment: 0.8, events: 1 }; } }
+export function saveLevels(v) { try { localStorage.setItem(LEVELS_KEY, JSON.stringify(v)); } catch { /* ignore */ } }
 export const LOOK_SENS = { low: 0.65, normal: 1, high: 1.5 };
 export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
@@ -108,7 +112,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   useEffect(() => { if (ready) W.current?.setEnv({ light, cond, facing: facingNow }); }, [ready, JSON.stringify(light), JSON.stringify(cond), facingNow]); // eslint-disable-line react-hooks/exhaustive-deps
   // the same sound as the photo view: the water, wind, rain and gulls for these conditions
   const heard = { kind: venue === "river" ? "river" : venue === "lake" ? "still" : "sea", wind: Math.min(1, (cond?.windKph ?? 12) / 45), rain: cond?.precipMm > 0 ? Math.min(1, 0.25 + cond.precipMm / 3) : 0, night: (light?.sunAlt ?? 30) < -6 ? 1 : 0, venue };
-  useEffect(() => { if (sound) soundOn(heard); else soundOff(); return () => soundOff(); }, [sound]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (sound) { soundOn(heard); setVolumes(loadLevels()); } else soundOff(); return () => soundOff(); }, [sound]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { soundEnv(heard); }, [JSON.stringify(heard)]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!ready) return undefined; const ro = new ResizeObserver(() => W.current?.resize()); ro.observe(wrap.current); return () => ro.disconnect(); }, [ready]);
 

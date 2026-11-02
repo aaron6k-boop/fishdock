@@ -467,3 +467,8 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 .look-sw { width: 28px; height: 28px; border-radius: 50%; background: var(--c); border: 2px solid transparent; box-shadow: inset 0 0 0 1px #0000002a; }
 .look-sw.on { border-color: var(--action); box-shadow: 0 0 0 2px var(--bg) inset; }
 @media (max-width: 360px) { .look-picker { grid-template-columns: 1fr; } .look-preview { justify-self: center; } }
+
+/* sound levels in the camera menu */
+.sound-levels { display: grid; gap: 6px; padding: 8px 12px; border-radius: 14px; background: #0a141bb3; border: 1px solid #ffffff2a; color: #fff; font-size: 12px; font-weight: 600; }
+.sl-row { display: grid; grid-template-columns: 1fr 96px; align-items: center; gap: 8px; }
+.sl-row input { width: 96px; accent-color: var(--action); }

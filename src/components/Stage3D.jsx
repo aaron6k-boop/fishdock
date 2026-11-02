@@ -1,7 +1,8 @@
 // ---- Stage3D: the 3D view with its small tools: camera modes, Look at my rod, Watch a friend, the catch card ----
 // Used by the demo and by Fish Together. The overlay (`children`) is the page's own top bar and fishing tray.
 import { useEffect, useRef, useState } from "react";
-import World3D, { loadView, saveView } from "./World3D.jsx";
+import World3D, { loadView, saveView, loadLevels, saveLevels } from "./World3D.jsx";
+import { setVolumes } from "../lib/sceneAudio.js";
 import { WorldCtx } from "./WorldContext.js";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
@@ -57,7 +58,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   return (
     <div className={`stage3d${walk ? " walking" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
-      <World3D ref={w} fight={fight} startMode="first" feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+      <World3D ref={w} fight={fight} startMode="first" feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} sound={sound} now={now} quality={view.gfx && view.gfx !== "auto" ? view.gfx : quality}
         onPhase={(id, phase, info) => {
           onPhase?.(id, phase, info);
           if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); return; }
@@ -106,6 +107,8 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.assisted} className={`ft-pill${reelOpts.assisted ? " on" : ""}`} onClick={() => onReelOpts?.({ assisted: !reelOpts.assisted })} title="One tap starts winding at a steady rate, another stops it, instead of tapping again and again">Assisted reeling</button>
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.advanced} className={`ft-pill${reelOpts.advanced ? " on" : ""}`} onClick={() => onReelOpts?.({ advanced: !reelOpts.advanced })} title="Set the drag yourself while you fight a fish: too tight and the line can break">Advanced fight</button>
               </> : null}
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("gfx", { auto: "performance", performance: "balanced", balanced: "high", high: "auto" }[view.gfx] || "auto")} title="Performance runs smoother and saves battery; Quality looks best on a newer phone">Graphics: {{ auto: "Auto", performance: "Performance", balanced: "Balanced", high: "Quality" }[view.gfx] || "Auto"}</button>
+              {sound ? <SoundLevels /> : null}
               {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
           ) : null}
@@ -169,6 +172,19 @@ function FishLook({ ev, demo, onKeep, onRelease, onClose }) {
         <button type="button" className="btn primary" onClick={onKeep}><Icon name="check" />Keep it</button>
         <button type="button" className="btn" onClick={onRelease}>Put it back</button>
       </div>
+    </div>
+  );
+}
+
+// ---- sound levels: the surroundings (waves, wind, gulls), the tackle (reel, line), and the moments (bites, splashes) ----
+function SoundLevels() {
+  const [lv, setLv] = useState(loadLevels);
+  const set = (k, v) => { const next = { ...lv, [k]: v }; setLv(next); saveLevels(next); setVolumes(next); };
+  return (
+    <div className="sound-levels" role="group" aria-label="Sound levels">
+      {[["environment", "Surroundings"], ["equipment", "Reel and tackle"], ["events", "Bites and splashes"]].map(([k, l]) => (
+        <label key={k} className="sl-row"><span>{l}</span><input type="range" min="0" max="1" step="0.05" value={lv[k]} onChange={(e) => set(k, Number(e.target.value))} aria-label={`${l} volume`} /></label>
+      ))}
     </div>
   );
 }

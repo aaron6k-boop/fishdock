@@ -450,6 +450,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     setRemotePose(id, pose) {
       if (id === localId) return;
       if (pose?.emote) { anglers.get(id)?.a.emote(pose.emote); return; }
+      if (pose?.fight) { anglers.get(id)?.a.setFight(pose.fight); return; } // their fight as they reel it
       if (pose?.spotAt) { const x = anglers.get(id); remote.delete(id); if (x) { x.a.setWalk(null); x.a.place({ ...x.a.spot, at: pose.at, face: pose.face, edge: pose.edge, cast: pose.cast }); } return; }
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },

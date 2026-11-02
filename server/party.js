@@ -31,6 +31,12 @@ export function cleanPose(p) {
   if (!p || typeof p !== "object") return undefined;
   // a wave, cheer or clap: just its name
   if ("emote" in p) return EMOTES.includes(p.emote) ? { emote: p.emote } : undefined;
+  // a fish being reeled in (virtual fishing): how far in, the line's tension, the drag slipping, the reel's turns
+  if ("fight" in p) {
+    const f = p.fight || {}, n = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : NaN);
+    const out = { progress: Math.round(n(f.progress, 0, 1) * 1000) / 1000, tension: Math.round(n(f.tension, 0, 2) * 100) / 100, slipping: !!f.slipping, turns: Math.round(n(f.turns, 0, 100000) * 10) / 10 };
+    return [out.progress, out.tension, out.turns].some(Number.isNaN) ? undefined : { fight: out };
+  }
   const n = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? Math.round(v * 100) / 100 : NaN);
   // fishing from somewhere they walked to: where they now stand, which way they face, the edge and the cast
   if (p.spotAt) {
@@ -214,7 +220,7 @@ export class PartyRoom {
       if (p === undefined) return res();
       // movement has to be possible: nobody covers more than a sprint's worth between two poses (a phone that sends
       // a jump across the place is ignored; the next believable pose carries on). Back at a spot starts afresh
-      if (p && !p.emote && !p.spotAt) {
+      if (p && !p.emote && !p.fight && !p.spotAt) {
         const lp = this.lastPose.get(mid);
         if (lp) { const dt = Math.max(0.05, (now - lp.at) / 1000), d = Math.hypot(p.x - lp.x, p.z - lp.z); if (dt < 5 && d / dt > PARTY.maxSpeed) return res(); }
         this.lastPose.set(mid, { x: p.x, z: p.z, at: now });

@@ -261,6 +261,8 @@ test("walking about in a virtual party: poses go to the others only, cleaned, ne
   assert.equal(cleanPose("hi"), undefined);
   assert.deepEqual(cleanPose({ emote: "wave", x: 5 }), { emote: "wave" }, "an emote is just its name");
   assert.equal(cleanPose({ emote: "dance<script>" }), undefined);
+  assert.deepEqual(cleanPose({ fight: { progress: 0.41234, tension: 0.777, slipping: 1, turns: 12.34, extra: "x" } }), { fight: { progress: 0.412, tension: 0.78, slipping: true, turns: 12.3 } }, "a fight's state, cleaned");
+  assert.equal(cleanPose({ fight: { progress: 3, tension: 0, turns: 0 } }), undefined);
   const room = new PartyRoom();
   await room.init({ code: "ABC234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
   const host = Object.values(room.s.members)[0];

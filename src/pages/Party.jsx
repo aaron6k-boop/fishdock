@@ -134,6 +134,13 @@ function PartyLive({ code, mkey }) {
   const [hint] = useState(() => { const pool = ["cod", "bass", "whiting", "mackerel", "pollack", "plaice", "thornback-ray", "pouting"]; const sp = pool[Math.floor(Math.random() * pool.length)]; return { species: sp, lengthCm: 30 + Math.round(Math.random() * 35) }; });
   const [fishFor, setFishFor] = useState(hint);
   const vf = useVirtualFishing({ species: fishFor.species, name: speciesById(fishFor.species)?.name || "Fish", lengthCm: fishFor.lengthCm, onEvent: (e) => { if (mode === "virtual" && fishing) P.sendEvent(e.type, e.data); if (e.type === "catch") { const pool = ["cod", "bass", "whiting", "mackerel", "pollack", "plaice", "pouting", "black-bream", "garfish"]; setTimeout(() => setFishFor({ species: pool[Math.floor(Math.random() * pool.length)], lengthCm: 25 + Math.round(Math.random() * 45) }), 12000); } } });
+  // your fight, a few times a second, so friends see the fish come in as you reel (virtual parties; never saved)
+  const fightSent = useRef(0);
+  useEffect(() => {
+    const f = vf.fight; if (!f || mode !== "virtual") return;
+    const now = Date.now(); if (now - fightSent.current < 330) return; fightSent.current = now;
+    P_ref.current?.send({ t: "pose", p: { fight: { progress: f.progress, tension: f.tension, slipping: f.slipping, turns: f.turns } } });
+  }, [vf.fight]); // eslint-disable-line react-hooks/exhaustive-deps
   const myServerEvents = P.events.filter((e) => e.who === me?.id);
   const myEvents = mode === "virtual" ? vf.events : myServerEvents;
   const now = Date.now();
