@@ -277,7 +277,8 @@ function standRules(L, inWater) {
   const bs = (L.buildings || []).map((b) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of b.ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { ring: b.ring, x0, x1, z0, z1 }; }).filter((b) => Math.hypot(Math.max(Math.abs(b.x0), Math.abs(b.x1)), Math.max(Math.abs(b.z0), Math.abs(b.z1))) < 600);
   const built = (q) => bs.some((b) => q[0] >= b.x0 && q[0] <= b.x1 && q[1] >= b.z0 && q[1] <= b.z1 && inside(q, b.ring));
   // a river's far bank is near: look less far across one
-  const narrow = L.venue === "river" || L.venue === "lake", side = narrow ? [5, 8] : [8, 14, 20, 26], waterAhead = narrow ? [6, 10] : LAYOUT_CHECK.waterAhead;
+  // (a lake is wide: it keeps the coast's distances ahead)
+  const narrow = L.venue === "river", side = narrow ? [5, 8] : L.venue === "lake" ? [8, 14] : [8, 14, 20, 26], waterAhead = narrow ? [6, 10] : LAYOUT_CHECK.waterAhead;
   return function problem(q, face) {
     const f = [Math.sin(face), -Math.cos(face)], ahead = (m) => [q[0] + f[0] * m, q[1] + f[1] * m];
     if (!waterAhead.every((m) => inWater(ahead(m)) && !onPier(ahead(m)))) return "no open water ahead";

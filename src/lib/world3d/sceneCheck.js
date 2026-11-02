@@ -15,15 +15,16 @@ export function checkScene(place, targets) {
     if (!down || Math.abs(eye.y - down.distance - y) > SCENE_CHECK.deckTol) why.push(`${sp.name}: not standing on the deck`);
     for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2, d = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)); for (const hgt of [0.4, 1.0, SCENE_CHECK.eye]) { const h = hit(new THREE.Vector3(x, y + hgt, z), d, SCENE_CHECK.clear); if (h) { why.push(`${sp.name}: something within ${SCENE_CHECK.clear} m`); k = 99; break; } } }
     if (hit(eye, new THREE.Vector3(0, 1, 0), SCENE_CHECK.above)) why.push(`${sp.name}: something overhead`);
-    let blocked = 0, n = 0;
+    let blocked = 0, n = 0; const by = new Set();
     // across a river: past the bank (from a 2.2 m bank the water right below it is out of sight), short of the far bank
-    const dists = place.venue === "river" || place.venue === "lake" ? [8, 11, 14] : SCENE_CHECK.view;
+    const dists = place.venue === "river" ? [8, 11, 14] : place.venue === "lake" ? [8, 14, 20] : SCENE_CHECK.view;
     for (const m of dists) for (const s of SCENE_CHECK.spread) {
       const dir = f.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), s), target = new THREE.Vector3(x + dir.x * m, 0.05, z + dir.z * m), v = target.clone().sub(eye), L = v.length();
-      n++; if (hit(eye, v.normalize(), L - 0.4)) blocked++;
+      n++; const h = hit(eye, v.normalize(), L - 0.4); if (h) { blocked++; by.add(h.object.userData.kind || "something"); }
     }
-    if (blocked > n * 0.25) why.push(`${sp.name}: the view of the water is blocked (${blocked} of ${n})`);
-    const ahead = new THREE.Vector3(x + f.x * 6, y + 3, z + f.z * 6), d2 = hit(ahead, new THREE.Vector3(0, -1, 0), 8);
+    if (blocked > n * 0.25) why.push(`${sp.name}: the view of the water is blocked by ${[...by].join(" and ")} (${blocked} of ${n})`);
+    // water a few metres out (a bank slopes into it, so a river or lake is looked at a little further out)
+    const out = place.venue === "river" || place.venue === "lake" ? 9 : 6, ahead = new THREE.Vector3(x + f.x * out, y + 3, z + f.z * out), d2 = hit(ahead, new THREE.Vector3(0, -1, 0), 8);
     if (d2 && ahead.y - d2.distance > 0.3) why.push(`${sp.name}: ground, not water, in front`);
   }
   return { ok: !why.length, why };

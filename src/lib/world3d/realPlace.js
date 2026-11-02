@@ -111,7 +111,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
   const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
-  ground.receiveShadow = true; group.add(ground); targets.push(ground);
+  ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
   place.deckMat = deckMat; // world.js darkens it in the rain
 
   const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : H_OF[c]; };
@@ -164,7 +164,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   }
   if (wp.length) {
     const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute("uv", new THREE.Float32BufferAttribute(wuv, 2)); wg.setIndex(wi); wg.computeVertexNormals();
-    const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughnessMap: sp.roughnessMap, roughness: 1, metalness: 0.15 })); wm.receiveShadow = true; group.add(wm); targets.push(wm);
+    const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughnessMap: sp.roughnessMap, roughness: 1, metalness: 0.15 })); wm.receiveShadow = true; group.add(wm); wm.userData.kind = "a harbour wall"; targets.push(wm);
     const cg = new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.Float32BufferAttribute(cp, 3)); cg.setAttribute("uv", new THREE.Float32BufferAttribute(cuv, 2)); cg.setIndex(ci); cg.computeVertexNormals();
     const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.9, color: 0xe6e2da, side: THREE.DoubleSide })); cm.receiveShadow = true; cm.castShadow = true; group.add(cm);
   }
@@ -242,7 +242,7 @@ export function buildRealPlace(group, place, M, solids = []) {
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
     near: (x, z) => nearSpot(x, z, NEAR_SOLID + 30),
   });
-  place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; targets.push(...res.meshes);
+  place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; for (const m of res.meshes) m.userData.kind = "a building"; targets.push(...res.meshes);
   for (const c of res.colliders) {
     const cbp = [], cbi = [];
     for (let k = 0; k < c.ring.length; k++) { const [x1, z1] = c.ring[k], [x2, z2] = c.ring[(k + 1) % c.ring.length], o = cbp.length / 3; cbp.push(x1, c.base, z1, x2, c.base, z2, x2, c.top, z2, x1, c.top, z1); cbi.push(o, o + 2, o + 1, o, o + 3, o + 2); }
@@ -255,12 +255,14 @@ export function buildRealPlace(group, place, M, solids = []) {
   for (const p of place.piers) {
     if (p.line) {
       // the deck at the height and width the anglers' spots use (osmPlace: p.h, and half the width less 60 cm from the middle)
-      const deckY = p.kind === "groyne" ? 1.2 : p.h, w = p.kind === "groyne" ? 0.5 : p.width;
+      // (only a jetty someone stands on needs that: the others stay lower and narrower, so they don't block the view)
+      const standOn = spots.some((sp) => p.line.some((q, k) => k < p.line.length - 1 && segDist([sp.at[0], sp.at[2]], q, p.line[k + 1]) < p.width / 2 + 0.5));
+      const deckY = p.kind === "groyne" ? 1.2 : standOn ? p.h : Math.min(p.h, LAND + 0.6), w = p.kind === "groyne" ? 0.5 : standOn ? p.width : Math.min(p.width, 6);
       for (let k = 0; k < p.line.length - 1; k++) {
         const [x1, z1] = p.line[k], [x2, z2] = p.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.2) continue;
         const ang = Math.atan2(z2 - z1, x2 - x1), cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
         if (p.kind === "groyne") { const m = new THREE.Mesh(new THREE.BoxGeometry(len, 1.6, w), M.wood); m.position.set(cx, 0.4, cz); m.rotation.y = -ang; group.add(m); continue; }
-        const deck = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.4, w), deckSlab); deck.position.set(cx, deckY - 0.2, cz); deck.rotation.y = -ang; deck.castShadow = deck.receiveShadow = true; group.add(deck); targets.push(deck);
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.4, w), deckSlab); deck.position.set(cx, deckY - 0.2, cz); deck.rotation.y = -ang; deck.castShadow = deck.receiveShadow = true; group.add(deck); deck.userData.kind = "a jetty"; targets.push(deck);
         if (nearSpot(cx, cz, NEAR_SOLID + len / 2)) solids.push(deck);
         const sx = Math.sin(ang), sz = -Math.cos(ang);
         for (let t = 0; t <= len; t += 4) for (const side of [-1, 1]) {
@@ -276,7 +278,7 @@ export function buildRealPlace(group, place, M, solids = []) {
       const ring = p.ring.slice(); if (THREE.ShapeUtils.isClockWise(ring.map(([x, z]) => new THREE.Vector2(x, z)))) ring.reverse();
       const sh = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
       const geo = new THREE.ExtrudeGeometry(sh, { depth: p.h - WALL_BOTTOM, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, WALL_BOTTOM, 0);
-      const m = new THREE.Mesh(geo, [deckSlab, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 })]); m.castShadow = m.receiveShadow = true; group.add(m); targets.push(m);
+      const m = new THREE.Mesh(geo, [deckSlab, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 })]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
       // railings round its edge where it meets the water, near the anglers
       if (p.kind === "pier" || p.kind === "quay") {
         const rp = [], rr = [];
@@ -302,6 +304,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   void PLACE3D;
   return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c]; const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
+function segDist(q, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dz) / l2)); return Math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dz * t); }
 // a mesh only for the camera's ray (never drawn)
 function collider(p, i) {
   const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); g.setIndex(i); g.computeBoundingSphere();
