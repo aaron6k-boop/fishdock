@@ -5,12 +5,15 @@
 /* global __BUILD_ID__ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
-import { fightSeconds, ROD_STYLES } from "../lib/sceneActors.js";
+import { ROD_STYLES } from "../lib/sceneActors.js";
 import { composeFrame } from "../lib/sceneGL.js";
 import { defaultView, nearbyPhotos, detectHorizon, smallPhoto, rankWaterViews, venueOf, viewFeatures, levelling } from "../lib/scene.js";
 import { VIEWPOINTS } from "../lib/viewpoint.js";
 import { shrinkImage } from "../lib/storage.js";
-import { DRAW_CM, activityText, phaseAt } from "../lib/liveEvents.js";
+import { DRAW_CM, phaseAt } from "../lib/liveEvents.js";
+import { useVirtualFishing } from "../lib/useVirtualFishing.js";
+import FishTray from "../components/FishTray.jsx";
+import { landedCatches } from "../lib/landed.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
 import { spotById } from "../data/spots.js";
@@ -28,8 +31,6 @@ const TIPS = [{ value: "auto", label: "At night" }, { value: "on", label: "On" }
 const FROM = [{ value: "auto", label: "The place's own" }, { value: "beach", label: "Beach" }, { value: "pier", label: "Pier" }, { value: "estuary", label: "Estuary" }, { value: "river", label: "River bank" }, { value: "lake", label: "Lake" }];
 const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", label: "Calm" }, { value: "breezy", label: "Breezy" }, { value: "windy", label: "Windy" }, { value: "overcast", label: "Overcast" }, { value: "drizzle", label: "Light rain" }, { value: "rain", label: "Heavy rain" }];
 const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, overcast: { windKph: 14, cloudPct: 100, precipMm: 0 }, drizzle: { windKph: 16, cloudPct: 95, precipMm: 0.4 }, rain: { windKph: 30, cloudPct: 100, precipMm: 4 } };
-let seq = 0;
-const ev = (type, data = null) => ({ id: `demo_${++seq}`, seq, t: Date.now(), type, data });
 
 /** A time today that gives the chosen light at this place, found from the real sun. */
 function timeFor(choice, place) {
@@ -52,7 +53,6 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [species, setSpecies] = useState(speciesById(initialSpecies) ? initialSpecies : fresh ? "perch" : "cod");
   const sp = speciesById(species) || fishList[0];
   const [length, setLength] = useState(DRAW_CM[species] || 45);
-  const [events, setEvents] = useState([]);
   const [photos, setPhotos] = useState(null);
   const [pick, setPick] = useState(0);
   const [view, setView] = useState(defaultView());
@@ -68,23 +68,22 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [volume, setVolume] = useState(0.7);
   const [own, setOwn] = useState(null); // the visitor's own photo for this demo: kept in this page only, never sent anywhere
   const [copied, setCopied] = useState("");
-  const timers = useRef([]);
   const [uiHidden, setUiHidden] = useState(false);
   const [sheet, setSheet] = useState(false);
   const sceneRef = useRef(null);
-  const clearAuto = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+  const vfReset = useRef(null); // a new place starts afresh
 
   useEffect(() => { // address bar follows the choice, so the page can be shared or bookmarked
     const h = `#try/${placeId}/${species}`;
     if (location.hash !== h) history.replaceState(null, "", h);
   }, [placeId, species]);
-  useEffect(() => { clearAuto(); setEvents([]); setPhotos(null); setPick(0); setView(defaultView()); setCond(null); setOwn(null);
+  useEffect(() => { vfReset.current?.(); setPhotos(null); setPick(0); setView(defaultView()); setCond(null); setOwn(null);
     // the photo that best suits a rod at the water's edge here; if none does (only views from high up, no water
     // where the line lands, a blocked foreground), the drawn scene, labelled as representative
     nearbyPhotos(place).then((r) => rankWaterViews(r.photos || [], venueOf(place))).then((list) => { setPhotos(list); setPick(list[0]?.ok ? 0 : -1); });
     getConditions(place.lat, place.lon).then((c) => setCond(c?.hourly?.length ? c : null));
     if (!fishList.some((f) => f.id === species)) { const f = fresh ? "perch" : "cod"; setSpecies(f); setLength(DRAW_CM[f] || 40); }
-    return clearAuto;
+    return undefined;
   }, [placeId]); // eslint-disable-line react-hooks/exhaustive-deps
   const photo = own || (photos && pick >= 0 ? photos[pick] : null);
   useEffect(() => { // level the photo if it leans a little, then line the water and the cast up with its horizon
@@ -111,62 +110,35 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   // at dusk the demo faces the sunset, so the glitter path shows
   const v = { ...view, facing: light === "dusk" ? Math.round(sun.az) : light === "night" && moon.alt > 0 ? Math.round(moon.az) : null };
   const scene = own ? { kind: "own", src: own.url, view: v, label: "Your photo (it stays on this device)" } : photo ? { kind: "commons", src: photo.url, view: v, commons: photo } : { kind: "representative", src: null, view: { ...defaultView(), facing: v.facing } };
-  // the phase moves on with time (a cast settles, a landing ends), so the controller follows it
+  // virtual fishing: cast, a fish bites by itself, strike, hold to reel; every catch is simulated
+  const vf = useVirtualFishing({ species: sp.id, name: sp.name, lengthCm: length });
+  vfReset.current = vf.reset;
+  const events = vf.events;
   const [, setTick] = useState(0);
   useEffect(() => { if (!events.length) return undefined; const id = setInterval(() => setTick((n) => n + 1), 400); return () => clearInterval(id); }, [events.length]);
   const p = phaseAt(events, Date.now());
   const last = events.at(-1)?.type;
-  const playing = timers.current.length > 0 && events.length < 4;
-  const add = (type, data) => setEvents((e) => [...e, ev(type, data)]);
-  const land = () => add("catch", { species: sp.id, name: sp.name, lengthCm: length, released: true });
-  function playAll() {
-    clearAuto();
-    setEvents([]);
-    setUiHidden(false);
-    // the fight lasts as long as this kind and size of fish usually takes in the animation (a whiting is quick, a cod or tope longer)
-    const steps = [[300, () => add("cast")], [5200, () => add("bite")], [8200, () => add("hooked")], [8200 + fightSeconds(sp.id, length) * 1000, () => { land(); timers.current = []; }]];
-    timers.current = steps.map(([ms, f]) => setTimeout(f, ms));
-  }
-  const reset = () => { clearAuto(); setEvents([]); };
-  // what can happen next: one main step, and only the other things that make sense right now
-  const next = (() => {
-    if (playing) return { main: ["Playing…", null, "play"], alt: [["Stop", reset]] };
-    if (p.phase === "idle" || p.phase === "ended") return { main: ["Cast", () => add("cast"), "target"], alt: [["Play it all", playAll]] };
-    if (p.phase === "cast") return { main: ["Casting…", null, "target"], alt: [] };
-    if (p.phase === "bite") return { main: ["Strike", () => add("hooked"), "hook"], alt: [["Miss it", () => add("missed")]] };
-    if (p.phase === "hooked") return { main: ["Land it", land, "fish"], alt: [["Lose it", () => add("lost")]] };
-    if (p.phase === "landing") return { main: ["Landing…", null, "fish"], alt: [] };
-    if (p.phase === "lost" || p.phase === "missed") return { main: ["Wait…", null, "clock"], alt: [] };
-    // waiting: after a catch or a lost fish the line is out of the water, so cast again; otherwise wait for a bite
-    if (last === "catch" || last === "lost") return { main: ["Cast again", () => add("cast"), "target"], alt: [["Reset", reset]] };
-    return { main: ["Get a bite", () => add("bite"), "bell"], alt: [["Cast again", () => add("cast")], ["Reset", reset]] };
-  })();
   const base = `${location.origin}/#try`;
   const copy = async (u) => { try { await navigator.clipboard.writeText(u); setCopied(u); setTimeout(() => setCopied(""), 1800); } catch { /* ignore */ } };
 
-  const catches = events.filter((e) => e.type === "catch");
+  const venue = from === "auto" ? venueOf(place) : from;
+  const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
   return (
     <div className={`watch-shell try-shell immersive${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch">
         <div className="watch-stage">
-          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue: from === "auto" ? venueOf(place) : from }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
+          <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
             <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
               {c?.windKph != null ? <span className="fs-chip"><Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</span> : null}
+              <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
               <span className="grow" />
               <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
               <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
             </div>
             <div className="fs-bottom">
-              <div className="fs-who"><b>{place.name.replace(/ \(.*\)$/, "")}</b><span> · {sp.name}, {length} cm</span></div>
-              <div className="demo-ctl" role="group" aria-label="Demo controls">
-                <div className="demo-act" aria-live="polite">{p.phase === "idle" ? "Ready when you are" : p.phase === "waiting" && (last === "catch" || last === "lost") ? "Line's out of the water. Cast again when you're ready" : p.phase === "landing" ? `${sp.name} landed (demo, not logged)` : activityText(p, { who: "", target: sp.name })}</div>
-                <div className="demo-btns">
-                  <button type="button" className="btn primary demo-main" onClick={next.main[1] || undefined} disabled={!next.main[1]}><Icon name={next.main[2]} />{next.main[0]}</button>
-                  {next.alt.map(([label, fn]) => <button key={label} type="button" className="btn small demo-alt" onClick={fn}>{label}</button>)}
-                </div>
-              </div>
+              <FishTray phase={p.phase} last={last} reel={vf.reel} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onHold={vf.hold} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
           </FishingScene>
         </div>
@@ -223,6 +195,19 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             <div className="field"><span className="lbl">Tip light</span><Seg value={tipLight} onChange={setTipLight} options={TIPS} /></div>
             <div className="field"><span className="lbl">Sound</span><div className="vol-row"><button type="button" className="btn small" onClick={() => setSound(!sound)} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} />{sound ? "On" : "Off"}</button><input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => { setVolume(Number(e.target.value)); if (!sound) setSound(true); }} aria-label="Volume" /><span className="num tiny">{Math.round(volume * 100)}%</span></div></div>
             <div className="field"><span className="lbl">Animation quality</span><Seg value={quality} onChange={setQuality} options={QUALITY_OPTIONS} /></div>
+          </section>
+
+          <section className="watch-sec test-panel">
+            <div className="card-h"><h2>Testing</h2><span className="aside">Skips the waiting</span></div>
+            <div className="moments">
+              <button type="button" className="chip" onClick={() => { setSheet(false); vf.playAll(); }}><Icon name="play" />Play it all</button>
+              <button type="button" className="chip" disabled={!(p.phase === "waiting" || p.phase === "missed") || last === "catch" || last === "lost"} onClick={() => { setSheet(false); vf.biteNow(); }}>Bite now</button>
+              <button type="button" className="chip" disabled={p.phase !== "bite"} onClick={() => { setSheet(false); vf.miss(); }}>Miss the bite</button>
+              <button type="button" className="chip" disabled={p.phase !== "hooked"} onClick={() => { setSheet(false); vf.landNow(); }}>Land it now</button>
+              <button type="button" className="chip" disabled={p.phase !== "hooked"} onClick={() => { setSheet(false); vf.lose(); }}>Lose the fish</button>
+              <button type="button" className="chip" disabled={!events.length} onClick={() => { setSheet(false); vf.reset(); }}>Reset</button>
+            </div>
+            <p className="tiny">Only steps that make sense now are offered: there's no landing a fish before a bite.</p>
           </section>
 
           {catches.length ? (

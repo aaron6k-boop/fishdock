@@ -63,7 +63,26 @@ const FIGHT = {
   perch: { pull: 0.7, tempo: 1.5, erratic: 0.6, splashy: 0.4, flex: 1.0, long: 0.7 },
 };
 const FIGHT_BASE = { pull: 1, tempo: 1, erratic: 0.4, splashy: 0.3, flex: 1, long: 1, flat: false, ray: false, eel: false, headRight: false };
-export const fightProfile = (species) => ({ ...FIGHT_BASE, ...(FIGHT[species] || {}) });
+export const fightProfile = (species) => ({ ...FIGHT_BASE, ...(FIGHT[species] || {}), species: FIGHT[species] ? species : null });
+
+/** How a bite shows at the rod tip, by the kind of fish: [seconds, tip tap, rod bend, how fast it fades]. Small,
+ *  quick fish rattle the tip; bass knock hard then run; cod and other heavy fish knock and then pull the rod
+ *  round; flatfish lean on it gently; rays and eels draw it down slowly. `strong` is a proper take rather than a
+ *  tentative one. With no species (a real session doesn't know what's biting), a plain light or strong bite. */
+export function biteTaps(species, strong = false, rnd = Math.random) {
+  const p = fightProfile(species), j = () => 0.85 + rnd() * 0.3;
+  if (!species || !FIGHT[species]) return strong ? [[0, 0.07, 0.1, 5.5], [0.35, 0.05, 0.24, 5.5], [1.0, 0.06, 0.14, 5.5], [1.9, 0.04, 0.3, 5.5]] : [[0, 0.05, 0, 5.5], [0.55, 0.07, 0.02, 5.5], [1.3, 0.04, 0, 5.5]];
+  if (p.ray || p.eel) return [[0, 0.025, 0.04, 2], [0.9 * j(), 0.02, strong ? 0.32 : 0.16, 0.9], [2.2 * j(), 0.02, strong ? 0.38 : 0.2, 0.8]];
+  if (p.flat) return [[0, 0.025, 0.02, 3.5], [0.8 * j(), 0.03, 0.06, 2.2], [1.7 * j(), 0.025, strong ? 0.14 : 0.07, 1.6]];
+  if (p.pull < 0.8) { // whiting, pouting, dab, small perch: a rattle of quick small taps
+    const n = strong ? 7 : 5, out = [];
+    for (let i = 0; i < n; i++) out.push([i * (0.18 + rnd() * 0.16), 0.035 + rnd() * 0.025, strong ? 0.03 : 0.01, 9]);
+    return out;
+  }
+  if (p.tempo >= 1.25 && p.splashy >= 0.5) return [[0, 0.09 * j(), 0.08, 7], [0.28 * j(), 0.1 * j(), 0.12, 7], [0.7 * j(), 0.06, strong ? 0.34 : 0.16, 2.5]]; // bass, mullet, garfish: knocks then a run
+  if (p.pull >= 1.15) return [[0, 0.06, 0.08, 4], [0.5 * j(), 0.07, 0.12, 4], [1.3 * j(), 0.04, strong ? 0.4 : 0.22, 1.2]]; // cod, pollack, smoothhound: knocks, then the rod pulled round
+  return [[0, 0.06, 0.04, 6], [0.45 * j(), 0.06, strong ? 0.2 : 0.08, 4], [1.2 * j(), 0.05, strong ? 0.18 : 0.06, 4]];
+}
 /** Seconds a fight with this fish typically lasts in the demo (longer for bigger, stronger fish). */
 /** How hard this fish loads the rod (about 0.45 for a small whiting to 1.7 for a big tope or conger). Weight is the
  *  logged one, or estimated from length with a typical round-fish length-weight curve (for the animation only). */
@@ -641,8 +660,9 @@ export function createActors(canvas, { onSound } = {}) {
       if (crossed(2.15)) { splash(E0[0], E0[1], 0.7 * P.size, 14, { rnd: seedR }); onSound?.("plop"); }
     } else if (phase === "bite") {
       // a light bite is a couple of taps at the tip; a proper take pulls the rod over
-      const taps = P.strong ? [[0, 0.07, 0.1], [0.35, 0.05, 0.24], [1.0, 0.06, 0.14], [1.9, 0.04, 0.3]] : [[0, 0.05, 0], [0.55, 0.07, 0.02], [1.3, 0.04, 0]];
-      for (const [p0, a, b] of taps) if (age > p0) { const e = Math.exp(-(age - p0) * 5.5); tipT += a * e * prof.pull * 1.4; kT += b * e * prof.pull; }
+      // (each kind of fish bites its own way: biteTaps)
+      if (!P.taps) P.taps = biteTaps(prof.species, P.strong, seedR);
+      for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; kT += b * e * prof.pull; if (crossed(p0 + 0.001) && p0 > 0 && a > 0.05) addRipple(E0[0], E0[1], 0.25); }
       slack = P.strong ? 0.3 : 0.55;
       if (floatRig) floatDip = clamp(Math.max(0, Math.sin(age * 5)) * (age < 3 ? 0.8 : 0.2), 0, 1);
       if (crossed(0.02)) { onSound?.("bell"); addRipple(E0[0], E0[1], P.strong ? 0.6 : 0.35); turb.push(); }

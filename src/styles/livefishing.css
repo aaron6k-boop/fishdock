@@ -267,3 +267,32 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .mini-tl i.t-missed, .mini-tl i.t-lost { background: #ffffff55; height: 6px; top: 8px; }
 .mini-tl i.t-catch { top: 3px; width: 9px; height: 16px; border-radius: 5px; background: var(--sun, #f2b84b); box-shadow: 0 0 0 2px #0a141bc4; }
 .mini-tl b { position: absolute; top: 2px; width: 2px; height: 18px; transform: translateX(-50%); background: #fff; border-radius: 2px; }
+
+/* ---- the fishing tray: one round button for the step that makes sense now, a line of small text, and nothing
+   while the cast flies or a fish is landed ---- */
+.fish-tray { pointer-events: auto; display: flex; align-items: center; gap: 10px; transition: opacity .25s, transform .25s; }
+.fish-tray.is-busy { opacity: 0; transform: translateY(12px); pointer-events: none; }
+.ft-main { position: relative; width: 64px; height: 64px; flex: none; border-radius: 50%; border: 1px solid #ffffff3a; display: grid; place-content: center; justify-items: center; gap: 1px;
+  background: color-mix(in srgb, var(--action) 88%, #000); color: var(--action-ink, #052421); font: 750 12px/1 var(--font-ui, inherit); box-shadow: 0 8px 22px #0007; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.ft-main svg { width: 22px; height: 22px; }
+.ft-strike { background: var(--sun, #f2b84b); color: #2b1a00; animation: ft-pulse 0.9s ease-in-out infinite; }
+.ft-reel { background: #0a141bd0; color: #fff; }
+.ft-reel > svg:first-child { position: absolute; inset: -1px; width: 66px; height: 66px; transform: rotate(-90deg); }
+.ft-reel:active { transform: scale(.96); }
+.ft-ring-bg { fill: none; stroke: #ffffff26; stroke-width: 4; }
+.ft-ring { fill: none; stroke: var(--action); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
+.ft-label { font-size: 13.5px; font-weight: 650; color: #fff; text-shadow: 0 1px 3px #000c; max-width: 52vw; line-height: 1.25; }
+.ft-pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #ffffff2a; background: #0a141bb3; color: #fff; font-size: 13px; font-weight: 650; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.ft-pill svg { width: 15px; height: 15px; }
+@keyframes ft-pulse { 50% { transform: scale(1.06); box-shadow: 0 0 0 8px #f2b84b33, 0 8px 22px #0007; } }
+@media (prefers-reduced-motion: reduce) { .ft-strike { animation: none; } .fish-tray { transition: none; } }
+
+/* the viewer's slim tray: no box, just a soft shadow behind the words */
+.view-tray { pointer-events: auto; display: flex; flex-direction: column; gap: 6px; max-width: min(78vw, 420px); transition: opacity .25s, transform .25s; }
+.view-tray.is-busy { opacity: 0; transform: translateY(10px); pointer-events: none; }
+.vt-act { font-size: 13.5px; color: #fff; text-shadow: 0 1px 3px #000c; line-height: 1.3; }
+.vt-act b { margin-right: 6px; }
+.vt-act span { color: #e2edf2; }
+.vt-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.view-tray .mini-tl { min-width: 180px; max-width: 320px; }
+.test-panel .chip[disabled] { opacity: .4; }

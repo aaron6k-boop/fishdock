@@ -2,7 +2,7 @@
 // and the landing's timings, which the scene, the catch card and highlight clips all share.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fightProfile, fishLoad, landingTimes, landingTech, fightSeconds } from "../src/lib/sceneActors.js";
+import { fightProfile, fishLoad, landingTimes, landingTech, fightSeconds, biteTaps } from "../src/lib/sceneActors.js";
 import { DUR } from "../src/lib/liveEvents.js";
 import { ART_IDS } from "../src/data/fishart.js";
 
@@ -57,4 +57,19 @@ test("each kind of place lands a fish its own way", () => {
   assert.equal(landingTech("whiting", 25, null, "estuary"), "lift");
   // a logged weight counts as well as the length
   assert.equal(landingTech("cod", 40, 1.6, "pier"), "dropnet");
+});
+
+test("each kind of fish bites its own way: a whiting rattles, a cod pulls round, a flatfish leans gently", () => {
+  const r = () => 0.5;
+  const whiting = biteTaps("whiting", true, r), cod = biteTaps("cod", true, r), plaice = biteTaps("plaice", true, r), bass = biteTaps("bass", true, r), ray = biteTaps("thornback-ray", true, r);
+  const maxBend = (t) => Math.max(...t.map((x) => x[2])), maxTap = (t) => Math.max(...t.map((x) => x[1]));
+  assert.ok(whiting.length > cod.length, "more, quicker taps from a whiting");
+  assert.ok(maxBend(cod) > maxBend(whiting) * 4, "a cod pulls the rod round");
+  assert.ok(maxTap(plaice) < maxTap(cod) && maxTap(plaice) < maxTap(bass), "a flatfish's bite is gentle");
+  assert.ok(maxTap(bass) >= 0.09, "a bass knocks hard");
+  assert.ok(ray.at(-1)[3] < 1.5, "a ray draws the rod down slowly");
+  assert.ok(maxBend(biteTaps("cod", false, r)) < maxBend(cod), "a tentative bite bends less than a proper take");
+  // a real session doesn't know the species when it bites: a plain bite, never a guessed one
+  assert.deepEqual(biteTaps(null, false, r), biteTaps("no-such-fish", false, r));
+  for (const t of [whiting, cod, plaice, bass, ray]) for (let i = 1; i < t.length; i++) assert.ok(t[i][0] > t[i - 1][0]);
 });

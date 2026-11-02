@@ -223,7 +223,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         info = { ...p, age: Math.max(0, (nowMs - p.since) / 1000) };
       }
       // the fish to draw (and how it fights): the logged catch, or during a fight, what the demo says it is
-      if (info.phase === "landing" || info.phase === "hooked") {
+      if (info.phase === "landing" || info.phase === "hooked" || (info.phase === "bite" && P.fishHint)) {
         const f = fishOf(info.ev, P.fishHint);
         const key = `${f.species}|${f.lengthCm}|${f.weightKg}`;
         if (r.fishFor !== key) {

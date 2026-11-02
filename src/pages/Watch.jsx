@@ -6,7 +6,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FishingScene, { CatchCard } from "../components/FishingScene.jsx";
 import { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
-import { phaseAt, activityText, catchesOf, timelineRows, notable, EV_INFO } from "../lib/liveEvents.js";
+import { phaseAt, activityText, timelineRows, notable, EV_INFO } from "../lib/liveEvents.js";
+import { landedCatches, isLanded } from "../lib/landed.js";
 import { defaultView } from "../lib/scene.js";
 import { fmtTime, fmtDuration, fmtClock, fmtDateTime } from "../lib/time.js";
 import { speciesById } from "../data/species.js";
@@ -165,7 +166,11 @@ export default function Watch({ token }) {
   const p = phaseAt(evs, now, { status: replayT != null ? undefined : share.status });
   const who = share.name || "The angler";
   const target = share.target?.name || null;
-  const catches = catchesOf(evs, now).reverse();
+  const catches = landedCatches(evs, now, share.place?.venue).reverse(); // a catch joins the list once it's out of the water
+  // "landed" only once the fish is out of the water on screen; until then it's being landed
+  const landingNow = p.phase === "landing" && !isLanded(p.ev, now, share.place?.venue);
+  const actShort = landingNow ? "Landing a fish" : activityText(p, { who: "", target });
+  const actText = p.phase === "landing" && !isLanded(p.ev, now, share.place?.venue) ? `${share.name || "The angler"} is landing a fish` : activityText(p, { who: share.name, target });
   const tlPct = (t) => Math.max(0, Math.min(100, ((t - share.startedAt) / Math.max(60e3, end - share.startedAt)) * 100));
   const counts = replayT != null ? null : share.counts;
   const statusChip = share.status === "ended" ? ["ended", "Ended"] : share.status === "paused" ? ["paused", "Paused"] : !share.connected ? ["quiet", "Phone quiet"] : ["live", "LIVE"];
@@ -190,20 +195,20 @@ export default function Watch({ token }) {
               <button type="button" className="fs-btn watch-more" onClick={() => setSheet(true)} aria-label="Session details"><Icon name="list" /></button>
             </div>
             <div className="fs-bottom">
-              <div className="fs-who"><b>{who}</b>{share.place?.label || share.place?.area ? <span> · {share.place.label || share.place.area}</span> : null}</div>
-              <div className="demo-ctl watch-ctl">
-                <div className="demo-act" aria-live="polite">{replayT != null ? `Replay: ${activityText(p, { who: share.name, target })}` : activityText(p, { who: share.name, target })}</div>
-                {/* the session at a glance: casts, bites and catches along a line from the start to now (tap for the full timeline) */}
+              {/* a slim tray, out of the rod's way: what's happening, the session at a glance, the catches; it steps
+                  aside while a fish is landed */}
+              <div className={`view-tray${p.phase === "landing" && !isLanded(p.ev, now, share.place?.venue) ? " is-busy" : ""}`}>
+                <div className="vt-act" aria-live="polite"><b>{who}</b><span>{replayT != null ? "Replay: " : ""}{actShort}</span></div>
                 {evs.some((e) => TL_MARKS.includes(e.type)) ? (
                   <button type="button" className="mini-tl" onClick={() => goTo("w-timeline")} aria-label={`Timeline: ${catches.length} caught. Open the full timeline`}>
-                    {evs.filter((e) => TL_MARKS.includes(e.type) && e.t <= now).slice(-80).map((e) => <i key={`${e.seq}-${e.t}`} className={`t-${e.type}`} style={{ left: `${tlPct(e.t)}%` }} />)}
+                    {evs.filter((e) => TL_MARKS.includes(e.type) && e.t <= now && (e.type !== "catch" || isLanded(e, now, share.place?.venue))).slice(-80).map((e) => <i key={`${e.seq}-${e.t}`} className={`t-${e.type}`} style={{ left: `${tlPct(e.t)}%` }} />)}
                     <b style={{ left: `${tlPct(now)}%` }} />
                   </button>
                 ) : null}
-                <div className="demo-btns">
-                  <button type="button" className="btn small demo-alt" onClick={() => goTo("w-catches")}><Icon name="fish" />{catches.length ? `${catches.length} caught` : "Catches"}</button>
-                  <button type="button" className="btn small demo-alt" onClick={() => goTo("w-timeline")}><Icon name="clock" />Timeline</button>
-                  {catches[0] ? <button type="button" className="btn small demo-alt" onClick={() => setOpen(catches[0])}>{catches[0].data?.name || "Fish"}{catches[0].data?.lengthCm ? `, ${catches[0].data.lengthCm} cm` : ""}</button> : null}
+                <div className="vt-btns">
+                  <button type="button" className="ft-pill" onClick={() => goTo("w-catches")}><Icon name="fish" />{catches.length ? `${catches.length} caught` : "Catches"}</button>
+                  <button type="button" className="ft-pill" onClick={() => goTo("w-timeline")}><Icon name="clock" />Timeline</button>
+                  {catches[0] ? <button type="button" className="ft-pill" onClick={() => setOpen(catches[0])}>{catches[0].data?.name || "Fish"}{catches[0].data?.lengthCm ? `, ${catches[0].data.lengthCm} cm` : ""}</button> : null}
                 </div>
               </div>
             </div>
@@ -215,7 +220,7 @@ export default function Watch({ token }) {
           <div className="sheet-head"><div className="try-head"><h1>{who}{replayT != null ? ": replay" : ""}</h1><p className="small muted">Animated from logged events, not a camera.</p></div><button type="button" className="xbtn sheet-x" onClick={() => setSheet(false)} aria-label="Close details"><Icon name="close" /></button></div>
           {replayT == null && !share.connected && share.status !== "ended" ? <div className="notice warn small"><Icon name="info" /><span>{who}'s phone hasn't sent anything for {fmtDuration(quietFor)}. Phones pause FishDock when the screen locks or there's no signal. This is the last thing it sent.</span></div> : null}
           {conn === "retrying" ? <div className="notice small"><Icon name="info" /><span>Reconnecting… you'll catch up on anything you missed.</span></div> : null}
-          <div className="watch-activity" aria-live="polite">{activityText(p, { who: share.name, target })}</div>
+          <div className="watch-activity" aria-live="polite">{actText}</div>
           <div className="stat-line">
             <div><b className="num">{counts ? counts.casts : evs.filter((e) => e.type === "cast" && e.t <= now).length}</b><span>Casts</span></div>
             <div><b className="num">{counts ? counts.bites : evs.filter((e) => e.type === "bite" && e.t <= now).length}</b><span>Bites</span></div>
