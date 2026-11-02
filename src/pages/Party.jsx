@@ -150,6 +150,16 @@ function PartyLive({ code, mkey }) {
     firstLoad.current = false;
   }, [P.events.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // a friend coming online: one subtle pulse. Compared with who was online before (kept across this phone's own
+  // reconnects, so catching up never buzzes); someone dropping in and out is felt once a minute at most
+  const onlineBefore = useRef(null);
+  useEffect(() => {
+    if (!me?.id || !P.members.length) return;
+    const now = new Set(P.members.filter((m) => m.online && m.id !== me.id && !blocked.has(m.id)).map((m) => m.id));
+    if (onlineBefore.current) for (const id of now) if (!onlineBefore.current.has(id)) haptics.feel("friendJoined", { key: `${id}|joined|${Math.floor(Date.now() / 60000)}` });
+    onlineBefore.current = now;
+  }, [P.members, me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---- voice ----
   useEffect(() => () => voice.current?.leave(), []);
   async function joinVoice() {
