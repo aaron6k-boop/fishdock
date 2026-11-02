@@ -1,0 +1,14 @@
+# Temporary: the Fish Together smoke test against the live site (one short party, closed at the end).
+name: Live party check
+on:
+  push:
+    branches: [live-check]
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/party-smoke.mjs https://fishdock.aaron6k.workers.dev
