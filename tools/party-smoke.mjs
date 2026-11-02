@@ -134,10 +134,10 @@ async function main() {
   a.send({ t: "kick", who: B.id });
   ok((await b2.next((m) => m.t === "kicked", "kicked")) && (await b2.closed), "host removes the guest; the guest's socket is closed");
   const b3 = connect(code, B.key);
-  // (the Worker refuses before the socket opens; the local e2e server opens and closes it straight away: either way,
-  // no hello and the socket ends)
+  // (the Worker refuses before the socket opens, which Node reports as an error with no close; the local e2e server
+  // opens and closes it straight away: either way, no hello and the socket ends)
   b3.opened.catch(() => {});
-  const refused = await Promise.race([b3.next((m) => m.t === "hello", "hello", 15000).then(() => "let in").catch(() => "timeout"), b3.closed.then(() => "refused")]);
+  const refused = await Promise.race([b3.next((m) => m.t === "hello", "hello", 15000).then(() => "let in").catch(() => "timeout"), b3.closed.then(() => "refused"), b3.opened.then(() => new Promise(() => {}), () => "refused")]);
   ok(refused === "refused" && !b3.inbox.some((m) => m.t === "hello"), "a removed guest can't reconnect with their old key", { refused, socket: b3.log, got: b3.inbox.map((m) => m.t) });
   try { b3.ws.close(); } catch { /* never opened */ }
 
