@@ -1,0 +1,1523 @@
+{
+  "base": "http://127.0.0.1:8787",
+  "at": "2026-11-02T05:33:48.054Z",
+  "pages": [
+    {
+      "name": "photo-pixel7",
+      "path": "/#try/gorleston-south-pier/cod",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [
+        {
+          "f": "bite",
+          "tray": [
+            12,
+            761,
+            176,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 0.0s",
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 3.7s",
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 6.8s",
+          "card": [
+            14,
+            60,
+            384,
+            218
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 10.0s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "card": [
+            14,
+            60,
+            384,
+            218
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 14.1s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "card": [
+            14,
+            60,
+            384,
+            218
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 17.3s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 20.6s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 23.4s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 26.5s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 29.9s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 33.0s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 36.7s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 39.8s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 42.7s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 46.4s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 50.3s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 54.1s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 57.0s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 60.4s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 63.8s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 67.1s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 70.0s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 73.7s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 76.5s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 79.6s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        },
+        {
+          "f": "land 82.4s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ]
+        }
+      ],
+      "loadMs": 186,
+      "fps": 4,
+      "reelSeconds": 10.1,
+      "requests": 77,
+      "kb": 382,
+      "heapMb": 10
+    },
+    {
+      "name": "photo-se",
+      "path": "/#try/whitby-piers/cod",
+      "device": "iPhone SE",
+      "errors": [],
+      "notes": [],
+      "frames": [
+        {
+          "f": "bite",
+          "tray": [
+            12,
+            490,
+            176,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 0.0s",
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 2.1s",
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 4.0s",
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 5.9s",
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 7.6s",
+          "card": [
+            14,
+            61,
+            292,
+            257
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 9.5s",
+          "card": [
+            14,
+            60,
+            292,
+            257
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 11.1s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "card": [
+            14,
+            60,
+            292,
+            257
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 13.0s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "card": [
+            14,
+            60,
+            292,
+            257
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 15.0s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "card": [
+            14,
+            60,
+            292,
+            257
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 16.9s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 18.5s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 20.3s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 22.0s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 23.7s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 25.4s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 27.3s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 29.0s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 30.8s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 32.6s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 34.4s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 36.3s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 37.9s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 39.7s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 41.3s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 43.2s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        },
+        {
+          "f": "land 44.8s",
+          "tray": [
+            12,
+            490,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            70
+          ]
+        }
+      ],
+      "loadMs": 153,
+      "reelSeconds": 10.4,
+      "requests": 77,
+      "kb": 348,
+      "heapMb": 10
+    },
+    {
+      "name": "3d-gorleston",
+      "path": "/#try/gorleston-south-pier/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [
+        {
+          "f": "bite",
+          "tray": [
+            12,
+            761,
+            176,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 0.0s",
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 1.5s",
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 3.3s",
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 5.0s",
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 6.6s",
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 8.2s",
+          "card": [
+            12,
+            60,
+            388,
+            132
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 9.8s",
+          "tray": [
+            12,
+            772,
+            142,
+            64
+          ],
+          "card": [
+            12,
+            60,
+            388,
+            132
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 11.5s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "card": [
+            12,
+            60,
+            388,
+            132
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 13.3s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "card": [
+            12,
+            60,
+            388,
+            132
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 14.5s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "card": [
+            12,
+            60,
+            388,
+            132
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 16.1s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 17.6s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 19.2s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 20.4s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 22.0s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 23.6s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 25.2s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 26.4s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 27.8s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 29.1s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 30.3s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 31.6s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 33.1s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 34.8s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 36.3s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        },
+        {
+          "f": "land 37.8s",
+          "tray": [
+            12,
+            761,
+            142,
+            64
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            70
+          ],
+          "label": [
+            49,
+            96,
+            313,
+            41
+          ]
+        }
+      ],
+      "loadMs": 158,
+      "fps": 11,
+      "label": "Gorleston South Pier: its shape and buildings from OpenStreetMap, drawn in 3D · © OpenStreetMap contributors · Beta",
+      "uiAfterDrag": true,
+      "reelSeconds": 10.3,
+      "requests": 82,
+      "kb": 570,
+      "heapMb": 22
+    },
+    {
+      "name": "3d-whitby",
+      "path": "/#try/whitby-piers/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 152,
+      "fps": 14,
+      "label": "Whitby Piers: its shape and buildings from OpenStreetMap, drawn in 3D · © OpenStreetMap contributors · Beta",
+      "requests": 81,
+      "kb": 627,
+      "heapMb": 20
+    },
+    {
+      "name": "3d-cromer",
+      "path": "/#try/cromer-pier/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 146,
+      "fps": 16,
+      "label": "Cromer Pier: its shape and buildings from OpenStreetMap, drawn in 3D · © OpenStreetMap contributors · Beta",
+      "requests": 64,
+      "kb": 596,
+      "heapMb": 20
+    },
+    {
+      "name": "3d-mumbles",
+      "path": "/#try/mumbles-head/bass/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 152,
+      "fps": 20,
+      "label": "Mumbles Head: its shape and buildings from OpenStreetMap, drawn in 3D · © OpenStreetMap contributors · Beta",
+      "requests": 81,
+      "kb": 454,
+      "heapMb": 17
+    },
+    {
+      "name": "3d-deal",
+      "path": "/#try/deal-pier/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 145,
+      "fps": 19,
+      "label": "Deal Pier: its shape and buildings from OpenStreetMap, drawn in 3D · © OpenStreetMap contributors · Beta",
+      "requests": 81,
+      "kb": 510,
+      "heapMb": 18
+    },
+    {
+      "name": "3d-wye",
+      "path": "/#try/river-wye-ross/barbel/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 150,
+      "fps": 11,
+      "label": "River Wye at Ross-on-Wye: its shape and buildings from OpenStreetMap, drawn in 3D; the mark's position is approximate, so you're on the nearest bank · © OpenStreetMap contributors · Beta",
+      "requests": 52,
+      "kb": 533,
+      "heapMb": 40
+    },
+    {
+      "name": "3d-rutland",
+      "path": "/#try/rutland-water/pike/3d",
+      "device": "Pixel 7",
+      "errors": [
+        "Failed to load resource: the server responded with a status of 429 ()",
+        "Failed to load resource: the server responded with a status of 429 ()"
+      ],
+      "notes": [],
+      "frames": [],
+      "loadMs": 271,
+      "fps": 15,
+      "label": "Rutland Water: its shape and buildings from OpenStreetMap, drawn in 3D; the mark's position is approximate, so you're on the nearest bank · © OpenStreetMap contributors · Beta",
+      "requests": 59,
+      "kb": 394,
+      "heapMb": 17
+    },
+    {
+      "name": "3d-chesil",
+      "path": "/#try/chesil-beach-ferry-bridge/cod/3d",
+      "device": "Pixel 7",
+      "errors": [
+        "Failed to load resource: the server responded with a status of 429 ()",
+        "Failed to load resource: the server responded with a status of 429 ()",
+        "Failed to load resource: the server responded with a status of 429 ()",
+        "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+      ],
+      "notes": [],
+      "frames": [],
+      "loadMs": 161,
+      "fps": 18,
+      "label": "Representative beach: a 3D drawing, not the real place · Beta",
+      "requests": 70,
+      "kb": 469,
+      "heapMb": 14
+    }
+  ]
+}
