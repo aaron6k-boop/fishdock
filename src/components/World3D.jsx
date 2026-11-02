@@ -72,6 +72,9 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
           onFeel: (n, d) => props.current.feel?.(n, d),
           onSound: (name, pos) => { if (!props.current.sound) return; const cam = W.current?.camera; if (soundPan && !loadView().spatial) soundPan(0, 1); else if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name); },
         });
+        // the real place as built failed its scene check (sceneCheck.js): don't serve it as a real scene
+        if (real && w.realCheck && !w.realCheck.ok) { w.dispose(); if (!gone) setReal(null); return; }
+        if (canvas.current) canvas.current.dataset.check = w.realCheck ? (w.realCheck.ok ? "ok" : "failed") : "drawn";
         W.current = w;
         w.setNow(() => props.current.now());
         w.setAnglers(props.current.anglers);
@@ -142,7 +145,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
       {failed ? <div className="w3d-fail">This browser can't draw the 3D view. The photo view still works.</div> : null}
       <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b>N</b></span><i>{compassPoint(heading)}</i></div>
       {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
-      <div className="w3d-label">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and buildings from OpenStreetMap, drawn in 3D{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</div>
+      <div className="w3d-label">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</div>
       {children}
     </div>
   );

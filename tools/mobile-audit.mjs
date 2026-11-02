@@ -98,6 +98,8 @@ await audit("3d-gorleston", "/#try/gorleston-south-pier/cod/3d", "Pixel 7", asyn
   await page.waitForTimeout(12000); await page.screenshot({ path: "audit/3d-gorleston-0.png" });
   P.fps = await fps(page);
   P.label = await page.locator(".w3d-label").innerText().catch(() => null);
+  // the rendered-geometry check (sceneCheck.js): ok, failed (the drawn place is shown instead) or drawn
+  P.sceneCheck = await page.locator("canvas.w3d-canvas").getAttribute("data-check").catch(() => null);
   // drag to look round (a finger swipe, as mouse moves on the canvas)
   const vp = page.viewportSize();
   await page.mouse.move(vp.width * 0.7, vp.height * 0.45); await page.mouse.down();
@@ -120,6 +122,7 @@ for (const [name, path] of [["3d-whitby", "/#try/whitby-piers/cod/3d"], ["3d-cro
     await page.waitForTimeout(12000); await page.screenshot({ path: `audit/${name}-0.png` });
     P.fps = await fps(page);
     P.label = await page.locator(".w3d-label").innerText().catch(() => null);
+    P.sceneCheck = await page.locator("canvas.w3d-canvas").getAttribute("data-check").catch(() => null);
     await page.getByRole("button", { name: "Camera" }).tap({ force: true }); await page.waitForTimeout(400);
     await page.getByRole("menuitemradio", { name: "Third person" }).tap({ force: true }); await page.waitForTimeout(2500);
     await page.screenshot({ path: `audit/${name}-1-third.png` });

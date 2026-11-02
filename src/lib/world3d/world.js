@@ -4,6 +4,7 @@
 // landings) and free look. Looking round never pauses the fishing. Quality: Performance, Balanced or High Quality,
 // chosen by Auto from the phone, and stepped down if frames run slow. Nothing is drawn while hidden.
 import * as THREE from "three";
+import { checkScene } from "./sceneCheck.js";
 import { createEnvironment } from "./environment.js";
 import { createAngler } from "./angler.js";
 import { createLook, lookAt, wrap } from "./look.js";
@@ -36,6 +37,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 5000);
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano });
+  // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
+  const realCheck = real && real.targets ? checkScene(real, real.targets) : null;
+  if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
   // a real place brings its own fishing spots (on its pier or along its shore); in a 360° photo everyone stands
   // where the photo was taken, side by side, facing the water
   let L = real?.spots?.length === 4 ? { ...layoutFor(venue), spots: real.spots } : layoutFor(venue);
@@ -110,6 +114,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     out.y = Math.max(out.y, (env.floorAt ? env.floorAt(out.x, out.z) : 0) + 0.6);
     return out;
   }
+  let camOverride = null;
   let camPos = new THREE.Vector3(0, L.deck + 1.65, 0), camTarget = null, cineShot = null, cineSince = 0, lastPhaseKey = "";
   // following jumps (optional, on to start): the camera turns to a leap just before it happens and closes in a little
   // so it reads on a phone, then eases back. Never while you're turning the view yourself, never in Free look, and not
@@ -169,6 +174,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(-1.2, Math.min(0.6, l.pitch))); steering = true; }
     else if (steering && idle && !steerTo) { steering = false; const h = look.home; if (mode === "first" || mode === "third") look.aim(h.yaw, h.pitch); }
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
+    if (camOverride) camPos.copy(camOverride); // test hook only: a fixed viewpoint for visual checks
     camera.position.copy(camPos);
     // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
     camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1) * jumpZoom; camera.updateProjectionMatrix();
@@ -188,6 +194,28 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const dt = Math.min(0.1, (ts - (last || ts)) / 1000); last = ts;
     tick((ts - clock0) / 1000, nowFn(), dt);
   }
+  // ---- the sky as light and reflection: a soft gradient (sky above, haze at the horizon, the ground below) made into
+  // an environment map once per change of light, so glass, wet concrete, metal railings and the reel catch the sky,
+  // and the shaded side of a building is lit by it rather than going flat grey ----
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene(), envGeo = new THREE.SphereGeometry(50, 32, 16), envCol = new Float32Array(envGeo.attributes.position.count * 3);
+  envGeo.setAttribute("color", new THREE.BufferAttribute(envCol, 3));
+  envScene.add(new THREE.Mesh(envGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  let envRT = null, envKey = "";
+  function skyLight(s) {
+    const key = [s.day, s.dusk, s.night, s.cloud].map((v) => Math.round(v * 10)).join(",");
+    if (key === envKey) return; envKey = key;
+    const top = new THREE.Color(0.32, 0.5, 0.82).multiplyScalar(s.day).add(new THREE.Color(0.32, 0.3, 0.48).multiplyScalar(s.dusk)).add(new THREE.Color(0.02, 0.025, 0.05).multiplyScalar(s.night)).lerp(new THREE.Color(0.55, 0.57, 0.6).multiplyScalar(s.day + s.dusk * 0.5 + s.night * 0.05), s.cloud * 0.7);
+    const hz = new THREE.Color(0.78, 0.84, 0.9).multiplyScalar(s.day).add(new THREE.Color(0.95, 0.62, 0.42).multiplyScalar(s.dusk)).add(new THREE.Color(0.05, 0.05, 0.08).multiplyScalar(s.night));
+    const low = new THREE.Color(0.3, 0.3, 0.29).multiplyScalar(s.day + s.dusk * 0.5 + s.night * 0.05);
+    const p = envGeo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i) / 50, c = y > 0 ? hz.clone().lerp(top, Math.pow(y, 0.6)) : hz.clone().lerp(low, Math.min(1, -y * 3)); envCol.set([c.r, c.g, c.b], i * 3); }
+    envGeo.attributes.color.needsUpdate = true;
+    const rt = pmrem.fromScene(envScene, 0.02);
+    scene.environment = rt.texture; scene.environmentIntensity = 0.55;
+    envRT?.dispose(); envRT = rt;
+  }
+
   // test hook (never used by the app): a test sets window.__fdFilm before loading, then freezes the clock and steps it
   // a set time per frame, so an animation can be filmed exactly even where frames are slow (software graphics)
   let film = null;
@@ -199,6 +227,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // for visual checks: turn the view to a compass heading (degrees; a real place has north up) and pitch at once
       view(yawDeg, pitch = -0.08) { const s = look.state(); look.aim((yawDeg * Math.PI) / 180, pitch); for (let i = 0; i < 40; i++) look.step(0.1); look.end(); return { yaw: look.yaw, pitch: look.pitch, was: s.yaw }; },
       get camera() { return camera; },
+      at(x, y, z) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); },
     };
   }
   function tick(t, now, dt, draw = true) {
@@ -233,9 +262,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   return {
     look, camera,
     setAnglers,
+    realCheck,
     setNow(f) { nowFn = f || Date.now; },
     setEnv({ light, cond, facing = 180 } = {}) {
       const s = env.setEnv({ light, cond, facing });
+      skyLight(s);
       renderer.toneMappingExposure = 1 + 0.3 * s.dusk + 0.45 * s.night; // eyes adapt: dusk and night aren't black
       envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind };
       return s;
@@ -258,6 +289,6 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     /** the screen position (0..1) of a world point, or null when behind the camera */
     project(p) { const v = p.clone().project(camera); return v.z > 1 ? null : { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; },
     snapshot() { renderer.render(scene, camera); return canvas.toDataURL("image/jpeg", 0.9); },
-    dispose() { cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); env.dispose(); renderer.dispose(); },
+    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); env.dispose(); renderer.dispose(); },
   };
 }

@@ -34,7 +34,8 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   M.tower = new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.85 });
   M.trim = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.6, vertexColors: true, side: THREE.DoubleSide });
   M.dark = new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 0.5, metalness: 0.3, vertexColors: true, side: THREE.DoubleSide });
-  M.glass = new THREE.MeshStandardMaterial({ color: 0x9fb8c8, roughness: 0.08, metalness: 0.6, emissive: 0xffd890, emissiveIntensity: 0, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+  // glazing: tinted and reflective, not see-through (an empty shell behind clear glass looked wrong)
+  M.glass = new THREE.MeshStandardMaterial({ color: 0x7f97a8, roughness: 0.08, metalness: 0.35, emissive: 0xffd890, emissiveIntensity: 0, side: THREE.DoubleSide });
   const B = Object.fromEntries(Object.keys(M).map((k) => [k, bucket()]));
   const colliders = [], glow = [M.brick, M.render, M.cladding, M.stone];
   const W1 = [1, 1, 1];
@@ -88,11 +89,19 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
           const A = [x1 + (x2 - x1) * f0, y0, z1 + (z2 - z1) * f0], Bp = [x1 + (x2 - x1) * f1, y0, z1 + (z2 - z1) * f1];
           let t = len / nb < 1.6 ? FACADE_TILE.plain : FACADE_TILE.window;
           if (st.type === "warehouse") t = s === 0 && front && q === Math.floor(nb / 2) ? FACADE_TILE.door : (q + s) % 3 === 0 && st.walls !== "cladding" ? FACADE_TILE.window : FACADE_TILE.plain;
-          else if (st.type === "lookout") t = s === 1 ? FACADE_TILE.shop : front && q === Math.floor(nb / 2) ? FACADE_TILE.door : FACADE_TILE.plain;
+          else if (st.type === "lookout") t = s === 1 ? FACADE_TILE.shop : front && q === Math.floor(nb / 2) ? FACADE_TILE.door : q % 2 ? FACADE_TILE.window : FACADE_TILE.plain;
           else if (s === 0 && st.shop && len > 4) t = FACADE_TILE.shop;
           else if (s === 0 && front && q === Math.floor(nb / 2) && len / nb >= 1.6) t = FACADE_TILE.door;
           else if (st.type === "small" && (q + k) % 2 === 1) t = FACADE_TILE.plain;
-          if (st.type === "lookout" && s === 1) { quad(B.glass, A, Bp, [Bp[0], y1 - 0.15, Bp[2]], [A[0], y1 - 0.15, A[2]], [0, 0, 1, 0, 1, 1, 0, 1], W1); continue; }
+          if (st.type === "lookout" && s === 1) {
+            // a band of lookout windows: a white sill, glass, white mullions between the panes
+            quad(B.trim, A, Bp, [Bp[0], y0 + 0.5, Bp[2]], [A[0], y0 + 0.5, A[2]], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+            quad(B.glass, [A[0], y0 + 0.5, A[2]], [Bp[0], y0 + 0.5, Bp[2]], [Bp[0], y1 - 0.25, Bp[2]], [A[0], y1 - 0.25, A[2]], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+            quad(B.trim, [A[0], y1 - 0.25, A[2]], [Bp[0], y1 - 0.25, Bp[2]], [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+            const ux = (Bp[0] - A[0]), uz = (Bp[2] - A[2]), ul = Math.hypot(ux, uz) || 1, nx = -uz / ul * 0.03, nz = ux / ul * 0.03, mw = 0.06 / ul; // just proud of the glass, outward
+            quad(B.trim, [A[0] + nx, y0 + 0.5, A[2] + nz], [A[0] + ux * mw + nx, y0 + 0.5, A[2] + uz * mw + nz], [A[0] + ux * mw + nx, y1 - 0.25, A[2] + uz * mw + nz], [A[0] + nx, y1 - 0.25, A[2] + nz], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+            continue;
+          }
           quad(wallB, A, Bp, [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], tileUV(t), tint);
         }
       }
@@ -108,7 +117,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     const roofB = B["roof_" + (st.roofMat || "slate")] || B.roof_slate, rc = st.roofMat === "clay" ? [1, 0.95, 0.92] : [1, 1, 1];
     const box = obb(ring);
     const pitched = st.roof === "hip" || st.roof === "gable";
-    const R = pitched && box && box.W < 18 ? pitchedRoof(ring, top, { shape: st.roof, pitch: st.pitch ?? 0.62, eave: st.type === "small" ? 0.2 : 0.3 }) : null;
+    const R = pitched && box && box.W < 26 ? pitchedRoof(ring, top, { shape: st.roof, pitch: st.pitch ?? 0.62, eave: st.type === "small" ? 0.2 : 0.3 }) : null;
     if (R) {
       for (const f of R.faces) {
         const uvs = f.pts.flatMap(([x, y, z]) => [(x * box.ax[0] + z * box.ax[1]) / 3, ((x * box.pz[0] + z * box.pz[1]) * 0.8 + (y - top) * 1.3) / 3]);

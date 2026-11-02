@@ -42,15 +42,15 @@ export function concrete({ size = 512, seed = 3, tint = [158, 154, 146] } = {}) 
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const u = x / n, v = y / n, i = y * n + x;
     const stain = fbm(u * 6, v * 6, 6, seed, 5), blotch = fbm(u * 2, v * 2, 2, seed + 9, 3);
-    const grit = hash(x, y, seed) , pit = hash(x * 3, y * 7, seed + 1) > 0.985 ? 1 : 0;
+    const grit = hash(x, y, seed), pit = 0; // (no pock marks: at this scale they read as a pattern of holes)
     // joints: a shallow groove every half tile, slightly wavy so it doesn't read as a drawn grid
     const jx = Math.abs(((u * 2 + fbm(v * 4, 0.5, 4, seed + 4, 2) * 0.004) % 1 + 1) % 1 - 0.5), jy = Math.abs(((v * 2 + fbm(u * 4, 0.3, 4, seed + 5, 2) * 0.004) % 1 + 1) % 1 - 0.5);
     const joint = Math.max(0, 1 - Math.min(jx, jy) * n / 1.6) * (Math.min(jx, jy) > 0.48 ? 1 : 0);
     const crack = Math.abs(fbm(u * 3, v * 3, 3, seed + 7, 4) - 0.5) < 0.006 && fbm(u * 1.5, v * 1.5, 1.5, seed + 8, 2) > 0.55 ? 1 : 0;
-    let L = 0.9 + (stain - 0.5) * 0.28 + (blotch - 0.5) * 0.18 + (grit - 0.5) * 0.06 - pit * 0.18 - joint * 0.2 - crack * 0.3;
+    let L = 0.9 + (stain - 0.5) * 0.28 + (blotch - 0.5) * 0.18 + (grit - 0.5) * 0.06 - pit * 0.18 - joint * 0.2 - crack * 0.07;
     const warm = (blotch - 0.5) * 10;
     img.data.set([tint[0] * L + warm, tint[1] * L + warm * 0.6, tint[2] * L, 255], i * 4);
-    hf[i] = grit * 0.05 + stain * 0.25 - joint * 1.2 - crack * 0.7 - pit * 0.4; // smooth, worn concrete: the joints and cracks catch the light, not a gritty bump everywhere
+    hf[i] = grit * 0.05 + stain * 0.25 - joint * 1.2 - crack * 0.1 - pit * 0.4; // smooth, worn concrete: the joints and cracks catch the light, not a gritty bump everywhere
     rough[i] = 0.82 + (stain - 0.5) * 0.25 + joint * 0.1;
   }
   g.putImageData(img, 0, 0);

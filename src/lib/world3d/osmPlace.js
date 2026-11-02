@@ -155,7 +155,7 @@ function bandAround(line, half) {
 }
 
 export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box, approx = false } = {}) {
-  const P = projector(lat0, lon0), nodes = new Map(), ways = new Map(), out = { origin: [lat0, lon0], venue, land: [], water: [], piers: [], beaches: [], green: [], buildings: [], spots: [], attribution: "Map data © OpenStreetMap contributors (ODbL)" };
+  const P = projector(lat0, lon0), nodes = new Map(), ways = new Map(), out = { origin: [lat0, lon0], venue, land: [], water: [], piers: [], beaches: [], green: [], buildings: [], roads: [], spots: [], attribution: "Map data © OpenStreetMap contributors (ODbL)" };
   const rels = [];
   for (const e of osm?.elements || []) {
     if (e.type === "node") nodes.set(e.id, P(e.lat, e.lon));
@@ -171,6 +171,11 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
     if (ring.length < 2) continue;
     const isClosed = closed(ids);
     if (isClosed && (t.natural === "water" || t.waterway === "riverbank" || t.landuse === "basin" || t.landuse === "reservoir" || t.water)) waterRings.push(ring.slice(0, -1));
+    else if (/^(primary|secondary|tertiary|unclassified|residential|service|living_street|pedestrian|trunk)(_link)?$/.test(t.highway || "") && !closed(ids) && t.area !== "yes" && t.tunnel !== "yes" && t.bridge !== "yes") {
+      // streets, drawn as tarmac with pavements so a town isn't one sheet of concrete
+      const w = { primary: 9, trunk: 10, secondary: 8, tertiary: 7, unclassified: 6, residential: 6, living_street: 5, service: 4, pedestrian: 5 }[t.highway.replace("_link", "")] || 5;
+      if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.roads.push({ line: ring, w, kind: t.highway === "pedestrian" ? "paved" : "tarmac" });
+    }
     else if (t.waterway === "river" || t.waterway === "canal") { const wTag = parseFloat(t.width); riverLines.push({ ring, w: Number.isFinite(wTag) && wTag > 2 && wTag < 300 ? wTag : t.waterway === "canal" ? 10 : 20 }); }
     else if (/^(pier|breakwater|groyne|quay)$/.test(t.man_made || "")) {
       const kind = t.man_made, wTag = parseFloat(t.width);

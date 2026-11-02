@@ -12,7 +12,7 @@ import { buildBuildings } from "./buildings3d.js";
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
 // beach's wet slope under the water carry their own colour over a neutral detail map
-const COL_OF = [[0.42, 0.44, 0.4], [1, 1, 1], [0.86, 0.78, 0.6], [0.42, 0.56, 0.3]];
+const COL_OF = [[0.42, 0.44, 0.4], [1, 1, 1], [0.62, 0.54, 0.4], [0.3, 0.42, 0.2]];
 const WALL_BOTTOM = GROUND.water - 0.8;
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
@@ -114,6 +114,34 @@ export function buildRealPlace(group, place, M, solids = []) {
   ground.receiveShadow = true; group.add(ground); targets.push(ground);
   place.deckMat = deckMat; // world.js darkens it in the rain
 
+  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : H_OF[c]; };
+  // ---- streets: tarmac with a pale pavement and kerb either side (from the map's roads) ----
+  {
+    const T = { p: [], uv: [], i: [] }, Pv = { p: [], uv: [], i: [] };
+    const ribbon = (Bk, line, w0, w1, y) => {
+      // a strip from w0 to w1 metres out from the centre line, on both sides when w0 > 0 (pavements)
+      for (const side of w0 > 0 ? [-1, 1] : [1]) {
+        let run = 0;
+        for (let k = 0; k < line.length - 1; k++) {
+          const [x1, z1] = line[k], [x2, z2] = line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
+          if (groundAt(x1, z1) === 0 && groundAt(x2, z2) === 0) { run += len; continue; }
+          const nx = -(z2 - z1) / len, nz = (x2 - x1) / len, a0 = w0 > 0 ? side * w0 : -w1, a1 = w0 > 0 ? side * w1 : w1;
+          const ya = groundAt(x1, z1) + y, yb = groundAt(x2, z2) + y, o = Bk.p.length / 3;
+          // ends pushed a little past each node so consecutive pieces overlap at bends instead of leaving a notch
+          const ex = ((x2 - x1) / len) * Math.min(1.5, w1 * 0.5), ez = ((z2 - z1) / len) * Math.min(1.5, w1 * 0.5);
+          Bk.p.push(x1 - ex + nx * a0, ya, z1 - ez + nz * a0, x2 + ex + nx * a0, yb, z2 + ez + nz * a0, x2 + ex + nx * a1, yb, z2 + ez + nz * a1, x1 - ex + nx * a1, ya, z1 - ez + nz * a1);
+          Bk.uv.push(run / 6, 0, (run + len) / 6, 0, (run + len) / 6, (a1 - a0) / 6, run / 6, (a1 - a0) / 6);
+          if (side > 0 || w0 === 0) Bk.i.push(o, o + 2, o + 1, o, o + 3, o + 2); else Bk.i.push(o, o + 1, o + 2, o, o + 2, o + 3);
+          run += len;
+        }
+      }
+    };
+    for (const r of place.roads || []) { if (r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(T, r.line, 0, r.w / 2, 0.035); if (r.kind === "tarmac") ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); }
+    const mk = (Bk, mat) => { if (!Bk.i.length) return; const g2 = new THREE.BufferGeometry(); g2.setAttribute("position", new THREE.Float32BufferAttribute(Bk.p, 3)); g2.setAttribute("uv", new THREE.Float32BufferAttribute(Bk.uv, 2)); g2.setIndex(Bk.i); g2.computeVertexNormals(); const m = new THREE.Mesh(g2, mat); m.receiveShadow = true; group.add(m); };
+    mk(T, new THREE.MeshStandardMaterial({ map: dTex.map, normalMap: dTex.normalMap, color: 0x46484b, roughness: 0.82, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }));
+    mk(Pv, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xd8d4cc, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
+  }
+
   // ---- harbour walls: steel sheet piling under a concrete cap, along the real water's edge ----
   const sp = sheetPiling({ water: (0 - WALL_BOTTOM) / (LAND - WALL_BOTTOM) });
   const wp = [], wuv = [], wi = [], cp = [], cuv = [], ci = [], cwp = [], cwi = [];
@@ -166,15 +194,55 @@ export function buildRealPlace(group, place, M, solids = []) {
   }
   place.railings = posts.length;
 
+  // ---- on the pier: lamp posts, lifebuoys and benches along the edge (never on a fishing spot) ----
+  const glowLamp = new THREE.MeshStandardMaterial({ color: 0xf4efe0, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.4 });
+  const mPost = new THREE.MeshStandardMaterial({ color: 0x2f3a36, roughness: 0.5, metalness: 0.5 });
+  const mBuoy = new THREE.MeshStandardMaterial({ color: 0xf06a1a, roughness: 0.6 }), mBox = new THREE.MeshStandardMaterial({ color: 0xb8312b, roughness: 0.55 });
+  const mWood = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.85 });
+  const addAt = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; group.add(m); return m; };
+  let acc = 0;
+  for (const e of walls) {
+    const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
+    if (Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > 200) { acc += len; continue; }
+    for (let t = 0; t < len; t += 1) {
+      const d = acc + t, f = t / len, ex = x1 + (x2 - x1) * f, ez = z1 + (z2 - z1) * f, ry = Math.atan2(nx, nz);
+      const inAt = (m) => [ex - nx * m, ez - nz * m];
+      const clearOfSpots = (q) => spots.every((sp) => Math.hypot(q[0] - sp.at[0], q[1] - sp.at[2]) > 4);
+      if (Math.floor(d / 28) !== Math.floor((d - 1) / 28)) {
+        const q = inAt(0.75); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q)) {
+          addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], LAND + 2.5, q[1]);
+          const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, LAND + 4.95, q[1] - nz * 0.35, ry);
+          addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, LAND + 4.85, q[1] - nz * 0.7, ry); void arm;
+        }
+      }
+      if (Math.floor((d + 14) / 55) !== Math.floor((d + 13) / 55)) {
+        const q = inAt(0.6); if (landAt(q) && clearOfSpots(q)) {
+          addAt(new THREE.BoxGeometry(0.62, 0.95, 0.22), mBox, q[0], LAND + 0.9, q[1], ry);
+          const buoy = addAt(new THREE.TorusGeometry(0.27, 0.07, 8, 18), mBuoy, q[0] + nx * 0.13, LAND + 0.95, q[1] + nz * 0.13, ry); void buoy;
+          addAt(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mPost, q[0], LAND + 0.25, q[1]);
+        }
+      }
+      if (Math.floor((d + 20) / 40) !== Math.floor((d + 19) / 40)) {
+        const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q)) {
+          const ax = -nz, az = nx; // along the edge
+          for (const [h, back, th] of [[0.45, 0, 0.42], [0.8, -0.2, 0.08]]) addAt(new THREE.BoxGeometry(1.8, th === 0.42 ? 0.06 : 0.36, th === 0.42 ? 0.42 : 0.05), mWood, q[0] - nx * back, LAND + h, q[1] - nz * back, ry);
+          for (const s2 of [-0.8, 0.8]) addAt(new THREE.BoxGeometry(0.06, 0.45, 0.42), mPost, q[0] + ax * s2, LAND + 0.22, q[1] + az * s2, ry);
+        }
+      }
+    }
+    acc += len;
+  }
+  place.buildingGlow = [glowLamp];
+
   // ---- buildings ----
-  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? LAND : H_OF[c]; };
+
   const res = buildBuildings(group, place.buildings || [], {
-    groundAt,
+    groundAt: (x, z) => groundAt(x, z) || LAND,
     // nothing on a fishing spot, the deck round it or in front of it
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
     near: (x, z) => nearSpot(x, z, NEAR_SOLID + 30),
   });
-  place.buildingGlow = res.glow; targets.push(...res.meshes);
+  place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; targets.push(...res.meshes);
   for (const c of res.colliders) {
     const cbp = [], cbi = [];
     for (let k = 0; k < c.ring.length; k++) { const [x1, z1] = c.ring[k], [x2, z2] = c.ring[(k + 1) % c.ring.length], o = cbp.length / 3; cbp.push(x1, c.base, z1, x2, c.base, z2, x2, c.top, z2, x1, c.top, z1); cbi.push(o, o + 2, o + 1, o, o + 3, o + 2); }

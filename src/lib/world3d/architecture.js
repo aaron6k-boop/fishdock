@@ -66,10 +66,11 @@ export function pitchedRoof(ring, base, { shape = "hip", pitch = 0.62, eave = 0.
   const box = obb(ring); if (!box) return null;
   const { c, ax, W, L } = box;
   const rise = Math.min(maxRise, (W / 2) * Math.tan(pitch));
-  const half = shape === "hip" ? Math.max(0, L / 2 - W / 2) : L / 2;
-  const r0 = [c[0] - ax[0] * half, c[1] - ax[1] * half], r1 = [c[0] + ax[0] * half, c[1] + ax[1] * half];
-  // the eave: the footprint pushed out a little from its centre
+  // the eave: the footprint pushed out a little from its centre; a gable's ridge runs out to the eaves' ends so the
+  // gable is upright
   const grow = 1 + eave / Math.max(1, W / 2);
+  const half = shape === "hip" ? Math.max(0, L / 2 - W / 2) : (L / 2) * grow;
+  const r0 = [c[0] - ax[0] * half, c[1] - ax[1] * half], r1 = [c[0] + ax[0] * half, c[1] + ax[1] * half];
   const eaves = ring.map(([x, z]) => [c[0] + (x - c[0]) * grow, c[1] + (z - c[1]) * grow]);
   const ccw = area2(eaves) > 0;
   const onRidge = ([x, z]) => { const t = Math.max(-half, Math.min(half, (x - c[0]) * ax[0] + (z - c[1]) * ax[1])); return [c[0] + ax[0] * t, base + rise, c[1] + ax[1] * t]; };
