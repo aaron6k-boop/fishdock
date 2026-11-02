@@ -37,7 +37,7 @@ function normalFrom(hf, w, h, strength = 2) {
 function greyTex(vals, w, h) { const c = canvas(w, h), g = c.getContext("2d"), img = g.createImageData(w, h); for (let i = 0; i < w * h; i++) { const v = Math.max(0, Math.min(255, vals[i] * 255)); img.data.set([v, v, v, 255], i * 4); } g.putImageData(img, 0, 0); return toTex(c, { srgb: false }); }
 
 // ---- weathered concrete: one tile covers 8 m; faint expansion joints every 4 m, aggregate, stains and hairline cracks ----
-export function concrete({ size = 256, seed = 3, tint = [158, 154, 146] } = {}) {
+export function concrete({ size = 256, seed = 3, tint = [196, 186, 166] } = {}) { // sun-bleached, warm pale concrete (as Gorleston's deck)
   const n = size, col = canvas(n), g = col.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n), rough = new Float32Array(n * n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const u = x / n, v = y / n, i = y * n + x;
