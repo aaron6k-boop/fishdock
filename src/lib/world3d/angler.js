@@ -50,6 +50,7 @@ function label(text, colour = "#ffffff") {
 }
 // a cylinder from a to b (for limbs, rod sections, ropes)
 const UP = new THREE.Vector3(0, 1, 0), tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
+const tmpUp = new THREE.Vector3();
 function between(mesh, a, b, r = null) {
   tmpV.subVectors(b, a); const len = tmpV.length() || 1e-4;
   mesh.position.addVectors(a, b).multiplyScalar(0.5);
@@ -78,7 +79,7 @@ function genericFishGeometry() {
   return g;
 }
 
-export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, local = false, real = false, onSound, onFeel } = {}) {
+export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, local = false, real = false, rail = false, onSound, onFeel } = {}) {
   const root = new THREE.Group(); world.add(root);
   const body = new THREE.Group(); root.add(body);
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
@@ -101,15 +102,49 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
 
   // ---- the rod: sections along a bending curve, a reel, a rest or tripod ----
   const R = ROD[venue] || ROD.pier;
-  const mBlank = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.35, metalness: 0.3 });
-  const mWhip = new THREE.MeshStandardMaterial({ color: R.col, roughness: 0.4, metalness: 0.2 });
-  const NSEG = 12;
-  const rodSegs = Array.from({ length: NSEG }, (_, i) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 6), i % 3 === 2 ? mWhip : mBlank); m.castShadow = true; root.add(m); return { m, r: lerp(0.018, 0.004, i / (NSEG - 1)) }; });
+  // a real rod: a slim graphite blank tapering to a fine tip, an EVA rear grip, a metal reel seat and a fore grip, rings
+  // on short legs under the blank (smaller towards the tip) each bound with a coloured whipping, and a spinning reel
+  // hanging under the seat: its body, rotor, spool of line, bail arm and a crank that turns as you reel
+  const mBlank = new THREE.MeshStandardMaterial({ color: 0x1e2833, roughness: 0.26, metalness: 0.4 });
+  const mWhip = new THREE.MeshStandardMaterial({ color: R.col, roughness: 0.35, metalness: 0.25 });
+  const mGrip = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.95 });
+  const mSeat = new THREE.MeshStandardMaterial({ color: 0x9aa1a8, roughness: 0.28, metalness: 0.85 });
+  const mRing = new THREE.MeshStandardMaterial({ color: 0xc4cacf, roughness: 0.18, metalness: 0.9 });
+  const mReel = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.35, metalness: 0.6 });
+  const unitCyl = new THREE.CylinderGeometry(1, 1, 1, 12);
+  const NSEG = 16;
+  const rodSegs = Array.from({ length: NSEG }, (_, i) => { const m = new THREE.Mesh(unitCyl, mBlank); m.castShadow = true; root.add(m); return { m, r: lerp(0.0108, 0.0022, (i / (NSEG - 1)) ** 0.8) }; });
+  const HANDLE = [[0, 0.02, 0.016, mSeat], [0.02, 0.4, 0.0152, mGrip], [0.4, 0.5, 0.0128, mSeat], [0.5, 0.66, 0.0142, mGrip], [0.66, 0.69, 0.0122, mSeat]];
+  const handleParts = HANDLE.map(([a, b, r, mat]) => { const m = new THREE.Mesh(unitCyl, mat); m.castShadow = true; root.add(m); return { m, a, b, r }; });
+  const GUIDES = [0.25, 0.37, 0.49, 0.6, 0.7, 0.8, 0.89, 0.96];
+  const guides = GUIDES.map((s, i) => {
+    const r = lerp(0.021, 0.0045, i / (GUIDES.length - 1)), g = new THREE.Group(); root.add(g);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.0013, r * 0.15), 6, 18), mRing); ring.position.y = -(r * 1.35 + 0.006); g.add(ring);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.0013, 0.0013, r * 0.4 + 0.008, 4), mRing); leg.position.y = -(r * 0.2 + 0.004); g.add(leg);
+    const wrap = new THREE.Mesh(unitCyl, mWhip); wrap.rotation.x = Math.PI / 2; wrap.scale.set(0.0001, 0.026, 0.0001); g.add(wrap);
+    return { g, s, r, ring, wrap };
+  });
   const reel = new THREE.Group(); root.add(reel);
-  // the reel: a light graphite body and a coloured spool, so it reads against a dark deck or water
-  part(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 14), new THREE.MeshStandardMaterial({ color: 0x6a7078, metalness: 0.7, roughness: 0.28 }), 0, 0, 0, reel).rotation.z = Math.PI / 2;
-  part(new THREE.CylinderGeometry(0.03, 0.03, 0.065, 14), mWhip, 0, 0, 0, reel).rotation.z = Math.PI / 2;
-  const handle = part(new THREE.BoxGeometry(0.01, 0.07, 0.01), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8 }), 0.04, 0, 0, reel);
+  {
+    // built with z along the rod towards the tip, y up towards the blank, hanging below it
+    const at = (geo, mat, x, y, z, rx = 0, rz = 0, parent = reel) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; parent.add(m); return m; };
+    at(new THREE.BoxGeometry(0.009, 0.006, 0.05), mSeat, 0, -0.016, 0); // the foot in the seat
+    at(new THREE.BoxGeometry(0.008, 0.045, 0.014), mReel, 0, -0.04, -0.004); // the stem
+    at(new THREE.CylinderGeometry(0.03, 0.03, 0.042, 18), mReel, 0, -0.072, -0.012, 0, Math.PI / 2); // the gearbox
+    at(new THREE.SphereGeometry(0.03, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), mReel, 0, -0.072, -0.012, -Math.PI / 2); // its rounded back
+    reel.userData.rotor = new THREE.Group(); reel.userData.rotor.position.set(0, -0.072, 0.018); reel.add(reel.userData.rotor);
+    at(new THREE.CylinderGeometry(0.031, 0.026, 0.022, 18), mReel, 0, 0, 0, Math.PI / 2, 0, reel.userData.rotor); // rotor cup
+    const bail = new THREE.Mesh(new THREE.TorusGeometry(0.033, 0.0022, 6, 20, Math.PI), mSeat); bail.position.set(0, 0, 0.03); reel.userData.rotor.add(bail);
+    at(new THREE.CylinderGeometry(0.027, 0.027, 0.03, 20), mWhip, 0, -0.072, 0.048, Math.PI / 2); // the spool
+    at(new THREE.CylinderGeometry(0.0245, 0.0245, 0.026, 20), new THREE.MeshStandardMaterial({ color: 0xe9ece6, roughness: 0.6 }), 0, -0.072, 0.049, Math.PI / 2); // line on it
+    const crank = new THREE.Group(); crank.position.set(-0.024, -0.072, -0.012); reel.add(crank); reel.userData.crank = crank;
+    at(new THREE.BoxGeometry(0.004, 0.05, 0.007), mSeat, -0.004, -0.024, 0, 0, 0, crank);
+    at(new THREE.CylinderGeometry(0.0075, 0.0075, 0.022, 10), mGrip, -0.016, -0.048, 0, 0, Math.PI / 2, crank); // the knob
+  }
+  const handle = reel.userData.crank;
+  // the line from the spool up through the rings to the tip
+  const guideLinePos = new Float32Array((GUIDES.length + 2) * 3), guideLineGeo = new THREE.BufferGeometry(); guideLineGeo.setAttribute("position", new THREE.BufferAttribute(guideLinePos, 3));
+  const guideLine = new THREE.Line(guideLineGeo, new THREE.LineBasicMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.7 })); guideLine.frustumCulled = false; root.add(guideLine);
   // the rest: a tripod on the beach, a rest on the bank, the railing on a pier or quay
   const rest = new THREE.Group(); root.add(rest);
   const mMetal = new THREE.MeshStandardMaterial({ color: 0x8c9196, metalness: 0.7, roughness: 0.35 });
@@ -121,7 +156,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     restTop = new THREE.Vector3(0.45, 0.42, -0.85); restButt = new THREE.Vector3(0.45, 0.22, 0.25);
     for (const p of [restTop, restButt]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), mMetal); between(l, new THREE.Vector3(p.x, 0, p.z), p); rest.add(l); }
   } else {
-    restTop = new THREE.Vector3(0.4, 1.08, -0.3); restButt = new THREE.Vector3(0.35, 0.05, 0.55); // leaning on the railing
+    restTop = new THREE.Vector3(0.4, 1.12, -0.3); restButt = new THREE.Vector3(0.35, 0.05, 0.4); // leaning on the railing (moved to it once the spot is known)
   }
   // tackle box and bucket beside them
   part(new THREE.BoxGeometry(0.45, 0.28, 0.3), new THREE.MeshStandardMaterial({ color: 0x2f5a3a, roughness: 0.6 }), -0.55, 0.14, 0.25, root);
@@ -211,6 +246,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const c = castPoint(s); castAt.set(c[0], 0, c[2]);
     const [dx, dz] = dirOf(face);
     edge = Number.isFinite(s.edge) ? s.edge : EDGE[venue] ?? 1;
+    // a real pier's railing stands 22 cm in from its edge: the rod leans on its top rail
+    if (rail) restTop.set(0.4, 1.12, -Math.max(0.3, edge - 0.22));
     const out = edge + (REACH[venue] ?? 2);
     nearAt.set(at.x + dx * out, 0, at.z + dz * out);
   }
@@ -376,7 +413,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
     if (fp && !(ph === "landing" && age >= LT.swingIn)) {
-      held = true; butt = new THREE.Vector3(0.13, 1.02, -0.4);
+      held = true; butt = new THREE.Vector3(0.17, 1.1, -0.34); // the reel about chest height, in the lower right of the view
       dir = new THREE.Vector3(Math.sin(fpYaw) * Math.cos(fpE), Math.sin(fpE), -Math.cos(fpYaw) * Math.cos(fpE));
     }
     dir.x += sway; dir.y += breath; dir.normalize();
@@ -390,8 +427,20 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       pts[i].copy(butt).addScaledVector(dir, R.len * s * (1 - 0.3 * k * s * s)).addScaledVector(bendDir, R.len * (k * s * s * 0.55 + spr.tip * s ** 6));
     }
     for (let i = 0; i < NSEG; i++) between(rodSegs[i].m, pts[i], pts[i + 1], rodSegs[i].r);
-    reel.position.copy(pts[0]).addScaledVector(dir, 0.35).add(new THREE.Vector3(0, -0.06, 0)); reel.lookAt(toWorld(pts[3]));
-    handle.rotation.x = reel.userData.spin || 0;
+    // the handle, the reel and the rings, each square to the blank with the rings and reel underneath it
+    const along = (m) => { const s2 = Math.min(1, m / R.len) * NSEG, i = Math.min(NSEG - 1, Math.floor(s2)), f = s2 - i; return { p: pts[i].clone().lerp(pts[i + 1], f), t: pts[i + 1].clone().sub(pts[i]).normalize() }; };
+    const frame = (t) => { const up = tmpUp.set(0, 1, 0).addScaledVector(t, -t.y); if (up.lengthSq() < 1e-4) up.set(1, 0, 0); up.normalize(); const x = new THREE.Vector3().crossVectors(up, t); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, t)); };
+    for (const hp of handleParts) { const a = along(hp.a).p, b = along(hp.b).p; between(hp.m, a, b, hp.r); }
+    const seat = along(0.45); reel.position.copy(seat.p); reel.quaternion.copy(frame(seat.t));
+    handle.rotation.x = -(reel.userData.spin || 0); reel.userData.rotor.rotation.z = (reel.userData.spin || 0) * 1.6;
+    guideLinePos.set(seat.p.clone().add(new THREE.Vector3(0, -0.072, 0.06).applyQuaternion(reel.quaternion)).toArray(), 0);
+    guides.forEach((gd, i) => {
+      const a = along(gd.s * R.len); gd.g.position.copy(a.p); gd.g.quaternion.copy(frame(a.t));
+      const br = rodSegs[Math.min(NSEG - 1, Math.floor(gd.s * NSEG))].r; gd.wrap.scale.set(br * 1.3, 0.024, br * 1.3);
+      guideLinePos.set(a.p.clone().add(new THREE.Vector3(0, -(gd.r * 1.35 + 0.006), 0).applyQuaternion(gd.g.quaternion)).toArray(), (i + 1) * 3);
+    });
+    guideLinePos.set(pts[NSEG].toArray(), (GUIDES.length + 1) * 3); guideLineGeo.attributes.position.needsUpdate = true;
+    guideLine.visible = showLine !== false;
     rest.visible = !held || venue === "beach";
 
     // ---- the body: stand, breathe, hands on the rod when it's held ----

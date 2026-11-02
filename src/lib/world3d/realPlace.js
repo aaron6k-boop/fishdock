@@ -1,47 +1,62 @@
 // ---- realPlace: the meshes for a real place built from OpenStreetMap (see osmPlace.js) ----
-// The ground from the grid (land, beaches and grass above the water, the water's edge sloping where it's a beach
-// and steep where it's a wall), every building with its own height, and the piers, breakwaters and groynes.
+// The ground from the grid, but with its edge snapped exactly onto the water's edge wherever there's a wall, so a deck
+// meets its wall cleanly (sampled every few metres, the edge used to slope down below the water inside the wall and the
+// sea showed through the walkway). Harbour walls only along real land-to-water edges (osmPlace.shoreEdges), drawn as
+// steel sheet piling under a concrete cap; galvanised railings along them near the anglers; jetties on piles; the
+// buildings from the architecture library (buildings3d.js). Materials are drawn on the phone (textures3d.js).
 import * as THREE from "three";
-import { unrle, GROUND, PLACE3D } from "./osmPlace.js";
+import { unrle, GROUND, PLACE3D, inside } from "./osmPlace.js";
+import { concrete, sheetPiling, detail, noise2 } from "./textures3d.js";
+import { buildBuildings } from "./buildings3d.js";
 
-function tex(draw, size = 128) {
-  const c = document.createElement("canvas"); c.width = c.height = size; draw(c.getContext("2d"), size);
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
-}
-// paving and tarmac with joints and wear; a wall of windows with a plain border (roofs use the border)
-const pavingTex = () => tex((g, n) => {
-  g.fillStyle = "#c9c6be"; g.fillRect(0, 0, n, n);
-  for (let i = 0; i < 1400; i++) { const v = Math.random(); g.fillStyle = `rgba(${v > 0.5 ? 255 : 40},${v > 0.5 ? 255 : 40},${v > 0.5 ? 255 : 40},${Math.random() * 0.12})`; g.fillRect(Math.random() * n, Math.random() * n, 2, 2); }
-  g.strokeStyle = "rgba(60,58,52,.35)"; g.lineWidth = 1.5; for (let k = 0; k <= n; k += n / 4) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k, n); g.stroke(); g.beginPath(); g.moveTo(0, k); g.lineTo(n, k); g.stroke(); }
-});
-const windowTex = () => tex((g, n) => {
-  g.fillStyle = "#ffffff"; g.fillRect(0, 0, n, n);
-  g.fillStyle = "#3b4654"; g.fillRect(n * 0.3, n * 0.25, n * 0.4, n * 0.45);
-  g.fillStyle = "#6d7f92"; g.fillRect(n * 0.32, n * 0.27, n * 0.17, n * 0.41);
-  g.fillStyle = "#e8e4dc"; g.fillRect(n * 0.28, n * 0.7, n * 0.44, n * 0.04);
-}, 64);
-
-// rough grass for the land along rivers and lakes (paving is for harbours and promenades)
-const grassTex = () => tex((g, n) => {
-  g.fillStyle = "#7d8f5a"; g.fillRect(0, 0, n, n);
-  for (let i = 0; i < 2600; i++) { const v = Math.random(); g.fillStyle = `rgba(${v > 0.5 ? 200 : 30},${v > 0.5 ? 220 : 60},${v > 0.5 ? 120 : 20},${Math.random() * 0.16})`; g.fillRect(Math.random() * n, Math.random() * n, 1.5, 3); }
-});
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
-const COL_OF = [[0.25, 0.3, 0.28], [0.52, 0.52, 0.46], [0.84, 0.76, 0.56], [0.36, 0.5, 0.26]];
-
+// colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
+// beach's wet slope under the water carry their own colour over a neutral detail map
+const COL_OF = [[0.42, 0.44, 0.4], [1, 1, 1], [0.86, 0.78, 0.6], [0.42, 0.56, 0.3]];
+const WALL_BOTTOM = GROUND.water - 0.8;
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
+const RAIL = { within: 260, inset: 0.22, h: 1.1, post: 2.0 };
+
+// nearest wall segment to a point, through a grid of 8 m cells
+function segIndex(segs, cell = 8) {
+  const m = new Map(), key = (i, j) => i * 100003 + j;
+  segs.forEach((s, n) => {
+    const i0 = Math.floor(Math.min(s[0], s[2]) / cell) - 1, i1 = Math.floor(Math.max(s[0], s[2]) / cell) + 1, j0 = Math.floor(Math.min(s[1], s[3]) / cell) - 1, j1 = Math.floor(Math.max(s[1], s[3]) / cell) + 1;
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const k = key(i, j); if (!m.has(k)) m.set(k, []); m.get(k).push(n); }
+  });
+  return (x, z) => {
+    const list = m.get(key(Math.floor(x / cell), Math.floor(z / cell))); if (!list) return null;
+    let best = null;
+    for (const n of list) {
+      const [x1, z1, x2, z2] = segs[n], dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((x - x1) * dx + (z - z1) * dz) / l2));
+      const px = x1 + dx * t, pz = z1 + dz * t, d = Math.hypot(x - px, z - pz);
+      if (!best || d < best.d) best = { d, p: [px, pz], s: segs[n] };
+    }
+    return best;
+  };
+}
 
 export function buildRealPlace(group, place, M, solids = []) {
   const spots = place.spots || [], nearSpot = (x, z, r = NEAR_SOLID) => spots.some((sp) => Math.hypot(x - sp.at[0], z - sp.at[2]) < r);
   const xs = place.grid.xs, n = xs.length, cls = unrle(place.grid.cls, n * n);
-  // inland (rivers, lakes) the land not mapped as anything else is fields and banks, not paving
   const inland = place.venue === "river" || place.venue === "lake";
-  const colOf = inland ? [COL_OF[0], [0.95, 0.97, 0.9], COL_OF[2], [0.9, 0.95, 0.85]] : COL_OF; // (the grass texture brings the green)
+  const LAND = GROUND.land;
+  const targets = []; // what the rendered-geometry check casts its rays at (world.js)
+  const walls = (place.edges || []).filter((e) => e[6] === "wall");
+  const nearestWall = segIndex(walls);
+  // the exact land, for the vertices along a wall (the grid's own answer is only right to a cell)
+  const landRings = place.land || [], waterRings = place.water || [], pierRings = (place.piers || []).filter((p) => p.ring).map((p) => p.ring);
+  const bb = (r) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of r) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { r, x0, x1, z0, z1 }; };
+  const LR = landRings.map(bb), WR = waterRings.map(bb), PR = pierRings.map(bb), inB = (q, b) => q[0] >= b.x0 && q[0] <= b.x1 && q[1] >= b.z0 && q[1] <= b.z1 && inside(q, b.r);
+  const landAt = (q) => (LR.some((b) => inB(q, b)) || PR.some((b) => inB(q, b))) && !WR.some((b) => inB(q, b));
+
   // ---- the ground ----
+  const pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3), uv = new Float32Array(n * n * 2);
+  const solid = new Uint8Array(n * n); // 1: land or a vertex moved onto a wall's line
   const h = new Float32Array(n * n);
-  for (let k = 0; k < n * n; k++) h[k] = H_OF[cls[k]];
-  // beaches slope gently into the water; walls stay steep
+  for (let k = 0; k < n * n; k++) { h[k] = H_OF[cls[k]]; solid[k] = cls[k] !== 0 ? 1 : 0; }
+  // beaches slope gently into the water (walls stay upright)
   for (let it = 0; it < 4; it++) {
     const nh = h.slice();
     for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
@@ -53,104 +68,154 @@ export function buildRealPlace(group, place, M, solids = []) {
     }
     h.set(nh);
   }
-  const pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const k = j * n + i, c = colOf[cls[k]], v = 0.92 + ((i * 7919 + j * 104729) % 97) / 97 * 0.16;
-    pos.set([xs[i], h[k], xs[j]], k * 3); col.set([c[0] * v, c[1] * v, c[2] * v], k * 3);
+  const X = new Float32Array(n * n), Z = new Float32Array(n * n), wet = new Float32Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; X[k] = xs[i]; Z[k] = xs[j]; }
+  // along every wall: a vertex on the water side within a cell of it moves onto the wall's line, at the deck's height;
+  // a land vertex the grid called water is put back. The ground then ends exactly at the wall's top.
+  for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+    const k = j * n + i, cell = Math.max(xs[i + 1] - xs[i], xs[j + 1] - xs[j]);
+    if (cell > 7) continue;
+    let mixed = false;
+    for (const q of [k - 1, k + 1, k - n, k + n, k - n - 1, k - n + 1, k + n - 1, k + n + 1]) if ((cls[q] === 0) !== (cls[k] === 0)) { mixed = true; break; }
+    if (!mixed) continue;
+    const w = nearestWall(X[k], Z[k]); if (!w || w.d > cell * 1.5) continue;
+    if (cls[k] === 2 || cls[k] === 3) continue;
+    if (landAt([X[k], Z[k]])) { h[k] = LAND; solid[k] = 1; wet[k] = 1 - w.d / (cell * 1.5); continue; }
+    X[k] = w.p[0] - w.s[4] * 0.02; Z[k] = w.p[1] - w.s[5] * 0.02; h[k] = LAND; solid[k] = 1; wet[k] = 1;
   }
-  const uv = new Float32Array(n * n * 2);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) uv.set([xs[i] / 2.5, xs[j] / 2.5], (j * n + i) * 2); // 2.5 m paving slabs
-  const idx = [];
-  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
-    const a = j * n + i, b = a + 1, c = a + n, d = c + 1;
-    if (cls[a] === 0 && cls[b] === 0 && cls[c] === 0 && cls[d] === 0 && h[a] < -1 && h[b] < -1 && h[c] < -1 && h[d] < -1) continue; // open water: nothing to draw
-    idx.push(a, c, b, b, c, d);
+  for (let k = 0; k < n * n; k++) {
+    const c = COL_OF[solid[k] && cls[k] === 0 ? 1 : cls[k]];
+    // large, soft variations (no per-vertex checker), and damp concrete near the edge
+    const v = 0.9 + noise2(X[k] / 23, Z[k] / 23, 1e6, 3) * 0.14 + noise2(X[k] / 7, Z[k] / 7, 1e6, 4) * 0.06 - wet[k] * 0.12;
+    pos.set([X[k], h[k], Z[k]], k * 3); col.set([c[0] * v, c[1] * v, c[2] * v], k * 3);
+    uv.set([X[k] / 8, Z[k] / 8], k * 2); // one concrete tile = 8 m (joints every 4 m)
   }
+  const idxDeck = [], idxSoft = [];
+  const addTri = (a, b, c) => {
+    const sa = solid[a], sb = solid[b], sc = solid[c];
+    if (!sa && !sb && !sc && h[a] < -1 && h[b] < -1 && h[c] < -1) return; // open water: nothing to draw
+    const soft = [a, b, c].some((q) => cls[q] === 2 || cls[q] === 3) || inland;
+    // a triangle reaching from a wall out into the water would stand above the water in front of the wall: only beaches
+    // and banks slope into the water
+    if (!(sa && sb && sc) && !soft) return;
+    (soft ? idxSoft : idxDeck).push(a, b, c);
+  };
+  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) { const a = j * n + i, b = a + 1, c = a + n, d = c + 1; addTri(a, c, b); addTri(b, c, d); }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-  g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1)); g.computeVertexNormals();
-  const ground = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, map: inland ? grassTex() : pavingTex() }));
-  ground.receiveShadow = true; group.add(ground);
+  const all = idxDeck.concat(idxSoft);
+  g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(all, 1) : new THREE.Uint16BufferAttribute(all, 1));
+  g.addGroup(0, idxDeck.length, 0); g.addGroup(idxDeck.length, idxSoft.length, 1);
+  g.computeVertexNormals();
+  const cTex = concrete({ seed: 3 }), dTex = detail(13);
+  const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
+  const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
+  const ground = new THREE.Mesh(g, [deckMat, softMat]);
+  ground.receiveShadow = true; group.add(ground); targets.push(ground);
+  place.deckMat = deckMat; // world.js darkens it in the rain
 
-  // ---- harbour walls: upright faces along the real water's edge (not on beaches) ----
-  const H = PLACE3D.box, cAt = (x, z) => { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; };
-  const wp = [], wi = [], wuv = [], cwp = [], cwi = [];
-  for (const ring of [...(place.land || []), ...(place.water || [])]) {
-    for (let k = 0; k < ring.length; k++) {
-      const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length];
-      if (Math.max(Math.abs(x1), Math.abs(z1), Math.abs(x2), Math.abs(z2)) > H) continue;
-      const len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
-      const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, nx = -(z2 - z1) / len * 3, nz = (x2 - x1) / len * 3;
-      if (cAt(mx + nx, mz + nz) === 2 || cAt(mx - nx, mz - nz) === 2) continue; // a beach: no wall
-      const o = wp.length / 3;
-      wp.push(x1, GROUND.water - 0.6, z1, x2, GROUND.water - 0.6, z2, x2, GROUND.land + 0.05, z2, x1, GROUND.land + 0.05, z1);
-      if (nearSpot(mx, mz)) { const c = cwp.length / 3; cwp.push(x1, GROUND.water - 0.6, z1, x2, GROUND.water - 0.6, z2, x2, GROUND.land + 0.05, z2, x1, GROUND.land + 0.05, z1); cwi.push(c, c + 1, c + 2, c, c + 2, c + 3); }
-      wuv.push(0, 0, len / 4, 0, len / 4, 1, 0, 1);
-      wi.push(o, o + 1, o + 2, o, o + 2, o + 3);
-    }
+  // ---- harbour walls: steel sheet piling under a concrete cap, along the real water's edge ----
+  const sp = sheetPiling({ water: (0 - WALL_BOTTOM) / (LAND - WALL_BOTTOM) });
+  const wp = [], wuv = [], wi = [], cp = [], cuv = [], ci = [], cwp = [], cwi = [];
+  let run = 0;
+  for (const e of walls) {
+    let [x1, z1, x2, z2, nx, nz] = e;
+    const len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.2) continue;
+    // face the water: (b - a) turned left is the face's normal; swap the ends if that points at the land
+    if ((-(z2 - z1)) * nx + (x2 - x1) * nz < 0) { [x1, z1, x2, z2] = [x2, z2, x1, z1]; }
+    const o = wp.length / 3, u0 = run / 2.4, u1 = (run + len) / 2.4; run += len;
+    wp.push(x1, WALL_BOTTOM, z1, x2, WALL_BOTTOM, z2, x2, LAND, z2, x1, LAND, z1);
+    wuv.push(u0, 0, u1, 0, u1, 1, u0, 1); wi.push(o, o + 1, o + 2, o, o + 2, o + 3);
+    // the cap: a concrete lip standing 12 cm proud of the piling, with its top and its underside
+    const ox = nx * 0.12, oz = nz * 0.12, c0 = cp.length / 3, yT = LAND + 0.03, yB = LAND - 0.45;
+    cp.push(x1 + ox, yB, z1 + oz, x2 + ox, yB, z2 + oz, x2 + ox, yT, z2 + oz, x1 + ox, yT, z1 + oz); // front
+    cp.push(x1 + ox, yT, z1 + oz, x2 + ox, yT, z2 + oz, x2 - ox, yT, z2 - oz, x1 - ox, yT, z1 - oz); // top
+    cp.push(x1, yB, z1, x2, yB, z2, x2 + ox, yB, z2 + oz, x1 + ox, yB, z1 + oz); // underside
+    for (let q = 0; q < 3; q++) { cuv.push(u0 * 0.3, 0, u1 * 0.3, 0, u1 * 0.3, 0.06, u0 * 0.3, 0.06); ci.push(c0 + q * 4, c0 + q * 4 + 1, c0 + q * 4 + 2, c0 + q * 4, c0 + q * 4 + 2, c0 + q * 4 + 3); }
+    if (nearSpot((x1 + x2) / 2, (z1 + z2) / 2)) { const c = cwp.length / 3; cwp.push(x1, WALL_BOTTOM, z1, x2, WALL_BOTTOM, z2, x2, LAND + 0.05, z2, x1, LAND + 0.05, z1); cwi.push(c, c + 1, c + 2, c, c + 2, c + 3); }
   }
   if (wp.length) {
     const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(wp, 3)); wg.setAttribute("uv", new THREE.Float32BufferAttribute(wuv, 2)); wg.setIndex(wi); wg.computeVertexNormals();
-    const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: M.stone.map, color: 0x8a867c, roughness: 0.95, side: THREE.DoubleSide })); wm.receiveShadow = true; group.add(wm);
+    const wm = new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughnessMap: sp.roughnessMap, roughness: 1, metalness: 0.15 })); wm.receiveShadow = true; group.add(wm); targets.push(wm);
+    const cg = new THREE.BufferGeometry(); cg.setAttribute("position", new THREE.Float32BufferAttribute(cp, 3)); cg.setAttribute("uv", new THREE.Float32BufferAttribute(cuv, 2)); cg.setIndex(ci); cg.computeVertexNormals();
+    const cm = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.9, color: 0xe6e2da, side: THREE.DoubleSide })); cm.receiveShadow = true; cm.castShadow = true; group.add(cm);
   }
   if (cwp.length) solids.push(collider(cwp, cwi));
 
-  // ---- buildings: walls and flat roofs, all in one mesh ----
-  const bp = [], bc = [], bi = [], bu = [], cbp = [], cbi = [];
-  const palette = [[0.86, 0.82, 0.74], [0.78, 0.7, 0.6], [0.9, 0.88, 0.84], [0.7, 0.6, 0.52], [0.82, 0.76, 0.66], [0.64, 0.6, 0.58]];
-  place.buildings.forEach((b, n2) => {
-    const ring = b.ring.slice(); if (ring.length < 3) return;
-    if (THREE.ShapeUtils.isClockWise(ring.map(([x, z]) => new THREE.Vector2(x, z)))) ring.reverse();
-    const base = GROUND.land - 0.3, top = GROUND.land + b.h, c = palette[n2 % palette.length], roof = [0.42, 0.3, 0.26];
-    for (let k = 0; k < ring.length; k++) {
-      const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], o = bp.length / 3, shade = 0.8 + 0.2 * Math.abs(Math.sin(Math.atan2(z2 - z1, x2 - x1)));
-      bp.push(x1, base, z1, x2, base, z2, x2, top, z2, x1, top, z1);
-      const wl = Math.hypot(x2 - x1, z2 - z1) / 3.2, hl = (top - base) / 3;
-      bu.push(0, 0, wl, 0, wl, hl, 0, hl);
-      for (let q = 0; q < 4; q++) bc.push(c[0] * shade, c[1] * shade, c[2] * shade);
-      bi.push(o, o + 2, o + 1, o, o + 3, o + 2);
-    }
-    const tri = THREE.ShapeUtils.triangulateShape(ring.map(([x, z]) => new THREE.Vector2(x, z)), []), o = bp.length / 3;
-    for (const [x, z] of ring) { bp.push(x, top, z); bc.push(...(b.h > 9 ? c.map((v) => v * 0.7) : roof)); bu.push(0.03, 0.03); }
-    for (const [a, b2, c2] of tri) bi.push(o + a, o + c2, o + b2);
-    if (nearSpot(ring[0][0], ring[0][1], NEAR_SOLID + 30)) {
-      for (let k = 0; k < ring.length; k++) { const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], c = cbp.length / 3; cbp.push(x1, base, z1, x2, base, z2, x2, top, z2, x1, top, z1); cbi.push(c, c + 2, c + 1, c, c + 3, c + 2); }
-    }
+  // ---- railings along the walls near the anglers: posts every 2 m, a top and a middle rail, a brace every few bays ----
+  const railMat = new THREE.MeshStandardMaterial({ color: 0xa9adaf, metalness: 0.55, roughness: 0.42 });
+  const posts = [], rails = [];
+  for (const e of walls) {
+    const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
+    if (len < 0.5 || Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > RAIL.within) continue;
+    const ix = -nx * RAIL.inset, iz = -nz * RAIL.inset, a = [x1 + ix, z1 + iz], b = [x2 + ix, z2 + iz];
+    if (!landAt([(a[0] + b[0]) / 2 - nx * 0.6, (a[1] + b[1]) / 2 - nz * 0.6])) continue;
+    const nPost = Math.max(1, Math.round(len / RAIL.post));
+    for (let q = 0; q < nPost; q++) { const f = q / nPost; posts.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]); }
+    for (const y of [RAIL.h, RAIL.h * 0.5]) rails.push({ a: [a[0], LAND + y, a[1]], b: [b[0], LAND + y, b[1]], r: y === RAIL.h ? 0.026 : 0.018 });
+    for (let q = 0; q + 1 < nPost; q += 3) { const f0 = q / nPost, f1 = (q + 1) / nPost; rails.push({ a: [a[0] + (b[0] - a[0]) * f0, LAND + 0.08, a[1] + (b[1] - a[1]) * f0], b: [a[0] + (b[0] - a[0]) * f1, LAND + RAIL.h * 0.5, a[1] + (b[1] - a[1]) * f1], r: 0.014 }); }
+  }
+  if (posts.length) {
+    const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 8), railMat, posts.length), mx = new THREE.Matrix4();
+    posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); pm.castShadow = true; group.add(pm);
+  }
+  if (rails.length) {
+    const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8), railMat, rails.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0);
+    rails.forEach(({ a, b, r }, q) => { const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b), d = Bv.clone().sub(A), L = d.length(); const qt = new THREE.Quaternion().setFromUnitVectors(up, d.normalize()); mx.compose(A.clone().add(Bv).multiplyScalar(0.5), qt, new THREE.Vector3(r, L + 0.06, r)); rm.setMatrixAt(q, mx); });
+    rm.castShadow = true; group.add(rm);
+  }
+  place.railings = posts.length;
+
+  // ---- buildings ----
+  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? LAND : H_OF[c]; };
+  const res = buildBuildings(group, place.buildings || [], {
+    groundAt,
+    // nothing on a fishing spot, the deck round it or in front of it
+    avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
+    near: (x, z) => nearSpot(x, z, NEAR_SOLID + 30),
   });
-  if (cbp.length) solids.push(collider(cbp, cbi));
-  if (bp.length) {
-    const bg = new THREE.BufferGeometry(); bg.setAttribute("position", new THREE.Float32BufferAttribute(bp, 3)); bg.setAttribute("color", new THREE.Float32BufferAttribute(bc, 3)); bg.setAttribute("uv", new THREE.Float32BufferAttribute(bu, 2)); bg.setIndex(bi); bg.computeVertexNormals();
-    const wt = windowTex(); place.windowTex = wt;
-    const bm = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide, map: wt, emissive: 0xffc070, emissiveIntensity: 0, emissiveMap: wt }));
-    place.buildingMat = bm.material; bm.castShadow = true; bm.receiveShadow = true; group.add(bm);
+  place.buildingGlow = res.glow; targets.push(...res.meshes);
+  for (const c of res.colliders) {
+    const cbp = [], cbi = [];
+    for (let k = 0; k < c.ring.length; k++) { const [x1, z1] = c.ring[k], [x2, z2] = c.ring[(k + 1) % c.ring.length], o = cbp.length / 3; cbp.push(x1, c.base, z1, x2, c.base, z2, x2, c.top, z2, x1, c.top, z1); cbi.push(o, o + 2, o + 1, o, o + 3, o + 2); }
+    solids.push(collider(cbp, cbi));
   }
 
-  // ---- piers, breakwaters, quays and groynes ----
-  const pierMat = { pier: M.stone, quay: M.stone, breakwater: M.cliff, groyne: M.wood };
+  // ---- piers drawn as a line (jetties on piles), outlines (breakwaters), groynes ----
+  const pileMat = new THREE.MeshStandardMaterial({ color: 0x4a443c, roughness: 0.95 });
+  const deckSlab = new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.95, color: 0xdedad2 });
   for (const p of place.piers) {
-    const mat = pierMat[p.kind] || M.stone;
     if (p.line) {
+      const deckY = p.kind === "groyne" ? 1.2 : Math.min(p.h, LAND + 0.6), w = p.kind === "groyne" ? 0.5 : Math.min(p.width, 6);
       for (let k = 0; k < p.line.length - 1; k++) {
         const [x1, z1] = p.line[k], [x2, z2] = p.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.2) continue;
         const ang = Math.atan2(z2 - z1, x2 - x1), cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
-        const deck = new THREE.Mesh(new THREE.BoxGeometry(len + p.width * 0.5, p.h - GROUND.water + 0.5, p.width), mat);
-        deck.position.set(cx, (p.h + GROUND.water - 0.5) / 2, cz); deck.rotation.y = -ang; deck.castShadow = deck.receiveShadow = true; group.add(deck);
+        if (p.kind === "groyne") { const m = new THREE.Mesh(new THREE.BoxGeometry(len, 1.6, w), M.wood); m.position.set(cx, 0.4, cz); m.rotation.y = -ang; group.add(m); continue; }
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.4, w), deckSlab); deck.position.set(cx, deckY - 0.2, cz); deck.rotation.y = -ang; deck.castShadow = deck.receiveShadow = true; group.add(deck); targets.push(deck);
         if (nearSpot(cx, cz, NEAR_SOLID + len / 2)) solids.push(deck);
-        if (p.kind === "pier") for (const side of [-1, 1]) {
-          const r = new THREE.Mesh(new THREE.BoxGeometry(len, 0.06, 0.06), M.rail); r.position.set(cx + Math.sin(ang) * side * (p.width / 2 - 0.15), p.h + 1.05, cz - Math.cos(ang) * side * (p.width / 2 - 0.15)); r.rotation.y = -ang; group.add(r);
-          for (let t = 0; t < len; t += 2.5) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.05, 0.07), M.rail); const f = t / len; post.position.set(x1 + (x2 - x1) * f + Math.sin(ang) * side * (p.width / 2 - 0.15), p.h + 0.52, z1 + (z2 - z1) * f - Math.cos(ang) * side * (p.width / 2 - 0.15)); group.add(post); }
+        const sx = Math.sin(ang), sz = -Math.cos(ang);
+        for (let t = 0; t <= len; t += 4) for (const side of [-1, 1]) {
+          const f = t / len, px = x1 + (x2 - x1) * f + sx * side * (w / 2 - 0.3), pz = z1 + (z2 - z1) * f + sz * side * (w / 2 - 0.3);
+          if (landAt([px, pz])) continue;
+          const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, deckY - WALL_BOTTOM, 8), pileMat); pile.position.set(px, (deckY + WALL_BOTTOM) / 2 - 0.2, pz); group.add(pile);
+        }
+        for (const side of [-1, 1]) for (const y of [RAIL.h, RAIL.h * 0.5]) {
+          const r = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, len, 6), railMat); r.position.set(cx + sx * side * (w / 2 - 0.12), deckY + y, cz + sz * side * (w / 2 - 0.12)); r.rotation.z = Math.PI / 2; r.rotation.y = -ang; group.add(r);
         }
       }
     } else if (p.ring && p.ring.length >= 3) {
       const ring = p.ring.slice(); if (THREE.ShapeUtils.isClockWise(ring.map(([x, z]) => new THREE.Vector2(x, z)))) ring.reverse();
       const sh = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
-      const geo = new THREE.ExtrudeGeometry(sh, { depth: p.h - GROUND.water, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, GROUND.water, 0);
-      const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; group.add(m);
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: p.h - WALL_BOTTOM, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, WALL_BOTTOM, 0);
+      const m = new THREE.Mesh(geo, [deckSlab, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 })]); m.castShadow = m.receiveShadow = true; group.add(m); targets.push(m);
       if (ring.some(([x, z]) => nearSpot(x, z, NEAR_SOLID + 60))) solids.push(m);
     }
   }
+  place.targets = targets;
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
-  return (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : H_OF[c]; };
+  function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }
+  void PLACE3D;
+  return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c]; const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
 // a mesh only for the camera's ray (never drawn)
 function collider(p, i) {

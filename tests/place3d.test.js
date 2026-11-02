@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildPlace, unrle, landFromCoast, GROUND, checkLayout } from "../src/lib/world3d/osmPlace.js";
+import { buildPlace, unrle, landFromCoast, GROUND, checkLayout, inside } from "../src/lib/world3d/osmPlace.js";
 import { handlePlace3d, markFor } from "../server/place3d.js";
 import { handlePano, pickPano } from "../server/pano.js";
 import { setup, stubFetch } from "./helpers/fishdock.js";
@@ -21,10 +21,13 @@ test("Gorleston from real map data: the sea and the river are water, the town is
   assert.ok(L.buildings.length > 300, `${L.buildings.length} buildings`);
   assert.ok(L.buildings.every((b) => b.h >= 2 && b.h < 200));
   assert.equal(L.spots.length, 4);
+  // exactly, on the map's own outlines (a spot a metre from the wall can be in a water cell of the 3 m grid)
+  const landAt = (q) => L.land.some((r) => inside(q, r)) && !L.water.some((r) => inside(q, r));
   for (const s of L.spots) {
-    assert.equal(at(s.at[0], s.at[2]) !== 0, true, `${s.name} stands on land`);
+    assert.equal(landAt([s.at[0], s.at[2]]), true, `${s.name} stands on land`);
     const ahead = [s.at[0] + Math.sin(s.face) * 20, s.at[2] - Math.cos(s.face) * 20];
-    assert.equal(at(...ahead), 0, `${s.name} faces the water`);
+    assert.equal(landAt(ahead), false, `${s.name} faces the water`);
+    assert.equal(at(...ahead), 0, `${s.name} faces water in the grid too`);
     assert.ok(Math.hypot(s.at[0], s.at[2]) < 120, `${s.name} is near the mark`);
     assert.equal(s.at[1], GROUND.land);
   }

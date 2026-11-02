@@ -184,7 +184,7 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
       const lv = parseFloat(t["building:levels"]), hh = parseFloat(t.height);
       const h = Number.isFinite(hh) && hh > 2 && hh < 200 ? hh : Number.isFinite(lv) && lv > 0 && lv < 60 ? lv * 3 + 1 : /^(garage|shed|hut|kiosk|toilets)$/.test(t.building) ? 3 : /^(church|cathedral)$/.test(t.building) ? 14 : 7;
       const ring2 = ring.slice(0, -1), c = ring2.reduce((a, p) => [a[0] + p[0] / ring2.length, a[1] + p[1] / ring2.length], [0, 0]);
-      out.buildings.push({ ring: ring2, h: r1(h), d: r1(Math.hypot(c[0], c[1])), kind: t.building, roof: t["roof:shape"] || null });
+      out.buildings.push({ id: w.id, ring: ring2, h: r1(h), tall: Number.isFinite(hh) || Number.isFinite(lv), levels: Number.isFinite(lv) ? lv : null, d: r1(Math.hypot(c[0], c[1])), kind: t.building, roof: t["roof:shape"] || null, use: t.man_made === "lighthouse" || t.building === "lighthouse" ? "lighthouse" : /lookout|coastwatch|coastguard/i.test(`${t.name || ""} ${t["seamark:building:function"] || ""}`) ? "lookout" : t.shop || t.amenity === "cafe" || t.amenity === "restaurant" || t.amenity === "pub" ? "shop" : null, name: t.name || null });
     }
   }
   // multipolygons (a river or lake drawn in pieces): their outer rings
@@ -218,11 +218,45 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
   out.grid = { xs, cls: rle(cls) };
   out.land = land; out.water = waterRings;
   const at = (p) => { const i = nearestIdx(xs, p[0]), j = nearestIdx(xs, p[1]); return cls[j * n + i]; };
-  const inWater = (p) => at(p) === 0;
+  // where anglers stand is decided on the exact outlines, not the grid (a spot a metre from a wall is often in a
+  // "water" cell of a 3 m grid); beaches and green spaces count as land
+  const pierRings = out.piers.filter((p) => p.ring).map((p) => p.ring);
+  const bbOf = (r) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of r) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { r, x0, x1, z0, z1 }; };
+  const LB = land.map(bbOf), WB = waterRings.map(bbOf), PB = pierRings.map(bbOf), inB = (q, b) => q[0] >= b.x0 && q[0] <= b.x1 && q[1] >= b.z0 && q[1] <= b.z1 && inside(q, b.r);
+  const exact = land.length || waterRings.length;
+  const inWater = exact ? (p) => !((LB.length ? LB.some((b) => inB(p, b)) : !coastChains.length && venue !== "pier" && venue !== "beach") || PB.some((b) => inB(p, b))) || WB.some((b) => inB(p, b)) : (p) => at(p) === 0;
   out.approx = !!approx;
+  out.edges = shoreEdges(out, out.beaches, box * 0.75);
   out.spots = spotsFor(out, venue, inWater);
   out.check = checkLayout(out, inWater);
   delete out.green; delete out.beaches;
+  return out;
+}
+
+// ---- the water's edges that are walls ----
+// Every edge between the land and the water, from the exact outlines (not the grid): for each, which side is land, and
+// whether it's a wall (a harbour wall, a pier's side, a quay) or a beach. A line with water on both sides isn't an
+// edge at all: OpenStreetMap closes the coastline straight across a river mouth, and drawing a wall there put a
+// 4 m wall across the open harbour. Returns [x1, z1, x2, z2, nx, nz, kind] with (nx, nz) pointing out to the water.
+export function shoreEdges(L, beaches = [], within = 450) {
+  const landRings = L.land || [], waterRings = L.water || [], pierRings = (L.piers || []).filter((p) => p.ring).map((p) => p.ring);
+  const landAt = (q) => (landRings.some((r) => inside(q, r)) || pierRings.some((r) => inside(q, r))) && !waterRings.some((r) => inside(q, r));
+  const beachAt = (q) => beaches.some((r) => inside(q, r));
+  const out = [];
+  for (const ring of [...landRings, ...waterRings]) {
+    for (let k = 0; k < ring.length; k++) {
+      const a = ring[k], b = ring[(k + 1) % ring.length];
+      if (Math.max(Math.abs(a[0]), Math.abs(a[1]), Math.abs(b[0]), Math.abs(b[1])) > within) continue;
+      const len = dist(a, b); if (len < 0.3) continue;
+      const nx = -(b[1] - a[1]) / len, nz = (b[0] - a[0]) / len, m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const p1 = landAt([m[0] + nx * 1.5, m[1] + nz * 1.5]), p2 = landAt([m[0] - nx * 1.5, m[1] - nz * 1.5]);
+      if (p1 === p2) continue; // water (or land) both sides: a closing line, not an edge
+      const s = p1 ? -1 : 1; // the normal points to the water
+      const landSide = [m[0] - nx * s * 3, m[1] - nz * s * 3], waterSide = [m[0] + nx * s * 3, m[1] + nz * s * 3];
+      const kind = beachAt(landSide) || beachAt(waterSide) || beachAt(m) ? "beach" : "wall";
+      out.push([r1(a[0]), r1(a[1]), r1(b[0]), r1(b[1]), Math.round(nx * s * 1000) / 1000, Math.round(nz * s * 1000) / 1000, kind]);
+    }
+  }
   return out;
 }
 
@@ -310,12 +344,12 @@ function spotsFor(L, venue, inWater) {
         if (got.length === 4) break;
         const w = walkRing(m); if (!w) continue;
         let nrm = [-w.dir[1], w.dir[0]]; if (onDeck([w.q[0] + nrm[0] * 1.5, w.q[1] + nrm[1] * 1.5])) nrm = [-nrm[0], -nrm[1]]; // outward
-        const q = [w.q[0] - nrm[0] * 1.2, w.q[1] - nrm[1] * 1.2], face = faceOf(nrm[0], nrm[1]);
+        const q = [w.q[0] - nrm[0] * 1.0, w.q[1] - nrm[1] * 1.0], face = faceOf(nrm[0], nrm[1]);
         if (!onDeck(q) || !apart(got, q) || problem(q, face)) continue;
         got.push({ q, face });
       }
       const names = ["On the pier", "Along the pier", "Further along the pier", "Along the other way"];
-      if (got.length === 4) return got.map(({ q, face }, k) => spot(k + 1, q, face, p.h, 30, names[k], 1.2));
+      if (got.length === 4) return got.map(({ q, face }, k) => spot(k + 1, q, face, p.h, 30, names[k], 1.0));
     }
   }
   if (!shore || shore.n.d > reach + 40) return [];
@@ -332,7 +366,7 @@ function spotsFor(L, venue, inWater) {
     return { at: n.at, dir: [1, 0] };
   };
   const pierLike = venue === "pier";
-  const back = venue === "beach" ? 6 : pierLike ? 1.6 : 2.2;
+  const back = venue === "beach" ? 6 : pierLike ? 1.0 : 2.2; // on a pier you stand at the railing (about 80 cm in front)
   const names = venue === "beach" ? ["On the beach, left", "On the beach, right", "Further along, left", "Further along, right"] : pierLike ? ["On the pier", "Along the pier", "Further along the pier", "Along the other way"] : ["Along the bank, left", "Along the bank, right", "Further along, left", "Further along, right"];
   // try places along the edge, nearest first, until four stand on dry ground with open water ahead, well apart
   const got = [], offsets = [0];

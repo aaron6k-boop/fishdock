@@ -9,9 +9,16 @@ import { createAngler } from "./angler.js";
 import { createLook, lookAt, wrap } from "./look.js";
 import { layoutFor } from "./spots.js";
 
-export const QUALITY3D = { performance: { dpr: 1, shadows: 0, q: 0.5 }, balanced: { dpr: 1.5, shadows: 1, q: 1 }, high: { dpr: 2, shadows: 1, q: 2 } };
+export const QUALITY3D = { performance: { dpr: 1.25, shadows: 0, q: 0.5 }, balanced: { dpr: 2, shadows: 1, q: 1 }, high: { dpr: 2, shadows: 1, q: 2 } };
 export function autoQuality3d() {
-  try { const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4; if (mem <= 2 || cores <= 4) return "performance"; if (mem >= 8 && cores >= 8) return "high"; } catch { /* ignore */ }
+  try {
+    // iPhone Safari reports no memory and only a few cores, which put every iPhone (even the newest) on the lowest
+    // setting: no antialiasing, one pixel per three and no shadows, so edges were jagged and everything soft. iPhones
+    // from the last several years have strong graphics; they get the balanced setting
+    const ua = navigator.userAgent || "", ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (ios) return "balanced";
+    const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4; if (mem <= 2 || cores <= 4) return "performance"; if (mem >= 8 && cores >= 8) return "high";
+  } catch { /* ignore */ }
   return "balanced";
 }
 export const HOME_PITCH = -0.09;
@@ -74,7 +81,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (!x || x.spotId !== a.spot || x.outfit !== a.outfit) {
         if (x) x.a.dispose();
         // only your own angler is felt (other people's catches arrive as a party notification instead)
-        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, local: !!a.local, real: !!a.real, onSound: (n, p) => onSound?.(n, p, a.id), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
+        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, local: !!a.local, real: !!a.real, rail: !!real && (venue === "pier" || venue === "estuary"), onSound: (n, p) => onSound?.(n, p, a.id), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
         made.onSplash(splash); made.onRipple(ripple);
         x = { a: made, spotId: a.spot, outfit: a.outfit, name: a.name, out: null };
         anglers.set(a.id, x);
@@ -189,6 +196,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       step(ms) { if (!film) return; const n = Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
       get mode() { return mode; },
+      // for visual checks: turn the view to a compass heading (degrees; a real place has north up) and pitch at once
+      view(yawDeg, pitch = -0.08) { const s = look.state(); look.aim((yawDeg * Math.PI) / 180, pitch); for (let i = 0; i < 40; i++) look.step(0.1); look.end(); return { yaw: look.yaw, pitch: look.pitch, was: s.yaw }; },
+      get camera() { return camera; },
     };
   }
   function tick(t, now, dt, draw = true) {

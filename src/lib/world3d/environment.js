@@ -279,7 +279,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // ---- the place itself: the real one from map data when there is one, otherwise a representative one ----
   if (pano) { /* the photo is the place */ }
   else if (real) {
-    floorAt = buildRealPlace(group, real, M, solids) || floorAt; if (real.buildingMat) lamps.push(real.buildingMat);
+    floorAt = buildRealPlace(group, real, M, solids) || floorAt; if (real.buildingGlow) lamps.push(...real.buildingGlow);
     // a lamp over the anglers after dark (piers, quays and promenades are lit), like the drawn pier's
     const sp = real.spots || [];
     if (sp.length) { const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 34, 1.5); pl.position.set(c[0], c[1] + 5.5, c[2]); group.add(pl); pointLights.push(pl); }
