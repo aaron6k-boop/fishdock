@@ -1,0 +1,15 @@
+name: wrangler dry run (temporary)
+on:
+  push:
+    branches: [wrangler-check2]
+jobs:
+  dry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npx --yes wrangler@latest deploy --dry-run --outdir out-worker 2>&1 | tail -80
