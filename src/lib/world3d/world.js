@@ -5,6 +5,7 @@
 // chosen by Auto from the phone, and stepped down if frames run slow. Nothing is drawn while hidden.
 import * as THREE from "three";
 import { checkScene } from "./sceneCheck.js";
+import { walker, stepWalker } from "./walker.js";
 import { createEnvironment } from "./environment.js";
 import { createAngler } from "./angler.js";
 import { createLook, lookAt, wrap } from "./look.js";
@@ -117,6 +118,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     return out;
   }
   let camOverride = null;
+  // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
+  let W = null, walkIn = { x: 0, y: 0, sprint: false }, walkJump = false, canFish = false, fishTest = 0, modeBeforeWalk = "first", fovBeforeWalk = null, onPose = null;
+  // other people walking (Fish Together): their latest pose, eased towards
+  const remote = new Map();
+  function applyRemote(id, x, dt) {
+    const r = remote.get(id); if (!r) return;
+    if (!r.pose) { x.a.setWalk(null); remote.delete(id); return; }
+    const k = 1 - Math.exp(-dt * 8), c = r.cur || { ...r.pose, phase: 0 };
+    const nx = c.x + (r.pose.x - c.x) * k, nz = c.z + (r.pose.z - c.z) * k, moved = Math.hypot(nx - c.x, nz - c.z);
+    r.cur = { x: nx, y: c.y + (r.pose.y - c.y) * k, z: nz, face: c.face + Math.atan2(Math.sin(r.pose.face - c.face), Math.cos(r.pose.face - c.face)) * k, speed: moved / dt, air: r.pose.air, phase: (c.phase + moved * 2.2) % (Math.PI * 2) };
+    x.a.setWalk(r.cur);
+  }
   let camPos = new THREE.Vector3(0, L.deck + 1.65, 0), camTarget = null, cineShot = null, cineSince = 0, lastPhaseKey = "";
   // following jumps (optional, on to start): the camera turns to a leap just before it happens and closes in a little
   // so it reads on a phone, then eases back. Never while you're turning the view yourself, never in Free look, and not
@@ -145,6 +158,16 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (leap) steerTo = leap;
     // closer in for a far leap, so a 50 cm fish 40 m out is more than a few pixels (the camera zooms; the fish isn't scaled)
     jumpZoom += ((leap ? Math.max(0.4, Math.min(0.8, 12 / Math.max(1, camPos.distanceTo(leap)))) : 1) - jumpZoom) * (1 - Math.exp(-dt * (leap ? 3 : 1.5)));
+    if (W) {
+      // Roblox-style: the camera orbits behind you as you drag, closer or further as you pinch; very close is first person
+      const dist = Math.max(0, ((look.fov - 28) / 50) * 9 + 0.4), tgt = new THREE.Vector3(W.x, W.y + 1.55, W.z);
+      const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+      if (dist < 1.1) { pos.copy(tgt).add(new THREE.Vector3(0, 0.07, 0)); anglers.get(localId)?.a.setFirstPerson(true); }
+      else { pos.copy(tgt).addScaledVector(d, -dist); pivot.copy(tgt); pos = unblocked(pivot, pos); anglers.get(localId)?.a.setFirstPerson(false); }
+      camPos.copy(pos); camera.position.copy(camPos); camera.fov = 62 * (camera.aspect < 0.8 ? 1.1 : 1); camera.updateProjectionMatrix();
+      camera.lookAt(camera.position.clone().add(d));
+      return { yaw, pitch };
+    }
     if (!out) { camera.position.copy(pos); }
     else if (mode === "first" || mode === "free") {
       pos.copy(out.eye);
@@ -237,7 +260,20 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const t0 = performance.now();
     const outs = {};
     if (env.waveState) envState = { ...envState, ...env.waveState() }; // the sea as the water shows it (conditions ease in)
-    for (const [id, x] of anglers) { x.out = x.a.frame(t, now, dt || 0.016, envState); outs[id] = x.out; }
+    // walking about: the stick moves the walker, the angler follows it
+    let walkInfo = null;
+    if (W) {
+      const me = anglers.get(localId);
+      if (!me) W = null;
+      else {
+        W = stepWalker(W, { ...walkIn, camYaw: look.yaw, jump: walkJump }, Math.min(0.05, dt || 0.016), env.ground); walkJump = false;
+        me.a.setWalk(W);
+        if (++fishTest % 8 === 0) canFish = !!env.ground.fishHere(W.x, W.z);
+        walkInfo = { on: true, canFish, sprint: !!walkIn.sprint };
+        onPose?.({ x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed, air: W.air });
+      }
+    }
+    for (const [id, x] of anglers) { if (remote.has(id)) applyRemote(id, x, dt || 0.016); x.out = x.a.frame(t, now, dt || 0.016, envState); outs[id] = x.out; }
     const view = updateCamera(t, dt || 0.016);
     // droplets fall back, rings spread
     for (let k = 0; k < DROPS; k++) {
@@ -253,7 +289,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (draw) renderer.render(scene, camera);
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
-    onFrame?.({ outs, view, slow, mode, focusId, localId });
+    onFrame?.({ outs, view, slow, mode, focusId, localId, walk: walkInfo });
   }
   function resize() {
     const w = canvas.clientWidth || canvas.parentElement?.clientWidth || 1, h = canvas.clientHeight || canvas.parentElement?.clientHeight || 1;
@@ -274,6 +310,40 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind };
       return s;
     },
+    /** Walk about (true) or stand at your spot again (false). Returns null when it worked, or why not. */
+    walk(on) {
+      const me = anglers.get(localId);
+      if (on) {
+        if (W) return null;
+        if (!env.ground) return "You can't walk about in this view.";
+        if (!me) return "Join as an angler to walk about.";
+        const ph = me.out?.phase;
+        if (ph && !["idle", "ended", "missed", "paused", "lost"].includes(ph) && !(ph === "landing" && me.out.landed)) return "Reel in first: you can walk about between casts.";
+        const p = me.a.root.position;
+        W = walker(p.x, p.z, me.out?.face ?? 0, p.y); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
+        fovBeforeWalk = look.fov; look.setFov?.(47); look.aim(W.face, -0.22); canFish = !!env.ground.fishHere(W.x, W.z);
+        return null;
+      }
+      if (!W) return null;
+      W = null; me?.a.setWalk(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
+      const s2 = me?.a.spot; if (s2) { look.setHome(s2.face, HOME_PITCH); look.aim(s2.face, HOME_PITCH); }
+      return null;
+    },
+    get walking() { return !!W; },
+    setWalkInput(i) { walkIn = { x: i.x || 0, y: i.y || 0, sprint: !!i.sprint }; },
+    jump() { if (W) walkJump = true; },
+    /** Fish from where you're standing: turns to the water's edge and makes it your spot. Returns the spot, or null. */
+    fishHere() {
+      const me = anglers.get(localId); if (!W || !me) return null;
+      const sp = env.ground.fishHere(W.x, W.z); if (!sp) return null;
+      const spot = { ...me.a.spot, ...sp, id: me.a.spot?.id ?? 1, name: "Where you chose" };
+      me.a.place(spot); W = null; me.a.setWalk(null); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
+      look.setHome(spot.face, HOME_PITCH); look.aim(spot.face, HOME_PITCH);
+      return spot;
+    },
+    onPose(f) { onPose = f; },
+    /** Someone else walking about (Fish Together): their pose, or null when they're back at their spot. */
+    setRemotePose(id, pose) { if (id === localId) return; const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r); },
     setTrack(on) { track = !!on && !reduceMotion; },
     get track() { return track; },
     setMode(m) { mode = CAMERA_MODES.some((x) => x.id === m) ? m : "first"; if (mode === "first" || mode === "free") { const me = anglers.get(localId) || anglers.get(focusId); if (me?.out) look.aim(me.out.face, -0.12); } },

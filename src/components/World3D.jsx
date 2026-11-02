@@ -16,11 +16,13 @@ export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left" };
 export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel };
+  const [walk, setWalk] = useState(null); // { on, canFish, sprint } while walking about
+  useEffect(() => { props.current.onWalk?.(walk); }, [walk]);
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk };
   const phases = useRef({});
   // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
   const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
@@ -79,7 +81,8 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
         w.setNow(() => props.current.now());
         w.setAnglers(props.current.anglers);
         if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
-        w.onFrame(({ outs, view }) => {
+        w.onFrame(({ outs, view, walk: wk }) => {
+          setWalk((o) => (!wk ? (o ? null : o) : !o || o.canFish !== wk.canFish || o.sprint !== wk.sprint ? wk : o));
           setHeading((h) => { const deg = Math.round(((props.current.facing + (view.yaw * 180) / Math.PI) % 360 + 360) % 360); return Math.abs(deg - h) >= 2 ? deg : h; });
           for (const [id, o] of Object.entries(outs)) {
             const key = `${o.phase}|${o.info.since}`, prev = phases.current[id];
@@ -125,18 +128,27 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
       pinch = 0;
     };
     const wheel = (e) => { e.preventDefault(); W.current?.look.zoom(e.deltaY < 0 ? 1.08 : 1 / 1.08); };
-    const key = (e) => { const L = W.current?.look; if (!L) return; const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -30], ArrowDown: [0, 30] }[e.key]; if (k) { e.preventDefault(); L.start(); L.drag(-k[0], -k[1], el.clientHeight); L.end(); } if (e.key === "Home") L.recenter(); };
-    el.addEventListener("pointerdown", down); el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("wheel", wheel, { passive: false }); el.addEventListener("keydown", key);
-    return () => { el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", key); };
+    // walking with the keyboard: WASD (or the arrow keys) to move, Space to jump, Shift to sprint
+    const held = new Set();
+    const walkKeys = () => { const w = W.current; if (!w?.walking) return; const has = (...k) => k.some((x) => held.has(x)); w.setWalkInput({ x: (has("d", "D") ? 1 : 0) - (has("a", "A") ? 1 : 0), y: (has("w", "W") ? 1 : 0) - (has("s", "S") ? 1 : 0), sprint: has("Shift") }); };
+    const keyUp = (e) => { held.delete(e.key); walkKeys(); };
+    const key = (e) => {
+      if (W.current?.walking) { if (e.key === " ") { e.preventDefault(); W.current.jump(); return; } if (/^[wasdWASD]$|^Shift$/.test(e.key)) { held.add(e.key); walkKeys(); return; } }
+      const L = W.current?.look; if (!L) return; const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -30], ArrowDown: [0, 30] }[e.key]; if (k) { e.preventDefault(); L.start(); L.drag(-k[0], -k[1], el.clientHeight); L.end(); } if (e.key === "Home") L.recenter(); };
+    el.addEventListener("pointerdown", down); el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("wheel", wheel, { passive: false }); el.addEventListener("keydown", key); el.addEventListener("keyup", keyUp);
+    return () => { el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", key); el.removeEventListener("keyup", keyUp); };
   }, []);
 
   useImperativeHandle(ref, () => ({
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
     setTrack: (on) => W.current?.setTrack(on),
+    walk: (on) => W.current?.walk(on), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
+    onPose: (f) => W.current?.onPose(f), setRemotePose: (id, p) => W.current?.setRemotePose(id, p),
+    get walkState() { return walk; },
     focus: (id) => W.current?.focus(id), follow: (id, sec) => W.current?.follow(id, sec), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),
     get mode() { return mode; },
-  }), [mode]);
+  }), [mode, walk]);
 
   return (
     <div ref={wrap} className={`w3d ${className}`}>

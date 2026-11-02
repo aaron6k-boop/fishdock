@@ -91,7 +91,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const part = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
   const legL = part(new THREE.CapsuleGeometry(0.085, 0.7, 4, 8), mTrousers, -0.11, 0.47, 0);
   const legR = part(new THREE.CapsuleGeometry(0.085, 0.7, 4, 8), mTrousers, 0.11, 0.47, 0);
-  part(new THREE.BoxGeometry(0.14, 0.12, 0.28), mBoot, -0.11, 0.06, -0.05); part(new THREE.BoxGeometry(0.14, 0.12, 0.28), mBoot, 0.11, 0.06, -0.05);
+  const bootL = part(new THREE.BoxGeometry(0.14, 0.12, 0.28), mBoot, -0.11, 0.06, -0.05), bootR = part(new THREE.BoxGeometry(0.14, 0.12, 0.28), mBoot, 0.11, 0.06, -0.05);
   const torso = part(new THREE.CapsuleGeometry(0.2, 0.42, 4, 10), mJacket, 0, 1.12, 0); torso.scale.z = 0.72;
   const head = part(new THREE.SphereGeometry(0.115, 14, 10), mSkin, 0, 1.6, -0.01);
   const hat = part(new THREE.SphereGeometry(0.125, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mHat, 0, 1.63, -0.01);
@@ -159,8 +159,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     restTop = new THREE.Vector3(0.4, 1.12, -0.3); restButt = new THREE.Vector3(0.35, 0.05, 0.4); // leaning on the railing (moved to it once the spot is known)
   }
   // tackle box and bucket beside them
-  part(new THREE.BoxGeometry(0.45, 0.28, 0.3), new THREE.MeshStandardMaterial({ color: 0x2f5a3a, roughness: 0.6 }), -0.55, 0.14, 0.25, root);
-  part(new THREE.CylinderGeometry(0.14, 0.12, 0.3, 12), new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.7 }), -0.35, 0.15, 0.62, root);
+  // (they stay at the spot when you walk off)
+  const kit = new THREE.Group(); world.add(kit);
+  part(new THREE.BoxGeometry(0.45, 0.28, 0.3), new THREE.MeshStandardMaterial({ color: 0x2f5a3a, roughness: 0.6 }), -0.55, 0.14, 0.25, kit);
+  part(new THREE.CylinderGeometry(0.14, 0.12, 0.3, 12), new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.7 }), -0.35, 0.15, 0.62, kit);
   // a landing net (rivers, lakes, estuaries) or a drop net with ropes (piers)
   // the net: knotted mesh you can see through (a drawn diamond pattern), hanging as a soft bag under a metal hoop
   const mNet = new THREE.MeshStandardMaterial({ color: 0x23302a, roughness: 1, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide, map: netTexture(), depthWrite: false });
@@ -241,8 +243,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // beyond it, never under the deck, so it can be seen being landed
   const REACH = { beach: 1, pier: 2.4, estuary: 2.0, river: 1.4, lake: 1.4 };
   const EDGE = { beach: 6, pier: 0.9, estuary: 1.2, river: 2.2, lake: 2.0 };
+  let curSpot = spot;
   function place(s) {
-    face = s.face; at.set(...s.at); root.position.copy(at); root.rotation.y = -face;
+    curSpot = s; face = s.face; at.set(...s.at); root.position.copy(at); root.rotation.y = -face; kit.position.copy(at); kit.rotation.y = -face;
     const c = castPoint(s); castAt.set(c[0], 0, c[2]);
     const [dx, dz] = dirOf(face);
     edge = Number.isFinite(s.edge) ? s.edge : EDGE[venue] ?? 1;
@@ -258,6 +261,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const spring = (key, vkey, target, w, z, dt) => { const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n; for (let i = 0; i < n; i++) { const a = w * w * (target - spr[key]) - 2 * z * w * spr[vkey]; spr[vkey] += a * h; spr[key] += spr[vkey] * h; } };
 
   let events = [], lastKey = "", P = {}, seed = rng(1), splashCb = null, rippleCb = null, prevAge = 0, fightPos = null, landStart = null, hintFish = null;
+  let walking = null; // walking about (walker.js): where, which way, how fast, the stride
   let fp = false, leanNow = 0; // first person: the rod held where you can see it; leaning over the rail to land a fish
   const toWorld = (v) => v.clone().applyMatrix4(root.matrixWorld);
   const toLocal = (v) => root.worldToLocal(v.clone());
@@ -409,6 +413,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (ph === "waiting" || ph === "bite") { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     } else { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     if (!held || (ph !== "cast" && ph !== "hooked" && ph !== "landing" && ph !== "lost")) { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); held = false; }
+    // walking about: the rod carried upright in the right hand, the line wound in
+    if (walking) { butt = new THREE.Vector3(0.27, 0.62, 0.02); dir = new THREE.Vector3(0.03, 0.96, 0.28).normalize(); held = true; showLine = false; showFish = false; }
     // first person: whenever the line is out the rod is in your hands, low and to the right with the reel in view and
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
@@ -441,15 +447,23 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     });
     guideLinePos.set(pts[NSEG].toArray(), (GUIDES.length + 1) * 3); guideLineGeo.attributes.position.needsUpdate = true;
     guideLine.visible = showLine !== false;
-    rest.visible = !held || venue === "beach";
+    rest.visible = !walking && (!held || venue === "beach");
 
     // ---- the body: stand, breathe, hands on the rod when it's held ----
-    const bob = Math.sin(t * 1.4 + id.length) * 0.01;
+    // a stride when walking: legs swing from the hips, arms swing the other way, the body bobs; tucked in a jump
+    const wk = walking ? Math.min(1, walking.speed / 4) : 0, stride = walking ? walking.phase : 0;
+    const bob = Math.sin(t * 1.4 + id.length) * 0.01 + Math.abs(Math.sin(stride)) * 0.05 * wk;
+    for (const [leg, boot, x, sgn] of [[legL, bootL, -0.11, 1], [legR, bootR, 0.11, -1]]) {
+      const a = walking ? (walking.air ? 0.5 * sgn * 0.4 + 0.35 : Math.sin(stride) * 0.6 * wk * sgn) : 0;
+      leg.rotation.x = a; leg.position.set(x, 0.86 - 0.39 * Math.cos(a), -0.39 * Math.sin(a));
+      boot.rotation.x = a * 0.6; boot.position.set(x, 0.86 - 0.8 * Math.cos(a), -0.8 * Math.sin(a) - 0.05);
+    }
     torso.position.y = 1.12 + bob; head.position.y = 1.6 + bob; hat.position.y = 1.63 + bob;
     const lean = held && (ph === "hooked" || ph === "landing") ? 0.12 : 0;
     body.rotation.x = -lean;
     const shoulders = [new THREE.Vector3(-0.24, 1.38 + bob, 0), new THREE.Vector3(0.24, 1.38 + bob, 0)];
-    const hands = held ? [pts[0].clone().addScaledVector(dir, 0.55), pts[0].clone().addScaledVector(dir, 0.12)] : [new THREE.Vector3(-0.28, 0.85, -0.05), new THREE.Vector3(0.28, 0.85, -0.05)];
+    const hands = walking ? [new THREE.Vector3(-0.28, 0.86, -0.05 + Math.sin(stride) * 0.22 * wk), pts[0].clone().addScaledVector(dir, 0.3)]
+      : held ? [pts[0].clone().addScaledVector(dir, 0.55), pts[0].clone().addScaledVector(dir, 0.12)] : [new THREE.Vector3(-0.28, 0.85, -0.05), new THREE.Vector3(0.28, 0.85, -0.05)];
     if (tech === "net" && netOn && ph === "landing") hands[0] = toLocal(netAt ? poleFrom : hands[0]);
     for (let i = 0; i < 2; i++) {
       const s = shoulders[i], h = hands[i], d = s.distanceTo(h), L1 = 0.3, L2 = 0.29;
@@ -519,11 +533,18 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     setHint(h) { hintFish = h || null; },
     setName(n) { const old = tag; const s = label(n || "Angler", local ? "#7ee8de" : "#ffffff"); s.position.copy(old.position); s.visible = old.visible; root.remove(old); old.material.map.dispose(); old.material.dispose(); root.add(s); tag = s; },
     place,
+    /** Walking about (walker.js state, world coordinates), or null to stand at the spot again. */
+    setWalk(w) {
+      if (w) { walking = w; root.position.set(w.x, w.y, w.z); root.rotation.y = -w.face; }
+      else if (walking) { walking = null; place(curSpot); }
+    },
+    get walking() { return !!walking; },
+    get spot() { return curSpot; },
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
     setFirstPerson(on) { fp = !!on; head.visible = hat.visible = !on; tag.visible = !on; torso.visible = !on; lift.legL.visible = lift.legR.visible = !on; for (const a of arms) { a.up.visible = a.lo.visible = a.hand.visible = !on; } },
     onSplash(f) { splashCb = f; }, onRipple(f) { rippleCb = f; },
     frame,
     real,
-    dispose() { world.remove(root, line, rig, fish, net, pole, ...ropes); root.traverse((o) => { o.geometry?.dispose?.(); }); },
+    dispose() { world.remove(root, kit, line, rig, fish, net, pole, ...ropes); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },
   };
 }

@@ -346,6 +346,27 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     ridge(-2000, 2000, -1000, 120, M.far, 8, 300);
   }
 
+  // ---- walking about (walker.js): the real place's own ground, or the drawn place's deck, quay, bank or beach ----
+  let ground = null;
+  if (!pano && real?.ground) ground = real.ground;
+  else if (!pano) {
+    const K = 0.45, edgeFish = (at, face, edge, cast) => ({ at, face, edge: Math.max(0.3, edge), cast });
+    if (venue === "pier") {
+      const hw = L.width / 2;
+      ground = {
+        walkable: (x, z) => Math.abs(x) <= hw - K && z >= L.to + K && z <= L.from,
+        heightAt: (x, z) => (Math.abs(x) <= hw && z >= L.to && z <= L.from ? L.deck : 0),
+        fishHere: (x, z) => { const dl = x + hw, dr = hw - x, de = z - L.to, m = Math.min(dl, dr, de); if (m > 1.6) return null; return m === de ? edgeFish([x, L.deck, z], 0, de, 34) : edgeFish([x, L.deck, z], m === dl ? -Math.PI / 2 : Math.PI / 2, m, 26); },
+      };
+    } else if (venue === "beach") {
+      const h = (z) => Math.max(-2.5, Math.min(5, z * 0.15));
+      ground = { walkable: (x, z) => Math.abs(x) < 300 && z >= 1.5 && z <= 30, heightAt: (x, z) => (z > 0 ? h(z) : 0), ramp: () => true, fishHere: (x, z) => (z < 8 ? edgeFish([x, h(z), z], 0, z, 70) : null) };
+    } else {
+      // a quay (estuary) or a bank (river, lake) along z = 0, the water to the north
+      ground = { walkable: (x, z) => Math.abs(x) < 240 && z >= K && z <= 50, heightAt: (x, z) => (z >= 0 ? L.deck : 0), fishHere: (x, z) => (z < 1.8 ? edgeFish([x, L.deck, z], 0, z, venue === "river" ? 14 : 30) : null) };
+    }
+  }
+
   // ---- the shore map for the water's foam and shallows (real places from their land; drawn places from their layout) ----
   if (!pano && venue !== "beach") {
     const piersNear = (real?.piers || []).filter((pr) => pr.line);
@@ -396,6 +417,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   return {
     group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids,
     floorAt: (x, z) => floorAt(x, z),
+    ground,
     /** The waves as the water shows them right now (eased), so floats and fish ride the same sea. */
     waveState: () => ({ swell: wU.uSwell.value, wind: wU.uWind.value, windDir: [wU.uWindDir.value.x, wU.uWindDir.value.y] }),
     /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM }; facing: bearing of -z */

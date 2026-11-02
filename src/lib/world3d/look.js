@@ -24,6 +24,7 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     start() { s.dragging = true; s.moved = 0; s.vyaw = 0; s.vpitch = 0; s.aim = null; },
     end() { s.dragging = false; },
     zoom(factor) { s.fov = clamp(s.fov / factor, FOV.min, FOV.max); s.touched = performance.now(); },
+    setFov(f) { s.fov = clamp(f, FOV.min, FOV.max); },
     /** turn smoothly to look at a heading (and pitch) */
     aim(yaw, pitch = s.pitch) { s.aim = { yaw: wrap(yaw), pitch: clamp(pitch, -1.25, 1.1) }; s.vyaw = 0; s.vpitch = 0; },
     recenter() { api.aim(s.home.yaw, s.home.pitch); s.fov = FOV.base; s.touched = -1e9; },

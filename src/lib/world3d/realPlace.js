@@ -249,6 +249,7 @@ export function buildRealPlace(group, place, M, solids = []) {
     solids.push(collider(cbp, cbi));
   }
 
+  const jetties = [], fishEdges = []; // for walking about and fishing from anywhere (below)
   // ---- piers drawn as a line (jetties on piles), outlines (breakwaters), groynes ----
   const pileMat = new THREE.MeshStandardMaterial({ color: 0x4a443c, roughness: 0.95 });
   const deckSlab = new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.95, color: 0xdedad2 });
@@ -262,6 +263,8 @@ export function buildRealPlace(group, place, M, solids = []) {
         const [x1, z1] = p.line[k], [x2, z2] = p.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.2) continue;
         const ang = Math.atan2(z2 - z1, x2 - x1), cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
         if (p.kind === "groyne") { const m = new THREE.Mesh(new THREE.BoxGeometry(len, 1.6, w), M.wood); m.position.set(cx, 0.4, cz); m.rotation.y = -ang; group.add(m); continue; }
+        jetties.push({ a: [x1, z1], b: [x2, z2], w, y: deckY });
+        for (const side of [-1, 1]) { const ox = Math.sin(ang) * side * (w / 2), oz = -Math.cos(ang) * side * (w / 2); fishEdges.push([x1 + ox, z1 + oz, x2 + ox, z2 + oz, Math.sin(ang) * side, -Math.cos(ang) * side, "jetty", deckY]); }
         const deck = new THREE.Mesh(new THREE.BoxGeometry(len + 0.05, 0.4, w), deckSlab); deck.position.set(cx, deckY - 0.2, cz); deck.rotation.y = -ang; deck.castShadow = deck.receiveShadow = true; group.add(deck); deck.userData.kind = "a jetty"; targets.push(deck);
         if (nearSpot(cx, cz, NEAR_SOLID + len / 2)) solids.push(deck);
         const sx = Math.sin(ang), sz = -Math.cos(ang);
@@ -288,6 +291,7 @@ export function buildRealPlace(group, place, M, solids = []) {
           let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
           if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], p.ring)) { nx = -nx; nz = -nz; } // outward
           if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], p.ring)) continue; // land, not water, outside
+          fishEdges.push([x1, z1, x2, z2, nx, nz, "pier", p.h]);
           const a2 = [x1 - nx * RAIL.inset, z1 - nz * RAIL.inset], b2 = [x2 - nx * RAIL.inset, z2 - nz * RAIL.inset], np = Math.max(1, Math.round(len / RAIL.post));
           for (let q = 0; q < np; q++) rp.push([a2[0] + (b2[0] - a2[0]) * q / np, a2[1] + (b2[1] - a2[1]) * q / np]);
           for (const y of [RAIL.h, RAIL.h * 0.5]) rr.push({ a: [a2[0], p.h + y, a2[1]], b: [b2[0], p.h + y, b2[1]], r: y === RAIL.h ? 0.026 : 0.018 });
@@ -299,6 +303,36 @@ export function buildRealPlace(group, place, M, solids = []) {
     }
   }
   place.targets = targets;
+
+  // ---- walking about (walker.js) and fishing from where you stand ----
+  // You walk on the land, the piers and the jetties people stand on: never into the water, through a railing (kept
+  // 45 cm in from a wall's edge) or into a building. Moving between decks of different heights (the promenade and a
+  // pier) is taken as a ramp. "Fish here" faces you out over the nearest real water's edge.
+  const KEEP = 0.45;
+  const drawnB = (place.buildings || []).filter((b) => !spots.some((sp) => b.ring.some(([x, z]) => Math.hypot(x - sp.at[0], z - sp.at[2]) < 6))).map((b) => bb(b.ring));
+  const PRh = (place.piers || []).filter((p) => p.ring).map((p) => ({ ...bb(p.ring), h: p.h }));
+  const jettyAt = (x, z) => jetties.find((j) => segDist([x, z], j.a, j.b) < j.w / 2 - KEEP);
+  const allEdges = [...walls.map((e) => [...e.slice(0, 6), "wall", LAND]), ...fishEdges], nearestEdge = segIndex(allEdges);
+  const heightAt = (x, z) => { const j = jettyAt(x, z); if (j) return j.y; const pr = PRh.find((b) => inB([x, z], b)); if (pr) return pr.h; const g = groundAt(x, z); return g || (landAt([x, z]) ? LAND : 0); };
+  const walkable = (x, z) => {
+    if (jettyAt(x, z)) return true;
+    const onPier = PRh.some((b) => inB([x, z], b));
+    if (!onPier && !landAt([x, z])) return false;
+    const e = nearestEdge(x, z); if (e && e.d < KEEP) return false; // the railing
+    return !drawnB.some((b) => inB([x, z], b));
+  };
+  place.ground = {
+    heightAt, walkable,
+    ramp: (x0, z0, x1, z1) => walkable(x1, z1) && Math.abs(heightAt(x1, z1) - heightAt(x0, z0)) < 2.6,
+    /** Fishing from here: the water's edge within reach, which way it faces and how far in front it is. */
+    fishHere(x, z) {
+      const e = nearestEdge(x, z); if (!e || e.d > 1.6) return null;
+      const [, , , , nx, nz] = e.s, y = heightAt(x, z);
+      if (heightAt(x + nx * 10, z + nz * 10) !== 0 && !jettyAt(x + nx * 10, z + nz * 10)) return null; // not water out there
+      if (walkable(x + nx * 12, z + nz * 12) || walkable(x + nx * 20, z + nz * 20)) return null;
+      return { at: [x, y, z], face: Math.atan2(nx, -nz), edge: Math.max(0.3, e.d), cast: 26 };
+    },
+  };
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }
   void PLACE3D;

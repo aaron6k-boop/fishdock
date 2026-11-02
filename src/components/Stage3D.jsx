@@ -7,10 +7,18 @@ import { Icon } from "./ui.jsx";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase }) {
+export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, onToast }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
+  // ---- walking about (Roblox-style): a thumbstick, jump, sprint, and "Fish here" at the water's edge ----
+  const [walk, setWalk] = useState(null), [walkMsg, setWalkMsg] = useState("");
+  const say = (m) => { setWalkMsg(m); setTimeout(() => setWalkMsg((x) => (x === m ? "" : x)), 3200); };
+  const startWalk = () => { const why = w.current?.walk(true); if (why) say(why); else { setMenu(false); say("Walk with the stick; drag to look round. Find the water's edge to fish."); } };
+  const stopWalk = () => w.current?.walk(false);
+  const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
+  const [sprint, setSprint] = useState(false);
+  useEffect(() => { if (!walk) setSprint(false); }, [walk]);
   const [view, setView] = useState(loadView);
   const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "hand") { if (v === "right") document.documentElement.dataset.hand = "right"; else delete document.documentElement.dataset.hand; } };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
@@ -29,9 +37,9 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const [alert, setAlert] = useState(null);
   useEffect(() => { if (!alert) return undefined; const t = setTimeout(() => setAlert(null), 14000); return () => clearTimeout(t); }, [alert]);
   return (
-    <div className="stage3d">
+    <div className={`stage3d${walk ? " walking" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
-      <World3D ref={w} startMode="first" feel={feel} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+      <World3D ref={w} startMode="first" feel={feel} onWalk={setWalk} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
         onPhase={(id, phase, info) => {
           onPhase?.(id, phase, info);
           if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); return; }
@@ -44,7 +52,22 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
           {toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
           {alert ? <button type="button" className="w3d-toast w3d-watch" onClick={() => watchOne(alert.id)}>{alert.name} has a fish on · <b>Watch</b></button> : null}
         </div>
+        {walk ? (
+          <>
+            <Joystick onMove={(x, y) => w.current?.setWalkInput({ x, y, sprint })} />
+            <div className="walk-buttons">
+              <button type="button" className={`walk-btn small${sprint ? " on" : ""}`} aria-pressed={sprint} onClick={() => setSprint(!sprint)}>Sprint</button>
+              <button type="button" className="walk-btn jump" onPointerDown={(e) => { e.preventDefault(); w.current?.jump(); }} aria-label="Jump"><Icon name="jump" /></button>
+            </div>
+            <div className="walk-top">
+              {walk.canFish ? <button type="button" className="walk-prompt" onClick={fishHere}><span className="key">Tap</span>Fish here</button> : null}
+              <button type="button" className="walk-done" onClick={stopWalk}>Back to my spot</button>
+            </div>
+          </>
+        ) : null}
+        {walkMsg ? <div className="walk-msg" role="status">{walkMsg}</div> : null}
         <div className="w3d-tools">
+          {!walk ? <button type="button" className="fs-btn" onClick={startWalk} aria-label="Walk about" title="Walk about"><Icon name="walk" /></button> : null}
           {menu ? (
             <div className="cam-menu" role="menu" aria-label="Camera">
               {MODES.filter(([m]) => m !== "spectator" || others.length).map(([m, l]) => <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} className={`ft-pill${mode === m ? " on" : ""}`} onClick={() => pick(m)}>{l}</button>)}
@@ -60,6 +83,26 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
         </div>
         {card ? <div className="w3d-card"><CatchCard ev={card.ev} demo={demo} compact photoUrl={catchPhoto?.(card.ev)} onClose={() => setCard(null)} who={card.who} /></div> : null}
       </World3D>
+    </div>
+  );
+}
+
+// ---- the thumbstick: drag from its middle; how far you push sets the speed ----
+function Joystick({ onMove }) {
+  const base = useRef(null), [knob, setKnob] = useState([0, 0]), id = useRef(null);
+  const R = 46;
+  const move = (e) => {
+    const r = base.current.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let dx = e.clientX - cx, dy = e.clientY - cy; const d = Math.hypot(dx, dy); if (d > R) { dx *= R / d; dy *= R / d; }
+    setKnob([dx, dy]); onMove(dx / R, -dy / R);
+  };
+  const end = () => { id.current = null; setKnob([0, 0]); onMove(0, 0); };
+  return (
+    <div ref={base} className="joystick" role="application" aria-label="Walk: drag the stick"
+      onPointerDown={(e) => { e.preventDefault(); id.current = e.pointerId; base.current.setPointerCapture(e.pointerId); move(e); }}
+      onPointerMove={(e) => { if (id.current === e.pointerId) move(e); }}
+      onPointerUp={end} onPointerCancel={end}>
+      <div className="joystick-knob" style={{ transform: `translate(${knob[0]}px, ${knob[1]}px)` }} />
     </div>
   );
 }

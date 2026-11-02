@@ -394,3 +394,21 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 .w3d-src .ft-pill.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: var(--action); }
 .w3d-label a { color: #e6f3f7; pointer-events: auto; }
 .immersive.ui-hidden .w3d-src { opacity: 0; pointer-events: none; }
+
+/* ---- walking about (Stage3D): thumbstick bottom left, jump and sprint bottom right, prompts at the top ---- */
+.stage3d.walking .fs-bottom, .stage3d.walking .w3d-card, .stage3d.walking .w3d-tools { display: none; }
+.joystick { position: absolute; z-index: 6; left: max(18px, env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 128px; height: 128px; border-radius: 50%; background: radial-gradient(circle, #ffffff1f, #ffffff0d 70%); border: 2px solid #ffffff40; touch-action: none; display: grid; place-items: center; }
+.joystick-knob { width: 58px; height: 58px; border-radius: 50%; background: #ffffffd9; box-shadow: 0 4px 14px #0006; transition: transform .05s; pointer-events: none; }
+.walk-buttons { position: absolute; z-index: 6; right: max(18px, env(safe-area-inset-right)); bottom: calc(30px + env(safe-area-inset-bottom)); display: flex; align-items: flex-end; gap: 12px; }
+.walk-btn { border: 2px solid #ffffff55; background: #0a141bb3; color: #fff; border-radius: 50%; width: 74px; height: 74px; display: grid; place-items: center; font-weight: 700; touch-action: none; }
+.walk-btn.small { width: 56px; height: 56px; font-size: 12px; }
+.walk-btn.on { background: var(--action); color: #04201d; border-color: transparent; }
+.walk-btn.jump svg { width: 30px; height: 30px; }
+.walk-top { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 96px); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.walk-top button { pointer-events: auto; }
+.walk-prompt { display: flex; align-items: center; gap: 10px; padding: 10px 18px 10px 10px; border-radius: 14px; border: 0; background: #0a141be6; color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 6px 20px #0008; animation: prompt-in .25s ease both; }
+.walk-prompt .key { background: #fff; color: #0a141b; border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+@keyframes prompt-in { from { transform: scale(.85); opacity: 0; } }
+.walk-done { border: 1px solid #ffffff40; background: #0a141bb3; color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 13px; }
+.walk-msg { position: absolute; z-index: 7; left: 50%; transform: translateX(-50%); bottom: calc(170px + env(safe-area-inset-bottom)); max-width: 86%; text-align: center; padding: 8px 14px; border-radius: 12px; background: #0a141be6; color: #fff; font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .walk-prompt { animation: none; } }
