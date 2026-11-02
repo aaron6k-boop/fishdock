@@ -12,7 +12,7 @@ import { play, soundPan, soundOn, soundOff, soundEnv } from "../lib/sceneAudio.j
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
 // from where they happen: your friend's reel from their side, quieter further away) ----
 const VIEW_KEY = "fishdock.view3d.v1";
-export const VIEW_DEFAULTS = { track: true, spatial: true };
+export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left" };
 export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
@@ -101,8 +101,10 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
   // ---- touch and mouse: drag to look, pinch or wheel to zoom, double tap to recentre ----
   useEffect(() => {
     const el = canvas.current; if (!el) return undefined;
-    const pts = new Map(); let pinch = 0;
-    const down = (e) => { el.setPointerCapture?.(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) W.current?.look.start(); if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
+    const pts = new Map(); let pinch = 0, stopping = false;
+    // a touch while the view is still turning (after a flick, or steering itself) just stops it: it isn't a tap, so it
+    // doesn't show or hide the controls by accident
+    const down = (e) => { el.setPointerCapture?.(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) { const st = W.current?.look.state(); stopping = !!st && (Math.abs(st.vyaw) > 0.05 || Math.abs(st.vpitch) > 0.05 || !!st.aim); W.current?.look.start(); } if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
     const move = (e) => {
       if (!pts.has(e.pointerId)) return;
       const p = pts.get(e.pointerId), dx = e.clientX - p[0], dy = e.clientY - p[1]; pts.set(e.pointerId, [e.clientX, e.clientY]);
@@ -115,7 +117,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
       if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId);
       if (pts.size === 0) {
         const L = W.current?.look; L?.end();
-        if (L && L.state().moved < 8) { clearTimeout(tapTimer); if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330); }
+        if (L && L.state().moved < 8 && !stopping) { clearTimeout(tapTimer); if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330); }
       }
       pinch = 0;
     };

@@ -97,7 +97,7 @@ export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = 
         {art ? <img className={`cc-art${own ? " small" : ""}`} src={art} alt="" /> : ph ? <img className={`cc-art photo${own ? " small" : ""}`} src={photoUrl(ph, 500)} alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" /> : null}
       </div>
       <div className="cc-body">
-        <span className="cc-kicker">{demo ? "Demo · not logged" : sim ? `${who ? `${who}'s simulated` : "Simulated"} catch · not a real record` : `${who ? `${who} · ` : ""}Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
+        <span className="cc-kicker">{demo ? "Demo · not logged" : sim ? `${who ? `${who} · ` : ""}Simulated · not a real record` : `${who ? `${who} · ` : ""}Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
         <h3>{name}</h3>
         <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released && !demo && !sim ? " · Released" : ""}</p>
         {d.bait ? <p className="tiny">On {d.bait}</p> : null}

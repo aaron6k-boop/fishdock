@@ -55,11 +55,12 @@ button.fs-chip { cursor: pointer; }
 .catch-card { position: relative; width: min(520px, 100%); display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: #0d171ef2; border: 1px solid #ffffff1c; box-shadow: 0 24px 60px #000c; color: var(--text); animation: fs-rise .55s cubic-bezier(.2, 1.1, .3, 1) both; }
 @keyframes fs-rise { from { transform: translateY(18px) scale(.96); opacity: 0; } }
 .catch-card.compact { max-height: 100%; flex-direction: row; align-items: stretch; width: min(560px, 100%); }
-.catch-card.compact .cc-pics { flex: 1.15; min-height: 0; }
+.catch-card.compact .cc-pics { flex: 0.95; min-height: 0; }
 /* "safe" so text taller than the card starts at the top and scrolls, never clipped at both ends (that cut
    "Demo catch · not logged" down to "LOGGED") */
 .catch-card.compact .cc-body { flex: 1; justify-content: safe center; overflow-y: auto; padding: 12px 12px 12px 10px; }
 .catch-card.compact .cc-body h3 { font-size: 21px; }
+.catch-card.compact .cc-kicker { font-size: 10.5px; letter-spacing: .04em; padding-right: 30px; }
 .catch-card.compact .cc-facts { font-size: 13.5px; }
 .catch-card.compact .cc-own img { max-height: none; height: 100%; }
 .catch-card.compact .cc-own { height: 100%; }
@@ -319,10 +320,14 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .fs-btn.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: color-mix(in srgb, var(--action) 60%, transparent); }
 .cam-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: #0a141be6; border: 1px solid #ffffff26; }
 .cam-menu button { text-align: left; }
+/* controls on the right (for a right thumb): Cast, Strike and Reel bottom right, the camera tools bottom left */
+html[data-hand="right"] .fs-bottom { align-self: flex-end; align-items: flex-end; }
+html[data-hand="right"] .fish-tray { flex-direction: row-reverse; }
+html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
 .cam-sep { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid #ffffff26; }
 /* the catch card sits under the top bar: the landed fish (in the hands, or the net) is in the lower part of the view */
 .w3d-card { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 50px); padding: 0 12px; pointer-events: none; display: flex; justify-content: center; }
-.w3d-card .catch-card.compact { max-height: 132px; }
+.w3d-card .catch-card.compact { max-height: 156px; } /* room for the line saying what it is; the scene stays clear below */
 .w3d-watch { pointer-events: auto; cursor: pointer; border-color: #7ee8de88; font: inherit; font-size: 13px; }
 .w3d-watch b { color: #7ee8de; }
 .w3d-card .catch-card { pointer-events: auto; }

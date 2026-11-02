@@ -12,7 +12,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
   const [view, setView] = useState(loadView);
-  const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); };
+  const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "hand") { if (v === "right") document.documentElement.dataset.hand = "right"; else delete document.documentElement.dataset.hand; } };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
   useEffect(() => { if (watching && mode !== "spectator" && mode !== "cinematic") { const t = setTimeout(() => pick("spectator"), 600); return () => clearTimeout(t); } return undefined; }, [watching]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -50,6 +50,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               {MODES.filter(([m]) => m !== "spectator" || others.length).map(([m, l]) => <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} className={`ft-pill${mode === m ? " on" : ""}`} onClick={() => pick(m)}>{l}</button>)}
               <hr className="cam-sep" />
               <button type="button" role="menuitemcheckbox" aria-checked={view.track} className={`ft-pill${view.track ? " on" : ""}`} onClick={() => setOpt("track", !view.track)} title="The camera turns to a leaping fish, unless you're moving the view yourself">Follow jumps</button>
+              <button type="button" role="menuitemcheckbox" aria-checked={view.hand === "right"} className={`ft-pill${view.hand === "right" ? " on" : ""}`} onClick={() => setOpt("hand", view.hand === "right" ? "left" : "right")} title="Cast, Strike and Reel at the bottom right, for your right thumb">Controls on the right</button>
               {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
           ) : null}
