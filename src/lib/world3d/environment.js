@@ -19,7 +19,7 @@ vec3 skyBase(vec3 d){
   float h = clamp(d.y, -.2, 1.);
   vec3 dayTop = vec3(.25, .48, .80), dayHor = vec3(.70, .80, .88);
   vec3 duskTop = vec3(.20, .24, .45), duskHor = vec3(.98, .58, .34);
-  vec3 nightTop = vec3(.010, .016, .035), nightHor = vec3(.04, .05, .08);
+  vec3 nightTop = vec3(.016, .024, .05), nightHor = vec3(.08, .09, .13);
   float t = pow(max(h, 0.), .45);
   vec3 c = mix(dayHor, dayTop, t)*uDay + mix(duskHor, duskTop, pow(max(h, 0.), .35))*uDusk + mix(nightHor, nightTop, t)*uNight;
   // the warm glow round a low sun
@@ -158,7 +158,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1 } = {}) {
         vec3 r = reflect(-v, n); r.y = abs(r.y);
         float F = .02 + .98*pow(1. - max(dot(n, v), 0.), 5.);
         vec3 refl = skyColour(normalize(r));
-        float lit = uDay + uDusk*.6 + uNight*.08;
+        float lit = uDay + uDusk*.6 + uNight*.16;
         vec3 body = uWater*lit*(.75 + .35*smoothstep(-.3, .4, vH));
         vec3 col = mix(body, refl, clamp(F*1.1, 0., .9));
         // the sun's (or moon's) glitter
@@ -202,7 +202,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1 } = {}) {
     lampGlow: new THREE.MeshBasicMaterial({ color: 0xffe0a0 }),
   };
   const box = (w, h, d, mat, x, y, z, parent = group) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; };
-  const lamps = [];
+  const lamps = [], pointLights = [];
   const buildings = (x0, x1, z0, z1, n, seed = 1) => {
     // a town's worth of simple houses and flats, roofs and lit windows at night
     const win = canvasTex(64, 64, (g) => { g.fillStyle = "#cfc7b8"; g.fillRect(0, 0, 64, 64); g.fillStyle = "#3a4450"; for (let y = 8; y < 64; y += 20) for (let x = 8; x < 64; x += 20) g.fillRect(x, y, 10, 12); });
@@ -246,6 +246,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1 } = {}) {
     for (let z = L.to + 8; z < L.from; z += 16) { // lamp posts
       const p = box(0.14, 4.5, 0.14, M.rail, -L.width / 2 + 0.6, L.deck + 2.25, z);
       const g = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), M.lampGlow); g.position.set(-L.width / 2 + 0.9, L.deck + 4.5, z); group.add(g); lamps.push(g); p.castShadow = false;
+      if (z < 0 && z > -50) { const pl = new THREE.PointLight(0xffd9a0, 0, 26, 1.6); pl.position.set(-L.width / 2 + 0.9, L.deck + 4.3, z); group.add(pl); pointLights.push(pl); }
     }
     const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 6, 12), M.white); beacon.position.set(-3, L.deck + 3, L.to + 2.5); beacon.castShadow = true; group.add(beacon);
     const top = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 1.4, 12), M.red); top.position.set(-3, L.deck + 6.7, L.to + 2.5); group.add(top);
@@ -324,10 +325,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1 } = {}) {
       sun.color.setRGB(1, 0.92 - dusk * 0.3, 0.82 - dusk * 0.45).lerp(new THREE.Color(0.55, 0.62, 0.8), night);
       sun.intensity = (2.4 * day + 1.2 * dusk + 0.25 * night * U.uMoonLight.value) * (1 - cloud * 0.6) * (1 - r * 0.3);
       hemi.intensity = 0.25 + 0.75 * day + 0.35 * dusk; hemi.color.setRGB(0.7 + 0.1 * day, 0.8, 0.95).multiplyScalar(1 - 0.2 * cloud); hemi.groundColor.setRGB(0.25, 0.22, 0.18);
-      if (night > 0.6) hemi.intensity = 0.12 + 0.1 * U.uMoonLight.value;
+      if (night > 0.6) hemi.intensity = 0.32 + 0.18 * U.uMoonLight.value; // enough to see by: moonlight, the town's glow, the pier's lamps
       // the haze matches the horizon's colour, closer in rain
       const hz = new THREE.Color().setRGB(0.70, 0.8, 0.88).multiplyScalar(day).add(new THREE.Color(0.95, 0.6, 0.4).multiplyScalar(dusk)).add(new THREE.Color(0.04, 0.05, 0.08).multiplyScalar(night)).lerp(new THREE.Color(0.6, 0.63, 0.66).multiplyScalar(day + dusk * 0.5 + night * 0.06), cloud > 0.55 ? (cloud - 0.55) * 1.6 : 0);
       scene.fog.color.copy(hz); scene.fog.far = 2600 - r * 1900; scene.fog.near = 200 - r * 150; wU.uFogC.value.copy(hz); wU.uFogFar.value = scene.fog.far;
+      for (const pl of pointLights) pl.intensity = (night * 1 + dusk * 0.3) * 60;
       for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = night * 0.9 + dusk * 0.3; else m.visible = night + dusk > 0.3; }
       rainAmt = r; rain.visible = r > 0; rain.material.opacity = 0.18 + r * 0.3;
       return { day, dusk, night, cloud, rain: r, wind };

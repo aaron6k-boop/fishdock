@@ -19,6 +19,9 @@ import { handleFishInfo } from "../../server/fishinfo.js";
 import { handlePlaces } from "../../server/places.js";
 import { handleLive } from "../../server/live.js";
 import { handleScene } from "../../server/scene.js";
+import { handleParty } from "../../server/party.js";
+import { localPartyNamespace } from "../helpers/party.js";
+import { acceptWebSocket } from "./ws.mjs";
 
 const port = Number(process.argv[2] || 8792);
 // --dist serves the production build (dist/, as Cloudflare Pages would); otherwise the single-file e2e build.
@@ -33,8 +36,9 @@ function staticFile(pathname) {
   }
   return { type: "text/plain", body: "not found" };
 }
-const env = { DB: createD1(":memory:"), ADMIRALTY_API_KEY: "test-key", GEMINI_API_KEY: "test-key", ADMIN_EMAILS: "admin@fishdock.example" };
-const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater, fishinfo: handleFishInfo, places: handlePlaces, live: handleLive, scene: handleScene };
+const PARTY = localPartyNamespace();
+const env = { PARTY, DB: createD1(":memory:"), ADMIRALTY_API_KEY: "test-key", GEMINI_API_KEY: "test-key", ADMIN_EMAILS: "admin@fishdock.example" };
+const HANDLERS = { conditions: handleConditions, tides: handleTides, river: handleRiver, ai: handleAi, sync: handleSync, community: handleCommunity, feedback: handleFeedback, metrics: handleMetrics, admin: handleAdmin, water: handleWater, fishinfo: handleFishInfo, places: handlePlaces, live: handleLive, scene: handleScene, party: handleParty };
 
 // ---- outside services, shaped like the real ones ----
 const now = Date.now();
@@ -75,7 +79,7 @@ globalThis.fetch = async (input, init) => {
   return new Response("not stubbed", { status: 599 });
 };
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
   const m = url.pathname.match(/^\/api\/([a-z]+)/);
   if (!m) { const f = staticFile(url.pathname); res.writeHead(200, { "content-type": f.type }); res.end(f.body); return; }
@@ -90,4 +94,16 @@ createServer(async (req, res) => {
     res.writeHead(r.status, Object.fromEntries(r.headers));
     res.end(Buffer.from(await r.arrayBuffer()));
   } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: "server_error", message: e.message })); }
-}).listen(port, () => console.log(`FishDock e2e on http://localhost:${port}`));
+});
+// Fish Together's live connections: the same checks as the Worker (same origin, a member's key), then the party
+server.on("upgrade", async (req, socket) => {
+  const url = new URL(req.url, `http://localhost:${port}`), m = url.pathname.match(/^\/api\/party\/([A-Z0-9]{6})\/ws$/);
+  const origin = req.headers.origin ? new URL(req.headers.origin).host : "";
+  if (!m || origin !== req.headers.host) { socket.end("HTTP/1.1 403 Forbidden\r\n\r\n"); return; }
+  const ws = acceptWebSocket(req, socket);
+  const conn = await PARTY.connect(m[1], url.searchParams.get("m") || "", ws);
+  if (!conn) { ws.close(4003, "not a member"); return; }
+  ws.onmessage = (t) => conn.send(t);
+  ws.onclose = () => conn.close();
+});
+server.listen(port, () => console.log(`FishDock e2e on http://localhost:${port}`));

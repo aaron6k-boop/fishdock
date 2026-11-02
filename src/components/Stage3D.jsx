@@ -1,6 +1,6 @@
 // ---- Stage3D: the 3D view with its small tools: camera modes, Look at my rod, Watch a friend, the catch card ----
 // Used by the demo and by Fish Together. The overlay (`children`) is the page's own top bar and fishing tray.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import World3D from "./World3D.jsx";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
@@ -11,6 +11,9 @@ export default function Stage3D({ venue, anglers, light, cond, facing, quality =
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
+  // someone who isn't fishing watches from behind an angler rather than standing nowhere
+  const watching = !anglers.some((a) => a.local) && anglers.length > 0;
+  useEffect(() => { if (watching && mode !== "spectator" && mode !== "cinematic") { const t = setTimeout(() => pick("spectator"), 600); return () => clearTimeout(t); } return undefined; }, [watching]); // eslint-disable-line react-hooks/exhaustive-deps
   const pick = (m) => { setMode(m); w.current?.setMode(m); setMenu(false); if (m === "spectator" && others[0]) { const id = watch || others[0].id; setWatch(id); w.current?.focus(id); } };
   const watchNext = () => {
     if (!others.length) return;
@@ -20,7 +23,8 @@ export default function Stage3D({ venue, anglers, light, cond, facing, quality =
   };
   return (
     <div className="stage3d">
-      <World3D ref={w} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now} onPhase={onPhase}
+      <World3D ref={w} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+        onPhase={(id, phase, info) => { onPhase?.(id, phase, info); if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); } }}
         onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (a?.local || (mode === "spectator" && watch === id)) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
         <div className="fs-overlay">{children}</div>
         <div className="w3d-toasts" aria-live="polite">{toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}</div>

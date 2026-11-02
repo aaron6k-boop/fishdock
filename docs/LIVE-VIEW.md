@@ -155,6 +155,48 @@ nothing is caught or logged; its settings come up in a sheet. A viewer sees what
 casts, bites and catches, and buttons for the catches and the full timeline, which open in a sheet without stopping
 the live scene. Safe areas are respected, so nothing sits under the iPhone's bars.
 
+## The 3D view (Beta)
+
+`src/lib/world3d/` (three.js, loaded only when the 3D view opens; the photo view stays the default for real places).
+
+- A representative place for each kind (`spots.js`): a stone pier with railings, lamps, a beacon, the beach beside
+  it, a town and a headland; a beach with groynes and dunes; an estuary quay with the far bank; a river bank with
+  trees and reeds; a lake with wooden swims. Labelled on screen as a 3D drawing, not the real place.
+- `environment.js`: one sky shader (sun, moon, stars, drifting cloud, overcast and rain greys) used for the sky and
+  the water's reflections; water with long swells and wind waves running with the wind, ripples, rain rings, shore
+  foam and whitecaps; lights and haze from the same conditions; rain streaks; pier lamps at night.
+- `angler.js`: each angler's body, clothes (five outfits), rod (by place: beach caster, pier rod, float rod, feeder
+  rod) on a tripod, rest or railing, reel, line, float or lead, landing net or drop net, and the fish (the same
+  cut-out based 3D fish as the photo view). It animates from the angler's own events with the same rules as the
+  photo view (bites by species, fights by profile, landings by place), so every phone shows the same moment.
+- `look.js`: 360° look-around (drag, pinch or wheel, double tap to recentre, inertia, keyboard arrows); `world.js`:
+  camera modes (first person, third person, spectator, cinematic, free look), Look at my rod, Watch a friend,
+  splashes and rings, adaptive quality (Performance, Balanced, High Quality) and no drawing while hidden.
+
+## Fish Together (Beta)
+
+`server/party.js`, `worker/party-do.js`, `src/lib/party.js`, `src/pages/Together.jsx`, `src/pages/Party.jsx`.
+
+- A party is one Cloudflare Durable Object (SQLite-backed, hibernating WebSockets) named by its six-character code.
+  Up to four anglers at the place's four spots, plus spectators (twelve people in all). Only events travel: casts,
+  bites, fish on, catches, reactions, chat and the voice set-up. Each phone animates them.
+- Two kinds, never mixed: virtual (the simulation; the server marks every catch simulated and enforces the order:
+  no strike before a bite, no landing before a fish is on) and real trips (people actually fishing log what
+  happens, with an optional photo; others watch reconstructions; each angler says if they're at the water).
+- Private by default: joining needs the invite link (code and secret, also as a QR code) or, while the host allows
+  it, the short code. The host can turn the code off, make a new link (old links stop working), lock the party, stop
+  new anglers, turn chat or voice off, move or remove people, set the time of day (virtual), start a one-hour
+  challenge and close the party. Parties end after 2, 6, 12 or 24 hours; storage is deleted a day later.
+- No positions anywhere: a party knows the kind of place and the name the host gives it. Member keys are stored
+  hashed; network addresses only as the usual daily keyed hashes for rate limits.
+- Reconnecting: the phone reconnects by itself (and when the screen comes back on), gets everything it missed, and
+  sends events queued while offline once each (the server drops repeats by their ids). Spots are kept ten minutes.
+- Voice: opt-in WebRTC between phones (perfect negotiation), public STUN only; mute, push to talk, per-person
+  volume and mute, a speaking light, and text chat as the fallback. Without a TURN relay some mobile networks won't
+  connect; adding Cloudflare's TURN key would fix that. Block hides someone's chat and voice on your phone; Report
+  is kept with the party for review.
+- The local test server runs parties in memory with a small WebSocket server (`tests/e2e/ws.mjs`).
+
 ## Phone limits
 
 Phones pause web apps when the screen locks or another app is in front: no GPS, no events, no pushes. FishDock
@@ -171,6 +213,12 @@ catches up the moment FishDock is open again, and viewers are told the phone has
 - `tests/sceneMotion.test.js`: every pictured species has a fight profile; rod load by size and weight; demo fight
   lengths; the landing's beats in order and always within the landing phase at every kind of place; each place's
   way of landing a fish.
+- `tests/world3d.test.js`: the spots (apart, on the deck, lines never landing together, host assignment) and the
+  look-around (full turns, pitch limits, inertia, double tap, aiming the short way round, compass points).
+- `tests/party.test.js`: starting and joining, wrong and old secrets, code joining off, locking, four anglers at most,
+  the virtual rules and simulated catches, duplicates, real trips and photos, host controls, chat, voice relay,
+  reports, reconnecting, leaving, ending on time, leaderboards, the socket's origin check.
+- `tests/qr.test.js`: the invite QR code.
 - `tests/viewpoint.test.js`: where a photo was taken from; which viewpoints suit each place; real photos'
   measurements judged (a level open view passes; a town seen from above, a view looking down and a tilted field
   don't); levelling.

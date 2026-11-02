@@ -24,6 +24,8 @@ const Settings = lazy(() => import("./pages/Settings.jsx"));
 const Admin = lazy(() => import("./pages/Admin.jsx"));
 const Watch = lazy(() => import("./pages/Watch.jsx"));
 const TryLive = lazy(() => import("./pages/TryLive.jsx"));
+const Together = lazy(() => import("./pages/Together.jsx"));
+const Party = lazy(() => import("./pages/Party.jsx"));
 
 const TABS = [
   { id: "home", label: "Home", icon: "home" },
@@ -68,13 +70,21 @@ const watchToken = () => (location.hash.match(/^#\/?watch\/([A-Za-z0-9_-]{30,64}
 // The labelled demo of the Live Fishing View: #try, #try/<place>, #try/<place>/<species>, and /3d on the end opens
 // the 360° 3D view.
 const tryRoute = () => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?$/); return m ? { place: m[1] === "3d" ? null : m[1] || null, species: m[2] === "3d" ? null : m[2] || null, view3d: !!m[3] } : null; };
+// Fish Together: #together (start, join, continue) and a party, #party/<code>/<secret> (or /code, or just the code to
+// come back to one this phone has joined).
+const togetherRoute = () => /^#\/?together$/.test(location.hash);
+const partyRoute = () => { const m = location.hash.match(/^#\/?party\/([A-Z0-9]{6})(?:\/([A-Za-z0-9_-]{4,40}))?$/); return m ? { code: m[1], secret: m[2] || null } : null; };
 export default function Root() {
+  const [tg, setTg] = useState(togetherRoute), [party, setParty] = useState(partyRoute);
+  useEffect(() => { const on = () => { setTg(togetherRoute()); setParty((p) => { const n = partyRoute(); return n && p && n.code === p.code ? p : n; }); }; addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
   const [token, setToken] = useState(watchToken);
   const [demo, setDemo] = useState(tryRoute);
   useEffect(() => { const on = () => { setToken(watchToken()); setDemo((d) => { const n = tryRoute(); return n && d ? d : n; }); }; addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
-  useEffect(() => { if (token || demo) applyTheme(loadSettings().theme); }, [token, !!demo]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (token || demo || tg || party) applyTheme(loadSettings().theme); }, [token, !!demo, tg, !!party]); // eslint-disable-line react-hooks/exhaustive-deps
   const wait = <div className="watch-shell"><div className="watch-msg"><span className="loading-dots" aria-label="Loading" /></div></div>;
   if (token) return <Suspense fallback={wait}><Watch token={token} /></Suspense>;
+  if (party) return <Suspense fallback={wait}><Party key={party.code} code={party.code} secret={party.secret} /></Suspense>;
+  if (tg) return <Suspense fallback={wait}><Together /></Suspense>;
   if (demo) return <Suspense fallback={wait}><TryLive initialPlace={demo.place} initialSpecies={demo.species} /></Suspense>;
   return <App />;
 }

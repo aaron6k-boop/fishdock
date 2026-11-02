@@ -21,6 +21,7 @@ import { spotById } from "../data/spots.js";
 import { SPECIES, speciesById } from "../data/species.js";
 import { hasArt, artUrl } from "../data/fishart.js";
 import ASTRO from "../lib/astro.js";
+import { timeFor } from "../lib/timeOfDay.js";
 import { Icon, Seg } from "../components/ui.jsx";
 
 const GORLESTON = { id: "gorleston-south-pier", name: "Gorleston South Pier", region: "Norfolk, East of England", kind: "sea", type: "pier", lat: 52.5733, lon: 1.7375 };
@@ -34,17 +35,6 @@ const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", labe
 const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, overcast: { windKph: 14, cloudPct: 100, precipMm: 0 }, drizzle: { windKph: 16, cloudPct: 95, precipMm: 0.4 }, rain: { windKph: 30, cloudPct: 100, precipMm: 4 } };
 
 /** A time today that gives the chosen light at this place, found from the real sun. */
-function timeFor(choice, place) {
-  if (choice === "now") return Date.now();
-  const day = new Date(); day.setUTCHours(0, 0, 0, 0);
-  let best = Date.now(), score = Infinity;
-  for (let m = 0; m < 24 * 60; m += 10) {
-    const t = day.getTime() + m * 60e3, a = ASTRO.sunPos(t, place.lat, place.lon).alt, pm = m >= 12 * 60;
-    const s = choice === "midday" ? -a : choice === "morning" ? (pm ? Infinity : Math.abs(a - 8)) : choice === "dusk" ? (pm ? Math.abs(a + 1) : Infinity) : (pm ? Math.abs(a + 18) : Infinity);
-    if (s < score) { score = s; best = t; }
-  }
-  return best;
-}
 
 export default function TryLive({ initialPlace, initialSpecies }) {
   const [placeId, setPlaceId] = useState(TRY_PLACES.includes(initialPlace) ? initialPlace : GORLESTON.id);
@@ -164,6 +154,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             <div className="try-head">
               <h1>Try the Live Fishing View</h1>
               <p className="small muted">A demo: nothing here is a real session or a real catch, and nothing is saved or shared.</p>
+              <a className="btn small" href="#together"><Icon name="users" />Fish Together with friends (Beta)</a>
             </div>
             <button type="button" className="xbtn sheet-x" onClick={() => setSheet(false)} aria-label="Close settings"><Icon name="close" /></button>
           </div>
