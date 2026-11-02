@@ -10,6 +10,7 @@ import { createEnvironment } from "./environment.js";
 import { createAngler } from "./angler.js";
 import { createLook, lookAt, wrap } from "./look.js";
 import { layoutFor } from "./spots.js";
+import { planCast } from "./castAim.js";
 
 export const QUALITY3D = { performance: { dpr: 1.25, shadows: 0, q: 0.5 }, balanced: { dpr: 2, shadows: 1, q: 1 }, high: { dpr: 2, shadows: 1, q: 2 } };
 export function autoQuality3d() {
@@ -74,6 +75,21 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   }
   const ripples = [];
   const ripple = (at, s = 0.6) => { ripples.push([at.x, at.z, 0, s]); if (ripples.length > 8) ripples.shift(); };
+
+  // ---- aiming a cast: a ring on the water where it will land, while you hold Cast ----
+  const aimMark = new THREE.Group(); aimMark.visible = false; scene.add(aimMark);
+  {
+    const m = new THREE.MeshBasicMaterial({ color: 0x7ee8de, transparent: true, opacity: 0.85, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.11, 6, 40), m); ring.rotation.x = Math.PI / 2; aimMark.add(ring);
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.18, 16), m); dot.rotation.x = -Math.PI / 2; aimMark.add(dot);
+    aimMark.renderOrder = 5;
+  }
+  let aimPower = null;
+  function castPlanFor(power) {
+    const me = anglers.get(localId); if (!me?.out || W) return null;
+    const spot = me.a.spot, ground = env.ground;
+    return planCast({ venue, spot: { ...spot, at: me.out.at.toArray(), face: me.out.face }, power, lookYaw: look.yaw, wind: { strength: envState.wind, dir: envState.windDir }, water: ground ? (x, z) => !ground.walkable(x, z) : null });
+  }
 
   // ---- anglers ----
   function setAnglers(list) {
@@ -301,6 +317,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (meK.out.kept && meK.out.kept !== "gone") kept = { state: meK.out.kept };
     }
     const view = updateCamera(t, dt || 0.016);
+    if (aimPower != null) { const pl = castPlanFor(aimPower); aimMark.visible = !!pl; if (pl) { aimMark.position.set(pl.point[0], 0.03, pl.point[1]); const k = (1.2 + pl.dist / 40) * (1 + 0.08 * Math.sin(t * 6)); aimMark.scale.set(k, 1, k); } } else aimMark.visible = false;
     // droplets fall back, rings spread
     for (let k = 0; k < DROPS; k++) {
       if (dropLife[k] <= 0) { dropPos[k * 3 + 1] = -50; continue; }
@@ -358,6 +375,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     get walking() { return !!W; },
     /** Someone talking (voice chat): a light above their head. */
     setSpeaking(id, on) { anglers.get(id)?.a.setSpeaking(on); },
+    /** Aiming a cast while Cast is held: power 0..1 shows where it would land (null hides it). Returns the plan. */
+    aimCast(power) { aimPower = power == null ? null : power; return power == null ? null : castPlanFor(power); },
+    /** The cast for this power and where you're looking now: { dist, aim, power }, or null (not fishing here). */
+    castParams(power) { const p = castPlanFor(power); return p ? { dist: p.dist, aim: p.aim, power: p.power } : null; },
+    /** Your fight's state (tap reeling, reelModel.js): the 3D fish, rod and reel follow it. */
+    setFight(f) { anglers.get(localId)?.a.setFight(f); },
     /** Your own angler waves, cheers or claps. */
     emote(kind) { anglers.get(localId)?.a.emote(kind); },
     /** Your landed fish: hold it up for a look (inspect), keep it, or put it back. */

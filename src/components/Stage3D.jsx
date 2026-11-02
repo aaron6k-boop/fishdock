@@ -2,13 +2,14 @@
 // Used by the demo and by Fish Together. The overlay (`children`) is the page's own top bar and fishing tray.
 import { useEffect, useRef, useState } from "react";
 import World3D, { loadView, saveView } from "./World3D.jsx";
+import { WorldCtx } from "./WorldContext.js";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
 import { speciesById } from "../data/species.js";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote }) {
+export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -56,7 +57,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   return (
     <div className={`stage3d${walk ? " walking" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
-      <World3D ref={w} startMode="first" feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
+      <World3D ref={w} fight={fight} startMode="first" feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} quality={quality} sound={sound} now={now}
         onPhase={(id, phase, info) => {
           onPhase?.(id, phase, info);
           if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); return; }
@@ -65,7 +66,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
         }}
         onKept={setKept} onFishTap={() => openInspect()}
         onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (alert?.id === id) setAlert(null); if (a?.local && a.inspect) { setLanded({ ev, key: `${id}|${ev?.id || ev?.t}` }); return; } if (a?.local || watch === id) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
-        <div className="fs-overlay">{children}</div>
+        <div className="fs-overlay"><WorldCtx.Provider value={w}>{children}</WorldCtx.Provider></div>
         <div className="w3d-toasts" aria-live="polite">
           {toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
           {alert ? <button type="button" className="w3d-toast w3d-watch" onClick={() => watchOne(alert.id)}>{alert.name} has a fish on · <b>Watch</b></button> : null}
@@ -94,6 +95,11 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               <hr className="cam-sep" />
               <button type="button" role="menuitemcheckbox" aria-checked={view.track} className={`ft-pill${view.track ? " on" : ""}`} onClick={() => setOpt("track", !view.track)} title="The camera turns to a leaping fish, unless you're moving the view yourself">Follow jumps</button>
               <button type="button" role="menuitemcheckbox" aria-checked={view.hand === "right"} className={`ft-pill${view.hand === "right" ? " on" : ""}`} onClick={() => setOpt("hand", view.hand === "right" ? "left" : "right")} title="Cast, Strike and Reel at the bottom right, for your right thumb">Controls on the right</button>
+              {reelOpts ? <>
+                <hr className="cam-sep" />
+                <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.assisted} className={`ft-pill${reelOpts.assisted ? " on" : ""}`} onClick={() => onReelOpts?.({ assisted: !reelOpts.assisted })} title="One tap starts winding at a steady rate, another stops it, instead of tapping again and again">Assisted reeling</button>
+                <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.advanced} className={`ft-pill${reelOpts.advanced ? " on" : ""}`} onClick={() => onReelOpts?.({ advanced: !reelOpts.advanced })} title="Set the drag yourself while you fight a fish: too tight and the line can break">Advanced fight</button>
+              </> : null}
               {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
           ) : null}

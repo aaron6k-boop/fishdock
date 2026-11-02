@@ -85,6 +85,7 @@ export function patternFor(name, d = {}) {
     }
     case "run": return seq([22, 40, 0.6, 0.8], [40, 30, 0.75, 0.7], [18, 0, 0.5, 0.8]); // a sudden dash or a leap
     case "reel": return seq([10, 0, 0.2 + 0.25 * Math.min(1, d.load || 0.5), 0.6]);    // reeling under load
+    case "reelTap": return seq([8, 0, 0.14 + 0.22 * Math.min(1, d.load || 0.4), 0.7]); // one tap of the reel: a small click, firmer under load
     case "landed": return seq([30, 60, 0.6, 0.6], [30, 60, 0.6, 0.6], [90, 0, 0.9, 0.4]); // a short, satisfying finish
     case "lost": return seq([90, 150, 0.7, 0.2], [20, 0, 0.3, 0.6]);                  // the line falling slack
     case "friendJoined": return seq([14, 0, 0.3, 0.6]);
@@ -109,8 +110,8 @@ const PARTY = new Set(["friendJoined", "friendHooked", "reaction", "invite"]);
 // taps, surges or reeling the animation fills in between)
 export const RECORDED = new Set(["bite", "hooked", "landed", "lost", "missed", "alert", "button"]);
 // the shortest time between two of the same kind, so nothing becomes a buzz
-const GAP = { tap: 140, pull: 1200, run: 900, reel: 1600, friendJoined: 8000, friendHooked: 15000, reaction: 6000, invite: 6000, release: 400, splashdown: 400 };
-const SAVER_SKIP = new Set(["release", "splashdown", "tap", "reel", "reaction", "friendJoined"]);
+const GAP = { tap: 140, pull: 1200, run: 900, reel: 1600, reelTap: 170, friendJoined: 8000, friendHooked: 15000, reaction: 6000, invite: 6000, release: 400, splashdown: 400 };
+const SAVER_SKIP = new Set(["release", "splashdown", "tap", "reel", "reelTap", "reaction", "friendJoined"]);
 export const BUDGET_MS = { normal: 4000, saver: 1500 }; // most vibration in any minute
 
 /** The Vibration API's on/off list for a pattern at a strength (the API can't set motor strength, so the presets

@@ -235,15 +235,28 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   }
 
   // ---- placing the angler ----
+  let events = [];
+  // the fight as you reel it (tap reeling, reelModel.js), for your own angler: how far in the fish is, the line's
+  // tension, the drag slipping, the handle's turns. Others' fights follow their events' times
+  let fightIn = null, lastTurns = 0, lastDragSound = 0;
   let face = 0, at = new THREE.Vector3(), castAt = new THREE.Vector3(), nearAt = new THREE.Vector3(), edge = 1;
   // `edge`: how far in front of the angler the pier, quay or bank ends (the water starts). The fish comes up a little
   // beyond it, never under the deck, so it can be seen being landed
   const REACH = { beach: 1, pier: 2.4, estuary: 2.0, river: 1.4, lake: 1.4 };
   const EDGE = { beach: 6, pier: 0.9, estuary: 1.2, river: 2.2, lake: 2.0 };
   let curSpot = spot;
+  // a cast with its own distance and aim (hold-to-cast in the 3D view): the rig lands there instead of the spot's usual
+  // place. The newest cast in the angler's events decides
+  function castFromEvents() {
+    const ev = [...(events || [])].reverse().find((e) => e.type === "cast");
+    const d = ev?.data;
+    if (!d || !Number.isFinite(d.dist)) return;
+    const a = face + (Number.isFinite(d.aim) ? d.aim : 0);
+    castAt.set(at.x + Math.sin(a) * d.dist, 0, at.z - Math.cos(a) * d.dist);
+  }
   function place(s) {
     curSpot = s; face = s.face; at.set(...s.at); root.position.copy(at); root.rotation.y = -face; kit.position.copy(at); kit.rotation.y = -face;
-    const c = castPoint(s); castAt.set(c[0], 0, c[2]);
+    const c = castPoint(s); castAt.set(c[0], 0, c[2]); castFromEvents();
     const [dx, dz] = dirOf(face);
     edge = Number.isFinite(s.edge) ? s.edge : EDGE[venue] ?? 1;
     // a real pier's railing stands 22 cm in from its edge: the rod leans on its top rail
@@ -257,7 +270,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const spr = { k: 0, kv: 0, tip: 0, tipv: 0 };
   const spring = (key, vkey, target, w, z, dt) => { const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n; for (let i = 0; i < n; i++) { const a = w * w * (target - spr[key]) - 2 * z * w * spr[vkey]; spr[vkey] += a * h; spr[key] += spr[vkey] * h; } };
 
-  let events = [], lastKey = "", P = {}, seed = rng(1), splashCb = null, rippleCb = null, prevAge = 0, fightPos = null, landStart = null, hintFish = null;
+  let lastKey = "", P = {}, seed = rng(1), splashCb = null, rippleCb = null, prevAge = 0, fightPos = null, landStart = null, hintFish = null;
   // the fish you've landed, until you decide: lying in the net (deck), held up for a look (inspect), going back in
   // (release), or kept (gone: the catch card shows it)
   let kept = null;
@@ -321,7 +334,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // the fish fights its own way (fightProfile): divers bore down and hold, fish of the upper water run fast and
       // erratically, bass and garfish leap clear, flatfish swing in slow wide arcs, rays sit deep and heavy, eels make
       // the tip pump. The rod follows it, bent by how hard it's pulling
-      const st = fightStyle(prof), pr = 1 - Math.exp(-age / (16 * prof.long));
+      const fl = fightIn && performance.now() - fightIn.at < 1500 ? fightIn : null;
+      const st = fightStyle(prof), pr = fl ? clamp(fl.progress, 0, 1) : 1 - Math.exp(-age / (16 * prof.long));
       const run = n1(age * 0.22 * prof.tempo * st.runSpeed + P.s1), surge = Math.max(0, Math.sin(age * 0.95 * prof.tempo + n1(age * 0.3 + P.s2) * 2.2)) ** 6;
       const f = castAt.clone().lerp(nearAt, pr * 0.85);
       const [dx, dz] = dirOf(face), side = [-dz, dx];
@@ -345,14 +359,21 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (surgeNow > 0.6 && (P.lastSurge ?? 0) <= 0.6) feel("pull", { tension: load * (0.72 + 0.4 * surgeNow) * st.heavy, surge: surgeNow });
       P.lastSurge = surgeNow;
       fightPos = f; rigAt = f; slack = 0;
-      const tension = load * (0.72 + 0.4 * surge) * st.heavy;
+      const tension = fl ? (0.35 + 1.05 * fl.tension) * Math.max(0.8, load) : load * (0.72 + 0.4 * surge) * st.heavy;
       bendT = 0.16 + 0.26 * tension; tipT = 0.05 * surge + (st.pump ? 0.05 * Math.max(0, Math.sin(age * 5.5)) : 0);
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
       fpE = 0.5 + 0.1 * surge; fpYaw = clamp(run * 0.22 * st.runWidth, -0.3, 0.3);
       P.tension = tension;
-      if (crossed(0.02)) { onSound?.("reelOn", at); feel("hooked", {}, true); }
+      if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); feel("hooked", {}, true); }
+      if (fl) {
+        // the handle turns as you tap; each half turn clicks; the drag giving line ratchets and the tip shivers
+        if (Math.floor(fl.turns * 2) > Math.floor(lastTurns * 2)) onSound?.("reelTap", at);
+        lastTurns = fl.turns;
+        if (fl.slipping && t - lastDragSound > 0.3) { lastDragSound = t; onSound?.("drag", at); spr.tipv += 0.6; }
+      }
       if (!st.leaps && prof.splashy > 0.3 && Math.floor(age * 0.5 + P.s1) !== Math.floor((age - dt) * 0.5 + P.s1) && seed() < prof.splashy * 0.5 && age > 2) { const sp = f.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.35 + prof.splashy * 0.4); rippleCb?.(sp, 0.5); onSound?.("splash", sp); }
-      reel.userData.spin = (reel.userData.spin || 0) + dt * 12;
+      if (fl) { const want = fl.turns * Math.PI * 2; reel.userData.spin = (reel.userData.spin || 0) + (want - (reel.userData.spin || 0)) * Math.min(1, dt * 14); }
+      else reel.userData.spin = (reel.userData.spin || 0) + dt * 12;
     } else if (ph === "landing") {
       // up from wherever the fight had got to, through the surface, then landed this place's way
       const { T1, T2, T3, T4, swingIn, card } = LT;
@@ -608,7 +629,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   return {
     id, root,
     get local() { return local; },
-    setEvents(list) { events = list || []; },
+    setEvents(list) { const before = events; events = list || []; if (events.length !== before.length) castFromEvents(); },
+    setFight(f) { fightIn = f ? { ...f, at: performance.now() } : null; },
     setHint(h) { hintFish = h || null; },
     setName(n) { const old = tag; const s = label(n || "Angler", local ? "#7ee8de" : "#ffffff"); s.position.copy(old.position); s.visible = old.visible; root.remove(old); old.material.map.dispose(); old.material.dispose(); root.add(s); tag = s; },
     place,

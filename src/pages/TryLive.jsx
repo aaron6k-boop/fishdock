@@ -144,7 +144,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
             </div>
             <div className="fs-bottom">
-              <FishTray phase={p.phase} last={last} reel={vf.reel} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onHold={(on) => { vf.hold(on); haptics.reeling(on && p.phase === "hooked", { load: 0.7, species: sp.id }); }} onNudge={vf.nudge} onStop={vf.stop} />
+              <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
     </>
   );
@@ -153,7 +153,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D feel={haptics.feel} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (

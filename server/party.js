@@ -166,6 +166,11 @@ export class PartyRoom {
     const type = ev?.type, d = ev?.data || {};
     if (!EVENT_TYPES.includes(type)) return null;
     const out = { type, cid: typeof ev.cid === "string" ? ev.cid.slice(0, 40) : null };
+    // a virtual cast's distance and aim (where the rig landed in the 3D place), so everyone sees it land there
+    if (type === "cast" && this.s.mode === "virtual") {
+      const dist = Number(d.dist), aim = Number(d.aim);
+      if (Number.isFinite(dist) && dist >= 2 && dist <= 150) out.data = { dist: Math.round(dist * 10) / 10, aim: Number.isFinite(aim) ? Math.max(-0.5, Math.min(0.5, Math.round(aim * 1000) / 1000)) : 0 };
+    }
     if (type === "catch") {
       const len = Number(d.lengthCm), kg = Number(d.weightKg);
       out.data = {

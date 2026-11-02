@@ -288,3 +288,14 @@ test("an angler's look: small whole numbers, cleaned, shared with the party; any
   const sam = them.last("hello").members.find((m) => m.name === "Sam");
   assert.equal(sam.look, null, "an out-of-range look isn't kept");
 });
+
+test("a virtual cast keeps its distance and aim (cleaned); a real trip's cast carries none", async () => {
+  const room = new PartyRoom();
+  await room.init({ code: "GHJ234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const host = Object.values(room.s.members)[0]; host.spot = host.spot || 1;
+  const r = room.message(host.id, { t: "event", ev: { type: "cast", data: { dist: 33.27, aim: 0.9, extra: 1 } } }, 2000);
+  assert.deepEqual(r.out[0].msg.ev.data, { dist: 33.3, aim: 0.5 });
+  const real = new PartyRoom(); await real.init({ code: "KLM234", mode: "real", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const rh = Object.values(real.s.members)[0]; rh.spot = rh.spot || 1;
+  assert.equal(real.message(rh.id, { t: "event", ev: { type: "cast", data: { dist: 30 } } }, 2000).out[0].msg.ev.data, null);
+});

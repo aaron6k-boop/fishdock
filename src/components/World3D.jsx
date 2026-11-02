@@ -16,7 +16,7 @@ export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left" };
 export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
@@ -101,6 +101,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
     return () => { gone = true; w?.dispose(); W.current = null; setReady(false); };
   }, [venue, quality, real, panoOn]);
 
+  useEffect(() => { W.current?.setFight(fight); }, [fight, ready]);
   useEffect(() => { W.current?.setAnglers(anglers); setOthers(anglers.filter((a) => !a.local).map((a) => ({ id: a.id, name: a.name }))); }, [anglers, ready]);
   useEffect(() => { if (ready) W.current?.setEnv({ light, cond, facing: facingNow }); }, [ready, JSON.stringify(light), JSON.stringify(cond), facingNow]); // eslint-disable-line react-hooks/exhaustive-deps
   // the same sound as the photo view: the water, wind, rain and gulls for these conditions
@@ -153,7 +154,8 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
     inspectFish: (on) => W.current?.inspectFish(on), keepFish: () => W.current?.keepFish(), releaseFish: () => W.current?.releaseFish(),
     setSpeaking: (id, on) => W.current?.setSpeaking(id, on),
     walk: (on) => W.current?.walk(on), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
-    onPose: (f) => W.current?.onPose(f), emote: (k) => W.current?.emote(k), setRemotePose: (id, p) => W.current?.setRemotePose(id, p),
+    onPose: (f) => W.current?.onPose(f), emote: (k) => W.current?.emote(k),
+    aimCast: (p) => W.current?.aimCast(p), castParams: (p) => W.current?.castParams(p), setRemotePose: (id, p) => W.current?.setRemotePose(id, p),
     get walkState() { return walk; },
     focus: (id) => W.current?.focus(id), follow: (id, sec) => W.current?.follow(id, sec), recenter: () => W.current?.look.recenter(), snapshot: () => W.current?.snapshot(),
     get mode() { return mode; },
