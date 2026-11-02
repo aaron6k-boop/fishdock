@@ -37,16 +37,16 @@ function normalFrom(hf, w, h, strength = 2) {
 function greyTex(vals, w, h) { const c = canvas(w, h), g = c.getContext("2d"), img = g.createImageData(w, h); for (let i = 0; i < w * h; i++) { const v = Math.max(0, Math.min(255, vals[i] * 255)); img.data.set([v, v, v, 255], i * 4); } g.putImageData(img, 0, 0); return toTex(c, { srgb: false }); }
 
 // ---- weathered concrete: one tile covers 8 m; faint expansion joints every 4 m, aggregate, stains and hairline cracks ----
-export function concrete({ size = 512, seed = 3, tint = [158, 154, 146] } = {}) {
+export function concrete({ size = 256, seed = 3, tint = [158, 154, 146] } = {}) {
   const n = size, col = canvas(n), g = col.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n), rough = new Float32Array(n * n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const u = x / n, v = y / n, i = y * n + x;
-    const stain = fbm(u * 6, v * 6, 6, seed, 5), blotch = fbm(u * 2, v * 2, 2, seed + 9, 3);
+    const stain = fbm(u * 6, v * 6, 6, seed, 4), blotch = fbm(u * 2, v * 2, 2, seed + 9, 2);
     const grit = hash(x, y, seed), pit = 0; // (no pock marks: at this scale they read as a pattern of holes)
     // joints: a shallow groove every half tile, slightly wavy so it doesn't read as a drawn grid
-    const jx = Math.abs(((u * 2 + fbm(v * 4, 0.5, 4, seed + 4, 2) * 0.004) % 1 + 1) % 1 - 0.5), jy = Math.abs(((v * 2 + fbm(u * 4, 0.3, 4, seed + 5, 2) * 0.004) % 1 + 1) % 1 - 0.5);
+    const jx = Math.abs(((u * 2 + noise2(v * 4, 0.5, 4, seed + 4) * 0.004) % 1 + 1) % 1 - 0.5), jy = Math.abs(((v * 2 + noise2(u * 4, 0.3, 4, seed + 5) * 0.004) % 1 + 1) % 1 - 0.5);
     const joint = Math.max(0, 1 - Math.min(jx, jy) * n / 1.6) * (Math.min(jx, jy) > 0.48 ? 1 : 0);
-    const crack = Math.abs(fbm(u * 3, v * 3, 3, seed + 7, 4) - 0.5) < 0.006 && fbm(u * 1.5, v * 1.5, 1.5, seed + 8, 2) > 0.55 ? 1 : 0;
+    const crack = Math.abs(fbm(u * 3, v * 3, 3, seed + 7, 3) - 0.5) < 0.008 && noise2(u * 1.5, v * 1.5, 1.5, seed + 8) > 0.55 ? 1 : 0;
     let L = 0.9 + (stain - 0.5) * 0.28 + (blotch - 0.5) * 0.18 + (grit - 0.5) * 0.06 - pit * 0.18 - joint * 0.2 - crack * 0.07;
     const warm = (blotch - 0.5) * 10;
     img.data.set([tint[0] * L + warm, tint[1] * L + warm * 0.6, tint[2] * L, 255], i * 4);
@@ -60,7 +60,7 @@ export function concrete({ size = 512, seed = 3, tint = [158, 154, 146] } = {}) 
 // ---- steel sheet piling under a concrete cap: one tile = 4 pans (about 2.4 m) wide and the wall's full height ----
 // v: 0 at the bottom (below the water) to 1 at the top of the cap. The cap is the top 11%; under it rust, streaks,
 // a dark wet band and weed round the waterline (v about 0.45 to 0.55)
-export function sheetPiling({ w = 256, h = 512, seed = 5, water = 0.5 } = {}) {
+export function sheetPiling({ w = 128, h = 256, seed = 5, water = 0.5 } = {}) {
   const col = canvas(w, h), g = col.getContext("2d"), img = g.createImageData(w, h), hf = new Float32Array(w * h), rough = new Float32Array(w * h);
   const cap = 0.89;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -71,7 +71,7 @@ export function sheetPiling({ w = 256, h = 512, seed = 5, water = 0.5 } = {}) {
       const c = 0.86 + (fbm(u * 8, v * 8, 8, seed + 3, 3) - 0.5) * 0.25 - (v < cap + 0.02 ? 0.25 : 0);
       r = 168 * c; gg = 164 * c; b = 156 * c; hh = 0.5 + (v < cap + 0.01 ? -0.6 : 0); ro = 0.9;
     } else {
-      const streak = fbm(u * 24, v * 2, 24, seed, 3), rust = fbm(u * 6, v * 6, 6, seed + 1, 4);
+      const streak = fbm(u * 24, v * 2, 24, seed, 2), rust = fbm(u * 6, v * 6, 6, seed + 1, 3);
       const wet = Math.max(0, 1 - Math.abs(v - water) / 0.12), weed = v < water + 0.04 ? Math.min(1, (water + 0.04 - v) / 0.08) : 0;
       const shade = 0.72 + prof * 0.28;
       r = (110 + rust * 60 - streak * 25) * shade; gg = (66 + rust * 28 - streak * 12) * shade; b = (44 + rust * 12) * shade;
@@ -97,7 +97,7 @@ export function facade(kind = "brick", seed = 7) {
     // the wall itself
     const img = g.createImageData(T, T);
     for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
-      let L = 0.94 + (fbm((x0 + x) / 40, y / 40, 512 / 40, seed, 3) - 0.5) * 0.18 - (y > T - 3 ? 0.1 : 0);
+      let L = 0.94 + (fbm((x0 + x) / 40, y / 40, 512 / 40, seed, 2) - 0.5) * 0.18 - (y > T - 3 ? 0.1 : 0);
       if (kind === "brick") { const row = Math.floor(y / 5), off = row % 2 ? 6 : 0, mortar = y % 5 === 0 || (x + off) % 12 === 0; L *= mortar ? 1.35 : 0.9 + hash(Math.floor((x + off) / 12), row, seed) * 0.22; }
       if (kind === "cladding") { const p = (x % 10) / 10; L *= p < 0.2 ? 0.8 : 1.02; }
       if (kind === "render") L *= 0.97 + hash(x >> 2, y >> 2, seed) * 0.04;
@@ -132,14 +132,14 @@ export function facade(kind = "brick", seed = 7) {
 
 // ---- roofs: slate (grey-blue) or clay tiles (red-brown), one tile = about 3 m square ----
 export function roof(kind = "slate", seed = 11) {
-  const n = 256, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n);
+  const n = 128, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n);
   const base = kind === "slate" ? [78, 84, 92] : kind === "felt" ? [62, 62, 60] : [150, 72, 50];
   const rows = kind === "felt" ? 1 : 16, cols = kind === "slate" ? 10 : 14;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const r = Math.floor((y / n) * rows), off = r % 2 ? 0.5 : 0, cIdx = Math.floor((x / n) * cols + off), fy = ((y / n) * rows) % 1;
     const tileV = kind === "felt" ? 0 : 0.85 + hash(cIdx, r, seed) * 0.3;
     const edge = kind === "felt" ? 0 : fy < 0.12 ? 0.6 : 1, gap = kind === "felt" ? 1 : ((x / n) * cols + off) % 1 < 0.04 ? 0.7 : 1;
-    const moss = fbm(x / 64, y / 64, 4, seed, 3) > 0.68 ? 0.25 : 0;
+    const moss = fbm(x / 32, y / 32, 4, seed, 2) > 0.68 ? 0.25 : 0;
     const L = (kind === "felt" ? 0.9 + hash(x, y, seed) * 0.15 : tileV) * edge * gap;
     img.data.set([base[0] * L * (1 - moss) + 70 * moss, base[1] * L * (1 - moss) + 86 * moss, base[2] * L * (1 - moss) + 40 * moss, 255], (y * n + x) * 4);
     hf[y * n + x] = fy * (kind === "felt" ? 0 : 1) * gap;
@@ -150,8 +150,8 @@ export function roof(kind = "slate", seed = 11) {
 
 // ---- a ground detail map with no joints (sand, grass, gravel: the colour comes from the ground's vertex colours) ----
 export function detail(seed = 13) {
-  const n = 256, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n);
-  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = 0.86 + fbm(x / 32, y / 32, 8, seed, 4) * 0.2 + (hash(x, y, seed) - 0.5) * 0.1; img.data.set([255 * v, 255 * v, 255 * v, 255], (y * n + x) * 4); hf[y * n + x] = hash(x, y, seed); }
+  const n = 128, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = 0.86 + fbm(x / 16, y / 16, 8, seed, 3) * 0.2 + (hash(x, y, seed) - 0.5) * 0.1; img.data.set([255 * v, 255 * v, 255 * v, 255], (y * n + x) * 4); hf[y * n + x] = hash(x, y, seed); }
   g.putImageData(img, 0, 0);
   return { map: toTex(c), normalMap: normalFrom(hf, n, n, 0.8) };
 }

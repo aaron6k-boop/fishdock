@@ -254,7 +254,8 @@ export function buildRealPlace(group, place, M, solids = []) {
   const deckSlab = new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.95, color: 0xdedad2 });
   for (const p of place.piers) {
     if (p.line) {
-      const deckY = p.kind === "groyne" ? 1.2 : Math.min(p.h, LAND + 0.6), w = p.kind === "groyne" ? 0.5 : Math.min(p.width, 6);
+      // the deck at the height and width the anglers' spots use (osmPlace: p.h, and half the width less 60 cm from the middle)
+      const deckY = p.kind === "groyne" ? 1.2 : p.h, w = p.kind === "groyne" ? 0.5 : p.width;
       for (let k = 0; k < p.line.length - 1; k++) {
         const [x1, z1] = p.line[k], [x2, z2] = p.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.2) continue;
         const ang = Math.atan2(z2 - z1, x2 - x1), cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
@@ -276,6 +277,22 @@ export function buildRealPlace(group, place, M, solids = []) {
       const sh = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
       const geo = new THREE.ExtrudeGeometry(sh, { depth: p.h - WALL_BOTTOM, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, WALL_BOTTOM, 0);
       const m = new THREE.Mesh(geo, [deckSlab, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 })]); m.castShadow = m.receiveShadow = true; group.add(m); targets.push(m);
+      // railings round its edge where it meets the water, near the anglers
+      if (p.kind === "pier" || p.kind === "quay") {
+        const rp = [], rr = [];
+        for (let k = 0; k < p.ring.length; k++) {
+          const [x1, z1] = p.ring[k], [x2, z2] = p.ring[(k + 1) % p.ring.length], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.5) continue;
+          if (Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > RAIL.within) continue;
+          let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
+          if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], p.ring)) { nx = -nx; nz = -nz; } // outward
+          if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], p.ring)) continue; // land, not water, outside
+          const a2 = [x1 - nx * RAIL.inset, z1 - nz * RAIL.inset], b2 = [x2 - nx * RAIL.inset, z2 - nz * RAIL.inset], np = Math.max(1, Math.round(len / RAIL.post));
+          for (let q = 0; q < np; q++) rp.push([a2[0] + (b2[0] - a2[0]) * q / np, a2[1] + (b2[1] - a2[1]) * q / np]);
+          for (const y of [RAIL.h, RAIL.h * 0.5]) rr.push({ a: [a2[0], p.h + y, a2[1]], b: [b2[0], p.h + y, b2[1]], r: y === RAIL.h ? 0.026 : 0.018 });
+        }
+        if (rp.length) { const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 8), railMat, rp.length), mx = new THREE.Matrix4(); rp.forEach(([x, z], q) => { mx.makeTranslation(x, p.h + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); group.add(pm); }
+        if (rr.length) { const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8), railMat, rr.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0); rr.forEach(({ a: A0, b: B0, r }, q) => { const A = new THREE.Vector3(...A0), Bv = new THREE.Vector3(...B0), d = Bv.clone().sub(A), L2 = d.length(); mx.compose(A.clone().add(Bv).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(up, d.normalize()), new THREE.Vector3(r, L2 + 0.06, r)); rm.setMatrixAt(q, mx); }); group.add(rm); }
+      }
       if (ring.some(([x, z]) => nearSpot(x, z, NEAR_SOLID + 60))) solids.push(m);
     }
   }

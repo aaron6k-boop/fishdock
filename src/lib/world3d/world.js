@@ -36,7 +36,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   renderer.shadowMap.enabled = !!Q.shadows; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 5000);
+  const tBuild = performance.now();
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano });
+  const buildMs = Math.round(performance.now() - tBuild);
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   const realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
@@ -227,6 +229,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // for visual checks: turn the view to a compass heading (degrees; a real place has north up) and pitch at once
       view(yawDeg, pitch = -0.08) { const s = look.state(); look.aim((yawDeg * Math.PI) / 180, pitch); for (let i = 0; i < 40; i++) look.step(0.1); look.end(); return { yaw: look.yaw, pitch: look.pitch, was: s.yaw }; },
       get camera() { return camera; },
+      buildMs,
       at(x, y, z) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); },
     };
   }
