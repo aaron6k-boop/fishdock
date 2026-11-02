@@ -96,7 +96,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const hat = part(new THREE.SphereGeometry(0.125, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mHat, 0, 1.63, -0.01);
   const limb = (r, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, 1, 8), mat); m.castShadow = true; body.add(m); return m; };
   const arms = [0, 1].map(() => ({ up: limb(0.06, mJacket), lo: limb(0.05, mJacket), hand: part(new THREE.SphereGeometry(0.05, 8, 6), mSkin, 0, 0, 0) }));
-  const tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, 2.05, 0); root.add(tag);
+  let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, 2.05, 0); root.add(tag);
   const lift = { legL, legR, torso, head, hat };
 
   // ---- the rod: sections along a bending curve, a reel, a rest or tripod ----
@@ -468,7 +468,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     get local() { return local; },
     setEvents(list) { events = list || []; },
     setHint(h) { hintFish = h || null; },
-    setName(n) { const old = tag; const s = label(n || "Angler", local ? "#7ee8de" : "#ffffff"); s.position.copy(old.position); root.remove(old); old.material.map.dispose(); old.material.dispose(); root.add(s); },
+    setName(n) { const old = tag; const s = label(n || "Angler", local ? "#7ee8de" : "#ffffff"); s.position.copy(old.position); s.visible = old.visible; root.remove(old); old.material.map.dispose(); old.material.dispose(); root.add(s); tag = s; },
     place,
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
     setFirstPerson(on) { fp = !!on; head.visible = hat.visible = !on; tag.visible = !on; torso.visible = !on; lift.legL.visible = lift.legR.visible = !on; for (const a of arms) { a.up.visible = a.lo.visible = a.hand.visible = !on; } },
