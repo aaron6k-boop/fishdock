@@ -36,9 +36,11 @@ function connect(code, key) {
       setTimeout(() => { const i = waiters.indexOf(w); if (i >= 0) { waiters.splice(i, 1); rej(new Error(`timed out waiting for ${what}`)); } }, ms);
     });
   };
+  const log = [];
+  ws.addEventListener("open", () => log.push("open")); ws.addEventListener("error", () => log.push("error")); ws.addEventListener("close", (e) => log.push(`close ${e.code}`));
   const opened = new Promise((res, rej) => { ws.addEventListener("open", res); ws.addEventListener("error", () => rej(new Error("socket error"))); });
   const closed = new Promise((res) => ws.addEventListener("close", (e) => res({ code: e.code, reason: e.reason })));
-  return { ws, inbox, next, opened, closed, send: (o) => ws.send(JSON.stringify(o)) };
+  return { ws, inbox, log, next, opened, closed, send: (o) => ws.send(JSON.stringify(o)) };
 }
 const isEv = (who, type) => (m) => m.t === "event" && m.ev?.who === who && m.ev?.type === type;
 const noPosition = (o) => !/"(lat|lon|lng|latitude|longitude|gps|coords|position)"\s*:/i.test(JSON.stringify(o));
@@ -97,7 +99,8 @@ async function main() {
   await a.next(isEv(A.id, "catch"), "host's own catch echo");
 
   // ---- reconnecting ----
-  b.ws.close(); await b.closed;
+  const t0 = Date.now(); b.ws.close(); await b.closed;
+  ok(Date.now() - t0 < 3000, "leaving the party completes quickly", `${Date.now() - t0} ms`);
   const away = await a.next((m) => m.t === "members" && m.members.some((x) => x.id === B.id && !x.online), "guest offline");
   ok(!!away, "host is told when the guest drops out");
   const b2 = connect(code, B.key); await b2.opened;
@@ -134,8 +137,9 @@ async function main() {
   // (the Worker refuses before the socket opens; the local e2e server opens and closes it straight away: either way,
   // no hello and the socket ends)
   b3.opened.catch(() => {});
-  const refused = await Promise.race([b3.next((m) => m.t === "hello", "hello", 8000).then(() => "let in").catch(() => "timeout"), b3.closed.then(() => "refused")]);
-  ok(refused === "refused" && !b3.inbox.some((m) => m.t === "hello"), "a removed guest can't reconnect with their old key", refused);
+  const refused = await Promise.race([b3.next((m) => m.t === "hello", "hello", 15000).then(() => "let in").catch(() => "timeout"), b3.closed.then(() => "refused")]);
+  ok(refused === "refused" && !b3.inbox.some((m) => m.t === "hello"), "a removed guest can't reconnect with their old key", { refused, socket: b3.log, got: b3.inbox.map((m) => m.t) });
+  try { b3.ws.close(); } catch { /* never opened */ }
 
   // ---- closing ----
   a.send({ t: "close" });

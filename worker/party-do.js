@@ -34,7 +34,11 @@ export class FishParty {
     return res;
   }
   async webSocketMessage(ws, message) { await this.host.onMessage(ws, message); }
-  async webSocketClose(ws) { await this.host.onClose(ws); }
+  // answer the closing handshake, or the phone waits (about 10 s) for a reply before it counts itself disconnected
+  async webSocketClose(ws, code, reason) {
+    try { ws.close(code === 1005 || code === 1006 || !code ? 1000 : code, "bye"); } catch { /* already closed */ }
+    await this.host.onClose(ws);
+  }
   async webSocketError(ws) { await this.host.onClose(ws); }
   async alarm() { await this.ctx.storage.deleteAll(); }
 }
