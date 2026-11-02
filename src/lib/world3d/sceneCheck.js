@@ -16,7 +16,9 @@ export function checkScene(place, targets) {
     for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2, d = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)); for (const hgt of [0.4, 1.0, SCENE_CHECK.eye]) { const h = hit(new THREE.Vector3(x, y + hgt, z), d, SCENE_CHECK.clear); if (h) { why.push(`${sp.name}: something within ${SCENE_CHECK.clear} m`); k = 99; break; } } }
     if (hit(eye, new THREE.Vector3(0, 1, 0), SCENE_CHECK.above)) why.push(`${sp.name}: something overhead`);
     let blocked = 0, n = 0;
-    for (const m of SCENE_CHECK.view) for (const s of SCENE_CHECK.spread) {
+    // across a river: past the bank (from a 2.2 m bank the water right below it is out of sight), short of the far bank
+    const dists = place.venue === "river" || place.venue === "lake" ? [8, 11, 14] : SCENE_CHECK.view;
+    for (const m of dists) for (const s of SCENE_CHECK.spread) {
       const dir = f.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), s), target = new THREE.Vector3(x + dir.x * m, 0.05, z + dir.z * m), v = target.clone().sub(eye), L = v.length();
       n++; if (hit(eye, v.normalize(), L - 0.4)) blocked++;
     }
