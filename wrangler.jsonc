@@ -17,11 +17,10 @@
   },
   "observability": { "enabled": true },
   // FishDock's own D1 database (never DetectDock's). The schema creates itself on the first request.
-  // Fish Together needs a Durable Object binding here (one per party, SQLite-backed, hibernating sockets):
-  //   "durable_objects": { "bindings": [{ "name": "PARTY", "class_name": "FishParty" }] },
-  //   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FishParty"] }],
-  // It's left out until the account's deploy accepts it (the first attempt failed in Cloudflare's deploy step); without
-  // it, /api/party answers that Fish Together isn't switched on yet.
+  // Fish Together: one Durable Object per party (SQLite-backed, which the Free plan supports), with hibernating sockets.
+  // v1 was first applied by the production deploy of c104c95. Migrations only ever get added after it, never edited.
+  "durable_objects": { "bindings": [{ "name": "PARTY", "class_name": "FishParty" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FishParty"] }],
   "d1_databases": [
     { "binding": "DB", "database_name": "fishdock", "database_id": "d6a8e717-4f54-460f-b5c4-6e6c55f206ba" }
   ]

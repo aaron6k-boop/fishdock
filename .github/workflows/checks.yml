@@ -19,3 +19,24 @@ jobs:
       - run: node --test tests/*.test.js
       - run: node tools/check-data.mjs
       - run: npm run build
+  party:
+    # Fish Together in Cloudflare's own runtime (workerd, via wrangler dev, with local D1 and Durable Objects): two members
+    # start, join, fish, reconnect and use the host controls. This shows the Worker and the Durable Object run together;
+    # it doesn't prove the live site works (that's checked against the deployed site after each deploy).
+    name: Fish Together in workerd
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - name: Start wrangler dev
+        run: |
+          npx --yes wrangler@4 dev --port 8787 --ip 127.0.0.1 > wrangler.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -H 'x-fishdock: 1' http://127.0.0.1:8787/api/health > /dev/null && break; sleep 2; done
+          curl -s -H 'x-fishdock: 1' http://127.0.0.1:8787/api/health | head -c 300; echo
+      - run: node tools/party-smoke.mjs http://127.0.0.1:8787
+      - if: always()
+        run: tail -60 wrangler.log
