@@ -21,6 +21,14 @@ page.on("websocket", (ws) => { log("socket opened"); ws.on("close", () => log("s
 const shot = async (name) => { await page.screenshot({ path: `shots/${name}.png` }).catch((e) => log("screenshot failed", e.message)); log(`screenshot ${name}`); };
 const text = async () => (await page.locator("body").innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 400);
 const visible = (loc) => loc.isVisible().catch(() => false);
+// tap like a finger: first check nothing covers the button's centre (the Strike button pulses, so the usual "wait until
+// it stops moving" check never passes), then tap
+async function tapUncovered(loc, what) {
+  await loc.waitFor({ timeout: 15000 });
+  const covered = await loc.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return top && !el.contains(top) ? (top.className || top.tagName).toString().slice(0, 80) : null; });
+  if (covered) log(`WARNING ${what} is covered by: ${covered}`);
+  await loc.tap({ force: true });
+}
 
 try {
   // ---- join ----
@@ -36,13 +44,13 @@ try {
 
   // ---- fish: cast, strike, reel ----
   const tray = page.getByRole("group", { name: "Fishing controls" });
-  await tray.getByRole("button", { name: "Cast" }).click();
+  await tapUncovered(tray.getByRole("button", { name: "Cast" }), "Cast");
   log("cast");
   await page.waitForTimeout(2500); await shot("03-cast");
   const strike = tray.getByRole("button", { name: "Strike" });
   await strike.waitFor({ timeout: 90000 });
   log("bite showing"); await shot("04-bite");
-  await strike.click(); log("struck");
+  await tapUncovered(strike, "Strike"); log("struck");
   const reel = tray.locator(".ft-reel");
   await reel.waitFor({ timeout: 15000 });
   const box = await reel.boundingBox();

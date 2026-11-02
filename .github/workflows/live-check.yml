@@ -16,6 +16,7 @@ jobs:
       - run: node tools/party-browser-guest.mjs "https://fishdock.aaron6k.workers.dev/#party/UUBKCQ/zBJMQ-F7Az0lX0sz" 7
       - if: always()
         uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: guest-shots
           path: shots/
