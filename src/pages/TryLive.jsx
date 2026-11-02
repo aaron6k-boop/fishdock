@@ -123,7 +123,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
 
   const venue = from === "auto" ? venueOf(place) : from;
   const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
-  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: 0, local: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length]);
+  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: 0, local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length]);
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (
     <>

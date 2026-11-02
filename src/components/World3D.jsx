@@ -16,13 +16,13 @@ export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left" };
 export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
   const [walk, setWalk] = useState(null); // { on, canFish, sprint } while walking about
   useEffect(() => { props.current.onWalk?.(walk); }, [walk]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk };
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk, onKept, onFishTap };
   const phases = useRef({});
   // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
   const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
@@ -81,7 +81,9 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
         w.setNow(() => props.current.now());
         w.setAnglers(props.current.anglers);
         if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
-        w.onFrame(({ outs, view, walk: wk }) => {
+        let keptWas = null;
+        w.onFrame(({ outs, view, walk: wk, kept }) => {
+          const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
           setWalk((o) => (!wk ? (o ? null : o) : !o || o.canFish !== wk.canFish || o.sprint !== wk.sprint ? wk : o));
           setHeading((h) => { const deg = Math.round(((props.current.facing + (view.yaw * 180) / Math.PI) % 360 + 360) % 360); return Math.abs(deg - h) >= 2 ? deg : h; });
           for (const [id, o] of Object.entries(outs)) {
@@ -123,6 +125,8 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
       if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId);
       if (pts.size === 0) {
         const L = W.current?.look; L?.end();
+        // a tap on your landed fish: have a look at it
+        if (L && L.state().moved < 8 && props.current.onFishTap) { const r = el.getBoundingClientRect(); if (W.current?.tapFish(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1))) { props.current.onFishTap(); pinch = 0; return; } }
         if (L && L.state().moved < 8 && !stopping) { clearTimeout(tapTimer); if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330); }
       }
       pinch = 0;
@@ -143,6 +147,7 @@ const World3D = forwardRef(function World3D({ spotId = null, placeName = "", sta
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
     setTrack: (on) => W.current?.setTrack(on),
+    inspectFish: (on) => W.current?.inspectFish(on), keepFish: () => W.current?.keepFish(), releaseFish: () => W.current?.releaseFish(),
     walk: (on) => W.current?.walk(on), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
     onPose: (f) => W.current?.onPose(f), setRemotePose: (id, p) => W.current?.setRemotePose(id, p),
     get walkState() { return walk; },

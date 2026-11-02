@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import World3D, { loadView, saveView } from "./World3D.jsx";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
+import { speciesById } from "../data/species.js";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
@@ -18,6 +19,13 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
   const [sprint, setSprint] = useState(false);
+  // ---- your landed fish: it waits in the net; tap it (or Look at it) to hold it up, then keep it or put it back ----
+  const [kept, setKept] = useState(null), [landed, setLanded] = useState(null), [looking, setLooking] = useState(false);
+  const openInspect = () => { if (!landed) return; w.current?.inspectFish(true); setLooking(true); };
+  const keepIt = () => { w.current?.keepFish(); setLooking(false); if (landed) { setCard({ ev: landed.ev, key: landed.key, who: null }); setTimeout(() => setCard((c) => (c?.ev === landed.ev ? null : c)), 8000); } setLanded(null); };
+  const putBack = () => { w.current?.releaseFish(); setLooking(false); const sp = speciesById(landed?.ev?.data?.species); say(`Back it goes${sp ? `: the ${sp.name.toLowerCase()} swims off` : ""}.`); setLanded(null); };
+  useEffect(() => { if (!kept) { setLooking(false); } }, [kept]);
+  useEffect(() => { if (kept === null && landed && !looking) setLanded(null); }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!walk) setSprint(false); }, [walk]);
   const [view, setView] = useState(loadView);
   const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "hand") { if (v === "right") document.documentElement.dataset.hand = "right"; else delete document.documentElement.dataset.hand; } };
@@ -46,7 +54,8 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
           const a = anglers.find((x) => x.id === id);
           if (a && !a.local && phase === "hooked" && !watching) setAlert({ id, name: a.name || "Someone" });
         }}
-        onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (alert?.id === id) setAlert(null); if (a?.local || watch === id) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
+        onKept={setKept} onFishTap={() => openInspect()}
+        onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (alert?.id === id) setAlert(null); if (a?.local && a.inspect) { setLanded({ ev, key: `${id}|${ev?.id || ev?.t}` }); return; } if (a?.local || watch === id) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
         <div className="fs-overlay">{children}</div>
         <div className="w3d-toasts" aria-live="polite">
           {toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
@@ -66,6 +75,8 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
           </>
         ) : null}
         {walkMsg ? <div className="walk-msg" role="status">{walkMsg}</div> : null}
+        {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is in the net: have a look</button></div> : null}
+        {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
         <div className="w3d-tools">
           {!walk ? <button type="button" className="fs-btn" onClick={startWalk} aria-label="Walk about" title="Walk about"><Icon name="walk" /></button> : null}
           {menu ? (
@@ -103,6 +114,26 @@ function Joystick({ onMove }) {
       onPointerMove={(e) => { if (id.current === e.pointerId) move(e); }}
       onPointerUp={end} onPointerCancel={end}>
       <div className="joystick-knob" style={{ transform: `translate(${knob[0]}px, ${knob[1]}px)` }} />
+    </div>
+  );
+}
+
+// ---- having a look at your fish before you decide ----
+function FishLook({ ev, demo, onKeep, onRelease, onClose }) {
+  const d = ev?.data || {}, sp = speciesById(d.species);
+  const len = d.lengthCm ? `${d.lengthCm} cm (${(d.lengthCm / 2.54).toFixed(1)} in)` : null, kg = d.weightKg ? `${d.weightKg >= 1 ? d.weightKg.toFixed(1) : d.weightKg.toFixed(2)} kg` : null;
+  return (
+    <div className="fish-look" role="dialog" aria-label={`Your ${sp?.name || "fish"}`}>
+      <button type="button" className="xbtn fish-look-x" onClick={onClose} aria-label="Put it down"><Icon name="close" /></button>
+      <span className="cc-kicker">{demo ? "Demo · not logged" : "Simulated · not a real record"}</span>
+      <h3>{sp?.name || "Fish"} {sp?.latin ? <i className="tiny muted">{sp.latin}</i> : null}</h3>
+      <p className="cc-facts">{[len, kg].filter(Boolean).join(" · ")}</p>
+      {sp?.idTip ? <p className="small"><b>How to tell it:</b> {sp.idTip}</p> : null}
+      {sp?.conservation ? <p className="small muted">{sp.conservation}</p> : null}
+      <div className="row">
+        <button type="button" className="btn primary" onClick={onKeep}><Icon name="check" />Keep it</button>
+        <button type="button" className="btn" onClick={onRelease}>Put it back</button>
+      </div>
     </div>
   );
 }

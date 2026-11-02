@@ -173,7 +173,7 @@ function PartyLive({ code, mkey }) {
   const anglers = useMemo(() => P.members.filter((m) => m.spot).map((m) => {
     let events = m.id === me?.id && mode === "virtual" ? vf.events : P.events.filter((e) => e.who === m.id);
     if (replay?.who === m.id && Date.now() - replay.start < 12000) events = [{ ...replay.ev, t: replay.start }];
-    return { id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, local: m.id === me?.id, real: mode === "real", events, fishHint: m.id === me?.id && mode === "virtual" ? fishFor : null };
+    return { id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, local: m.id === me?.id, inspect: m.id === me?.id && mode === "virtual", real: mode === "real", events, fishHint: m.id === me?.id && mode === "virtual" ? fishFor : null };
   }), [P.members, P.events, vf.events, me?.id, mode, replay, fishFor]);
 
   // the light: a real trip is always now; a virtual party at whatever time of day the host picks (midday to start)

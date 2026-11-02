@@ -93,7 +93,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         x = { a: made, spotId: a.spot, outfit: a.outfit, name: a.name, out: null };
         anglers.set(a.id, x);
       }
-      x.a.setEvents(a.events); x.a.setHint(a.fishHint || null);
+      x.a.setEvents(a.events); x.a.setHint(a.fishHint || null); x.inspect = !!a.inspect && !!a.local;
       if (a.local) localId = a.id;
     }
     for (const [id, x] of anglers) if (!seen.has(id)) { x.a.dispose(); anglers.delete(id); }
@@ -117,7 +117,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     out.y = Math.max(out.y, (env.floorAt ? env.floorAt(out.x, out.z) : 0) + 0.6);
     return out;
   }
-  let camOverride = null;
+  let camOverride = null, inspectFrom = null;
   // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
   let W = null, walkIn = { x: 0, y: 0, sprint: false }, walkJump = false, canFish = false, fishTest = 0, modeBeforeWalk = "first", fovBeforeWalk = null, onPose = null;
   // other people walking (Fish Together): their latest pose, eased towards
@@ -158,6 +158,17 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (leap) steerTo = leap;
     // closer in for a far leap, so a 50 cm fish 40 m out is more than a few pixels (the camera zooms; the fish isn't scaled)
     jumpZoom += ((leap ? Math.max(0.4, Math.min(0.8, 12 / Math.max(1, camPos.distanceTo(leap)))) : 1) - jumpZoom) * (1 - Math.exp(-dt * (leap ? 3 : 1.5)));
+    const mk = anglers.get(localId)?.out;
+    if (mk?.keptAt && (mk.kept === "inspect" || mk.kept === "release")) {
+      // looking at your fish: in front of you, a little to the side, looking back at it as you hold it up
+      const [fx, fz] = [Math.sin(mk.face), -Math.cos(mk.face)], c = mk.kept === "inspect" ? mk.keptAt : inspectFrom || mk.keptAt;
+      if (!inspectFrom) inspectFrom = mk.keptAt.clone();
+      // (far enough back that you see the fish held up against you, like a catch photo, not your arm)
+      const at0 = mk.at.clone().add(new THREE.Vector3(fx * 2.1 - fz * 0.45, 1.22, fz * 2.1 + fx * 0.45));
+      camPos.lerp(at0, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
+      camera.fov = 44; camera.updateProjectionMatrix(); camera.lookAt(mk.kept === "release" ? mk.keptAt : c);
+      return { yaw, pitch };
+    } else inspectFrom = null;
     if (W) {
       // Roblox-style: the camera orbits behind you as you drag, closer or further as you pinch; very close is first person
       const dist = Math.max(0, ((look.fov - 28) / 50) * 9 + 0.4), tgt = new THREE.Vector3(W.x, W.y + 1.55, W.z);
@@ -274,6 +285,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       }
     }
     for (const [id, x] of anglers) { if (remote.has(id)) applyRemote(id, x, dt || 0.016); x.out = x.a.frame(t, now, dt || 0.016, envState); outs[id] = x.out; }
+    // your landed fish stays in the net (or on the deck) until you've had a look and decided (Stage3D)
+    let kept = null;
+    const meK = anglers.get(localId);
+    if (meK?.inspect && meK.out) {
+      const key = meK.out.info?.since;
+      if (meK.out.landed && meK.keptFor !== key) { meK.keptFor = key; meK.a.keepFish("deck"); }
+      if (meK.out.kept && meK.out.kept !== "gone") kept = { state: meK.out.kept };
+    }
     const view = updateCamera(t, dt || 0.016);
     // droplets fall back, rings spread
     for (let k = 0; k < DROPS; k++) {
@@ -289,7 +308,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (draw) renderer.render(scene, camera);
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
-    onFrame?.({ outs, view, slow, mode, focusId, localId, walk: walkInfo });
+    onFrame?.({ outs, view, slow, mode, focusId, localId, walk: walkInfo, kept });
   }
   function resize() {
     const w = canvas.clientWidth || canvas.parentElement?.clientWidth || 1, h = canvas.clientHeight || canvas.parentElement?.clientHeight || 1;
@@ -330,6 +349,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       return null;
     },
     get walking() { return !!W; },
+    /** Your landed fish: hold it up for a look (inspect), keep it, or put it back. */
+    inspectFish(on = true) { anglers.get(localId)?.a.keepFish(on ? "inspect" : "deck"); },
+    keepFish() { anglers.get(localId)?.a.keepFish("gone"); },
+    releaseFish() { anglers.get(localId)?.a.keepFish("release"); },
+    /** A tap on the screen (-1..1 each way): was it your landed fish? */
+    tapFish(nx, ny) {
+      const me = anglers.get(localId); if (!me?.a.kept || me.a.kept === "gone") return false;
+      const rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(nx, ny), camera);
+      if (rc.intersectObject(me.a.fishMesh, false).length) return true;
+      // or near it on the screen (a small fish is hard to hit with a finger)
+      const p = me.a.fishMesh.position.clone().project(camera); return Math.hypot(p.x - nx, (p.y - ny) * camera.aspect) < 0.16 && p.z < 1;
+    },
     setWalkInput(i) { walkIn = { x: i.x || 0, y: i.y || 0, sprint: !!i.sprint }; },
     jump() { if (W) walkJump = true; },
     /** Fish from where you're standing: turns to the water's edge and makes it your spot. Returns the spot, or null. */
