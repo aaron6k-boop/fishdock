@@ -115,7 +115,7 @@ await audit("3d-gorleston", "/#try/gorleston-south-pier/cod/3d", "Pixel 7", asyn
     await page.screenshot({ path: `audit/3d-gorleston-4-${m.replace(/\s/g, "").toLowerCase()}.png` });
   }
 });
-for (const [name, path] of [["3d-whitby", "/#try/whitby-piers/cod/3d"], ["3d-chesil", "/#try/chesil-beach-ferry-bridge/cod/3d"], ["3d-river-avon", "/#try/royalty-fishery-avon/barbel/3d"], ["3d-rocks-mumbles", "/#try/mumbles-head/bass/3d"], ["3d-deal", "/#try/deal-pier/cod/3d"], ["3d-brixham", "/#try/brixham-breakwater/pollack/3d"]]) {
+for (const [name, path] of [["3d-whitby", "/#try/whitby-piers/cod/3d"], ["3d-cromer", "/#try/cromer-pier/cod/3d"], ["3d-mumbles", "/#try/mumbles-head/bass/3d"], ["3d-deal", "/#try/deal-pier/cod/3d"], ["3d-wye", "/#try/river-wye-ross/barbel/3d"], ["3d-rutland", "/#try/rutland-water/pike/3d"], ["3d-chesil", "/#try/chesil-beach-ferry-bridge/cod/3d"]]) {
   await audit(name, path, "Pixel 7", async (page, P) => {
     await page.waitForTimeout(12000); await page.screenshot({ path: `audit/${name}-0.png` });
     P.fps = await fps(page);
