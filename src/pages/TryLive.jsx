@@ -16,6 +16,7 @@ import { DRAW_CM, phaseAt } from "../lib/liveEvents.js";
 import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import FishTray from "../components/FishTray.jsx";
 import Stage3D from "../components/Stage3D.jsx";
+import InviteHere from "../components/InviteHere.jsx";
 import { landedCatches } from "../lib/landed.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -64,6 +65,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [copied, setCopied] = useState("");
   const [uiHidden, setUiHidden] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [invite, setInvite] = useState(false);
   const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
   const [view3d, setView3d] = useState(() => /\/3d$/.test(location.hash)); // the 360° 3D view (Beta)
   const sceneRef = useRef(null);
@@ -132,6 +134,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
               <span className="grow" />
               <button type="button" className={`fs-btn${view3d ? " on" : ""}`} onClick={() => setView3d(!view3d)} aria-pressed={view3d} aria-label={view3d ? "Back to the photo view" : "Look around in 3D (Beta)"} title="360° look-around (Beta)"><Icon name="compass" /></button>
+              <button type="button" className="fs-btn" onClick={() => setInvite(true)} aria-label="Invite a friend here" title="Invite a friend here"><Icon name="users" /></button>
               <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
               <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
             </div>
@@ -154,6 +157,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             </FishingScene>
           )}
         </div>
+        <InviteHere open={invite} onClose={() => setInvite(false)} markId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} />
         {sheet ? <div className="sheet-scrim" onClick={() => setSheet(false)} /> : null}
         <aside className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Demo settings">
           <div className="sheet-head">

@@ -9,7 +9,8 @@
 //   code. The host can turn code joining off, make a new link (old links stop working), lock the party, remove
 //   people, turn chat or voice off and close it. Parties end after the hours the host chose.
 // - No positions: a party knows the kind of place (pier, beach, ...) and a place label the host typed or picked, at
-//   most an area. Never coordinates. Member keys are stored hashed. Network addresses are never stored.
+//   most an area, or (a virtual party started from the 3D demo) one of FishDock's own public, documented marks by id,
+//   so everyone fishes that real place's 3D reconstruction. Never anyone's coordinates. Member keys are stored hashed. Network addresses are never stored.
 // - Voice: the server only relays the connection set-up (WebRTC signalling) between members; audio goes phone to
 //   phone and never through FishDock.
 
@@ -17,6 +18,13 @@ import { json, err, guard, toResponse, sameOrigin, readJson, routePath, cleanLin
 import { needDb, enforce } from "./db.js";
 import { ipKey } from "./ipKey.js";
 import { assignSpots, layoutFor, MAX_ANGLERS } from "../src/lib/world3d/spots.js";
+import { markFor } from "./place3d.js";
+
+/** A party's place: a label, and for a virtual party only, a documented FishDock mark id (a public place) or nothing. */
+export function cleanPlace(place, mode) {
+  const mark = mode !== "real" && typeof place?.mark === "string" && markFor(place.mark) ? place.mark : null;
+  return { label: cleanLine(place?.label, 60) || null, ...(mark ? { mark } : {}) };
+}
 
 export const PARTY = {
   maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
@@ -47,7 +55,7 @@ export class PartyRoom {
     const h = PARTY.hours.includes(Number(hours)) ? Number(hours) : PARTY.defaultHours;
     this.s = {
       code, mode: mode === "real" ? "real" : "virtual", venue: VENUES.includes(venue) ? venue : "pier",
-      place: { label: cleanLine(place?.label, 60) || null }, createdAt: now, expiresAt: now + h * 3600e3, closed: false,
+      place: cleanPlace(place, mode), createdAt: now, expiresAt: now + h * 3600e3, closed: false,
       light: mode === "real" ? "now" : "midday", secret: randomId(12), codeOn: true, locked: false, chatOn: true, voiceOn: true, anglersOn: true,
       members: {}, events: [], seq: 0, chat: [], challenge: null, reports: [], photos: [],
     };
@@ -392,7 +400,7 @@ export async function handleParty(request, env, now = Date.now()) {
     if (!code && request.method === "POST") {
       await enforce(db, `party:new:${who}`, PARTY.createPerDay, now, { daily: true }, "That's as many parties as can be started from here today.");
       const b = await readJson(request, 4096);
-      const body = { mode: b.mode === "real" ? "real" : "virtual", venue: VENUES.includes(b.venue) ? b.venue : "pier", place: { label: cleanLine(b.place?.label, 60) || null }, name: nameOf(b.name, "Host"), outfit: Number(b.outfit) || 0, hours: Number(b.hours) || PARTY.defaultHours };
+      const body = { mode: b.mode === "real" ? "real" : "virtual", venue: VENUES.includes(b.venue) ? b.venue : "pier", place: cleanPlace(b.place, b.mode), name: nameOf(b.name, "Host"), outfit: Number(b.outfit) || 0, hours: Number(b.hours) || PARTY.defaultHours };
       for (let i = 0; i < 4; i++) {
         const c = makeCode();
         const r = await inner(c, "init", { method: "POST", body: JSON.stringify({ ...body, code: c }) });

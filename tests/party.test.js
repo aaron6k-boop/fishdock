@@ -242,3 +242,12 @@ test("a party's saved record can't grow without limit: reports are capped, and s
   assert.ok(Object.keys(room.s.members).length <= PARTY.maxEverMembers && full > 0);
   const codes = Array.from({ length: 2000 }, makeCode); assert.ok(codes.every(validCode));
 });
+
+test("a party started from the 3D demo can be at a documented FishDock mark, never an arbitrary place, and never on a real trip", async () => {
+  const { cleanPlace } = await import("../server/party.js");
+  assert.deepEqual(cleanPlace({ label: "Gorleston South Pier", mark: "gorleston-south-pier" }, "virtual"), { label: "Gorleston South Pier", mark: "gorleston-south-pier" });
+  assert.deepEqual(cleanPlace({ label: "Somewhere", mark: "52.57,1.73" }, "virtual"), { label: "Somewhere" }, "a position isn't a mark");
+  assert.deepEqual(cleanPlace({ label: "x", mark: "not-a-real-mark-anywhere" }, "virtual"), { label: "x" });
+  assert.deepEqual(cleanPlace({ label: "Gorleston", mark: "gorleston-south-pier" }, "real"), { label: "Gorleston" }, "a real trip never names a mark");
+  assert.deepEqual(cleanPlace({ label: "  " }, "virtual"), { label: null });
+});
