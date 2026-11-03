@@ -73,8 +73,8 @@ export function fitNet(net, scene, kind = "drop") {
         // the mesh's cords are in the texture's alpha: seen from both sides, blended (a hard cut-out loses the fine cords
         // at any distance), the cords' cover boosted a little so the bag still reads as netting from across the deck
         const m = o.material = o.material.clone(); m.transparent = true; m.alphaTest = 0.04; m.side = THREE.DoubleSide; m.depthWrite = false;
-        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 2.4, 0.0, 1.0);"); };
-        m.customProgramCacheKey = () => "fdnet1"; o.renderOrder = 2;
+        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 4.0, 0.0, 1.0); diffuseColor.rgb *= 0.75;"); };
+        m.customProgramCacheKey = () => "fdnet2"; o.renderOrder = 2;
       }
     });
   }

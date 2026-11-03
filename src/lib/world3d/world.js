@@ -253,6 +253,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
             // (letting it down too: from low by the water you see the net come down the pier's side towards you)
             const k = st === "lead" || st === "lower" ? 0 : Math.max(0, Math.min(1, (net.y - landing.water) / Math.max(0.5, out.at.y + 1.1 - landing.water)));
             shot = from(-1.9, landing.edge + 2.3 - 0.6 * k, Math.max(wl + 1.25, wl + 1.25 + (2.3 - wl - 1.25) * k));
+            // the moment it goes in (as fishing games frame it): in close and low over the hoop, the fish filling the shot
+            if (st === "lead") shot = from(-1.15, landing.edge + 1.45, wl + 0.85);
             focusAt = net.clone().lerp(rail, st === "lead" ? 0 : st === "lower" ? 0.15 : 0.1); focusAt.y += st === "lead" ? 0.15 : 0;
           }
         } else if (st === "lower" || st === "lead" || st === "haul") {
@@ -269,7 +271,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
         const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage)); // (and back up from it: climbing the wall it passed close over the deck)
         landShot.stage = st;
-        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "lead" || st === "haul";
+        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "haul";
         anglers.get(localId)?.a.showTag(false);
         if (cutTo) { camPos.copy(landShot.pos); landShot.up = true; landShot.clear = true; const l = lookAt(camPos.toArray(), focusAt.toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch))); for (let i = 0; i < 40; i++) look.step(0.1); }
         // out of your own head by going up first (never back through it), then round to the shot; your head shows once
