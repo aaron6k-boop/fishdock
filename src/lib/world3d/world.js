@@ -160,7 +160,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // with reduced motion on
   let track = trackJumps && !reduceMotion, jumpZoom = 1;
   function updateCamera(t, dt) {
-    look.step(dt);
+    // (the view has already been turned for this frame, before the anglers were posed: see tick)
     const focus = anglers.get(mode === "spectator" ? focusId : localId) || anglers.get(focusId);
     const out = focus?.out;
     let pos = camPos.clone();
@@ -269,7 +269,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (!out) { camera.position.copy(pos); }
     else if (mode === "first" || mode === "free") {
       pos.copy(out.eye);
-      if (!reduceMotion) { pos.y += Math.sin(t * 1.4) * 0.008; pos.x += Math.sin(t * 0.7) * 0.004; } // breathing
+      if (mode === "free" && !reduceMotion) { pos.y += Math.sin(t * 1.4) * 0.008; pos.x += Math.sin(t * 0.7) * 0.004; } // breathing (in first person it's in your eye already, so the rod in your hands moves with it)
     } else if (mode === "third" || mode === "spectator") {
       // behind and a little to the side of the angler, orbiting as you drag; never inside a wall or a building
       const r = 4.2, h = 1.9;
@@ -414,6 +414,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         onPose?.({ x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed, air: W.air });
       }
     }
+    // the view turns first, then your angler is posed from it: the rod and your hands in first person are placed from the
+    // same view the camera then draws (they used to be placed from the frame before, and swam as the view turned)
+    look.step(dt || 0.016);
     anglers.get(localId)?.a.setView(look.yaw, look.pitch);
     for (const [id, x] of anglers) { if (remote.has(id)) applyRemote(id, x, dt || 0.016); x.out = x.a.frame(t, now, dt || 0.016, envState); outs[id] = x.out; }
     // your landed fish stays in the net (or on the deck) until you've had a look and decided (Stage3D)

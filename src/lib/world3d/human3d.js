@@ -168,25 +168,26 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
   const standOutfit = { ...(outfit || {}), jacket: COATS[L.coat]?.hex ?? outfit?.jacket };
   const stand = createFigure({ id, look: L.gloves ? { ...L, skinHex: 0x23262a } : L, outfit: standOutfit, venue }); group.add(stand.group);
   let H = null, fp = false, gone = false;
-  const show = () => { if (H) H.root.visible = !fp; stand.group.visible = fp || !H; };
+  // (in first person none of the body is drawn: your forearms and hands are drawn on their own, fpHands.js)
+  const show = () => { if (H) H.root.visible = !fp; stand.group.visible = !H && !fp; };
   if (realistic && typeof document !== "undefined") {
     Promise.all([loadGLB(L.file || "gardener"), clipSet()]).then(([g, clips]) => {
       if (gone) return;
       H = makeHuman(L, g, clips[L.sex === "f" ? "f" : "m"], outfit, venue);
-      group.add(H.root); show();
+      group.add(H.root); H.setFirstPerson(fp); show();
     }).catch((e) => { if (typeof console !== "undefined") console.warn("person model:", e?.message || e); });
   }
-  const who = () => (H && !fp ? H : stand);
+  const who = () => H || stand;
   return {
     group, look: L,
     // (the model is posed every frame even while hidden, so it's ready the moment it shows)
-    pose(o) { if (H) H.pose(o); if (!H || fp) stand.pose(o); },
+    pose(o) { if (H) H.pose(o); else stand.pose(o); },
     get ready() { return !!H; },
     get top() { return (H || stand).top; },
     get headAt() { return who().headAt; },
     get eyeAt() { return who().eyeAt; },
     hand(i) { return who().hand(i); },
-    setFirstPerson(on) { fp = !!on; stand.setFirstPerson(fp); show(); },
+    setFirstPerson(on) { fp = !!on; H?.setFirstPerson(fp); show(); },
     dispose() { gone = true; stand.dispose(); H?.dispose(); },
   };
 }
@@ -453,7 +454,12 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         const palm = (use.palm || reach.clone().cross(ax).multiplyScalar(-sg)).clone();
         Zh = palm.addScaledVector(ax, -palm.dot(ax)); if (Zh.lengthSq() < 1e-6) Zh = V(0, -1, 0).addScaledVector(ax, ax.y); Zh.normalize();
         let X = ax.clone().multiplyScalar(sg); Yh = Zh.clone().cross(X).normalize();
-        if (Yh.dot(reach) < -0.2 * reach.length()) { X.negate(); Yh.negate(); }
+        // which way round the hand goes on the handle is settled once, when it takes hold (and changed only if it's
+        // plainly wrong), never flipped back and forth from frame to frame as the hand moves (a crank turning)
+        const d = Yh.dot(reach) / Math.max(1e-6, reach.length());
+        if (hs.flip == null || hs.flipKind !== use.kind) { hs.flip = d < -0.2; hs.flipKind = use.kind; }
+        else if (hs.flip ? d > 0.6 : d < -0.6) hs.flip = !hs.flip;
+        if (hs.flip) { X.negate(); Yh.negate(); }
         wrist = at.clone().addScaledVector(Yh, -GRIP.y).addScaledVector(Zh, -GRIP.z);
       }
       const S0 = wp(B(s + "_UpperArm")), E0 = wp(B(s + "_Forearm")), W0 = wp(B(s + "_Hand"));
@@ -509,7 +515,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     get headAt() { return wFigSafe(B("Head")); },
     get eyeAt() { const a = B("LEye"), b = B("REye"); if (!a || !b) return wFigSafe(B("Head")).add(V(0, 0.1, -0.08)); return wFigSafe(a).add(wFigSafe(b)).multiplyScalar(0.5).add(V(0, 0, -0.02)); },
     hand(i) { return wFigSafe(B(i ? "R_Hand" : "L_Hand")); },
-    setFirstPerson(on) { fp = !!on; B("Head").scale.setScalar(on ? 0.001 : 1); },
+    setFirstPerson(on) { fp = !!on; },
     dispose() { root.parent?.remove(root); mixer.stopAllAction(); mixer.uncacheRoot(model); for (const m of mats) m.dispose(); for (const m of extraMats) m.dispose(); for (const o of extra) o.geometry?.dispose?.(); },
   };
   function wFigSafe(b) { const g = groupOf(); const p = wp(b); return g ? g.worldToLocal(p) : p; }
