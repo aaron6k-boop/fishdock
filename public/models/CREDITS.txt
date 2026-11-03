@@ -1,0 +1,10 @@
+FishDock's 3D equipment models (reel.glb, nets.glb) were modelled in Blender for FishDock (source-assets/blender/).
+
+The net mesh textures are from ambientCG (https://ambientcg.com), by Lennart Demes, CC0 1.0 (public domain):
+  Net001A (drop net), Net002A (landing net).
+No attribution is required by the licence; credited here with thanks.
+The full list of third-party assets, with sources, licences and file hashes: source-assets/ASSET-LICENCES.json.
+
+fp_arms.glb (your forearms and hands in first person) is cut from a person made with MPFB, MakeHuman for Blender
+(https://static.makehumancommunity.org/mpfb/), with the MakeHuman system assets' skin; the people MPFB makes and the
+system assets are CC0 1.0. Credited with thanks to the MakeHuman team.

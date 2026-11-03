@@ -13,6 +13,8 @@
 // Each hand is one skinned mesh (every vertex on one bone, so it bends at the joints and stays one draw call), and each
 // sleeve is one more.
 import * as THREE from "three";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { loadPart } from "./glbParts.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -32,7 +34,7 @@ const THUMB = { at: V(0.026, 0.03, 0.012), len: [0.028, 0.024, 0.02], r: 0.0102 
 // how far each joint curls (radians, finger bases first), and the thumb's, for each way of holding something
 const GRIPS = {
   rest: { f: [[0.35, 0.45, 0.3], [0.4, 0.5, 0.32], [0.45, 0.55, 0.35], [0.5, 0.6, 0.38]], t: [0.25, 0.2, 0.15], spread: 0.06 },
-  seat: { f: [[1.0, 1.1, 0.7], [1.25, 1.35, 0.85], [1.35, 1.4, 0.9], [1.4, 1.4, 0.95]], t: [0.85, 0.35, 0.25], spread: 0.0 },
+  seat: { f: [[1.25, 1.3, 0.8], [1.25, 1.35, 0.85], [1.35, 1.4, 0.9], [1.4, 1.4, 0.95]], t: [0.85, 0.35, 0.25], spread: 0.0 },
   crank: { f: [[0.95, 1.15, 0.85], [1.25, 1.3, 0.9], [1.4, 1.35, 0.9], [1.5, 1.35, 0.95]], t: [0.7, 0.5, 0.45], spread: 0.0 },
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fish: { f: [[0.25, 0.3, 0.2], [0.3, 0.35, 0.22], [0.35, 0.38, 0.25], [0.4, 0.4, 0.28]], t: [0.1, 0.15, 0.1], spread: 0.05 },
@@ -152,6 +154,61 @@ function mirror(geo) {
   for (const a of Object.values(geo.attributes)) { const s = a.itemSize, arr = a.array; for (let t = 0; t < a.count; t += 3) for (let k = 0; k < s; k++) { const i1 = (t + 1) * s + k, i2 = (t + 2) * s + k, tmp = arr[i1]; arr[i1] = arr[i2]; arr[i2] = tmp; } }
 }
 
+// ---- the real (MPFB) arms: rest frames worked out once from the bones, then posed from the frames above ----
+const SIDES = ["l", "r"], DIG = ["index", "middle", "ring", "pinky"];
+function realArms(scene, { gloves, skinHex }) {
+  const root = cloneSkinned(scene); root.updateMatrixWorld(true);
+  const bone = (n) => root.getObjectByName(n);
+  const wp = (o) => o.getWorldPosition(V()), wq = (o) => o.getWorldQuaternion(new THREE.Quaternion());
+  const m = new THREE.Matrix4();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.frustumCulled = false; o.castShadow = false;
+    // (a plain opaque skin material: the export marks it see-through and physical, neither of which a hand needs)
+    const src = o.material, mt = o.material = new THREE.MeshStandardMaterial({ map: src.map || null, normalMap: src.normalMap || null, roughness: 0.62, metalness: 0 });
+    if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
+    else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); } // (your skin tone over the model's)
+  });
+  const sides = SIDES.map((sfx, i) => {
+    const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
+    if (!hand || !fore) throw new Error("bones missing");
+    const P = wp(hand), Yh = wp(bone("middle_01_" + sfx)).sub(P).normalize();
+    const across = wp(bone("index_01_" + sfx)).sub(wp(bone("pinky_01_" + sfx))); across.addScaledVector(Yh, -across.dot(Yh)).normalize();
+    const X = across.clone().multiplyScalar(s), Z = X.clone().cross(Yh).normalize(); X.copy(Yh).cross(Z).normalize();
+    const frame = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(X, Yh, Z));
+    const handW = wq(hand), foreW = wq(fore), foreP = wp(fore), len = P.distanceTo(foreP), dir0 = P.clone().sub(foreP).normalize();
+    const up0 = Z.clone().addScaledVector(dir0, -Z.dot(dir0)).normalize(), fr0 = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(dir0.clone().cross(up0), dir0, up0));
+    // each finger's bones, with the axis it curls about (towards the palm) in its own frame
+    const chain = (name, axisW) => [1, 2, 3].map((k) => { const b = bone(`${name}_0${k}_${sfx}`); return { b, rest: b.quaternion.clone(), axis: axisW.clone().applyQuaternion(wq(b).invert()).normalize() }; });
+    const fingers = DIG.map((d) => chain(d, X));
+    const tDir = wp(bone("thumb_02_" + sfx)).sub(wp(bone("thumb_01_" + sfx))).normalize(), tAxis = tDir.clone().cross(Z).normalize().multiplyScalar(-s);
+    const thumb = chain("thumb", tAxis);
+    return { hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone() };
+  });
+  const q = new THREE.Quaternion(), qa = new THREE.Quaternion(), gq = new THREE.Quaternion();
+  return {
+    root,
+    /** hand i at `pos` with frame `quat` (the group's space), its fingers curled as `curl`, the elbow towards `elbow` */
+    pose(i, group, pos, quat, curl, elbow) {
+      const S = sides[i]; group.updateWorldMatrix(true, false); group.getWorldQuaternion(gq);
+      const Pw = group.localToWorld(pos.clone()), Ew = group.localToWorld(elbow.clone()), Qw = gq.clone().multiply(quat);
+      const handT = Qw.clone().multiply(S.frameInv).multiply(S.handW); // (the hand bone's world turn for that frame)
+      // the forearm from the elbow's side to the wrist, rolled so the palm side stays the palm side (no twist)
+      const dir = Pw.clone().sub(Ew).normalize(), Zt = V(0, 0, 1).applyQuaternion(Qw); Zt.addScaledVector(dir, -Zt.dot(dir)); if (Zt.lengthSq() < 1e-6) Zt.set(0, 1, 0); Zt.normalize();
+      const foreT = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(dir.clone().cross(Zt), dir, Zt)).multiply(S.fr0Inv).multiply(S.foreW);
+      const par = S.fore.parent; par.updateWorldMatrix(true, false);
+      S.fore.position.copy(par.worldToLocal(Pw.clone().addScaledVector(dir, -S.len)));
+      S.fore.quaternion.copy(par.getWorldQuaternion(q).invert().multiply(foreT));
+      S.fore.updateMatrixWorld(true);
+      S.hand.quaternion.copy(foreT.clone().invert().multiply(handT));
+      const fs = curl?.f || [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]], ts = curl?.t || [0, 0, 0];
+      S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, fs[a][k]))));
+      S.thumb.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, ts[k] * 0.8)));
+      root.updateMatrixWorld(true);
+    },
+  };
+}
+
 /**
  * Your hands in first person. look: { gloves, skinHex, coatHex }. Add `group` to the angler's root; call
  * pose({ hands: [left, right], eye, vr, vu, vf, dt, t }) each frame (everything in the angler's space), and show(on).
@@ -181,6 +238,13 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
     group.add(mesh, sleeve);
     return { mesh, sleeve, bones: b.bones, joints: b.joints, s: i ? 1 : -1, cur: null, from: null, u: 1, kind: undefined, curl: GRIPS.rest };
   });
+
+  // ---- the real hands: forearms and hands cut from a MakeHuman (MPFB, CC0) person in Blender (public/models/
+  // fp_arms.glb): real fingers, knuckles and skin, on their own skeleton. Placed by the same frames as above (so they
+  // can't drift or flip any more than the simple hands could), the forearm laid from the elbow to the wrist and turned
+  // with the hand (no twisting), each finger curled about its own joint. Until they've loaded, the simple hands show
+  let real = null;
+  loadPart("fp_arms").then((sc) => { try { real = realArms(sc, { gloves, skinHex }); } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } }).catch(() => {});
 
   const m4 = new THREE.Matrix4();
   // the hand's frame from what it holds: the thumb along the handle (towards the rod's tip, or out along the reel's
@@ -262,6 +326,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         const wrist = pos.clone().add(tmpV.set(0, -0.05, 0).applyQuaternion(quat));
         const back = elbow.clone().sub(wrist).normalize();
         h.sleeve.position.copy(wrist); h.sleeve.quaternion.setFromUnitVectors(V(0, -1, 0), back);
+        if (real) real.pose(i, group, pos, quat, curl, elbow);
       }
     },
     /** where each hand is (the wrist, in the group's space), for tests */
