@@ -163,24 +163,30 @@ function knit() {
 export function createPerson({ id = "", look = null, outfit, venue = "pier", realistic = true } = {}) {
   const L = look || lookFor(id);
   const group = new THREE.Group(); group.name = "person";
-  const stand = createFigure({ id, look: L, outfit, venue }); group.add(stand.group);
+  // the simple figure: stands in while the model loads, and gives you your forearms and hands in first person (a whole
+  // body's arm, sleeve and shoulder that close to the eye fills the screen); dressed in your jacket colour and gloves
+  const standOutfit = { ...(outfit || {}), jacket: COATS[L.coat]?.hex ?? outfit?.jacket };
+  const stand = createFigure({ id, look: L.gloves ? { ...L, skinHex: 0x23262a } : L, outfit: standOutfit, venue }); group.add(stand.group);
   let H = null, fp = false, gone = false;
+  const show = () => { if (H) H.root.visible = !fp; stand.group.visible = fp || !H; };
   if (realistic && typeof document !== "undefined") {
     Promise.all([loadGLB(L.file || "gardener"), clipSet()]).then(([g, clips]) => {
       if (gone) return;
       H = makeHuman(L, g, clips[L.sex === "f" ? "f" : "m"], outfit, venue);
-      group.add(H.root); stand.group.visible = false; H.setFirstPerson(fp);
+      group.add(H.root); show();
     }).catch((e) => { if (typeof console !== "undefined") console.warn("person model:", e?.message || e); });
   }
+  const who = () => (H && !fp ? H : stand);
   return {
     group, look: L,
-    pose(o) { (H || stand).pose(o); },
+    // (the model is posed every frame even while hidden, so it's ready the moment it shows)
+    pose(o) { if (H) H.pose(o); if (!H || fp) stand.pose(o); },
     get ready() { return !!H; },
     get top() { return (H || stand).top; },
-    get headAt() { return (H || stand).headAt; },
-    get eyeAt() { return (H || stand).eyeAt; },
-    hand(i) { return (H || stand).hand(i); },
-    setFirstPerson(on) { fp = !!on; stand.setFirstPerson(fp); H?.setFirstPerson(fp); },
+    get headAt() { return who().headAt; },
+    get eyeAt() { return who().eyeAt; },
+    hand(i) { return who().hand(i); },
+    setFirstPerson(on) { fp = !!on; stand.setFirstPerson(fp); show(); },
     dispose() { gone = true; stand.dispose(); H?.dispose(); },
   };
 }
