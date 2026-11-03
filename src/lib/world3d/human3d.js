@@ -14,7 +14,7 @@
 //    fingers curled round it; a free hand keeps the motion capture (the arm swinging as they walk)
 //  - blinking, and the jaw moving while they talk in voice chat
 // The clothes: the jacket, trousers and boots can be recoloured (keeping the fabric's folds, stitching and zips from
-// its texture), with gloves, wellies, a hat, the hood up in the rain and a life jacket added on; in the rain the cloth
+// its texture), with gloves, wellies, a hat or the jacket's hood (up or down) and a life jacket added on; in the rain the cloth
 // darkens and goes glossy, and in a wind the jacket's hem stirs.
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -257,7 +257,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const hatCol = new THREE.Color(outfit?.hat ?? 0x8a2f2a), coatHex = COATS[L.coat]?.hex ?? outfit?.jacket ?? 0x1f3a5f;
   const knitMat = new THREE.MeshStandardMaterial({ color: hatCol, map: knit(), roughness: 1 }); extraMats.push(knitMat);
   const capMat = new THREE.MeshStandardMaterial({ color: hatCol.clone().multiplyScalar(0.8), roughness: 0.85 }); extraMats.push(capMat);
-  const hoodMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.55, side: THREE.DoubleSide }); extraMats.push(hoodMat);
+  const hoodMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.8 }); extraMats.push(hoodMat);
   const hd = bounds.head; // { cx, cz, rx, rz (the head with its hair, above the eyes), eye (eye height), top }
   const hats = new THREE.Group(); hats.name = "hat";
   const brow = hd.eye + 0.045; // where a hat's front edge sits, just above the eyebrows
@@ -281,18 +281,38 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     brim.scale.set(hd.rx + 0.016, 1, hd.rz + 0.016); brim.position.set(hd.cx, cy - 0.016, hd.cz); hats.add(brim);
   }
   if (hats.children.length) attach("Head", hats);
-  // the hood, up in the rain when there's no hat: round the back and over the top of the head, open at the face
+  // the hood (chosen as "Hood up"): cut to the head like a real jacket's hood rather than a shell over it: close round
+  // the back and top of the head with a centre seam, wider below where it meets the collar, open at the face with the
+  // edge rolled; lined a shade darker inside
   const hood = new THREE.Group(); hood.name = "hood";
-  {
-    const g0 = new THREE.SphereGeometry(1, 26, 16, 0, Math.PI * 2, 0, Math.PI * 0.7), p = g0.attributes.position, idx = g0.index.array, keep = [];
-    for (let i = 0; i < idx.length; i += 3) {
-      let zc = 0, yc = 0; for (let j = 0; j < 3; j++) { zc += p.getZ(idx[i + j]) / 3; yc += p.getY(idx[i + j]) / 3; }
-      if (!(zc < -0.25 && yc < 0.42)) keep.push(idx[i], idx[i + 1], idx[i + 2]); // the face's opening
-    }
-    g0.setIndex(keep); g0.computeVertexNormals();
-    const m = new THREE.Mesh(g0, hoodMat); const cy = hd.eye + 0.005; m.scale.set(hd.rx + 0.034, hd.top + 0.035 - cy, hd.rz + 0.04); m.position.set(hd.cx, cy, hd.cz + 0.012); hood.add(m);
+  if (L.hat === 4) {
+    const c = V(hd.cx, hd.eye + 0.012, hd.cz + 0.008), rx = hd.rx + 0.03, rz = hd.rz + 0.036, top = hd.top + 0.016 - c.y, low = c.y - (bounds.chest.sh - 0.03);
+    // around: a from the left of the face (0) round the back (0.5) to the right (1); up: e from the collar (0) to the crown (1)
+    const NA = 34, NE = 18, pos = [], idx = [], edge = [];
+    const open = (e) => 0.2 - 0.07 * Math.max(0, e - 0.55) / 0.45 + 0.05 * Math.max(0, 0.35 - e) / 0.35; // (the face's opening: narrower over the brow, wider at the chin)
+    const at = (u, e) => {
+      const o = open(e), ang = Math.PI * (o + (1 - 2 * o) * u) * 2 - Math.PI; // (ang 0 is straight back)
+      const el = e < 0.38 ? -(0.38 - e) / 0.38 * 1.2 : ((e - 0.38) / 0.62) * Math.PI / 2;
+      const ce = Math.cos(el), flare = e < 0.38 ? 1 + 0.75 * ((0.38 - e) / 0.38) ** 1.3 : 1; // (spreading onto the shoulders)
+      const ridge = 1 + 0.025 * Math.exp(-((ang / 0.3) ** 2)) * Math.sin(Math.max(0, el)); // (a slight ridge down the centre seam)
+      // (soft folds where the fabric gathers at the neck and down the sides, so it reads as cloth, not a shell)
+      const fold = 1 + (0.035 * Math.max(0, 0.5 - e) + 0.008) * Math.sin(ang * 7 + e * 3) + 0.01 * Math.sin(ang * 13 + e * 9) * (1 - e);
+      const x = Math.sin(ang) * rx * ce * flare * 0.97 * fold, z = Math.cos(ang) * rz * ce * flare * ridge * fold;
+      const y = el >= 0 ? Math.sin(el) * top : Math.sin(el) / Math.sin(1.2) * low;
+      return V(c.x + x, c.y + y, c.z + z + (e < 0.38 ? 0.02 * (0.38 - e) / 0.38 : 0));
+    };
+    for (let j = 0; j <= NE; j++) for (let i = 0; i <= NA; i++) pos.push(at(i / NA, j / NE));
+    for (let j = 0; j < NE; j++) for (let i = 0; i < NA; i++) { const a0 = j * (NA + 1) + i, a1 = a0 + 1, b0 = a0 + NA + 1, b1 = b0 + 1; idx.push(a0, b0, a1, a1, b0, b1); }
+    const g = new THREE.BufferGeometry().setFromPoints(pos); g.setIndex(idx); g.computeVertexNormals();
+    const outer = new THREE.Mesh(g, hoodMat); hood.add(outer);
+    const lining = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: new THREE.Color(coatHex).multiplyScalar(0.45), roughness: 0.9, side: THREE.BackSide })); extraMats.push(lining.material); hood.add(lining);
+    // the rolled edge round the face, and the peak
+    for (let j = 0; j <= NE; j++) edge.push(at(0, j / NE)); for (let j = NE; j >= 0; j--) edge.push(at(1, j / NE));
+    const rim = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edge.filter((_, k) => k % 2 === 0)), 60, 0.0085, 6, false), hoodMat); hood.add(rim);
   }
-  hood.visible = false; attach("Head", hood);
+  hood.visible = L.hat === 4; if (L.hat === 4) attach("Head", hood);
+  // ("Hood down": the jacket as it's made, nothing added; a folded hood drawn on top of the models' own collars and
+  // hoods looked like a cushion)
   // a life jacket (the inflatable kind sea anglers wear): two padded straps down the chest from a collar behind the
   // neck, lying on the jacket, with the reflective patches; a black waist belt and buckle
   if (L.life) {
@@ -495,7 +515,6 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     const amp = (Math.min(1, wind / 12) * 0.018 + st.v * 0.004) / unit; // in the meshes' own units
     // (the wind blows in the figure's space; turned into the meshes' own frame)
     if (amp > 1e-6 && clothMesh) { const d = figDirW(V(wd[0], 0, wd[1])); clothInv.copy(clothMesh.matrixWorld).invert(); U.uWind.value.copy(d.transformDirection(clothInv)).multiplyScalar(amp); } else U.uWind.value.set(0, 0, 0);
-    hood.visible = !fp && !!o.hood && L.hat === 3;
     hats.visible = !fp;
   }
 
