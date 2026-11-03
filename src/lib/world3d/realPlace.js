@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { unrle, GROUND, PLACE3D, inside } from "./osmPlace.js";
 import { concrete, sheetPiling, detail, noise2 } from "./textures3d.js";
 import { buildBuildings } from "./buildings3d.js";
+import { loadPart } from "./glbParts.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -35,6 +36,64 @@ function segIndex(segs, cell = 8) {
     }
     return best;
   };
+}
+
+// ---- the deck's concrete: a photographed surface (Poly Haven's concrete_floor_02, CC0, in public/textures/) ----
+// The drawn concrete (its joints, stains and the large soft variations in the vertex colours) stays as the large scale;
+// the photographed concrete is laid over it at about 2.5 m a tile for the close-up grain, wear and roughness. It is
+// sampled twice, at two scales and turned, and blended by the large stains so its repeat doesn't show across a deck.
+// Wet (rain) darkens it and makes it shine. Until the photographs have loaded (or if they can't) the drawn one shows.
+export const PIER_TEX = "/textures/pier_concrete_";
+const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
+function pierConcrete(mat) {
+  const wet = { value: 0 };
+  if (typeof document === "undefined") return wet;
+  const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t;
+  });
+  Promise.all([get("diff", true), get("nor", false), get("rough", false)]).then(([diff, nor, rough]) => {
+    nor.repeat.set(PHOTO_TILE, PHOTO_TILE); rough.repeat.set(PHOTO_TILE, PHOTO_TILE);
+    mat.normalMap = nor; mat.roughnessMap = rough; mat.normalScale.set(0.9, 0.9);
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWet = wet;
+      sh.fragmentShader = "uniform sampler2D pDiff;\nuniform float uWet;\n" + sh.fragmentShader
+        .replace("#include <map_fragment>", `#include <map_fragment>
+        {
+          vec2 pu = vMapUv * ${PHOTO_TILE.toFixed(3)};
+          vec3 a = texture2D(pDiff, pu).rgb, b = texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb;
+          float m = smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6);
+          vec3 avg = texture2D(pDiff, vec2(0.5), 12.0).rgb; // its smallest mip: the photograph's own average colour
+          vec3 p = mix(a, b, m) / max(avg, vec3(0.02)); // over its average: the drawn colour stays the colour
+          p = mix(vec3(dot(p, vec3(0.3, 0.59, 0.11))), p, 0.35);
+          diffuseColor.rgb *= mix(vec3(1.0), p, 0.6) * (1.0 - uWet * 0.32);
+        }`)
+        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        roughnessFactor = mix(0.7, 1.0, roughnessFactor) * (1.0 - uWet * 0.55);`);
+    };
+    mat.customProgramCacheKey = () => "fdpier1";
+    mat.needsUpdate = true;
+  }).catch(() => {});
+  return wet;
+}
+
+// ---- the pier's furniture from Blender: one instanced mesh per piece (a draw call per material for all of them) ----
+function placeProps(group, stand, props, glowGlass) {
+  loadPart("pierprops").then((scene) => {
+    const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+    for (const [name, list] of Object.entries(props)) {
+      const src = scene.getObjectByName(name + "_mesh") || scene.getObjectByName(name); if (!src || !list.length) continue;
+      src.updateWorldMatrix(true, true);
+      const meshes = []; src.traverse((o) => { if (o.isMesh) meshes.push(o); });
+      for (const m of meshes) {
+        const geo = m.geometry.clone().applyMatrix4(new THREE.Matrix4().copy(src.matrixWorld).invert().multiply(m.matrixWorld));
+        const mats = (Array.isArray(m.material) ? m.material : [m.material]).map((mt) => /glass|bulb/i.test(mt.name) ? glowGlass : mt);
+        const im = new THREE.InstancedMesh(geo, mats.length > 1 ? mats : mats[0], list.length);
+        list.forEach(([x, y, z, ry], k) => { mx.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, ry), one); im.setMatrixAt(k, mx); });
+        im.castShadow = true; im.receiveShadow = true; group.add(im);
+      }
+    }
+    group.remove(stand);
+  }).catch(() => {}); // (the simple shapes stay)
 }
 
 export function buildRealPlace(group, place, M, solids = []) {
@@ -110,6 +169,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   g.computeVertexNormals();
   const cTex = concrete({ seed: 3 }), dTex = detail(13);
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
+  place.deckWet = pierConcrete(deckMat);
   const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
@@ -177,7 +237,8 @@ export function buildRealPlace(group, place, M, solids = []) {
   if (cwp.length) solids.push(collider(cwp, cwi));
 
   // ---- railings along the walls near the anglers: posts every 2 m, a top and a middle rail, a brace every few bays ----
-  const railMat = new THREE.MeshStandardMaterial({ color: 0xa9adaf, metalness: 0.55, roughness: 0.42 });
+  // galvanised steel: dull, mottled zinc (the detail map's blotches), not polished chrome
+  const railMat = new THREE.MeshStandardMaterial({ color: 0xb9bdbd, map: dTex.map, metalness: 0.7, roughness: 0.55 });
   const posts = [], rails = [];
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
@@ -190,11 +251,17 @@ export function buildRealPlace(group, place, M, solids = []) {
     for (let q = 0; q + 1 < nPost; q += 3) { const f0 = q / nPost, f1 = (q + 1) / nPost; rails.push({ a: [a[0] + (b[0] - a[0]) * f0, LAND + 0.08, a[1] + (b[1] - a[1]) * f0], b: [a[0] + (b[0] - a[0]) * f1, LAND + RAIL.h * 0.5, a[1] + (b[1] - a[1]) * f1], r: 0.014 }); }
   }
   if (posts.length) {
-    const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 8), railMat, posts.length), mx = new THREE.Matrix4();
+    const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 10, 1, true), railMat, posts.length), mx = new THREE.Matrix4();
     posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); pm.castShadow = true; group.add(pm);
+    // each post's fittings: a domed cap, a ball joint where the middle rail runs through, and a base plate bolted
+    // to the deck
+    const fit = (geo, y) => { const m = new THREE.InstancedMesh(geo, railMat, posts.length); posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND + y, z); m.setMatrixAt(q, mx); }); m.castShadow = true; group.add(m); };
+    fit(new THREE.SphereGeometry(0.04, 10, 3, 0, Math.PI * 2, 0, Math.PI * 0.55), RAIL.h + 0.02);
+    fit(new THREE.SphereGeometry(0.038, 8, 5), RAIL.h * 0.5);
+    fit(new THREE.CylinderGeometry(0.075, 0.08, 0.018, 10, 1), 0.009);
   }
   if (rails.length) {
-    const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8), railMat, rails.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0);
+    const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 10, 1, true), railMat, rails.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0);
     rails.forEach(({ a, b, r }, q) => { const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b), d = Bv.clone().sub(A), L = d.length(); const qt = new THREE.Quaternion().setFromUnitVectors(up, d.normalize()); mx.compose(A.clone().add(Bv).multiplyScalar(0.5), qt, new THREE.Vector3(r, L + 0.06, r)); rm.setMatrixAt(q, mx); });
     rm.castShadow = true; group.add(rm);
   }
@@ -205,7 +272,12 @@ export function buildRealPlace(group, place, M, solids = []) {
   const mPost = new THREE.MeshStandardMaterial({ color: 0x2f3a36, roughness: 0.5, metalness: 0.5 });
   const mBuoy = new THREE.MeshStandardMaterial({ color: 0xf06a1a, roughness: 0.6 }), mBox = new THREE.MeshStandardMaterial({ color: 0xb8312b, roughness: 0.55 });
   const mWood = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.85 });
-  const addAt = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; group.add(m); return m; };
+  // the simple shapes stand in until the Blender furniture (pierprops.glb) has loaded, then go
+  const stand = new THREE.Group(); group.add(stand);
+  const addAt = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; stand.add(m); return m; };
+  const props = { lamp: [], station: [], bollard: [], bench: [] }; // where each goes: [x, y, z, turn]
+  // the lamps' lanterns: lit after dark with the rest (environment.js drives buildingGlow)
+  const glowGlass = new THREE.MeshStandardMaterial({ color: 0xe8e2d2, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.15, transparent: true, opacity: 0.8 });
   let acc = 0;
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
@@ -219,7 +291,8 @@ export function buildRealPlace(group, place, M, solids = []) {
           addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], LAND + 2.5, q[1]);
           const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, LAND + 4.95, q[1] - nz * 0.35, ry);
           addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, LAND + 4.85, q[1] - nz * 0.7, ry); void arm;
-          perches.push([q[0] - nx * 0.7, LAND + 4.97, q[1] - nz * 0.7]); // somewhere for a gull to sit
+          props.lamp.push([q[0], LAND, q[1], ry]);
+          perches.push([q[0], LAND + 3.9, q[1]]); // somewhere for a gull to sit (the lamp's top)
         }
       }
       if (Math.floor((d + 14) / 55) !== Math.floor((d + 13) / 55)) {
@@ -227,19 +300,26 @@ export function buildRealPlace(group, place, M, solids = []) {
           addAt(new THREE.BoxGeometry(0.62, 0.95, 0.22), mBox, q[0], LAND + 0.9, q[1], ry);
           const buoy = addAt(new THREE.TorusGeometry(0.27, 0.07, 8, 18), mBuoy, q[0] + nx * 0.13, LAND + 0.95, q[1] + nz * 0.13, ry); void buoy;
           addAt(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mPost, q[0], LAND + 0.25, q[1]);
+          props.station.push([q[0], LAND, q[1], Math.atan2(-nx, -nz)]); // facing the deck
         }
+      }
+      // mooring bollards just inside the railing, every 30 m or so
+      if (Math.floor((d + 7) / 30) !== Math.floor((d + 6) / 30)) {
+        const q = inAt(0.55); if (landAt(q) && clearOfSpots(q)) props.bollard.push([q[0], LAND, q[1], ry]);
       }
       if (Math.floor((d + 20) / 40) !== Math.floor((d + 19) / 40)) {
         const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q)) {
           const ax = -nz, az = nx; // along the edge
           for (const [h, back, th] of [[0.45, 0, 0.42], [0.8, -0.2, 0.08]]) addAt(new THREE.BoxGeometry(1.8, th === 0.42 ? 0.06 : 0.36, th === 0.42 ? 0.42 : 0.05), mWood, q[0] - nx * back, LAND + h, q[1] - nz * back, ry);
           for (const s2 of [-0.8, 0.8]) addAt(new THREE.BoxGeometry(0.06, 0.45, 0.42), mPost, q[0] + ax * s2, LAND + 0.22, q[1] + az * s2, ry);
+          props.bench.push([q[0], LAND, q[1], ry]); // facing the water
         }
       }
     }
     acc += len;
   }
-  place.buildingGlow = [glowLamp];
+  place.buildingGlow = [glowLamp, glowGlass];
+  if (Object.values(props).some((l) => l.length)) placeProps(group, stand, props, glowGlass);
 
   // ---- buildings ----
 

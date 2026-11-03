@@ -38,3 +38,6 @@
 
 /models/*
   Cache-Control: public, max-age=604800
+
+/textures/*
+  Cache-Control: public, max-age=604800

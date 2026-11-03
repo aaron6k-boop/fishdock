@@ -422,6 +422,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     // the lamps' reflections on the water (up to four, nearest the anglers first)
     for (let i = 0; i < 4; i++) { const pl = pointLights[i]; wU.uLamps.value[i].set(pl ? pl.position.x : 0, pl ? pl.position.y : 0, pl ? pl.position.z : 0, pl ? lampOn : 0); }
+    if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
   return {
