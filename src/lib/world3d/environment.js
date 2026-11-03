@@ -180,6 +180,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 refl = skyColour(normalize(r));
         float lit = uDay + uDusk*.6 + uNight*.2;
         vec3 body = uWater*lit*(.75 + .35*smoothstep(-.3, .4, vH)) + vec3(.008, .016, .03)*uNight;
+        // light through the thin water at the wave tops: crests a lighter green-blue, more so looking towards the sun
+        float crest = smoothstep(-.05, .45, vH)*(1. - uNight*.85);
+        float toward = pow(max(dot(-v, normalize(vec3(uSunDir.x, 0., uSunDir.z))), 0.), 3.);
+        body += vec3(.012, .045, .04)*crest*(.55 + .9*toward)*lit;
         // close below you, light comes back up out of the water: the foreground isn't a black pool
         body *= 1. + .45*(1. - smoothstep(3., 26., dist));
         // near land: lighter, greener shallows, and the dark of a wall or bank mirrored close to it
@@ -285,7 +289,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // ---- the place itself: the real one from map data when there is one, otherwise a representative one ----
   if (pano) { /* the photo is the place */ }
   else if (real) {
-    floorAt = buildRealPlace(group, real, M, solids) || floorAt; if (real.buildingGlow) lamps.push(...real.buildingGlow);
+    floorAt = buildRealPlace(group, real, M, solids, quality) || floorAt; if (real.buildingGlow) lamps.push(...real.buildingGlow);
     // a lamp over the anglers after dark (piers, quays and promenades are lit), like the drawn pier's
     const sp = real.spots || [];
     if (sp.length) { const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 34, 1.5); pl.position.set(c[0], c[1] + 5.5, c[2]); group.add(pl); pointLights.push(pl); }
@@ -422,6 +426,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     // the lamps' reflections on the water (up to four, nearest the anglers first)
     for (let i = 0; i < 4; i++) { const pl = pointLights[i]; wU.uLamps.value[i].set(pl ? pl.position.x : 0, pl ? pl.position.y : 0, pl ? pl.position.z : 0, pl ? lampOn : 0); }
+    if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
   return {

@@ -8,3 +8,8 @@ The full list of third-party assets, with sources, licences and file hashes: sou
 fp_arms.glb (your forearms and hands in first person) is cut from a person made with MPFB, MakeHuman for Blender
 (https://static.makehumancommunity.org/mpfb/), with the MakeHuman system assets' skin; the people MPFB makes and the
 system assets are CC0 1.0. Credited with thanks to the MakeHuman team.
+
+pierprops.glb (the pier's lamps, lifebuoy stations, bollards and benches): the bollard, bench and lifebuoy housing were
+modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and the buoy Poly Haven's "Lifebuoy"
+(https://polyhaven.com), CC0 1.0. The pier deck's concrete (public/textures/pier_concrete_*.jpg) is Poly Haven's
+"Concrete Floor 02", CC0 1.0. Credited with thanks to Poly Haven and its artists.

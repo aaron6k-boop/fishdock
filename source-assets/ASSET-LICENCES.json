@@ -162,7 +162,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "models",
    "resolution": "1k",
-   "use": "pier prop",
+   "use": "the lifebuoy in the pier lifebuoy stations (public/models/pierprops.glb)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -294,7 +294,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "models",
    "resolution": "1k",
-   "use": "pier lamp",
+   "use": "pier lamps (public/models/pierprops.glb, textures cut to 512 px)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -439,6 +439,138 @@
    "use": "makes and rigs the anglers",
    "downloaded": "2026-11-03",
    "files": []
+  },
+  {
+   "id": "polyhaven:concrete_floor_worn_001",
+   "name": "Concrete Floor Worn 001",
+   "source": "https://polyhaven.com/a/concrete_floor_worn_001",
+   "author": "Dimitrios Savva, Rico Cilliers",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "pier deck (worn concrete)",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/concrete_floor_worn_001/concrete_floor_worn_001_1k.gltf",
+     "bytes": 2792,
+     "sha256": "115527a0c009b81318ec7c0ed41f8b83d8783b2ea1f7f31a2636e81aab3008c2",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/1k/concrete_floor_worn_001/concrete_floor_worn_001_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_worn_001/textures/concrete_floor_worn_001_diff_1k.jpg",
+     "bytes": 118806,
+     "sha256": "6e40c0fc908f4d66431836f5abe203f3a4eb064e88824378a91a46a26e2f464c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_worn_001/concrete_floor_worn_001.bin",
+     "bytes": 2370516,
+     "sha256": "948100d06619b0a29b7d2471355c5f9c26f36547d5aed16ed266a8267eef5fbc",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/8k/concrete_floor_worn_001/concrete_floor_worn_001.bin"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_worn_001/textures/concrete_floor_worn_001_rough_1k.jpg",
+     "bytes": 181942,
+     "sha256": "069efe4ca018e0ef61fd8cc9964395ba8272284ae239da68d7f87988e2e9f488",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_rough_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_worn_001/textures/concrete_floor_worn_001_nor_gl_1k.jpg",
+     "bytes": 110906,
+     "sha256": "523bd94a1be5dd2f11c2ae2b7d7c77445cf5bd9e41604db515a7c8364dcba067",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_worn_001/concrete_floor_worn_001_nor_gl_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:concrete_floor_02",
+   "name": "Concrete Floor 02",
+   "source": "https://polyhaven.com/a/concrete_floor_02",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "the pier deck (public/textures/pier_concrete_*.jpg)",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/concrete_floor_02/concrete_floor_02_1k.gltf",
+     "bytes": 3585,
+     "sha256": "6e2ed1282e159c54f6fef1dfc937d7399937dbef8735acf57361f7cd9fa22b1d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/1k/concrete_floor_02/concrete_floor_02_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_02/textures/concrete_floor_02_rough_1k.jpg",
+     "bytes": 318550,
+     "sha256": "c7f026a611b7859903c61ec7fd4574944157223e9e7796413dd6e2a66eaeac7a",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_rough_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_02/textures/concrete_floor_02_diff_1k.jpg",
+     "bytes": 776097,
+     "sha256": "6db84a6d87dc50508b9d134d6fbd2b7e876b8081a5f43a118a249ca18de73af5",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_02/concrete_floor_02.bin",
+     "bytes": 2369556,
+     "sha256": "f9a7878eca8745f000989b17d110b782b1308b5cdacc733d5c473da312a333d5",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/8k/concrete_floor_02/concrete_floor_02.bin"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_02/textures/concrete_floor_02_nor_gl_1k.jpg",
+     "bytes": 192757,
+     "sha256": "fcda391b57a816d646ae15544688be53790478da5cd48dbe514b3c6901415e61",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_02/concrete_floor_02_nor_gl_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:concrete_wall_004",
+   "name": "Concrete Wall 004",
+   "source": "https://polyhaven.com/a/concrete_wall_004",
+   "author": "Dario Barresi, Charlotte Baglioni",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "pier wall caps",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/concrete_wall_004/concrete_wall_004_1k.gltf",
+     "bytes": 2739,
+     "sha256": "cea04e8458f4836a9b71dddf2e757912c35c4b0816909f5b90f2136f12ce7f03",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/1k/concrete_wall_004/concrete_wall_004_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_wall_004/textures/concrete_wall_004_rough_1k.jpg",
+     "bytes": 233170,
+     "sha256": "ca10ef32dd1cc81c87fbb6a711ede7fde317a4caa0b4f574cc8203b642c05d03",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_004/concrete_wall_004_rough_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_wall_004/textures/concrete_wall_004_nor_gl_1k.jpg",
+     "bytes": 993350,
+     "sha256": "91fb0da4686d6735e6091974c235c0eefd26fd27840547cbfe03b1e6fcde3544",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_004/concrete_wall_004_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_wall_004/textures/concrete_wall_004_diff_1k.jpg",
+     "bytes": 531968,
+     "sha256": "446261c8d9ae49e5ca9858fe590a71a53cbd3c3b5fcf54f6adcc5c14a649c14f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_wall_004/concrete_wall_004_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_wall_004/concrete_wall_004.bin",
+     "bytes": 2370228,
+     "sha256": "f51d8136a5da586cf168bc9dbe1b891046942245d4a3f10958efe3b0cd4578c8",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/8k/concrete_wall_004/concrete_wall_004.bin"
+    }
+   ]
   }
  ]
 }

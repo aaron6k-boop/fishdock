@@ -286,7 +286,7 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .ft-reel:active { transform: scale(.96); }
 .ft-ring-bg { fill: none; stroke: #ffffff26; stroke-width: 4; }
 .ft-ring { fill: none; stroke: var(--action); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
-.ft-label { font-size: 14.5px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000, 0 0 10px #0009; max-width: 52vw; line-height: 1.25; }
+.ft-label { font-size: 14.5px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000, 0 0 10px #0009; max-width: 52vw; line-height: 1.25; min-width: 0; text-wrap: balance; }
 .ft-label .ft-dist { display: block; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 html:not([data-hand="left"]) .ft-label { text-align: right; }
 /* the Reel button: the thing you press most, so the biggest and clearest; it answers every tap */

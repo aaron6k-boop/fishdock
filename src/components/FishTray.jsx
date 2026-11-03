@@ -32,7 +32,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   else if (phase === "hooked") {
     act = fight?.near ? "land" : "reel";
     // what's happening, said only when it's true: a run only while the fish is taking line, the drag only while it slips
-    status = fight?.near ? "It's close: land it" : fight?.running ? "It's running: line going out" : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : "Tap Reel again and again";
+    status = fight?.near ? "It's close: land it" : fight?.running ? "It's running: line going out" : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : "Keep tapping Reel";
     dist = fight && !fight.near ? `${Math.round(fight.dist)}\u00a0m` : null; label = status;
   }
   else if (phase === "landing") { busy = true; label = "Landing it"; }
