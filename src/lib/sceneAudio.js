@@ -5,7 +5,7 @@
 // rod), the reel's ratchet while a fish is played, the cast and the splashes. Everything follows the scene's own
 // conditions, so what you hear matches what you see. One level control and mute.
 
-let ac = null, master = null, reelTimer = null, gullTimer = null;
+let ac = null, master = null, reelTimer = null, gullTimer = null, slapTimer = null;
 // three groups with their own levels (environment, equipment, fishing events), and a panner so another angler's
 // reel or splash comes from their side
 let envG = null, gearG = null, evG = null, pan = null, nearG = null;
@@ -70,6 +70,12 @@ function apply() {
   to(rain.f.frequency, 3200 - r * 1500);
   to(rain.depth.gain, 0.15);
   to(rain.gain.gain, on ? r * r * 0.12 + (r > 0 ? 0.01 : 0) : 0, 1.2);
+  // on a pier or quay: now and then a wave slapping against the wall below and draining back (not on a beach or bank)
+  clearTimeout(slapTimer); slapTimer = null;
+  if (on && sea && (env.venue === "pier" || env.venue === "estuary")) {
+    const nextSlap = () => { slapTimer = setTimeout(() => { if (ac.state === "running") slap(w); nextSlap(); }, (3500 + Math.random() * 6000) * (1.2 - w * 0.5)); };
+    nextSlap();
+  }
   // gulls: by the sea in daylight, not in heavy rain, every 8 to 30 seconds
   clearTimeout(gullTimer); gullTimer = null;
   if (on && sea && env.night < 0.5 && r < 0.6) {
@@ -98,7 +104,7 @@ export function soundOff() {
   if (!ac) return;
   to(master.gain, 0, 0.2);
   clearInterval(reelTimer); reelTimer = null;
-  clearTimeout(gullTimer); gullTimer = null;
+  clearTimeout(gullTimer); gullTimer = null; clearTimeout(slapTimer); slapTimer = null;
   apply();
 }
 function applyGroups() { if (!ac) return; envG.gain.value = groupLevel.environment; gearG.gain.value = groupLevel.equipment; evG.gain.value = groupLevel.events; }
@@ -133,6 +139,8 @@ function burst(dur, freq, gain, q = 0.8, white = false, out = evG) {
   src.connect(bp); bp.connect(v); v.connect(out || master); src.start(t); src.stop(t + dur + 0.05);
 }
 function click() { burst(0.025, 3200, 0.12, 4, false, gearG); }
+// a wave against the wall: a soft low slap, then the water sucking back (quiet: it sits under the wash)
+function slap(w = 0.3) { const g = 0.06 + w * 0.08; burst(0.18, 320 + Math.random() * 120, g, 0.8, false, envG); setTimeout(() => burst(0.7, 900 + Math.random() * 300, g * 0.35, 0.6, false, envG), 160); }
 // a herring gull's call: a few falling, slightly harsh cries
 function gull() {
   const n = 2 + Math.floor(Math.random() * 3), base = 1150 + Math.random() * 300, g = 0.012 + Math.random() * 0.012;
@@ -160,7 +168,12 @@ export function play(name) {
   else if (name === "whoosh") burst(0.35, 2400, 0.18, 0.4, false, gearG);
   else if (name === "drip") { for (let i = 0; i < 16; i++) setTimeout(() => burst(0.05 + Math.random() * 0.05, 2600 + Math.random() * 2200, 0.05 * (1 - i / 18), 1.4, true), i * 95 + Math.random() * 60); } // water pouring out of the net as it comes up
   else if (name === "net") { burst(0.4, 700, 0.3, 0.6); setTimeout(() => burst(0.25, 1500, 0.15, 0.8, true), 150); }
-  else if (name === "reelOn") { clearInterval(reelTimer); reelTimer = setInterval(click, 70); setTimeout(() => { clearInterval(reelTimer); reelTimer = null; }, 20000); }
+  else if (name === "reelOn") { clearInterval(reelTimer); reelTimer = setInterval(click, 70); setTimeout(() => { clearInterval(reelTimer); reelTimer = null; }, 2500); } // (a friend's reel: the first run, not a loop for the whole fight)
+  else if (name === "swish") burst(0.22, 1700, 0.16, 0.5, false, gearG); // the rod swept up on the strike
+  else if (name === "step" || name === "stepRun") { const k = name === "stepRun" ? 1.3 : 1; burst(0.06, 180 + Math.random() * 60, 0.22 * k, 1.1); burst(0.035, 2400 + Math.random() * 900, 0.035 * k, 1.6, true); } // a boot on concrete: a soft thump and a little grit
+  else if (name === "rope") { const d = 0.28 + Math.random() * 0.12; burst(d, 1300 + Math.random() * 500, 0.05, 0.9, true, gearG); setTimeout(() => burst(0.06, 600, 0.05, 1.2), d * 900); } // the rope drawn through the hands, then gripped
+  else if (name === "mat") { burst(0.12, 260, 0.28, 0.9); burst(0.08, 1800, 0.05, 1, true); } // the fish laid on the wet mat
+  else if (name === "flap") { burst(0.07, 900, 0.12, 1.3); setTimeout(() => burst(0.05, 1200, 0.07, 1.3), 90); } // a flick of its tail on the mat
   else if (name === "reelOff") { clearInterval(reelTimer); reelTimer = null; }
   else if (name === "reelTap") { click(); setTimeout(click, 45); setTimeout(click, 95); } // one turn of the handle: the gears' clicks
   else if (name === "drag") { for (let i = 0; i < 7; i++) setTimeout(() => burst(0.018, 4200 + Math.random() * 600, 0.1, 5, false, gearG), i * 28); } // the drag giving line: a fast ratchet

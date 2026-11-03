@@ -89,15 +89,55 @@ function netTexture() {
 
 /** A generic fish (for species without a FishDock picture): a smooth lofted body and a forked tail. */
 function genericFishGeometry() {
-  const pos = [], idx = [], K = 22, M = 12;
+  const pos = [], idx = [], uv = [], K = 22, M = 12;
   for (let i = 0; i < K; i++) {
     const u = i / (K - 1), r = Math.sin(Math.PI * Math.min(1, u * 1.15)) * 0.11 * (u < 0.85 ? 1 : 0.3) + 0.004;
-    for (let j = 0; j < M; j++) { const a = (j / M) * Math.PI * 2; pos.push(u, Math.cos(a) * r, Math.sin(a) * r * 0.55); }
+    for (let j = 0; j < M; j++) { const a = (j / M) * Math.PI * 2; pos.push(u, Math.cos(a) * r, Math.sin(a) * r * 0.55); uv.push(u, j / M); }
   }
   for (let i = 0; i < K - 1; i++) for (let j = 0; j < M; j++) { const a = i * M + j, b = i * M + ((j + 1) % M); idx.push(a, a + M, b, b, a + M, b + M); }
-  const base = pos.length / 3; pos.push(0.86, 0, 0, 1.0, 0.13, 0, 1.0, -0.13, 0, 0.95, 0, 0); idx.push(base, base + 1, base + 3, base, base + 3, base + 2);
-  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  const base = pos.length / 3; pos.push(0.86, 0, 0, 1.0, 0.13, 0, 1.0, -0.13, 0, 0.95, 0, 0); uv.push(0.97, 0.25, 0.99, 0.02, 0.99, 0.48, 0.98, 0.25); idx.push(base, base + 1, base + 3, base, base + 3, base + 2);
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
   return g;
+}
+
+// ---- the skin of a fish without a FishDock picture (the freshwater species): drawn from its known colouring, darker
+// on the back and pale on the belly (as every fish is), with its markings: a pike's pale spots, a trout's dark spots,
+// a perch-like zander's bars, the red fins of a roach or rudd. The canvas runs head (left) to tail, round the body from
+// the back (top), down one side to the belly (middle) and up the other side ----
+const FISH_SKINS = {
+  carp: { back: [74, 62, 30], side: [168, 132, 60], belly: [226, 204, 150], scales: 0.5 }, "crucian-carp": { back: [70, 62, 28], side: [170, 140, 62], belly: [222, 200, 140], scales: 0.45 },
+  roach: { back: [62, 78, 84], side: [196, 202, 204], belly: [236, 236, 232], fin: [196, 70, 50], scales: 0.3 }, rudd: { back: [86, 82, 52], side: [204, 180, 110], belly: [236, 226, 196], fin: [214, 64, 40], scales: 0.3 },
+  bream: { back: [62, 58, 46], side: [150, 136, 104], belly: [210, 200, 180], scales: 0.35 }, tench: { back: [44, 58, 30], side: [96, 112, 52], belly: [170, 164, 90], scales: 0.1 },
+  pike: { back: [44, 62, 36], side: [96, 116, 60], belly: [222, 218, 190], spots: [214, 206, 150], spotN: 70 }, zander: { back: [60, 70, 66], side: [150, 156, 150], belly: [230, 230, 222], bars: 8 },
+  barbel: { back: [86, 74, 50], side: [160, 140, 96], belly: [220, 206, 170], scales: 0.2 }, chub: { back: [56, 62, 60], side: [176, 172, 158], belly: [228, 224, 214], scales: 0.45 },
+  dace: { back: [70, 80, 86], side: [200, 204, 206], belly: [238, 238, 236], scales: 0.25 }, ide: { back: [60, 66, 70], side: [184, 180, 170], belly: [232, 230, 222], fin: [200, 96, 60], scales: 0.3 },
+  gudgeon: { back: [92, 86, 64], side: [168, 160, 130], belly: [222, 216, 196], blotch: 7 }, grayling: { back: [70, 74, 82], side: [160, 162, 170], belly: [222, 222, 226], spotN: 18, spots: [40, 40, 44] },
+  "brown-trout": { back: [70, 64, 36], side: [176, 150, 90], belly: [232, 220, 180], spots: [60, 40, 26], spotN: 60, red: true }, "rainbow-trout": { back: [56, 76, 64], side: [190, 190, 180], belly: [236, 234, 226], spots: [40, 40, 36], spotN: 90, band: [200, 110, 120] },
+  salmon: { back: [52, 66, 80], side: [202, 206, 210], belly: [240, 240, 238], spots: [36, 40, 46], spotN: 22 }, "sea-trout": { back: [58, 70, 82], side: [200, 204, 206], belly: [240, 240, 236], spots: [40, 44, 50], spotN: 30 },
+  "wels-catfish": { back: [46, 48, 40], side: [92, 92, 74], belly: [196, 190, 170], blotch: 14 },
+};
+function fishSkin(species) {
+  const S = FISH_SKINS[species]; if (!S || typeof document === "undefined") return null;
+  const W = 256, H = 128, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
+  const img = g.createImageData(W, H), mix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+  let seed = 7; for (const ch of species) seed = (seed * 31 + ch.charCodeAt(0)) % 9973; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const v = y / H, u = x / W, up = Math.cos(v * Math.PI * 2); // 1 on the back, -1 at the belly
+    let col = up > 0 ? mix(S.side, S.back, Math.pow(up, 0.8)) : mix(S.side, S.belly, Math.pow(-up, 0.7));
+    if (S.scales) { const sx = (u * 60 + (Math.floor(v * 40) % 2) * 0.5) % 1, sy = (v * 40) % 1; const e = Math.min(1, Math.hypot(sx - 0.5, sy - 0.5) * 2); col = col.map((c0) => c0 * (1 - S.scales * 0.18 * e * e)); }
+    if (S.bars) { const b = Math.max(0, Math.sin(u * Math.PI * S.bars)) ** 4 * Math.max(0, up + 0.2); col = mix(col, S.back, b * 0.6); }
+    if (S.band) { const bd = Math.exp(-((Math.abs(up) - 0.1) ** 2) / 0.02); col = mix(col, S.band, bd * 0.5); }
+    if (S.fin && u > 0.82) col = mix(col, S.fin, 0.55);
+    const k = (y * W + x) * 4; img.data[k] = col[0]; img.data[k + 1] = col[1]; img.data[k + 2] = col[2]; img.data[k + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const dots = (n, rgb, r0, r1, onBelly = false) => { g.fillStyle = `rgb(${rgb.join(",")})`; for (let i = 0; i < n; i++) { const x = 25 + rnd() * (W - 60), y = rnd() * H, up = Math.cos((y / H) * Math.PI * 2); if (!onBelly && up < -0.3) continue; g.beginPath(); g.ellipse(x, y, r0 + rnd() * (r1 - r0), (r0 + rnd() * (r1 - r0)) * 0.8, 0, 0, Math.PI * 2); g.fill(); } };
+  if (S.spots) dots(S.spotN, S.spots, 1.4, species === "pike" ? 3.2 : 2.4);
+  if (S.red) dots(18, [176, 40, 30], 1.2, 2);
+  if (S.blotch) dots(S.blotch * 4, S.back, 3, 7);
+  // the eye, near the head on each side (a quarter and three quarters of the way round)
+  for (const y of [H * 0.25, H * 0.75]) { g.fillStyle = "#e9e2c8"; g.beginPath(); g.arc(W * 0.06, y, 4, 0, Math.PI * 2); g.fill(); g.fillStyle = "#101010"; g.beginPath(); g.arc(W * 0.06, y, 2.4, 0, Math.PI * 2); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
 export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, look = null, local = false, real = false, rail = false, onSound, onFeel } = {}) {
@@ -221,6 +261,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1, 6), mMetal); world.add(pole); pole.visible = false;
   // an unhooking mat (a padded, wipe-clean mat: where a fish you'll put back is laid to be looked at and unhooked)
   const mat = new THREE.Group(); world.add(mat); mat.visible = false;
+  const MAT_AT = new THREE.Vector3(0.05, 0, -0.62); // (where it's laid: in front of you)
   { const top = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.46), new THREE.MeshStandardMaterial({ color: 0x2f5a3c, roughness: 0.75 })); top.position.y = 0.022;
     const edgeM = new THREE.MeshStandardMaterial({ color: 0x1f2c24, roughness: 0.8 });
     for (const [w, d, x, z] of [[0.9, 0.05, 0, 0.235], [0.9, 0.05, 0, -0.235], [0.05, 0.5, 0.43, 0], [0.05, 0.5, -0.43, 0]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), edgeM); e.position.set(x, 0.025, z); mat.add(e); }
@@ -247,7 +288,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (key === fishFor) return; fishFor = key;
     prof = fightProfile(species); fishLen = clamp((lengthCm || 40) / 100, 0.12, 2);
     load = fishLoad(species, lengthCm, weightKg); LT = landingTimes(species, lengthCm, weightKg, venue); tech = landingTech(species, lengthCm, weightKg, venue);
-    fish.geometry = fishGeo = genericFishGeometry(); fishBase = fishGeo.attributes.position.array.slice(); fishMat.map = null; fishMat.color.set(0xb8c0c4); fishMat.needsUpdate = true;
+    fish.geometry = fishGeo = genericFishGeometry(); fishBase = fishGeo.attributes.position.array.slice(); { const sk = hasArt(species) ? null : fishSkin(species); fishMat.map = sk; fishMat.color.set(sk ? 0xffffff : 0xb8c0c4); } fishMat.needsUpdate = true;
     if (species && hasArt(species)) {
       const img = new Image();
       img.onload = () => {
@@ -444,7 +485,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
       pitch += 0.38 * strikeK; fpE += 0.32 * strikeK; bendT += 0.25 * strikeK;
       P.tension = tension;
-      if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); feel("hooked", {}, true); }
+      if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); else onSound?.("swish", at); feel("hooked", {}, true); } // (the strike: the rod swept up)
       if (fl) {
         // the handle turns as you tap; each half turn clicks; the drag giving line ratchets and the tip shivers
         // (your own reel's clicks only: a friend's fight is seen, not heard)
@@ -511,6 +552,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
             // hauled up hand over hand: a pull at a time (each hand in turn), slower with the weight at first
             const N = Math.max(4, Math.round(L / 0.6)), f = seg(age, T4, swingIn), q = f * N, k = Math.min(N - 1, Math.floor(q)), u = q - k;
             const pulled = (k + ease(clamp((u - 0.15) / 0.75, 0, 1))) / N; ropeOut = L * (1 - pulled);
+            if (k !== P.lastPull) { P.lastPull = k; onSound?.("rope", hangAt(ropeOut)); } // (each pull: the rope through the hands)
             ropePull = { hand: k % 2, u }; sway = Math.sin((age - T4) * 2.6) * 0.1 * (1 - f) * (0.6 + 0.4 * Math.sin(u * Math.PI));
             if (ropeOut < L - sink - 0.1 && f < 0.92 && Math.floor(age / 0.12) !== Math.floor((age - dt) / 0.12)) splashCb?.(hangAt(ropeOut).add(new THREE.Vector3(0, -bridle - 0.3 * ns, 0)), 0.06 + 0.1 * (1 - f)); // (water pouring out of the mesh)
             if (crossed(T4 + 0.25)) onSound?.("drip", hangAt(ropeOut));
@@ -568,21 +610,25 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]);
       showFish = true; showLine = false;
       const G = venue === "pier" ? dropGeo(ns) : null;
-      const matAt = toWorld(new THREE.Vector3(0.05, 0.004, -0.62)), onMat = matAt.clone().add(new THREE.Vector3(0, 0.04 + 0.02 * ns, 0));
+      const matAt = toWorld(MAT_AT.clone().setY(0.004)), onMat = matAt.clone().add(new THREE.Vector3(0, 0.04 + 0.02 * ns, 0));
       const netDeck = G ? G.deck : toWorld(new THREE.Vector3(-0.62, 0.06, -0.2));
       const lying = (c, kk) => ({ mouth: c.clone().addScaledVector(side, fishLen * 0.5), dir: side.clone().negate(), roll: Math.PI / 2, beat: kk.beat, curl: kk.curl, centre: c });
       if (kept.state === "deck") {
         if (G) { netOn = true; ropesOn = true; netAt = G.deck.clone(); rigAt = netAt.clone(); inNet = true; netRest = 1; }
-        else if (tech === "net") { netOn = true; netAt = netDeck.clone().add(new THREE.Vector3(0, 0.12, 0)); rigAt = netAt.clone(); inNet = true; netRest = 1; } // (resting in the landing net on the bank)
+        else if (tech === "net") { netOn = true; netAt = netDeck.clone().add(new THREE.Vector3(0, 0.12, 0)); rigAt = netAt.clone(); inNet = true; netRest = 1; poleFrom = toWorld(new THREE.Vector3(-1.45, 0.05, 0.55)); } // (resting in the landing net on the bank, its handle down)
         else keptPose = lying(netDeck.clone(), { beat: 0.12, curl: Math.max(0, Math.sin(kt * 1.7)) ** 8 * 0.5 });
       } else if (kept.state === "inspect") {
         // a look at it: lifted out of the net in both hands and laid on an unhooking mat in front of you (low, wet and
         // soft: the way to handle a fish you'll put back), you crouching over it with a hand resting on it. Still apart
         // from its gills and now and then a flick of the tail; nothing turns it
         matOn = true; if (G) { netOn = true; ropesOn = true; netAt = G.deck.clone(); netRest = 1; }
+        // (a landing net is laid down on the bank beside you, its handle on the ground, out of the way of the mat)
+        else if (tech === "net") { netOn = true; netRest = 1; netAt = netDeck.clone().add(new THREE.Vector3(0, 0.08, 0)); poleFrom = toWorld(new THREE.Vector3(-1.45, 0.05, 0.55)); }
         const lift = ease(Math.min(1, kt / 1.1)), c = netDeck.clone().add(new THREE.Vector3(0, 0.05, 0)).lerp(onMat, lift); c.y += Math.sin(lift * Math.PI) * 0.32;
         keptPose = lying(c, { beat: 0.12, curl: Math.max(0, Math.sin(kt * 1.1)) ** 10 * 0.25 });
         keptPose.lift = kt < 1.15;
+        if (crossed2(kt, 1.05)) onSound?.("mat", c); // laid down on the mat
+        if (kt > 2 && Math.sin(prevKt * 1.1) < 0.97 && Math.sin(kt * 1.1) >= 0.97) onSound?.("flap", c); // (each flick of its tail)
       } else if (kept.state === "release") {
         // back to the water. Off a high pier it isn't dropped: it goes back in the drop net, let down to the water, and
         // swims out of it; from a bank, in the landing net at the edge; on a beach, into the shallows. Shortened: after
@@ -854,7 +900,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       poseFish(rigAt, hangDir, t, { beat: age < LT.T4 ? 1 : 0.3, curl: Math.sin(t * 2.3) * 0.2 * (age > LT.T2 && age < LT.swingIn ? 1 : 0) });
     }
     mat.visible = matOn || (kept?.state === "release" && !!keptPose?.lift);
-    if (mat.visible) { mat.position.copy(toWorld(new THREE.Vector3(0.05, 0, -0.62))); mat.rotation.y = root.rotation.y; }
+    if (mat.visible) { mat.position.copy(toWorld(MAT_AT)); mat.rotation.y = root.rotation.y; }
     net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r) => (r.visible = net.visible && !netIdle && (tech === "dropnet" || ropesOn)));
     if (net.visible) {
       net.position.copy(netAt);
