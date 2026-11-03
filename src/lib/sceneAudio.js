@@ -149,7 +149,8 @@ function gull() {
 }
 
 /** Plays a named effect if sound is on: bell (the bite: a bell at sea, an alarm on fresh water), plop, splash,
- *  bigsplash, whoosh, reelOn, reelOff. */
+ *  bigsplash, whoosh, net (a net going into the water), drip (water pouring out of a lifted net), reelOn, reelOff,
+ *  reelTap (one tap of the reel), drag (the drag slipping). */
 export function play(name) {
   if (!ac || !on || ac.state !== "running") return;
   if (name === "bell") { if (env.venue === "river" || env.venue === "lake") alarm(3 + Math.floor(Math.random() * 3)); else bell(); }
@@ -157,7 +158,10 @@ export function play(name) {
   else if (name === "splash") { burst(0.5, 1200, 0.45, 0.6); burst(0.3, 3500, 0.12, 0.8, true); }
   else if (name === "bigsplash") { burst(0.9, 900, 0.8, 0.5); setTimeout(() => { burst(0.6, 1800, 0.35, 0.7); burst(0.5, 4000, 0.12, 0.8, true); }, 120); }
   else if (name === "whoosh") burst(0.35, 2400, 0.18, 0.4, false, gearG);
+  else if (name === "drip") { for (let i = 0; i < 16; i++) setTimeout(() => burst(0.05 + Math.random() * 0.05, 2600 + Math.random() * 2200, 0.05 * (1 - i / 18), 1.4, true), i * 95 + Math.random() * 60); } // water pouring out of the net as it comes up
   else if (name === "net") { burst(0.4, 700, 0.3, 0.6); setTimeout(() => burst(0.25, 1500, 0.15, 0.8, true), 150); }
   else if (name === "reelOn") { clearInterval(reelTimer); reelTimer = setInterval(click, 70); setTimeout(() => { clearInterval(reelTimer); reelTimer = null; }, 20000); }
   else if (name === "reelOff") { clearInterval(reelTimer); reelTimer = null; }
+  else if (name === "reelTap") { click(); setTimeout(click, 45); setTimeout(click, 95); } // one turn of the handle: the gears' clicks
+  else if (name === "drag") { for (let i = 0; i < 7; i++) setTimeout(() => burst(0.018, 4200 + Math.random() * 600, 0.1, 5, false, gearG), i * 28); } // the drag giving line: a fast ratchet
 }

@@ -4,6 +4,8 @@
 // (Wikimedia Commons, credited) or the drawn scene; "Live weather" is the real forecast for that place.
 /* global __BUILD_ID__ */
 import { useEffect, useMemo, useRef, useState } from "react";
+import HapticSettings from "../components/HapticSettings.jsx";
+import { haptics } from "../lib/haptics.js";
 import FishingScene, { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
 import { ROD_STYLES } from "../lib/sceneActors.js";
 import { composeFrame } from "../lib/sceneGL.js";
@@ -14,6 +16,9 @@ import { DRAW_CM, phaseAt } from "../lib/liveEvents.js";
 import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import FishTray from "../components/FishTray.jsx";
 import Stage3D from "../components/Stage3D.jsx";
+import InviteHere from "../components/InviteHere.jsx";
+import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
+import { saveLook } from "../lib/world3d/people.js";
 import { landedCatches } from "../lib/landed.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -37,7 +42,8 @@ const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { win
 /** A time today that gives the chosen light at this place, found from the real sun. */
 
 export default function TryLive({ initialPlace, initialSpecies }) {
-  const [placeId, setPlaceId] = useState(TRY_PLACES.includes(initialPlace) ? initialPlace : GORLESTON.id);
+  // the chips offer the demo places, but a link to any documented mark opens that mark (never a different place)
+  const [placeId, setPlaceId] = useState(initialPlace && (initialPlace === GORLESTON.id || spotById(initialPlace)) ? initialPlace : GORLESTON.id);
   const place = placeOf(placeId);
   const fresh = place.kind !== "sea";
   const fishList = useMemo(() => SPECIES.filter((s) => (fresh ? s.type !== "sea" : s.type !== "fresh")).sort((a, b) => (hasArt(b.id) ? 1 : 0) - (hasArt(a.id) ? 1 : 0)), [fresh]);
@@ -61,6 +67,10 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [copied, setCopied] = useState("");
   const [uiHidden, setUiHidden] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [invite, setInvite] = useState(false);
+  const [lookOpen, setLookOpen] = useState(false), [look, setLookNow] = useState(myLook);
+  const setLook = (v) => { setLookNow(v); saveLook(v); };
+  const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
   const [view3d, setView3d] = useState(() => /\/3d$/.test(location.hash)); // the 360° 3D view (Beta)
   const sceneRef = useRef(null);
   const vfReset = useRef(null); // a new place starts afresh
@@ -109,28 +119,33 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [, setTick] = useState(0);
   useEffect(() => { if (!events.length) return undefined; const id = setInterval(() => setTick((n) => n + 1), 400); return () => clearInterval(id); }, [events.length]);
   const p = phaseAt(events, Date.now());
+  // the fight's over (landed, lost or never started): the reeling ticks stop with it
+  useEffect(() => { if (p.phase !== "hooked") haptics.reeling(false); }, [p.phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = events.at(-1)?.type;
   const base = `${location.origin}/#try`;
   const copy = async (u) => { try { await navigator.clipboard.writeText(u); setCopied(u); setTimeout(() => setCopied(""), 1800); } catch { /* ignore */ } };
 
   const venue = from === "auto" ? venueOf(place) : from;
   const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
-  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: 0, local: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length]);
+  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length, look]);
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (
     <>
       <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
-              <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
-              {c?.windKph != null ? <span className="fs-chip"><Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</span> : null}
+              <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
               <span className="grow" />
-              <button type="button" className={`fs-btn${view3d ? " on" : ""}`} onClick={() => setView3d(!view3d)} aria-pressed={view3d} aria-label={view3d ? "Back to the photo view" : "Look around in 3D (Beta)"} title="360° look-around (Beta)"><Icon name="compass" /></button>
-              <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
-              <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
+              {/* in 3D these live in the view's one menu (top right); the photo view keeps its buttons */}
+              {!view3d ? <>
+                <button type="button" className="fs-btn" onClick={() => setView3d(true)} aria-label="Look around in 3D (Beta)" title="360° look-around (Beta)"><Icon name="compass" /></button>
+                <button type="button" className="fs-btn" onClick={() => setInvite(true)} aria-label="Invite a friend here" title="Invite a friend here"><Icon name="users" /></button>
+                <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
+                <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
+              </> : null}
             </div>
             <div className="fs-bottom">
-              <FishTray phase={p.phase} last={last} reel={vf.reel} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onHold={vf.hold} onNudge={vf.nudge} onStop={vf.stop} />
+              <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
     </>
   );
@@ -139,15 +154,26 @@ export default function TryLive({ initialPlace, initialSpecies }) {
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "photo", label: "Photo view", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (
-            <FishingScene ref={sceneRef} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
+            <FishingScene ref={sceneRef} feel={haptics.feel} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </FishingScene>
           )}
         </div>
+        {lookOpen ? <>
+          <div className="sheet-scrim" onClick={() => setLookOpen(false)} />
+          <aside className="watch-panel sheet open look-sheet" aria-label="Your angler">
+            <div className="sheet-head">
+              <div className="try-head"><h1>Your angler</h1><p className="small muted">How you look in the 3D view, and to friends in Fish Together. Saved on this phone.</p></div>
+              <button type="button" className="xbtn sheet-x" onClick={() => setLookOpen(false)} aria-label="Close"><Icon name="close" /></button>
+            </div>
+            <section className="watch-sec"><LookPicker value={look} onChange={setLook} /></section>
+          </aside>
+        </> : null}
+        <InviteHere open={invite} onClose={() => setInvite(false)} markId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} />
         {sheet ? <div className="sheet-scrim" onClick={() => setSheet(false)} /> : null}
         <aside className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Demo settings">
           <div className="sheet-head">
@@ -204,6 +230,11 @@ export default function TryLive({ initialPlace, initialSpecies }) {
             <div className="field"><span className="lbl">Animation quality</span><Seg value={quality} onChange={setQuality} options={QUALITY_OPTIONS} /></div>
           </section>
 
+          <section className="watch-sec">
+            <div className="card-h"><h2>Haptic feedback</h2></div>
+            <HapticSettings compact />
+          </section>
+
           <section className="watch-sec test-panel">
             <div className="card-h"><h2>Testing</h2><span className="aside">Skips the waiting</span></div>
             <div className="moments">
@@ -215,6 +246,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
               <button type="button" className="chip" disabled={!events.length} onClick={() => { setSheet(false); vf.reset(); }}>Reset</button>
             </div>
             <p className="tiny">Only steps that make sense now are offered: there's no landing a fish before a bite.</p>
+            <label className="check"><input type="checkbox" checked={panoPreview} onChange={(e) => { const on = e.target.checked; setPanoPreview(on); try { if (on) localStorage.setItem("fishdock.panoPreview", "1"); else localStorage.removeItem("fishdock.panoPreview"); } catch { /* no storage */ } }} /><span>Preview real 360° photos in 3D on this phone (not public yet; reopen the 3D view to see it)</span></label>
           </section>
 
           {catches.length ? (

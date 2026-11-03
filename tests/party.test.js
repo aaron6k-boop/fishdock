@@ -202,3 +202,130 @@ test("the live connection is checked by origin: a page elsewhere can't open a pa
   const r = await h.c("GET", `/${code}/ws?m=x`, { headers: { upgrade: "websocket" }, origin: "https://evil.example", fishdock: false });
   assert.equal(r.status, 403);
 });
+
+test("only the host can use the host's controls, whatever a guest's phone sends", async (t) => {
+  const h = harness(t);
+  const { code, member, secret } = (await start(h.c)).body;
+  const host = await h.sock(code, member.key);
+  const j = (await h.c("POST", `/${code}/join`, { body: { secret, name: "James", role: "angler" } })).body.member;
+  const james = await h.sock(code, j.key);
+  const before = JSON.stringify((await h.c("GET", `/${code}?s=${secret}`)).body);
+  for (const m of [{ t: "kick", who: member.id }, { t: "assign", who: member.id, spot: 3 }, { t: "settings", locked: true, codeOn: false, chatOn: false, voiceOn: false, anglersOn: false, light: "night" }, { t: "newLink" }, { t: "challenge", kind: "biggest", minutes: 60 }, { t: "close" }]) await james.send(m);
+  assert.equal(JSON.stringify((await h.c("GET", `/${code}?s=${secret}`)).body), before, "nothing about the party changed");
+  assert.equal((await h.c("GET", `/${code}?s=${secret}`)).status, 200, "the old link still works: no new link was made");
+  assert.ok(!host.got.some((m) => m.t === "kicked" || m.t === "closed"));
+  assert.ok(!james.got.some((m) => m.t === "settings" && m.secret), "a guest never receives the invite secret");
+  // and a guest can't fish as someone else: events are always theirs
+  await james.send({ t: "event", ev: { type: "cast", cid: "x1", who: member.id } });
+  assert.equal(host.last("event").ev.who, james.member);
+});
+
+test("asking about codes, joining and starting parties are limited per connection", async (t) => {
+  const h = harness(t);
+  const { code, secret } = (await start(h.c)).body;
+  let last;
+  for (let i = 0; i <= PARTY.lookupsPerMinute; i++) last = await h.c("GET", `/ZZZZZ${"23456789ABCDEFGHJKMNPQRSTUVWXYZ"[i % 31]}?via=code`);
+  assert.equal(last.status, 429, "guessing codes is slowed down");
+  for (let i = 0; i <= PARTY.joinsPerMinute; i++) last = await h.c("POST", `/${code}/join`, { body: { secret: `wrong${i}xxxxxx`, name: "x" } });
+  assert.equal(last.status, 429, "guessing invite secrets is slowed down");
+  h.advance?.(70e3);
+});
+
+test("a party's saved record can't grow without limit: reports are capped, and so is everyone who ever joined", async (t) => {
+  const room = new PartyRoom(null), now = Date.now();
+  const host = await room.init({ code: "ABCDEF", mode: "virtual", venue: "pier", name: "H", hours: 2 }, now);
+  const g = await room.join({ secret: room.s.secret, name: "G", role: "spectator" }, now);
+  for (let i = 0; i < PARTY.maxReports + 50; i++) room.message(g.member.id, { t: "report", who: host.id, reason: `r${i}` }, now + i * 1000);
+  assert.ok(room.s.reports.length <= PARTY.maxReports, `${room.s.reports.length} reports kept`);
+  let full = 0;
+  for (let i = 0; i < PARTY.maxEverMembers + 5; i++) { const r = await room.join({ secret: room.s.secret, name: `p${i}`, role: "spectator" }, now); if (r.error === "full") full++; else room.s.members[r.member.id].left = true; }
+  assert.ok(Object.keys(room.s.members).length <= PARTY.maxEverMembers && full > 0);
+  const codes = Array.from({ length: 2000 }, makeCode); assert.ok(codes.every(validCode));
+});
+
+test("a party started from the 3D demo can be at a documented FishDock mark, never an arbitrary place, and never on a real trip", async () => {
+  const { cleanPlace } = await import("../server/party.js");
+  assert.deepEqual(cleanPlace({ label: "Gorleston South Pier", mark: "gorleston-south-pier" }, "virtual"), { label: "Gorleston South Pier", mark: "gorleston-south-pier" });
+  assert.deepEqual(cleanPlace({ label: "Somewhere", mark: "52.57,1.73" }, "virtual"), { label: "Somewhere" }, "a position isn't a mark");
+  assert.deepEqual(cleanPlace({ label: "x", mark: "not-a-real-mark-anywhere" }, "virtual"), { label: "x" });
+  assert.deepEqual(cleanPlace({ label: "Gorleston", mark: "gorleston-south-pier" }, "real"), { label: "Gorleston" }, "a real trip never names a mark");
+  assert.deepEqual(cleanPlace({ label: "  " }, "virtual"), { label: null });
+});
+
+test("walking about in a virtual party: poses go to the others only, cleaned, never saved, with their own limit", async () => {
+  const { cleanPose } = await import("../server/party.js");
+  assert.deepEqual(cleanPose({ x: 1.234, y: 2.2, z: -7.5, face: 0.4, air: 1, extra: "x" }), { x: 1.23, y: 2.2, z: -7.5, face: 0.4, air: true });
+  assert.equal(cleanPose(null), null, "back at their spot");
+  assert.equal(cleanPose({ x: 1e6, y: 0, z: 0, face: 0 }), undefined, "out of the place");
+  assert.equal(cleanPose({ x: "1", y: 0, z: 0, face: 0 }), undefined);
+  assert.equal(cleanPose("hi"), undefined);
+  assert.deepEqual(cleanPose({ emote: "wave", x: 5 }), { emote: "wave" }, "an emote is just its name");
+  assert.equal(cleanPose({ emote: "dance<script>" }), undefined);
+  assert.deepEqual(cleanPose({ fight: { progress: 0.41234, tension: 0.777, slipping: 1, turns: 12.34, extra: "x" } }), { fight: { progress: 0.412, tension: 0.78, slipping: true, turns: 12.3 } }, "a fight's state, cleaned");
+  assert.equal(cleanPose({ fight: { progress: 3, tension: 0, turns: 0 } }), undefined);
+  const room = new PartyRoom();
+  await room.init({ code: "ABC234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const host = Object.values(room.s.members)[0];
+  host.spot = host.spot || 1;
+  const r = room.message(host.id, { t: "pose", p: { x: 3, y: 2.2, z: -7, face: 0.4 } }, 2000);
+  assert.equal(r.save, false); assert.deepEqual(r.out, [{ to: "others", msg: { t: "pose", who: host.id, p: { x: 3, y: 2.2, z: -7, face: 0.4, air: false } } }]);
+  let sent = 0; for (let i = 0; i < 80; i++) sent += room.message(host.id, { t: "pose", p: { x: i, y: 2, z: 0, face: 0 } }, 3000 + i).out.length;
+  assert.ok(sent <= PARTY.posesPer10s, `${sent} poses in a burst`);
+  assert.equal(room.message(host.id, { t: "chat", text: "still fine" }, 3200).out.length, 1, "walking doesn't use up the chat and cast limit");
+  const real = new PartyRoom(); await real.init({ code: "DEF234", mode: "real", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const rh = Object.values(real.s.members)[0]; rh.spot = rh.spot || 1;
+  assert.equal(real.message(rh.id, { t: "pose", p: { x: 3, y: 2.2, z: -7, face: 0.4 } }, 2000).out.length, 0, "no walking on a real trip");
+});
+
+test("an angler's look: small whole numbers, cleaned, shared with the party; anything else is dropped", async (t) => {
+  const h = harness(t);
+  const look = { skin: 4, hair: 0, hat: 1, beard: 2, build: 2 };
+  const r = await start(h.c, { look: { ...look, extra: "x" } });
+  assert.equal(r.status, 200, r.text);
+  const me = await h.sock(r.body.code, r.body.member.key);
+  assert.deepEqual(me.last("hello").members[0].look, look);
+  const j = await h.c("POST", `/${r.body.code}/join`, { body: { secret: r.body.secret, name: "Sam", role: "angler", look: { skin: 99, hair: 0, hat: 0, beard: 0, build: 0 } } });
+  assert.equal(j.status, 200, j.text);
+  const them = await h.sock(r.body.code, j.body.member.key);
+  const sam = them.last("hello").members.find((m) => m.name === "Sam");
+  assert.equal(sam.look, null, "an out-of-range look isn't kept");
+  // the realistic person and their kit go to everyone too (and nothing else)
+  const kit = { ...look, person: 8, coat: 4, legs: 2, boots: 1, life: 1, gloves: 1 };
+  const k = await h.c("POST", `/${r.body.code}/join`, { body: { secret: r.body.secret, name: "Jo", role: "angler", look: { ...kit, person: 3, gps: [52.6, 1.7] } } });
+  assert.equal(k.status, 200, k.text);
+  const jo = (await h.sock(r.body.code, k.body.member.key)).last("hello").members.find((m) => m.name === "Jo");
+  assert.deepEqual(jo.look, { ...kit, person: 3 });
+});
+
+test("a virtual cast keeps its distance and aim (cleaned); a real trip's cast carries none", async () => {
+  const room = new PartyRoom();
+  await room.init({ code: "GHJ234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const host = Object.values(room.s.members)[0]; host.spot = host.spot || 1;
+  const r = room.message(host.id, { t: "event", ev: { type: "cast", data: { dist: 33.27, aim: 0.9, extra: 1 } } }, 2000);
+  assert.deepEqual(r.out[0].msg.ev.data, { dist: 33.3, aim: 0.5 });
+  const real = new PartyRoom(); await real.init({ code: "KLM234", mode: "real", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const rh = Object.values(real.s.members)[0]; rh.spot = rh.spot || 1;
+  assert.equal(real.message(rh.id, { t: "event", ev: { type: "cast", data: { dist: 30 } } }, 2000).out[0].msg.ev.data, null);
+});
+
+test("walking poses must be possible: a jump across the place is ignored, ordinary walking isn't", async () => {
+  const room = new PartyRoom();
+  await room.init({ code: "NPQ234", mode: "virtual", venue: "pier", place: { label: "x" }, name: "Host" }, 1000);
+  const host = Object.values(room.s.members)[0]; host.spot = host.spot || 1;
+  const send = (x, at) => room.message(host.id, { t: "pose", p: { x, y: 2, z: 0, face: 0 } }, at).out.length;
+  assert.equal(send(0, 2000), 1);
+  assert.equal(send(1.5, 2300), 1, "5 m/s: fine");
+  assert.equal(send(60, 2600), 0, "195 m/s: ignored");
+  assert.equal(send(3, 2900), 1, "carries on from the last believable pose");
+  room.message(host.id, { t: "pose", p: null }, 3000);
+  assert.equal(send(200, 3100), 1, "back at a spot, then walking from somewhere new, starts afresh");
+});
+
+test("virtual party: you can wind your line in between bites (and only then)", () => {
+  const room = new PartyRoom(); room.s = { mode: "virtual", events: [] };
+  const mine = (type) => room.s.events.push({ who: "a", type });
+  assert.equal(room.allowed("a", "reelin"), false, "nothing to wind in");
+  mine("cast"); assert.equal(room.allowed("a", "reelin"), true);
+  mine("reelin"); assert.equal(room.allowed("a", "bite"), false, "no bite once it's wound in"); assert.equal(room.allowed("a", "cast"), true);
+  mine("cast"); mine("bite"); mine("hooked"); assert.equal(room.allowed("a", "reelin"), false, "not with a fish on");
+});

@@ -9,7 +9,10 @@
 //   code. The host can turn code joining off, make a new link (old links stop working), lock the party, remove
 //   people, turn chat or voice off and close it. Parties end after the hours the host chose.
 // - No positions: a party knows the kind of place (pier, beach, ...) and a place label the host typed or picked, at
-//   most an area. Never coordinates. Member keys are stored hashed. Network addresses are never stored.
+//   most an area, or (a virtual party started from the 3D demo) one of FishDock's own public, documented marks by id,
+//   so everyone fishes that real place's 3D reconstruction. Never anyone's coordinates. Member keys are stored hashed. Network addresses are never stored.
+// - Looks: an angler's figure in the 3D view (skin tone, hair, hat, beard, build: small whole numbers chosen in the
+//   app, or none). It's how their character looks in the simulation, nothing more.
 // - Voice: the server only relays the connection set-up (WebRTC signalling) between members; audio goes phone to
 //   phone and never through FishDock.
 
@@ -17,43 +20,81 @@ import { json, err, guard, toResponse, sameOrigin, readJson, routePath, cleanLin
 import { needDb, enforce } from "./db.js";
 import { ipKey } from "./ipKey.js";
 import { assignSpots, layoutFor, MAX_ANGLERS } from "../src/lib/world3d/spots.js";
+import { markFor } from "./place3d.js";
+import { cleanLook } from "../src/lib/world3d/people.js";
+
+/** A walking pose: { x, y, z, face, air } within the 3D place, null (back at their spot), or an emote ({ emote });
+ * undefined if it's not one. */
+export const EMOTES = ["wave", "cheer", "clap"];
+export function cleanPose(p) {
+  if (p === null) return null;
+  if (!p || typeof p !== "object") return undefined;
+  // a wave, cheer or clap: just its name
+  if ("emote" in p) return EMOTES.includes(p.emote) ? { emote: p.emote } : undefined;
+  // a fish being reeled in (virtual fishing): how far in, the line's tension, the drag slipping, the reel's turns
+  if ("fight" in p) {
+    const f = p.fight || {}, n = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : NaN);
+    const out = { progress: Math.round(n(f.progress, 0, 1) * 1000) / 1000, tension: Math.round(n(f.tension, 0, 2) * 100) / 100, slipping: !!f.slipping, turns: Math.round(n(f.turns, 0, 100000) * 10) / 10 };
+    return [out.progress, out.tension, out.turns].some(Number.isNaN) ? undefined : { fight: out };
+  }
+  const n = (v, lo, hi) => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? Math.round(v * 100) / 100 : NaN);
+  // fishing from somewhere they walked to: where they now stand, which way they face, the edge and the cast
+  if (p.spotAt) {
+    const at = Array.isArray(p.at) ? [n(p.at[0], -700, 700), n(p.at[1], -5, 60), n(p.at[2], -700, 700)] : [NaN];
+    const o = { spotAt: true, at, face: n(p.face, -7, 7), edge: n(p.edge, 0, 10), cast: n(p.cast, 1, 120) };
+    return [...at, o.face, o.edge, o.cast].some(Number.isNaN) ? undefined : o;
+  }
+  const out = { x: n(p.x, -700, 700), y: n(p.y, -5, 60), z: n(p.z, -700, 700), face: n(p.face, -7, 7), air: !!p.air };
+  return [out.x, out.y, out.z, out.face].some(Number.isNaN) ? undefined : out;
+}
+
+/** A party's place: a label, and for a virtual party only, a documented FishDock mark id (a public place) or nothing. */
+export function cleanPlace(place, mode) {
+  const mark = mode !== "real" && typeof place?.mark === "string" && markFor(place.mark) ? place.mark : null;
+  return { label: cleanLine(place?.label, 60) || null, ...(mark ? { mark } : {}) };
+}
 
 export const PARTY = {
-  maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
-  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, signalBytes: 16000, photoBytes: 400e3,
+  maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
+  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, maxSpeed: 12, signalBytes: 16000, photoBytes: 400e3,
 };
 export const VENUES = ["pier", "beach", "estuary", "river", "lake"];
-export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch"];
+export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch", "reelin"];
 export const REACTIONS = { nice: "Nice one", wow: "Wow", clap: "Well done", fish: "Fish on!" };
 export const CHALLENGES = { biggest: "Biggest fish", most: "Most fish", species: "Most species", longest: "Longest fish" };
 const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-export const makeCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => CODE_ABC[b % CODE_ABC.length]).join("");
+// each character equally likely (a byte that would favour the first few letters is thrown away and drawn again)
+export function makeCode() {
+  const out = [], top = 256 - (256 % CODE_ABC.length);
+  while (out.length < 6) for (const b of crypto.getRandomValues(new Uint8Array(12))) { if (b < top && out.length < 6) out.push(CODE_ABC[b % CODE_ABC.length]); }
+  return out.join("");
+}
 export const validCode = (c) => typeof c === "string" && /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(c);
 const hashKey = (k) => sha256Hex(`party-member|${k}`);
 const nameOf = (v, d) => cleanLine(v, 24) || d;
 
 // ---- the party itself: pure state and rules (tested without Cloudflare) ----
 export class PartyRoom {
-  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); }
+  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); this.poseRate = new Map(); this.lastPose = new Map(); }
   get ready() { return !!this.s; }
 
-  async init({ code, mode, venue, place, name, outfit, hours }, now) {
+  async init({ code, mode, venue, place, name, outfit, look, hours }, now) {
     if (this.s) throw new Error("exists");
     const h = PARTY.hours.includes(Number(hours)) ? Number(hours) : PARTY.defaultHours;
     this.s = {
       code, mode: mode === "real" ? "real" : "virtual", venue: VENUES.includes(venue) ? venue : "pier",
-      place: { label: cleanLine(place?.label, 60) || null }, createdAt: now, expiresAt: now + h * 3600e3, closed: false,
+      place: cleanPlace(place, mode), createdAt: now, expiresAt: now + h * 3600e3, closed: false,
       light: mode === "real" ? "now" : "midday", secret: randomId(12), codeOn: true, locked: false, chatOn: true, voiceOn: true, anglersOn: true,
       members: {}, events: [], seq: 0, chat: [], challenge: null, reports: [], photos: [],
     };
-    const host = await this.addMember({ name, role: "host", outfit }, now);
+    const host = await this.addMember({ name, role: "host", outfit, look }, now);
     return host;
   }
-  async addMember({ name, role, outfit }, now) {
+  async addMember({ name, role, outfit, look }, now) {
     const id = randomId(6), key = randomId(24);
     const angler = role === "host" || role === "angler";
     const m = { id, keyHash: await hashKey(key), name: nameOf(name, angler ? "Angler" : "Spectator"), role: role === "host" ? "host" : angler ? "angler" : "spectator",
-      outfit: Number.isInteger(outfit) ? ((outfit % 5) + 5) % 5 : Object.keys(this.s.members).length % 5, spot: null, presence: this.s.mode === "virtual" ? "virtual" : "remote",
+      outfit: Number.isInteger(outfit) ? ((outfit % 5) + 5) % 5 : Object.keys(this.s.members).length % 5, look: cleanLook(look), spot: null, presence: this.s.mode === "virtual" ? "virtual" : "remote",
       joinedAt: now, seenAt: now, left: false, kicked: false, voice: { on: false, muted: true } };
     this.s.members[id] = m;
     if (m.role !== "spectator") this.placeAnglers(now, m.id);
@@ -92,19 +133,22 @@ export class PartyRoom {
     const host = Object.values(S.members).find((m) => m.role === "host");
     return { ok: true, party: { code: S.code, mode: S.mode, venue: S.venue, place: S.place, host: host?.name || "The host", anglers: this.anglerCount(), maxAnglers: PARTY.maxAnglers, locked: S.locked, anglersOn: S.anglersOn, spotsFree: PARTY.maxAnglers - this.anglerCount(), expiresAt: S.expiresAt } };
   }
-  async join({ secret, viaCode, name, role, outfit }, now) {
+  async join({ secret, viaCode, name, role, outfit, look }, now) {
     const pv = this.preview(now, { secret, viaCode });
     if (!pv.ok) return { error: pv.why };
     const S = this.s;
     if (S.locked) return { error: "locked" };
     if (Object.values(S.members).filter((m) => !m.left && !m.kicked).length >= PARTY.maxMembers) return { error: "full" };
+    // everyone who ever joined is kept (a removed person's key must keep failing), so joining and leaving over and
+    // over can't grow the party's saved record without limit
+    if (Object.keys(S.members).length >= PARTY.maxEverMembers) return { error: "full" };
     const wants = role === "angler" && S.anglersOn && this.anglerCount() < PARTY.maxAnglers ? "angler" : "spectator";
-    const m = await this.addMember({ name, role: wants, outfit }, now);
+    const m = await this.addMember({ name, role: wants, outfit, look }, now);
     return { member: m, role: S.members[m.id].role };
   }
 
   // ---- what each member sees ----
-  memberOut(m) { return { id: m.id, name: m.name, role: m.role, outfit: m.outfit, spot: m.spot, presence: m.presence, online: !!this.online.get(m.id), voice: m.voice, left: m.left }; }
+  memberOut(m) { return { id: m.id, name: m.name, role: m.role, outfit: m.outfit, look: m.look || null, spot: m.spot, presence: m.presence, online: !!this.online.get(m.id), voice: m.voice, left: m.left }; }
   members() { return Object.values(this.s.members).filter((m) => !m.kicked && !m.left).map((m) => this.memberOut(m)); }
   hello(mid, now) {
     const S = this.s, me = S.members[mid];
@@ -122,12 +166,17 @@ export class PartyRoom {
     if (this.s.mode === "real") return true; // a real log: people log what happened, in whatever order they could
     const last = this.lastOf(mid)?.type || null;
     const lineOut = last === "cast" || last === "missed" || last === "bite";
-    return ({ cast: last !== "hooked", bite: lineOut && last !== "bite", missed: last === "bite", hooked: last === "bite", lost: last === "hooked", catch: last === "hooked" })[type] ?? false;
+    return ({ cast: last !== "hooked", bite: lineOut && last !== "bite", missed: last === "bite", hooked: last === "bite", lost: last === "hooked", catch: last === "hooked", reelin: last === "cast" || last === "missed" })[type] ?? false;
   }
   cleanEvent(mid, ev) {
     const type = ev?.type, d = ev?.data || {};
     if (!EVENT_TYPES.includes(type)) return null;
     const out = { type, cid: typeof ev.cid === "string" ? ev.cid.slice(0, 40) : null };
+    // a virtual cast's distance and aim (where the rig landed in the 3D place), so everyone sees it land there
+    if (type === "cast" && this.s.mode === "virtual") {
+      const dist = Number(d.dist), aim = Number(d.aim);
+      if (Number.isFinite(dist) && dist >= 2 && dist <= 150) out.data = { dist: Math.round(dist * 10) / 10, aim: Number.isFinite(aim) ? Math.max(-0.5, Math.min(0.5, Math.round(aim * 1000) / 1000)) : 0 };
+    }
     if (type === "catch") {
       const len = Number(d.lengthCm), kg = Number(d.weightKg);
       out.data = {
@@ -160,6 +209,25 @@ export class PartyRoom {
     me.seenAt = now;
     if (msg?.t === "ping") { out.push({ to: mid, msg: { t: "pong", now } }); return res(); }
     if (this.ended(now)) { out.push({ to: mid, msg: { t: "closed", why: S.closed ? "closed" : "ended" } }); return res({ close: [mid] }); }
+    // walking about (virtual parties): where an angler is in the 3D place, a few times a second, passed straight on to
+    // the others and never saved. Scene coordinates of the shared 3D place, not anyone's real position. Its own limit,
+    // so walking never crowds out casts and chat
+    if (msg?.t === "pose") {
+      if (S.mode !== "virtual" || !me.spot) return res();
+      const r = this.poseRate.get(mid) || { n: 0, at: now }; if (now - r.at > 10e3) { r.n = 0; r.at = now; } r.n++; this.poseRate.set(mid, r);
+      if (r.n > PARTY.posesPer10s) return res();
+      const p = cleanPose(msg.p);
+      if (p === undefined) return res();
+      // movement has to be possible: nobody covers more than a sprint's worth between two poses (a phone that sends
+      // a jump across the place is ignored; the next believable pose carries on). Back at a spot starts afresh
+      if (p && !p.emote && !p.fight && !p.spotAt) {
+        const lp = this.lastPose.get(mid);
+        if (lp) { const dt = Math.max(0.05, (now - lp.at) / 1000), d = Math.hypot(p.x - lp.x, p.z - lp.z); if (dt < 5 && d / dt > PARTY.maxSpeed) return res(); }
+        this.lastPose.set(mid, { x: p.x, z: p.z, at: now });
+      } else if (!p || p.spotAt) this.lastPose.delete(mid);
+      out.push({ to: "others", msg: { t: "pose", who: mid, p } });
+      return res();
+    }
     if (this.limited(mid, now)) { out.push({ to: mid, msg: { t: "error", code: "slow", message: "That's a lot at once. Give it a moment." } }); return res(); }
     const host = me.role === "host";
     const bcastMembers = () => out.push({ to: "*", msg: { t: "members", members: this.members() } });
@@ -224,6 +292,7 @@ export class PartyRoom {
         const who = S.members[msg.who];
         if (!who || who.id === mid) return res();
         S.reports.push({ at: now, by: mid, who: who.id, reason: cleanLine(msg.reason, 200) || null });
+        if (S.reports.length > PARTY.maxReports) S.reports.splice(0, S.reports.length - PARTY.maxReports);
         out.push({ to: mid, msg: { t: "reported", who: who.id } });
         return res({ save: true });
       }
@@ -383,7 +452,7 @@ export async function handleParty(request, env, now = Date.now()) {
     if (!code && request.method === "POST") {
       await enforce(db, `party:new:${who}`, PARTY.createPerDay, now, { daily: true }, "That's as many parties as can be started from here today.");
       const b = await readJson(request, 4096);
-      const body = { mode: b.mode === "real" ? "real" : "virtual", venue: VENUES.includes(b.venue) ? b.venue : "pier", place: { label: cleanLine(b.place?.label, 60) || null }, name: nameOf(b.name, "Host"), outfit: Number(b.outfit) || 0, hours: Number(b.hours) || PARTY.defaultHours };
+      const body = { mode: b.mode === "real" ? "real" : "virtual", venue: VENUES.includes(b.venue) ? b.venue : "pier", place: cleanPlace(b.place, b.mode), name: nameOf(b.name, "Host"), outfit: Number(b.outfit) || 0, look: cleanLook(b.look), hours: Number(b.hours) || PARTY.defaultHours };
       for (let i = 0; i < 4; i++) {
         const c = makeCode();
         const r = await inner(c, "init", { method: "POST", body: JSON.stringify({ ...body, code: c }) });
@@ -404,7 +473,7 @@ export async function handleParty(request, env, now = Date.now()) {
     if (op === "join" && request.method === "POST") {
       await enforce(db, `party:join:${who}`, PARTY.joinsPerMinute, now, { windowMs: 60e3 }, "That's a lot of tries. Wait a minute and try again.");
       const b = await readJson(request, 4096);
-      const r = await inner(code, "join", { method: "POST", body: JSON.stringify({ secret: typeof b.secret === "string" ? b.secret.slice(0, 40) : null, viaCode: !!b.viaCode, name: b.name, role: b.role === "spectator" ? "spectator" : "angler", outfit: Number(b.outfit) || 0 }) });
+      const r = await inner(code, "join", { method: "POST", body: JSON.stringify({ secret: typeof b.secret === "string" ? b.secret.slice(0, 40) : null, viaCode: !!b.viaCode, name: b.name, role: b.role === "spectator" ? "spectator" : "angler", outfit: Number(b.outfit) || 0, look: cleanLook(b.look) }) });
       const out = await r.json();
       if (!r.ok) return err(r.status, out.error || "not_found", { not_found: "There's no party with that code, or its invitation has changed.", ended: "That party has ended.", locked: "The host has locked this party.", full: "This party is full." }[out.error] || "Couldn't join.");
       return json(out);

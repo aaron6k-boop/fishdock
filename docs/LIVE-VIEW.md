@@ -250,3 +250,27 @@ catches up the moment FishDock is open again, and viewers are told the phone has
 - Judging photos by their pictures is rough (it reads level lines and smooth patches as water); the words and the
   horizon carry most of the weight. A small on-device model could tell water, sand, buildings and sky apart better.
 - Posting a replay moment to Community (needs accounts, and a public replay format with its own privacy review).
+
+## 3D view: first person, real places and watching others (November 2026)
+
+- **First person** (the default): the rod is held low and to the right with the reel in view, the tip pointing out to
+  the line; only the hands' work shows (head, body and arms would fill a portrait phone's narrow view). While your
+  fish is fought and landed the view follows it unless you've dragged in the last 2.5 seconds, and the angler leans
+  over the rail to watch the net come up. The fish surfaces beyond the edge of the pier or bank (`edge` on a spot).
+- **Camera collision**: third person, spectator and cinematic stop short of walls, decks and buildings (a ray from
+  the angler's head; `env.solids`, only things near the spots for real places) and keep above the ground (`floorAt`).
+- **Real places** (`osmPlace.js`): one set of standing rules for finding spots and for the final check (`standRules`):
+  dry ground or a pier deck, open water 14 and 26 m ahead, no pier across the view, nothing built where the angler or
+  the camera stands. Piers drawn as lines or outlines (rectangles included) get spots round the mark; rivers drawn
+  only as a centre line are widened into water; marks whose listed position is approximate may use the nearest bank
+  within 400 m, and the label says so. A layout that fails uses the labelled drawing. Of 15 places checked with
+  live map data, 12 pass; Chesil and Lough Erne have incomplete map data, Loch Ryan's shore is 200 m from its mark.
+- **Watching someone**: "Name has a fish on · Watch" (or Watch a friend) keeps your view on their fight and landing;
+  their catch card shows once it's landed. The first two spots of each drawn place are side by side.
+- **Fights by species** (`fightStyle` in sceneActors.js): divers deep, upper-water fish shallow and erratic, bass and
+  garfish leap, flatfish swing wide, rays sit deep and heavy, eels pump the tip.
+- **Mapillary photos** are checked before they can be shown (`PANO_RULES`): within 60 m, Mapillary-corrected position
+  and direction, under 8 years old; others only appear in previews, with what's wrong. `tools/pano-coverage.mjs`
+  lists every mark (and writes a table with a third argument).
+- **Filming for tests**: a page with `window.__fdFilm = true` set before loading gets `window.__fdWorld.freeze()`
+  and `.step(ms)`, so an animation can be filmed frame by frame where frames are slow. The app never sets it.

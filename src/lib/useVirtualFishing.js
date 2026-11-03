@@ -1,10 +1,19 @@
-// ---- useVirtualFishing: the angler's side of virtual fishing (the demo now, Fish Together later) ----
-// Cast, and a fish bites by itself after a while (sooner for quick, plentiful fish); strike before the bite passes
-// or it's missed and the bait stays out; then hold to reel while the fish fights back, until it's landed. Every
-// catch made here is simulated and says so (data.simulated), and nothing here is ever saved as a real catch.
+// ---- useVirtualFishing: the angler's side of virtual fishing (the demo and Fish Together) ----
+// Cast (with the power and aim you chose), and a fish bites by itself after a while (sooner for quick, plentiful
+// fish); strike in time (too soon or too late and it can let go); then tap the reel to wind it in while it fights
+// back (reelModel.js): watch the line's tension, let the drag do its work through a run, and land it once it's close.
+// Assisted reeling (an option) winds at a steady rate after one tap, for anyone who can't tap repeatedly. Every catch
+// made here is simulated and says so (data.simulated), and nothing here is ever saved as a real catch.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DUR } from "./liveEvents.js";
 import { fightProfile, fightSeconds } from "./sceneActors.js";
+import { createFight, fightStep, tapRate, DRAG, strikeTiming } from "./reelModel.js";
+
+// ---- reeling options, saved on this phone: Assisted reeling, and Advanced (set the drag yourself) ----
+const OPT_KEY = "fishdock.reel";
+export function loadReelOpts() { try { const v = JSON.parse(localStorage.getItem(OPT_KEY) || "{}"); return { assisted: !!v.assisted, advanced: !!v.advanced }; } catch { return { assisted: false, advanced: false }; } }
+export function saveReelOpts(o) { try { localStorage.setItem(OPT_KEY, JSON.stringify(o)); } catch { /* ignore */ } }
+export { strikeTiming };
 
 let seq = 0;
 export const virtualEvent = (type, data = null, who = null) => ({ id: `v_${Date.now().toString(36)}_${++seq}`, seq, t: Date.now(), type, data, ...(who ? { who } : {}) });
@@ -27,7 +36,13 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
   const [events, setEvents] = useState([]);
   const [reel, setReel] = useState(0);
   const [autoplay, setAutoplay] = useState(false);
+  const autoplayRef = useRef(false); autoplayRef.current = autoplay;
   const holding = useRef(false), timers = useRef([]), reelRef = useRef(0), fish = useRef({ species, name, lengthCm });
+  // tapping the reel: recent tap times, the fight's state (reelModel.js), assisted winding on or off, the drag
+  const taps = useRef([]), fightRef = useRef(null), assistOn = useRef(false), dragRef = useRef(DRAG.standard), tapN = useRef(0);
+  const [fight, setFight] = useState(null), [opts, setOptsNow] = useState(loadReelOpts), [note, setNote] = useState("");
+  const optsRef = useRef(opts); optsRef.current = opts;
+  const say = (t) => { setNote(t); setTimeout(() => setNote((n) => (n === t ? "" : n)), 2600); };
   fish.current = { species, name, lengthCm };
   const emit = useRef(onEvent); emit.current = onEvent;
   const add = useCallback((type, data = null) => {
@@ -50,35 +65,56 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
       if (autoplay) later(1100, () => add("hooked"));
       else later(DUR.bite - 700, () => add("missed")); // not struck in time: the fish lets go, the bait is still out
     }
-    if (last.type === "hooked" && autoplay) holding.current = true;
+
     if (last.type === "catch" && autoplay) later(DUR.catch, () => setAutoplay(false));
     return clearTimers;
   }, [last?.id, autoplay]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // reeling: a steady tick while a fish is on
+  // the fight: tapping winds line in against the fish (reelModel.js), ten steps a second
   useEffect(() => {
-    if (last?.type !== "hooked") { reelRef.current = 0; setReel(0); holding.current = false; return undefined; }
-    const f = fish.current, need = reelNeeded(f.species, f.lengthCm), prof = fightProfile(f.species), t0 = performance.now();
-    let prev = t0;
+    if (last?.type !== "hooked") { reelRef.current = 0; setReel(0); holding.current = false; assistOn.current = false; taps.current = []; fightRef.current = null; setFight(null); return undefined; }
+    const f = fish.current, castEv = [...events].reverse().find((e) => e.type === "cast");
+    fightRef.current = createFight({ species: f.species, lengthCm: f.lengthCm, startM: castEv?.data?.dist || 30, mode: optsRef.current.advanced ? "advanced" : "standard", seed: Math.floor(last.t % 100000) });
+    let prev = performance.now();
     const id = setInterval(() => {
-      const now = performance.now(), dt = (now - prev) / 1000, age = (now - t0) / 1000;
-      prev = now;
-      const surge = Math.max(0, Math.sin(age * 0.95 * prof.tempo + 1.3)) ** 6;
-      reelRef.current = reelStep(reelRef.current, dt, holding.current, { need, surge });
-      setReel(reelRef.current);
-      if (reelRef.current >= 1) { holding.current = false; clearInterval(id); add("catch", { species: f.species, name: f.name, lengthCm: f.lengthCm, released: true, simulated: true }); }
+      const now = performance.now(), dt = Math.min(0.3, (now - prev) / 1000); prev = now;
+      const assisted = assistOn.current || holding.current || autoplayRef.current;
+      const s = fightStep(fightRef.current, dt, { rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
+      fightRef.current = s; reelRef.current = s.progress; setReel(s.progress);
+      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, mode: s.mode });
+      if (s.out) { clearInterval(id); say(s.out === "broke" ? "The line broke. Ease the drag off when it runs." : "The hook came free. Keep the line tight."); add("lost", { why: s.out }); return; }
+      if (s.near && autoplayRef.current) { clearInterval(id); land(); }
     }, 100);
     return () => clearInterval(id);
   }, [last?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => clearTimers, []);
   const f = fish.current;
+  const catchData = () => ({ species: f.species, name: f.name, lengthCm: f.lengthCm, released: true, simulated: true });
+  function land() { if (last?.type === "hooked" || fightRef.current) { fightRef.current = null; add("catch", catchData()); } }
   return {
-    events, reel, autoplay, last,
-    cast: () => add("cast"),
-    strike: () => add("hooked"),
+    events, reel, autoplay, last, fight, note, opts,
+    /** cast: optionally { dist (m), aim (radians from straight out), power (0..1) } from the 3D view's aim */
+    cast: (d) => add("cast", d && Number.isFinite(d.dist) ? { dist: Math.round(d.dist * 10) / 10, aim: Math.round((d.aim || 0) * 1000) / 1000 } : null),
+    strike: () => {
+      // timing: right in the first moment of a bite, or as it's ending, and it can let go
+      const bite = [...events].reverse().find((e) => e.type === "bite"), when = strikeTiming(Date.now() - (bite?.t || Date.now()));
+      if (when !== "good" && Math.random() < (when === "early" ? 0.3 : 0.35)) { say(when === "early" ? "Too soon: it let go. Wait for the pull." : "Too late: it dropped the bait."); add("missed"); return; }
+      add("hooked");
+    },
+    /** one tap of the reel (or, with Assisted reeling on, start or stop winding) */
+    tap: () => {
+      if (last?.type !== "hooked") return;
+      if (optsRef.current.assisted) { assistOn.current = !assistOn.current; return; }
+      const now = Date.now(); taps.current = [...taps.current.filter((t) => now - t < 2000), now]; tapN.current++;
+    },
+    land,
+    /** wind the line in (between bites): ready to cast again or walk about; nothing happens if it isn't out */
+    windIn: () => { if (last && (last.type === "cast" || last.type === "missed")) { clearTimers(); add("reelin"); return true; } return false; },
+    setDrag: (d) => { dragRef.current = Math.max(DRAG.min, Math.min(DRAG.max, d)); },
+    setOpts: (o) => { const next = { ...optsRef.current, ...o }; setOptsNow(next); saveReelOpts(next); },
     hold: (on) => { holding.current = !!on; },
-    nudge: () => { reelRef.current = Math.min(0.999, reelRef.current + 0.12); setReel(reelRef.current); }, // a tap or a key press: a turn of the handle
+    nudge: () => { const now = Date.now(); taps.current = [...taps.current, now]; tapN.current++; }, // a key press: a tap
     reset: () => { clearTimers(); setAutoplay(false); setEvents([]); },
     playAll: () => { clearTimers(); setEvents([]); setAutoplay(true); setTimeout(() => add("cast"), 300); },
     stop: () => { clearTimers(); setAutoplay(false); setEvents([]); },
@@ -86,6 +122,6 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     biteNow: () => add("bite"),
     miss: () => add("missed"),
     lose: () => add("lost"),
-    landNow: () => add("catch", { species: f.species, name: f.name, lengthCm: f.lengthCm, released: true, simulated: true }),
+    landNow: () => { fightRef.current = null; add("catch", catchData()); },
   };
 }

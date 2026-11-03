@@ -4,16 +4,18 @@
 // catch is marked simulated; real trips are logged by the people actually fishing, and others watch reconstructions.
 // The group button opens people, voice and text chat, catches and challenges, the invitation and the host's controls.
 import { useEffect, useMemo, useRef, useState } from "react";
+import { haptics } from "../lib/haptics.js";
 import Stage3D from "../components/Stage3D.jsx";
 import FishTray from "../components/FishTray.jsx";
 import { Icon } from "../components/ui.jsx";
-import { OutfitPicker } from "./Together.jsx";
+import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
+import { saveLook } from "../lib/world3d/people.js";
 import { useParty, previewParty, joinParty, remember, membershipOf, forget, partyLink, momentText, uploadPartyPhoto, partyPhotoUrl } from "../lib/party.js";
 import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import { phaseAt } from "../lib/liveEvents.js";
 import { isLanded } from "../lib/landed.js";
 import { standings, CHALLENGES } from "../lib/partyStats.js";
-import { createVoice } from "../lib/voice.js";
+import { createVoice, proximityOf } from "../lib/voice.js";
 import { qrSvg } from "../lib/qr.js";
 import { SPECIES, speciesById } from "../data/species.js";
 import { hasArt, artUrl } from "../data/fishart.js";
@@ -32,13 +34,14 @@ function JoinScreen({ code, secret, onJoined }) {
   const viaCode = secret === "code";
   const [pv, setPv] = useState(null), [err, setErr] = useState(""), [busy, setBusy] = useState(false);
   const [name, setName] = useState(() => { try { return localStorage.getItem("fishdock.party.name") || ""; } catch { return ""; } });
-  const [role, setRole] = useState("angler"), [outfit, setOutfit] = useState(1);
+  const [role, setRole] = useState("angler"), [look, setLookNow] = useState(myLook);
+  const setLook = (v) => { setLookNow(v); saveLook(v); };
   useEffect(() => { previewParty(code, viaCode ? { viaCode: true } : { secret }).then((r) => { setPv(r.party); if (!r.party.anglersOn || r.party.spotsFree <= 0) setRole("spectator"); }).catch((e) => setErr(e.message)); }, [code, secret]); // eslint-disable-line react-hooks/exhaustive-deps
   async function join() {
     setBusy(true); setErr("");
     try {
       try { localStorage.setItem("fishdock.party.name", name.trim()); } catch { /* ignore */ }
-      const r = await joinParty(code, { secret: viaCode ? null : secret, viaCode, name: name.trim() || (role === "angler" ? "Angler" : "Watching"), role, outfit });
+      const r = await joinParty(code, { secret: viaCode ? null : secret, viaCode, name: name.trim() || (role === "angler" ? "Angler" : "Watching"), role, outfit: look.outfit, look: lookOnly(look) });
       remember(code, { key: r.member.key, member: r.member.id, mode: pv.mode, venue: pv.venue, expiresAt: pv.expiresAt });
       history.replaceState(null, "", `#party/${code}`);
       onJoined();
@@ -58,7 +61,7 @@ function JoinScreen({ code, secret, onJoined }) {
           <button type="button" disabled={!pv.anglersOn || pv.spotsFree <= 0} className={`tg-mode${role === "angler" ? " on" : ""}`} onClick={() => setRole("angler")}><b>{pv.mode === "real" ? "An angler" : "An angler"}</b><span>{pv.spotsFree > 0 ? `Your own spot and rod. ${pv.spotsFree} free.` : "All four spots are taken."}</span></button>
           <button type="button" className={`tg-mode${role === "spectator" ? " on" : ""}`} onClick={() => setRole("spectator")}><b>A spectator</b><span>Watch, chat and cheer; you don't fish.</span></button>
         </div></div>
-        {role === "angler" ? <div className="field"><span className="lbl">Your clothes</span><OutfitPicker value={outfit} onChange={setOutfit} /></div> : null}
+        {role === "angler" ? <div className="field"><span className="lbl">Your angler</span><LookPicker value={look} onChange={setLook} /></div> : null}
         <button type="button" className="btn primary block" disabled={busy || pv.locked} onClick={join}>{pv.locked ? "The host has locked this party" : busy ? "Joining…" : "Join the party"}</button>
         {err ? <p className="notice warn small"><Icon name="info" /><span>{err}</span></p> : null}
         <p className="tiny">No account needed. Your name is only shown in this party. Voice chat is off until you choose to join it.</p>
@@ -99,10 +102,21 @@ function PartyLive({ code, mkey }) {
   const [replay, setReplay] = useState(null), [logging, setLogging] = useState(false), [chatText, setChatText] = useState(""), [copied, setCopied] = useState(false);
   const voice = useRef(null);
   const toast = (text, kind = "") => { const id = Math.random().toString(36).slice(2); setToasts((t) => [...t.slice(-4), { id, text, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200); };
+  // walking about: others' poses go straight to the 3D view; yours are sent a few times a second while you move
+  const poseBus = useMemo(() => new EventTarget(), []);
+  const poseSent = useRef({ at: 0, p: null });
+  const sendPose = (p) => {
+    const now = Date.now(), last = poseSent.current;
+    if (p && !p.spotAt && last.p && now - last.at < 300) return;
+    if (p && !p.spotAt && last.p && Math.hypot(p.x - last.p.x, p.z - last.p.z) < 0.05 && Math.abs(p.face - last.p.face) < 0.05 && p.air === last.p.air && now - last.at < 2000) return;
+    poseSent.current = { at: now, p: p && !p.spotAt ? p : null };
+    P_ref.current?.send({ t: "pose", p: p ? (p.spotAt ? { spotAt: true, at: p.at, face: p.face, edge: p.edge, cast: p.cast } : { x: p.x, y: p.y, z: p.z, face: p.face, air: p.air }) : null });
+  };
   const P = useParty(code, mkey, {
     onMessage: (m) => {
       const name = (id) => P_ref.current?.members.find((x) => x.id === id)?.name || "Someone";
-      if (m.t === "react" && !blocked.has(m.from)) toast(`${name(m.from)}: ${REACT.find((r) => r[0] === m.r)?.[1] || "Nice"}`, "react");
+      if (m.t === "pose") { poseBus.dispatchEvent(new CustomEvent("pose", { detail: { who: m.who, p: m.p } })); return; }
+      if (m.t === "react" && !blocked.has(m.from)) { toast(`${name(m.from)}: ${REACT.find((r) => r[0] === m.r)?.[1] || "Nice"}`, "react"); if (m.from !== P_ref.current?.me?.id) haptics.feel("reaction"); }
       if (m.t === "chat" && m.c.who !== P_ref.current?.me?.id && !blocked.has(m.c.who) && sheetRef.current !== "chat") toast(`${name(m.c.who)}: ${m.c.text}`, "chat");
       if (m.t === "signal") voice.current?.signal(m.from, m.data);
       if (m.t === "voice" && m.voice.on && m.who !== P_ref.current?.me?.id && !blocked.has(m.who)) voice.current?.meet(m.who);
@@ -120,12 +134,24 @@ function PartyLive({ code, mkey }) {
   const [hint] = useState(() => { const pool = ["cod", "bass", "whiting", "mackerel", "pollack", "plaice", "thornback-ray", "pouting"]; const sp = pool[Math.floor(Math.random() * pool.length)]; return { species: sp, lengthCm: 30 + Math.round(Math.random() * 35) }; });
   const [fishFor, setFishFor] = useState(hint);
   const vf = useVirtualFishing({ species: fishFor.species, name: speciesById(fishFor.species)?.name || "Fish", lengthCm: fishFor.lengthCm, onEvent: (e) => { if (mode === "virtual" && fishing) P.sendEvent(e.type, e.data); if (e.type === "catch") { const pool = ["cod", "bass", "whiting", "mackerel", "pollack", "plaice", "pouting", "black-bream", "garfish"]; setTimeout(() => setFishFor({ species: pool[Math.floor(Math.random() * pool.length)], lengthCm: 25 + Math.round(Math.random() * 45) }), 12000); } } });
+  // your fight, a few times a second, so friends see the fish come in as you reel (virtual parties; never saved)
+  const fightSent = useRef(0);
+  useEffect(() => {
+    const f = vf.fight; if (!f || mode !== "virtual") return;
+    const now = Date.now(); if (now - fightSent.current < 330) return; fightSent.current = now;
+    P_ref.current?.send({ t: "pose", p: { fight: { progress: f.progress, tension: f.tension, slipping: f.slipping, turns: f.turns } } });
+  }, [vf.fight]); // eslint-disable-line react-hooks/exhaustive-deps
   const myServerEvents = P.events.filter((e) => e.who === me?.id);
   const myEvents = mode === "virtual" ? vf.events : myServerEvents;
   const now = Date.now();
   const myPhase = phaseAt(myEvents, now);
+  useEffect(() => { if (myPhase.phase !== "hooked") haptics.reeling(false); }, [myPhase.phase]); // the fight's over: no more reeling ticks
   const [, tick] = useState(0);
   useEffect(() => { const id = setInterval(() => tick((n) => n + 1), 500); return () => clearInterval(id); }, []);
+  // once you're in, the invite secret leaves the address bar: it can't be copied, screenshotted or kept in history by
+  // mistake, and a link replaced by the host is never left showing (Invite has the current link; coming back to
+  // #party/<code> works with this phone's member key)
+  useEffect(() => { if (location.hash.startsWith(`#party/${code}/`)) history.replaceState(null, "", `${location.pathname}${location.search}#party/${code}`); }, [code]);
 
   // ---- notifications: what the others are doing (from their recorded events only) ----
   const seen = useRef(new Set()), firstLoad = useRef(true);
@@ -138,10 +164,21 @@ function PartyLive({ code, mkey }) {
       const name = P.members.find((m) => m.id === e.who)?.name;
       if (e.type === "catch") { const at = landedDelay(e, venue); setTimeout(() => toast(momentText(name, e, mode), "catch"), at); }
       else { const t = momentText(name, e, mode); if (t) toast(t); }
-      if (navigator.vibrate && e.type === "bite") try { navigator.vibrate(40); } catch { /* ignore */ }
+      // another angler with a fish on: one distinct notification (each event once, never on catching up after reconnecting)
+      if (e.type === "hooked") haptics.feel("friendHooked", { key: `${e.who}|${e.seq}|hooked` });
     }
     firstLoad.current = false;
   }, [P.events.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // a friend coming online: one subtle pulse. Compared with who was online before (kept across this phone's own
+  // reconnects, so catching up never buzzes); someone dropping in and out is felt once a minute at most
+  const onlineBefore = useRef(null);
+  useEffect(() => {
+    if (!me?.id || !P.members.length) return;
+    const now = new Set(P.members.filter((m) => m.online && m.id !== me.id && !blocked.has(m.id)).map((m) => m.id));
+    if (onlineBefore.current) for (const id of now) if (!onlineBefore.current.has(id)) haptics.feel("friendJoined", { key: `${id}|joined|${Math.floor(Date.now() / 60000)}` });
+    onlineBefore.current = now;
+  }, [P.members, me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- voice ----
   useEffect(() => () => voice.current?.leave(), []);
@@ -150,13 +187,23 @@ function PartyLive({ code, mkey }) {
     try { await voice.current.join(P.members.filter((m) => m.id !== me.id && m.voice?.on && !blocked.has(m.id)).map((m) => m.id)); }
     catch { toast("Voice needs the microphone. It wasn't allowed, so text chat is there instead."); }
   }
+  // the mic button on the fishing screen: the first tap joins voice (the phone asks for the microphone then, not
+  // before); after that it mutes and unmutes you
+  const micTap = async () => {
+    if (!voiceState.on) { await joinVoice(); if (voice.current?.state().on) toast("Voice on. People near you sound louder. Tap the mic to mute."); return; }
+    voice.current?.mute(!voiceState.muted);
+  };
+  // proximity chat: everyone's loudness and side from where they stand in the 3D place
+  const onHear = (h) => { const v = voice.current; if (!v || !v.state().on) return; for (const p of v.state().peers) { const r = proximityOf(h.me, h.others[p.id], h.yaw); v.setPlace(p.id, r.near, r.pan); } };
+  const speakingKey = [...(voiceState.peers || []).filter((p) => p.speaking && !p.muted).map((p) => p.id), ...(voiceState.on && voiceState.talking && voiceState.level > 0.05 && me ? [me.id] : [])].sort().join(",");
+  const speaking = useMemo(() => new Set(speakingKey ? speakingKey.split(",") : []), [speakingKey]);
   const block = (id, on) => { const s = new Set(blocked); if (on) { s.add(id); voice.current?.drop(id); } else s.delete(id); setBlocked(s); try { localStorage.setItem(BLOCK_KEY, JSON.stringify([...s])); } catch { /* ignore */ } };
 
   // ---- the anglers in the 3D place ----
   const anglers = useMemo(() => P.members.filter((m) => m.spot).map((m) => {
     let events = m.id === me?.id && mode === "virtual" ? vf.events : P.events.filter((e) => e.who === m.id);
     if (replay?.who === m.id && Date.now() - replay.start < 12000) events = [{ ...replay.ev, t: replay.start }];
-    return { id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, local: m.id === me?.id, real: mode === "real", events, fishHint: m.id === me?.id && mode === "virtual" ? fishFor : null };
+    return { id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, look: m.look || null, local: m.id === me?.id, inspect: m.id === me?.id && mode === "virtual", real: mode === "real", events, fishHint: m.id === me?.id && mode === "virtual" ? fishFor : null };
   }), [P.members, P.events, vf.events, me?.id, mode, replay, fishFor]);
 
   // the light: a real trip is always now; a virtual party at whatever time of day the host picks (midday to start)
@@ -188,21 +235,21 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D onWindIn={mode === "virtual" ? vf.windIn : undefined} menu={[{ key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "people", label: "People, chat and catches", icon: "users", onClick: () => setSheet("people") }]} feel={haptics.feel} fight={mode === "virtual" ? vf.fight : null} reelOpts={mode === "virtual" ? vf.opts : null} onReelOpts={vf.setOpts} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>
-            {party.place?.label ? <span className="fs-chip">{party.place.label}</span> : null}
+            {mode === "real" && party.place?.label ? <span className="fs-chip">{party.place.label}</span> : null}
             <button type="button" className="fs-chip" onClick={() => setSheet("people")}><Icon name="users" />{P.members.filter((m) => m.spot).length}{P.members.some((m) => !m.spot) ? ` + ${P.members.filter((m) => !m.spot).length} watching` : ""}</button>
             {P.status === "reconnecting" ? <span className="fs-chip">Reconnecting…</span> : null}
             <span className="grow" />
-            <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
+            {party.voiceOn ? <button type="button" className={`fs-btn mic${voiceState.on && !voiceState.muted ? " on" : ""}${voiceState.on && voiceState.talking && voiceState.level > 0.05 ? " talking" : ""}`} onClick={micTap} aria-pressed={voiceState.on && !voiceState.muted} aria-label={!voiceState.on ? "Turn on your microphone (voice chat)" : voiceState.muted ? "Unmute your microphone" : "Mute your microphone"} title={!voiceState.on ? "Voice chat: tap to turn your mic on" : voiceState.muted ? "Muted: tap to talk" : "Mic on: tap to mute"}><Icon name={voiceState.on && !voiceState.muted ? "mic" : "micoff"} /></button> : null}
             <button type="button" className={`fs-btn${sheet ? " on" : ""}`} onClick={() => setSheet(sheet ? null : "people")} aria-label="Party: people, voice, chat, catches, invite"><Icon name="users" /></button>
           </div>
           <div className="fs-bottom">
             {voiceState.on && voiceState.ptt ? <button type="button" className="ft-pill ptt" onPointerDown={() => voice.current?.talk(true)} onPointerUp={() => voice.current?.talk(false)} onPointerLeave={() => voice.current?.talk(false)}><Icon name="mic" />Hold to talk</button> : null}
             {!fishing ? <span className="ft-label">Watching{meM?.role === "spectator" ? "" : " (no spot free)"}</span>
-              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} reel={vf.reel} autoplay={false} onCast={vf.cast} onStrike={vf.strike} onHold={vf.hold} onNudge={vf.nudge} />
+              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={false} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} />
               : <div className="fish-tray real-tray" role="group" aria-label="Log what happens">{realNext.map(([l, f, ic]) => <button key={l} type="button" className="ft-pill" onClick={f}><Icon name={ic} />{l}</button>)}<span className="ft-label">{meM?.presence === "water" ? "At the water" : "Not at the water"}</span></div>}
           </div>
         </Stage3D>
@@ -219,7 +266,8 @@ function PartyLive({ code, mkey }) {
               {!voiceState.on ? <button type="button" className="btn small primary" disabled={!party.voiceOn} onClick={joinVoice}><Icon name="mic" />{party.voiceOn ? "Join voice" : "Voice is off"}</button>
                 : <><button type="button" className="btn small" onClick={() => voice.current?.leave()}>Leave voice</button>
                   <button type="button" className={`btn small${voiceState.muted ? " primary" : ""}`} onClick={() => voice.current?.mute(!voiceState.muted)}><Icon name={voiceState.muted ? "mute" : "mic"} />{voiceState.muted ? "Unmute" : "Mute me"}</button>
-                  <label className="check small"><input type="checkbox" checked={voiceState.ptt} onChange={(e) => voice.current?.setPushToTalk(e.target.checked)} /> Push to talk</label></>}
+                  <label className="check small"><input type="checkbox" checked={voiceState.ptt} onChange={(e) => voice.current?.setPushToTalk(e.target.checked)} /> Push to talk</label>
+                  <label className="check small"><input type="checkbox" checked={voiceState.proximity !== false} onChange={(e) => voice.current?.setProximity(e.target.checked)} /> Proximity chat (people near you are louder, from their side; off: hear everyone)</label></>}
             </div>
             <p className="tiny">Voice goes phone to phone. It asks for the microphone only when you join. On some mobile networks someone may not connect; text chat always works.</p>
             <div className="list">{P.members.map((m) => {
@@ -228,7 +276,7 @@ function PartyLive({ code, mkey }) {
                 <div key={m.id} className="li party-person">
                   <span className={`speak${(isMe ? voiceState.talking && voiceState.level > 0.05 : vp?.speaking) ? " on" : ""}`} aria-hidden="true" />
                   <span className="grow"><span className="t">{m.name}{isMe ? " (you)" : ""}{m.role === "host" ? " · host" : ""}</span>
-                    <span className="s">{m.spot ? `${spotById(venue, m.spot).name} · ${mode === "real" ? (m.presence === "water" ? "At the water" : "Not at the water") : "Fishing virtually"}` : "Watching"}{m.online ? "" : " · away"}{m.voice?.on ? (m.voice.muted ? " · voice (muted)" : " · in voice") : ""}{vp ? (vp.connected ? " · you can hear each other" : vp.failed ? " · voice couldn't connect" : " · connecting voice…") : ""}</span></span>
+                    <span className="s">{m.spot ? `${spotById(venue, m.spot).name} · ${mode === "real" ? (m.presence === "water" ? "At the water" : "Not at the water") : "Fishing virtually"}` : "Watching"}{m.online ? "" : " · away"}{m.voice?.on ? (m.voice.muted ? " · voice (muted)" : " · in voice") : ""}{vp ? (vp.connected ? (voiceState.proximity !== false && vp.near < 0.05 ? " · too far away to hear" : " · you can hear each other") : vp.failed ? " · voice couldn't connect" : " · connecting voice…") : ""}</span></span>
                   {!isMe && vp ? <input type="range" min="0" max="1" step="0.1" value={vp.volume} onChange={(e) => voice.current?.setVolume(m.id, Number(e.target.value))} aria-label={`${m.name}'s volume`} className="vol-mini" /> : null}
                   {!isMe && vp ? <button type="button" className="xbtn" onClick={() => voice.current?.muteOther(m.id, !vp.muted)} aria-label={vp.muted ? `Unmute ${m.name}` : `Mute ${m.name}`}><Icon name={vp.muted ? "mute" : "volume"} /></button> : null}
                   {!isMe && m.spot ? <button type="button" className="xbtn" onClick={() => { setSheet(null); }} aria-label={`Watch ${m.name}`} title="Watch"><Icon name="eye" /></button> : null}

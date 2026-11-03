@@ -6,11 +6,11 @@
 export const EV_INFO = {
   start: ["play", "Started fishing"], cast: ["target", "Cast"], bite: ["bell", "Bite"], smartbite: ["bell", "Smart Bite alert (Beta)"],
   missed: ["close", "Missed bite"], hooked: ["hook", "Fish on"], lost: ["close", "Fish lost"], snag: ["close", "Snag or weed, not a fish"],
-  catch: ["fish", "Landed"], pause: ["pause", "Paused"], resume: ["play", "Back fishing"], end: ["stop", "Session ended"],
+  catch: ["fish", "Landed"], reelin: ["close", "Wound in"], pause: ["pause", "Paused"], resume: ["play", "Back fishing"], end: ["stop", "Session ended"],
   mark: ["flag", "Mark"], note: ["edit", "Note"], conditions: ["wind", "Conditions"],
 };
 /** Event types the Live Fishing View plays and shares. Marks, notes and conditions snapshots stay on the phone. */
-export const SHARED_TYPES = ["cast", "bite", "smartbite", "missed", "hooked", "lost", "snag", "catch", "pause", "resume", "end"];
+export const SHARED_TYPES = ["cast", "bite", "smartbite", "missed", "hooked", "lost", "snag", "catch", "reelin", "pause", "resume", "end"];
 // How long one-off moments last on screen (ms).
 export const DUR = { cast: 2900, bite: 5500, smartbite: 4500, missed: 2500, lost: 2600, snag: 2200, catch: 11000 };
 
@@ -31,6 +31,7 @@ export function phaseAt(events, t, { status } = {}) {
       case "hooked": hooked = e; phase = "hooked"; since = e.t; ev = e; break;
       case "lost": case "snag": hooked = null; phase = e.type === "lost" ? "lost" : "missed"; since = e.t; ev = e; break;
       case "catch": hooked = null; phase = "landing"; since = e.t; ev = e; break;
+      case "reelin": if (!hooked) { phase = "idle"; since = e.t; ev = e; cast = false; } break; // the line wound in (virtual): ready to cast or walk
       case "pause": phase = "paused"; since = e.t; ev = e; break;
       case "resume": phase = hooked ? "hooked" : "waiting"; since = e.t; ev = e; break;
       case "end": phase = "ended"; since = e.t; ev = e; hooked = null; break;
@@ -127,3 +128,14 @@ export function timelineRows(events, { upTo = Infinity, limit = 60 } = {}) {
 
 /** Typical lengths (cm) used to draw a fish when no length was logged (shown without a number). */
 export const DRAW_CM = { cod: 55, bass: 48, whiting: 32, mackerel: 32, flounder: 30, plaice: 32, dab: 24, sole: 30, pollack: 45, coalfish: 40, "ballan-wrasse": 35, "thornback-ray": 60, smoothhound: 80, "lesser-spotted-dogfish": 55, tope: 110, conger: 110, "black-bream": 32, "thick-lipped-mullet": 45, garfish: 55, gurnard: 32, pouting: 25, eel: 55, perch: 25, pike: 70, carp: 55, roach: 22, bream: 40, tench: 40, chub: 38, barbel: 55, rudd: 22, "brown-trout": 33, "rainbow-trout": 40, "sea-trout": 50, salmon: 70, zander: 50, grayling: 32, dace: 18, gudgeon: 12 };
+
+/**
+ * Whether your line is in the water, from your events: after a cast (and a bite or a missed one) it is; once a fish is
+ * landed or lost, or you wind in, it isn't. While a fish is on it's "hooked" (not wound in, not free to walk off).
+ */
+export function lineState(events) {
+  let last = null;
+  for (const e of [...(events || [])].sort(byTime)) if (["cast", "bite", "smartbite", "missed", "hooked", "lost", "snag", "catch", "reelin", "end"].includes(e.type)) last = e.type;
+  if (last === "hooked") return "hooked";
+  return last === "cast" || last === "bite" || last === "smartbite" || last === "missed" ? "out" : "in";
+}

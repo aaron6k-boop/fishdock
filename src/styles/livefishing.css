@@ -48,14 +48,19 @@ button.fs-chip { cursor: pointer; }
 
 /* the close-up of a landed fish */
 /* the close-up comes once the fish is swung in; it sits low so the scene stays in view above it */
-.fs-cardwrap { position: absolute; inset: 0; z-index: 5; display: grid; place-items: end center; padding: 14px; background: linear-gradient(to bottom, #05090c00 30%, #05090c55 55%, #05090cc0); animation: fs-fade .5s ease both; }
+/* the catch card at the top, with a light shade behind it only up there: the fish and the water below stay clear */
+.fs-cardwrap { position: absolute; inset: 0; z-index: 5; display: grid; place-items: start center; padding: calc(max(10px, env(safe-area-inset-top)) + 50px) 14px 14px; background: linear-gradient(to top, #05090c00 55%, #05090c40 75%, #05090ca0); animation: fs-fade .5s ease both; pointer-events: none; }
+.fs-cardwrap .catch-card { pointer-events: auto; max-height: 40%; }
 @keyframes fs-fade { from { opacity: 0; } }
 .catch-card { position: relative; width: min(520px, 100%); display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: #0d171ef2; border: 1px solid #ffffff1c; box-shadow: 0 24px 60px #000c; color: var(--text); animation: fs-rise .55s cubic-bezier(.2, 1.1, .3, 1) both; }
 @keyframes fs-rise { from { transform: translateY(18px) scale(.96); opacity: 0; } }
 .catch-card.compact { max-height: 100%; flex-direction: row; align-items: stretch; width: min(560px, 100%); }
-.catch-card.compact .cc-pics { flex: 1.15; min-height: 0; }
-.catch-card.compact .cc-body { flex: 1; justify-content: center; padding: 12px 12px 12px 10px; }
+.catch-card.compact .cc-pics { flex: 0.95; min-height: 0; }
+/* "safe" so text taller than the card starts at the top and scrolls, never clipped at both ends (that cut
+   "Demo catch · not logged" down to "LOGGED") */
+.catch-card.compact .cc-body { flex: 1; justify-content: safe center; overflow-y: auto; padding: 12px 12px 12px 10px; }
 .catch-card.compact .cc-body h3 { font-size: 21px; }
+.catch-card.compact .cc-kicker { font-size: 10.5px; letter-spacing: .04em; padding-right: 30px; }
 .catch-card.compact .cc-facts { font-size: 13.5px; }
 .catch-card.compact .cc-own img { max-height: none; height: 100%; }
 .catch-card.compact .cc-own { height: 100%; }
@@ -277,13 +282,39 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .ft-main svg { width: 22px; height: 22px; }
 .ft-strike { background: var(--sun, #f2b84b); color: #2b1a00; animation: ft-pulse 0.9s ease-in-out infinite; }
 .ft-reel { background: #0a141bd0; color: #fff; }
-.ft-reel > svg:first-child { position: absolute; inset: -1px; width: 66px; height: 66px; transform: rotate(-90deg); }
+.ft-reel > svg.ft-ringsvg { position: absolute; inset: -1px; width: 72px; height: 72px; transform: rotate(-90deg); }
 .ft-reel:active { transform: scale(.96); }
 .ft-ring-bg { fill: none; stroke: #ffffff26; stroke-width: 4; }
 .ft-ring { fill: none; stroke: var(--action); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
 .ft-label { font-size: 13.5px; font-weight: 650; color: #fff; text-shadow: 0 1px 3px #000c; max-width: 52vw; line-height: 1.25; }
 .ft-pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #ffffff2a; background: #0a141bb3; color: #fff; font-size: 13px; font-weight: 650; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .ft-pill svg { width: 15px; height: 15px; }
+/* hold to cast, tap to reel, the tension gauge, land */
+.ft-main { width: 70px; height: 70px; }
+/* the actions you have to hit quickly are bigger, with a touch area larger still (an iPhone thumb, mid-fight) */
+.ft-strike, .ft-reel, .ft-land { width: 84px; height: 84px; }
+.ft-strike::after, .ft-reel::after, .ft-land::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; }
+.ft-reel > svg.ft-ringsvg, .ft-land > svg.ft-ringsvg { inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); }
+.ft-strike svg, .ft-reel svg, .ft-land svg { width: 26px; height: 26px; }
+.ft-strike span, .ft-reel span, .ft-land span { font-size: 14px; font-weight: 800; }
+.ft-main > svg.ft-ringsvg { position: absolute; inset: -1px; width: 72px; height: 72px; transform: rotate(-90deg); }
+.ft-cast.holding { transform: scale(1.05); }
+.ft-ring.power { stroke: #fff; transition: none; }
+.ft-reel.assisted { box-shadow: 0 0 0 3px color-mix(in srgb, var(--action) 55%, transparent), 0 8px 22px #0007; }
+.ft-handle { display: grid; place-items: center; transition: transform .12s ease-out; }
+.ft-land { background: var(--action); animation: ft-pulse 0.9s ease-in-out infinite; }
+.ft-fight { display: flex; align-items: center; gap: 8px; }
+.ft-tension { position: relative; width: 9px; height: 78px; border-radius: 6px; background: #0a141bb8; border: 1px solid #ffffff30; overflow: hidden; }
+.ft-ten-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 6px; background: #5fd38d; transition: height .1s linear, background-color .2s; }
+.ft-tension.mid .ft-ten-fill { background: #e9c74b; }
+.ft-tension.high .ft-ten-fill, .ft-tension.slip .ft-ten-fill { background: #f07a52; }
+.ft-tension.slip { animation: ft-shiver .18s linear infinite; }
+.ft-ten-drag { position: absolute; left: -2px; right: -2px; height: 2px; background: #fff; box-shadow: 0 0 3px #000; }
+.ft-drag { display: grid; gap: 6px; }
+.ft-drag .ft-pill { min-height: 30px; padding: 0 10px; font-size: 12px; }
+@keyframes ft-shiver { 50% { transform: translateX(1px); } }
+html[data-hand="right"] .ft-fight { flex-direction: row-reverse; }
+@media (prefers-reduced-motion: reduce) { .ft-land, .ft-tension.slip { animation: none; } }
 @keyframes ft-pulse { 50% { transform: scale(1.06); box-shadow: 0 0 0 8px #f2b84b33, 0 8px 22px #0007; } }
 @media (prefers-reduced-motion: reduce) { .ft-strike { animation: none; } .fish-tray { transition: none; } }
 
@@ -298,23 +329,54 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .test-panel .chip[disabled] { opacity: .4; }
 
 /* ---- the 3D view (Beta) ---- */
-.w3d { position: relative; width: 100%; height: 100%; min-height: 320px; overflow: hidden; background: #0b1620; touch-action: none; }
+.w3d { position: relative; width: 100%; height: 100%; min-height: 320px; overflow: hidden; background: linear-gradient(180deg, #8a93a3 0%, #6f7d8c 46%, #2a3a48 54%, #16232e 100%); touch-action: none; }
+/* while the scene is being set up (or restored) the sky-and-sea backdrop shows, never black, and the fishing controls wait */
+.w3d-canvas { transition: opacity .35s ease; }
+.w3d.is-waiting .w3d-canvas { opacity: 0; }
+.w3d.is-waiting .fish-tray, .w3d.is-waiting .walk-actions, .w3d.is-waiting .joystick-zone { visibility: hidden; }
+.w3d-loading { background: transparent; }
+.w3d-load-card { display: grid; gap: 10px; justify-items: center; padding: 14px 18px; border-radius: 14px; background: #0a141bcc; color: #fff; font-size: 14px; }
 .w3d-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; cursor: grab; }
 .w3d-canvas:active { cursor: grabbing; }
 .w3d .fs-overlay { pointer-events: none; }
 .w3d-fail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #fff; background: #0b1620; }
-.w3d-compass { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 96px); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #0a141bb3; border: 1px solid #ffffff26; color: #fff; pointer-events: none; }
+.w3d-compass { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 58px); width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #0a141bb3; border: 1px solid #ffffff26; color: #fff; pointer-events: none; }
 .w3d-compass span { position: absolute; inset: 3px; display: grid; justify-items: center; transition: transform .15s linear; }
-.w3d-compass span b { font-size: 10px; color: #ff6b5e; line-height: 1; }
+.w3d-compass span b { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 7px solid #ff6b5e; margin-top: 1px; } /* the north pointer: a red marker that turns (the letters say which way you face) */
 .w3d-compass i { font-style: normal; font-size: 10px; font-weight: 700; margin-top: 10px; }
-.w3d-label { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom)); width: max-content; max-width: min(92vw, 640px); text-align: center; font-size: 10.5px; line-height: 1.3; color: #dbe6ec; text-shadow: 0 1px 2px #000; pointer-events: none; opacity: .85; }
+/* what the place is (and its credits): under the top bar, out of the way of the fishing controls at the bottom */
+.w3d-label { position: absolute; z-index: 3; left: max(10px, env(safe-area-inset-left)); right: 60px; top: calc(max(10px, env(safe-area-inset-top)) + 40px); display: flex; align-items: flex-start; gap: 6px; font-size: 11px; line-height: 1.35; color: #dbe6ec; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.w3d-label .w3d-short { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .85; padding-top: 3px; }
+.w3d-label.open .w3d-full { background: #0a141be6; border-radius: 10px; padding: 8px 10px; text-shadow: none; pointer-events: auto; }
+.w3d-about { pointer-events: auto; flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #ffffff33; background: #0a141b99; color: #dbe6ec; display: grid; place-items: center; padding: 0; }
+.w3d-about svg { width: 13px; height: 13px; }
 .w3d-label b { color: var(--action); }
+.w3d-menuwrap { position: absolute; z-index: 6; top: calc(max(10px, env(safe-area-inset-top))); right: max(10px, env(safe-area-inset-right)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto; }
+.w3d-menubtn { width: 40px; height: 40px; border-radius: 13px; }
+.w3d-menu { width: min(250px, 78vw); max-height: min(68vh, 560px); overflow-y: auto; overscroll-behavior: contain; }
+.w3d-menu .ft-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; }
+.w3d-menu .ft-pill svg { width: 16px; height: 16px; }
+.cam-head { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #9fb3bf; padding: 2px 4px 0; }
+.cam-row { display: flex; gap: 6px; } .cam-row .ft-pill { flex: 1; justify-content: center; }
+.w3d-walkbtn { position: absolute; z-index: 5; right: max(14px, env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; border: 1px solid #ffffff33; background: #0a141bc4; color: #fff; pointer-events: auto; }
+.w3d-walkbtn svg { width: 24px; height: 24px; }
+html[data-hand="right"] .w3d-walkbtn { right: auto; left: max(14px, env(safe-area-inset-left)); }
+.stage3d.walking .w3d-walkbtn, .immersive.ui-hidden .w3d-walkbtn, .immersive.ui-hidden .w3d-menuwrap { opacity: 0; pointer-events: none; }
 .w3d-tools { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: auto; }
 .immersive.ui-hidden .w3d-tools, .immersive.ui-hidden .w3d-compass { opacity: 0; pointer-events: none; }
 .fs-btn.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: color-mix(in srgb, var(--action) 60%, transparent); }
 .cam-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: #0a141be6; border: 1px solid #ffffff26; }
 .cam-menu button { text-align: left; }
-.w3d-card { position: absolute; z-index: 6; left: 0; right: 0; bottom: 0; padding: 0 12px calc(14px + env(safe-area-inset-bottom)); pointer-events: none; }
+/* controls on the right (for a right thumb): Cast, Strike and Reel bottom right, the camera tools bottom left */
+html[data-hand="right"] .fs-bottom { align-self: flex-end; align-items: flex-end; }
+html[data-hand="right"] .fish-tray { flex-direction: row-reverse; }
+html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
+.cam-sep { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid #ffffff26; }
+/* the catch card sits under the top bar: the landed fish (in the hands, or the net) is in the lower part of the view */
+.w3d-card { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 50px); padding: 0 12px; pointer-events: none; display: flex; justify-content: center; }
+.w3d-card .catch-card.compact { max-height: 156px; } /* room for the line saying what it is; the scene stays clear below */
+.w3d-watch { pointer-events: auto; cursor: pointer; border-color: #7ee8de88; font: inherit; font-size: 13px; }
+.w3d-watch b { color: #7ee8de; }
 .w3d-card .catch-card { pointer-events: auto; }
 .w3d-toasts { position: absolute; z-index: 5; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 52px); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; }
 .w3d-toast { padding: 7px 14px; border-radius: 999px; background: #0a141bd9; border: 1px solid #ffffff26; color: #fff; font-size: 13px; font-weight: 650; animation: fs-pop .3s ease both; white-space: nowrap; }
@@ -333,7 +395,8 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .beta-pill { display: inline-block; vertical-align: middle; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; color: var(--action); border: 1px solid color-mix(in srgb, var(--action) 50%, transparent); background: color-mix(in srgb, var(--action) 14%, transparent); }
 .tg-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--elev); color: var(--text); }
 .tg-card.on { border-color: color-mix(in srgb, var(--action) 60%, transparent); }
-.tg-card .grow { display: flex; flex-direction: column; gap: 2px; }
+.tg-card .grow { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tg-card > svg { width: 18px; height: 18px; flex: none; color: var(--text-2); }
 .tg-card .grow span { font-size: 13px; color: var(--text-2); }
 .tg-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--action) 16%, transparent); color: var(--action); flex: none; }
 .tg-form { display: flex; flex-direction: column; gap: 12px; padding: 4px 4px 12px; }
@@ -379,3 +442,71 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .w3d-src .ft-pill.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: var(--action); }
 .w3d-label a { color: #e6f3f7; pointer-events: auto; }
 .immersive.ui-hidden .w3d-src { opacity: 0; pointer-events: none; }
+
+/* ---- walking about (Stage3D): thumbstick bottom left, jump and sprint bottom right, prompts at the top ---- */
+.stage3d.walking .fs-bottom, .stage3d.walking .w3d-card, .stage3d.walking .w3d-tools { display: none; }
+.joystick-zone { position: absolute; z-index: 6; left: 0; bottom: 0; width: 1px; height: 1px; }
+.joystick-zone.floating { width: 46vw; height: 42vh; touch-action: none; }
+.joystick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); width: var(--js, 128px); height: var(--js, 128px); border-radius: 50%; background: radial-gradient(circle, #ffffff1f, #ffffff0d 70%); border: 2px solid #ffffff40; touch-action: none; display: grid; place-items: center; opacity: .45; transition: opacity .25s; }
+.joystick-zone.active .joystick { opacity: 1; }
+.joystick-zone.floating .joystick.placed { left: calc(var(--jx) - var(--js, 128px) / 2); bottom: auto; top: calc(var(--jy) - var(--js, 128px) / 2); }
+.joystick-zone.floating .joystick { pointer-events: none; }
+.stick-s { --js: 104px; } .stick-m { --js: 128px; } .stick-l { --js: 156px; }
+.stick-s .joystick-knob { width: 48px; height: 48px; } .stick-l .joystick-knob { width: 68px; height: 68px; }
+.joystick-knob { width: 58px; height: 58px; border-radius: 50%; background: #ffffffd9; box-shadow: 0 4px 14px #0006; transition: transform .05s; pointer-events: none; }
+/* walking: Start fishing (only at the water's edge) above a row of small pills, bottom right, clear of the left thumb */
+.walk-actions { position: absolute; z-index: 6; right: max(14px, env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; max-width: 58%; }
+.walk-small { display: flex; gap: 8px; }
+.walk-pill { min-width: 46px; height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid #ffffff40; background: #0a141bb3; color: #fff; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; touch-action: none; }
+.walk-pill svg { width: 20px; height: 20px; }
+.walk-pill.on { background: var(--action); color: #04201d; border-color: transparent; }
+.walk-fish { display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 20px 0 16px; border-radius: 999px; border: 0; background: var(--action); color: #04201d; font-weight: 800; font-size: 16px; box-shadow: 0 6px 18px #0007; animation: prompt-in .25s ease both; }
+.walk-fish svg { width: 22px; height: 22px; }
+.walk-note { background: #0a141be0; color: #fff; font-size: 12.5px; padding: 7px 12px; border-radius: 12px; text-align: right; }
+.walk-top { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 150px); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.walk-top button { pointer-events: auto; }
+.walk-prompt { display: flex; align-items: center; gap: 10px; padding: 10px 18px 10px 10px; border-radius: 14px; border: 0; background: #0a141be6; color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 6px 20px #0008; animation: prompt-in .25s ease both; }
+.walk-prompt .key { background: #fff; color: #0a141b; border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+@keyframes prompt-in { from { transform: scale(.85); opacity: 0; } }
+.walk-msg { position: absolute; z-index: 7; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 104px); max-width: 86%; text-align: center; padding: 8px 14px; border-radius: 12px; background: #0a141be6; color: #fff; font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .walk-prompt, .walk-fish { animation: none; } }
+
+/* ---- having a look at your landed fish (Stage3D): a compact panel low down, the fish held up above it ---- */
+.fish-look { position: absolute; z-index: 7; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); max-width: 520px; margin: 0 auto; max-height: 44%; overflow-y: auto; padding: 14px 16px; border-radius: 18px; background: #0d171ef2; border: 1px solid #ffffff1c; box-shadow: 0 18px 50px #000b; color: var(--text); display: flex; flex-direction: column; gap: 6px; animation: fs-rise .4s cubic-bezier(.2, 1.1, .3, 1) both; }
+.fish-look h3 { margin: 0; font-size: 22px; padding-right: 36px; }
+.fish-look h3 i { font-weight: 400; margin-left: 6px; }
+.fish-look p { margin: 0; }
+.fish-look .row { margin-top: 6px; gap: 10px; }
+.fish-look-x { position: absolute; top: 8px; right: 8px; }
+.stage3d .fish-look ~ .w3d-tools { display: none; }
+
+/* ---- the mic button (Fish Together): off, on (teal) and a ring while you're talking ---- */
+.fs-btn.mic.on { background: var(--action); color: #04201d; }
+.fs-btn.mic.talking { box-shadow: 0 0 0 3px #7ee8de88; }
+
+/* ---- choosing your angler's look ---- */
+.look-picker { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: start; }
+.look-people { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.look-people + .look-people { margin-top: 2px; }
+.look-person { flex: 0 0 auto; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; background: var(--elev); line-height: 0; }
+.look-person img { width: 48px; height: 60px; object-fit: cover; display: block; }
+.look-person.on { border-color: var(--action); }
+.look-sw.own { background: conic-gradient(#7a5a3a 0 25%, #3d4a5c 0 50%, #7a5a3a 0 75%, #3d4a5c 0); }
+.look-pair { grid-template-columns: 1fr 1fr; gap: 10px; }
+.look-preview { position: sticky; top: 0; }
+.look-preview { width: 112px; height: 168px; border-radius: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--action) 12%, var(--elev)), var(--elev)); border: 1px solid var(--line); }
+.look-opts { display: grid; gap: 10px; min-width: 0; }
+.look-row { display: grid; gap: 5px; }
+.look-row .lbl { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.look-row .outfits { gap: 8px; flex-wrap: wrap; }
+.look-row .outfit { width: 34px; height: 34px; }
+.look-row .outfit i { top: 4px; width: 13px; height: 7px; }
+.look-swatches { display: flex; gap: 7px; flex-wrap: wrap; }
+.look-sw { width: 28px; height: 28px; border-radius: 50%; background: var(--c); border: 2px solid transparent; box-shadow: inset 0 0 0 1px #0000002a; }
+.look-sw.on { border-color: var(--action); box-shadow: 0 0 0 2px var(--bg) inset; }
+@media (max-width: 360px) { .look-picker { grid-template-columns: 1fr; } .look-preview { justify-self: center; } }
+
+/* sound levels in the camera menu */
+.sound-levels { display: grid; gap: 6px; padding: 8px 12px; border-radius: 14px; background: #0a141bb3; border: 1px solid #ffffff2a; color: #fff; font-size: 12px; font-weight: 600; }
+.sl-row { display: grid; grid-template-columns: 1fr 96px; align-items: center; gap: 8px; }
+.sl-row input { width: 96px; accent-color: var(--action); }

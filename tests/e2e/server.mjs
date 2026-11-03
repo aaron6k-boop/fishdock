@@ -3,7 +3,7 @@
 // stand-ins, so the whole app can be exercised in a browser with no network and no keys.
 // Usage: node tools/build-preview.mjs --server && node tests/e2e/server.mjs [port]
 import { createServer } from "node:http";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createD1 } from "../helpers/d1.js";
 import { handleConditions } from "../../server/conditions.js";
 import { handleTides } from "../../server/tides.js";
@@ -77,7 +77,16 @@ globalThis.fetch = async (input, init) => {
     return J({ elements: inland ? [{ type: "way", id: 1, tags: { waterway: "river", name: "River Test" } }] : [{ type: "way", id: 2, tags: { natural: "coastline" } }, { type: "way", id: 3, tags: { man_made: "pier", name: "Test Pier" } }] });
   }
   if (url.includes("generativelanguage.googleapis.com")) return J({ candidates: [{ content: { parts: [{ text: JSON.stringify({ summary: "A shingle beach with a gentle swell.", scene: "beach", features: [{ x: 0.55, y: 0.58, kind: "surf", label: "Second breaker line", why: "Waves turn over food here.", how: "Cast just beyond it.", for: ["Bass", "Cod"], confidence: "medium" }], avoid: [], safety: ["Steep shingle: keep well back from the waterline."], candidates: [{ species: "Bass", id: "bass", confidence: "high", why: "Silver, two dorsal fins, spiny gill cover." }] }) }] } }] });
-  if (url.includes("api.openstreetmap.org/api/0.6/map.json")) return new Response(readFileSync(new URL("../fixtures/osm-gorleston.json", import.meta.url)), { headers: { "content-type": "application/json" } });
+  // (FISHDOCK_OSM_DIR can point at a folder of saved answers, <id>.json with <id>.h holding "x-mark: lat,lon", to
+  // look at real places closely; otherwise every place gets the Gorleston fixture)
+  if (url.includes("api.openstreetmap.org/api/0.6/map.json")) {
+    const dir = process.env.FISHDOCK_OSM_DIR;
+    if (dir) {
+      const [w, so, e, n] = new URL(url).searchParams.get("bbox").split(",").map(Number);
+      for (const f of readdirSync(dir).filter((x) => x.endsWith(".h"))) { const m = readFileSync(`${dir}/${f}`, "utf8").match(/x-mark: ([\d.-]+),([\d.-]+)/); if (m && +m[1] > so && +m[1] < n && +m[2] > w && +m[2] < e) return new Response(readFileSync(`${dir}/${f.replace(/\.h$/, ".json")}`), { headers: { "content-type": "application/json" } }); }
+    }
+    return new Response(readFileSync(new URL("../fixtures/osm-gorleston.json", import.meta.url)), { headers: { "content-type": "application/json" } });
+  }
   if (url.includes("googleapis.com/service_accounts") || url.includes("securetoken")) return J({ keys: [] });
   return new Response("not stubbed", { status: 599 });
 };

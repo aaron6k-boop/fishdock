@@ -4,6 +4,7 @@
 // full and in order. When the angler's phone goes quiet (locked screen, no signal) it says so and keeps the last
 // known state; nothing is made up to fill the gap.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { haptics } from "../lib/haptics.js";
 import FishingScene, { CatchCard } from "../components/FishingScene.jsx";
 import { QUALITY_OPTIONS } from "../components/FishingScene.jsx";
 import { phaseAt, activityText, timelineRows, notable, EV_INFO } from "../lib/liveEvents.js";
@@ -183,7 +184,7 @@ export default function Watch({ token }) {
       <div className="watch">
         <div className="watch-stage">
           <FishingScene ref={sceneRef} scene={scene} events={evs} status={replayT != null ? "running" : share.status} now={sceneNow}
-            env={{ cond: share.cond, light: share.light, kind: share.place?.kind, venue: share.place?.venue }} quality={quality} sound={sound} volume={volume} vibrate={buzz && replayT == null}
+            env={{ cond: share.cond, light: share.light, kind: share.place?.kind, venue: share.place?.venue }} quality={quality} sound={sound} volume={volume} feel={buzz && replayT == null ? haptics.feel : null}
             catchPhoto={(ev) => (ev?.data?.photo ? photos[ev.data.photo] || null : null)} onTap={() => setUiHidden((h) => !h)}>
             <div className="fs-top">
               <span className={`live-badge s-${replayT != null ? "replay" : statusChip[0]}`}>{replayT != null ? "Replay" : <><span className="rec-dot" />{statusChip[1]}</>}</span>

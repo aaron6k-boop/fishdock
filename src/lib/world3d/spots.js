@@ -4,15 +4,16 @@
 // spaced so rods, people and tackle never overlap, each with the way it faces and where its line lands.
 
 export const LAYOUTS = {
-  // a stone harbour pier running out to sea: fish over either side or off the end
+  // a stone harbour pier running out to sea: fish over either side or off the end. The first two spots are side by
+  // side on the same rail (friends fish together and can watch each other's rods); the others spread out from there
   pier: {
     label: "Representative pier",
     deck: 4.2, width: 9, from: 70, to: -48, // the deck: height, width, from the shore (z) to the end
     spots: [
-      { id: 1, name: "Left side of the pier", at: [-3.6, 4.2, -6], face: -Math.PI / 2, cast: 26 },
-      { id: 2, name: "Right side of the pier", at: [3.6, 4.2, -14], face: Math.PI / 2, cast: 26 },
-      { id: 3, name: "Further along the pier", at: [-3.6, 4.2, -26], face: -Math.PI / 2, cast: 28 },
-      { id: 4, name: "End of the pier", at: [0.5, 4.2, -46.2], face: 0, cast: 34 },
+      { id: 1, name: "Left side of the pier", at: [-3.6, 4.2, -10], face: -Math.PI / 2, cast: 26, edge: 0.9 },
+      { id: 2, name: "Beside them on the left", at: [-3.6, 4.2, -18], face: -Math.PI / 2 + 0.1, cast: 26, edge: 0.9 },
+      { id: 3, name: "Right side of the pier", at: [3.6, 4.2, -14], face: Math.PI / 2, cast: 26, edge: 0.9 },
+      { id: 4, name: "End of the pier", at: [0.5, 4.2, -46.2], face: 0, cast: 34, edge: 1.8 },
     ],
   },
   // a shelving sand and shingle beach: rods on tripods at the water's edge
@@ -20,8 +21,8 @@ export const LAYOUTS = {
     label: "Representative beach",
     deck: 0.9, shore: 0,
     spots: [
-      { id: 1, name: "On the beach, left", at: [-12, 0.9, 6], face: 0, cast: 70 },
-      { id: 2, name: "On the beach, right", at: [12, 0.9, 6], face: 0, cast: 70 },
+      { id: 1, name: "On the beach, left", at: [-7, 0.9, 6], face: 0, cast: 70 },
+      { id: 2, name: "On the beach, right", at: [7, 0.9, 6], face: 0, cast: 70 },
       { id: 3, name: "Further along, left", at: [-36, 0.9, 6], face: 0, cast: 70 },
       { id: 4, name: "Further along, right", at: [36, 0.9, 6], face: 0, cast: 70 },
     ],
@@ -31,8 +32,8 @@ export const LAYOUTS = {
     label: "Representative estuary quay",
     deck: 2.6, wall: 0, farBank: -170,
     spots: [
-      { id: 1, name: "On the quay, left", at: [-9, 2.6, 1.2], face: 0, cast: 30 },
-      { id: 2, name: "On the quay, right", at: [9, 2.6, 1.2], face: 0, cast: 30 },
+      { id: 1, name: "On the quay, left", at: [-5, 2.6, 1.2], face: 0, cast: 30 },
+      { id: 2, name: "On the quay, right", at: [5, 2.6, 1.2], face: 0, cast: 30 },
       { id: 3, name: "Further along, left", at: [-27, 2.6, 1.2], face: 0, cast: 30 },
       { id: 4, name: "Further along, right", at: [27, 2.6, 1.2], face: 0, cast: 30 },
     ],
@@ -42,8 +43,8 @@ export const LAYOUTS = {
     label: "Representative river bank",
     deck: 0.7, bank: 0, farBank: -42,
     spots: [
-      { id: 1, name: "On the bank, upstream", at: [-10, 0.7, 2.2], face: 0, cast: 14 },
-      { id: 2, name: "On the bank, downstream", at: [10, 0.7, 2.2], face: 0, cast: 14 },
+      { id: 1, name: "On the bank, upstream", at: [-6, 0.7, 2.2], face: 0, cast: 14 },
+      { id: 2, name: "On the bank, downstream", at: [6, 0.7, 2.2], face: 0, cast: 14 },
       { id: 3, name: "Further upstream", at: [-30, 0.7, 2.2], face: 0, cast: 14 },
       { id: 4, name: "Further downstream", at: [30, 0.7, 2.2], face: 0, cast: 14 },
     ],
@@ -53,8 +54,8 @@ export const LAYOUTS = {
     label: "Representative lake",
     deck: 0.6, bank: 0, farBank: -260,
     spots: [
-      { id: 1, name: "Swim 1", at: [-11, 0.6, 2], face: 0, cast: 30 },
-      { id: 2, name: "Swim 2", at: [11, 0.6, 2], face: 0, cast: 30 },
+      { id: 1, name: "Swim 1", at: [-7, 0.6, 2], face: 0, cast: 30 },
+      { id: 2, name: "Swim 2", at: [7, 0.6, 2], face: 0, cast: 30 },
       { id: 3, name: "Swim 3", at: [-33, 0.6, 2], face: 0.05, cast: 30 },
       { id: 4, name: "Swim 4", at: [33, 0.6, 2], face: -0.05, cast: 30 },
     ],

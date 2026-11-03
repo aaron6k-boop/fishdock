@@ -65,6 +65,20 @@ const FIGHT = {
 const FIGHT_BASE = { pull: 1, tempo: 1, erratic: 0.4, splashy: 0.3, flex: 1, long: 1, flat: false, ray: false, eel: false, headRight: false };
 export const fightProfile = (species) => ({ ...FIGHT_BASE, ...(FIGHT[species] || {}), species: FIGHT[species] ? species : null });
 
+/** How a species moves in the 3D fight, from its profile: how deep, how wide and fast its runs, whether it leaps,
+ *  how heavily it pulls, and whether the tip pumps (eels). */
+export function fightStyle(p) {
+  const diver = !!(p.ray || p.eel || (p.pull >= 1.15 && p.splashy < 0.5));
+  return {
+    depth: p.ray ? 2.6 : diver ? 2.0 : p.flat ? 1.2 : p.splashy >= 0.55 ? 0.35 : 0.9,
+    runWidth: p.ray ? 0.35 : p.flat ? 1.35 : 0.6 + 0.8 * (p.erratic ?? 0.4),
+    runSpeed: p.flat ? 0.6 : p.ray ? 0.5 : 0.8 + 0.6 * (p.erratic ?? 0.4),
+    leaps: p.splashy >= 0.8 && !p.flat && !p.eel,
+    heavy: p.ray ? 1.3 : diver ? 1.12 : 1,
+    pump: !!p.eel,
+  };
+}
+
 /** How a bite shows at the rod tip, by the kind of fish: [seconds, tip tap, rod bend, how fast it fades]. Small,
  *  quick fish rattle the tip; bass knock hard then run; cod and other heavy fish knock and then pull the rod
  *  round; flatfish lean on it gently; rays and eels draw it down slowly. `strong` is a proper take rather than a
@@ -107,7 +121,7 @@ export function landingTech(species, lengthCm, weightKg, venue = "pier") {
 export function landingTimes(species, lengthCm, weightKg, venue = "pier") {
   const tech = landingTech(species, lengthCm, weightKg, venue);
   const ts = clamp(0.85 + 0.15 * fishLoad(species, lengthCm, weightKg), 0.9, 1.12);
-  const B = { lift: [1.6, 2.6, 3.9, 4.6, 5.6, 6.6], dropnet: [1.6, 2.7, 4.4, 5.6, 7.3, 8.3], net: [1.6, 2.6, 3.7, 4.9, 6.3, 7.2], beach: [1.8, 3.4, 4.6, 5.6, 6.0, 6.9] }[tech];
+  const B = { lift: [1.6, 2.6, 3.9, 4.6, 5.6, 6.6], dropnet: [2.0, 3.6, 5.4, 6.4, 8.2, 9.4], net: [1.6, 2.6, 3.7, 4.9, 6.3, 7.2], beach: [1.8, 3.4, 4.6, 5.6, 6.0, 6.9] }[tech];
   const [T1, T2, T3, T4, swingIn, end] = B.map((v) => v * ts);
   return { tech, ts, T1, T2, T3, T4, swingIn, end, card: end - 0.2 };
 }
@@ -116,7 +130,7 @@ export function fightSeconds(species, lengthCm) {
   return clamp(4 + 6 * p.long * p.pull * Math.sqrt((lengthCm || 40) / 45), 4, 18);
 }
 
-export function createActors(canvas, { onSound } = {}) {
+export function createActors(canvas, { onSound, onFeel } = {}) {
   // the 3D fish (FishDock's own pictures lofted into light models); null without WebGL, then the flat bent picture
   let fish3 = null, fish3Tried = false, fish3For = null;
   const ctx = canvas.getContext("2d");
@@ -614,6 +628,8 @@ export function createActors(canvas, { onSound } = {}) {
     ctx.clearRect(0, 0, W, H);
     const { phase = "idle", age = 0, ev = null } = info || {};
     const key = `${phase}|${info?.since || 0}`;
+    // what you feel (haptics.js), at the moments drawn here; logged moments carry a key so they're felt once
+    const feel = (n, extra = {}, recorded = false) => onFeel?.(n, { species: prof.species, lengthCm: fishCm || null, pull: prof.pull, ...extra, recorded, key: recorded ? `${info?.since || 0}|${n}` : undefined });
     if (key !== lastPhaseKey) {
       lastPhaseKey = key; prevAge = age > 1.2 ? age : -1;
       // each event gets its own, repeatable variation (a replay looks the same; the next cast doesn't)
@@ -656,16 +672,16 @@ export function createActors(canvas, { onSound } = {}) {
         lead = [x, y, 1 - f * 0.7];
         end = [x, y]; slack = 0.05; showLine = true;
       } else if (age >= 2.15) slack = clamp((age - 2.15) / 0.8, 0.05, 1);
-      if (crossed(0.8)) onSound?.("whoosh");
-      if (crossed(2.15)) { splash(E0[0], E0[1], 0.7 * P.size, 14, { rnd: seedR }); onSound?.("plop"); }
+      if (crossed(0.8)) { onSound?.("whoosh"); feel("release"); }
+      if (crossed(2.15)) { splash(E0[0], E0[1], 0.7 * P.size, 14, { rnd: seedR }); onSound?.("plop"); feel("splashdown"); }
     } else if (phase === "bite") {
       // a light bite is a couple of taps at the tip; a proper take pulls the rod over
       // (each kind of fish bites its own way: biteTaps)
       if (!P.taps) P.taps = biteTaps(prof.species, P.strong, seedR);
-      for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; kT += b * e * prof.pull; if (crossed(p0 + 0.001) && p0 > 0 && a > 0.05) addRipple(E0[0], E0[1], 0.25); }
+      for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; kT += b * e * prof.pull; if (crossed(p0 + 0.001) && p0 > 0) { if (a > 0.05) addRipple(E0[0], E0[1], 0.25); feel("tap", { a, b }); } }
       slack = P.strong ? 0.3 : 0.55;
       if (floatRig) floatDip = clamp(Math.max(0, Math.sin(age * 5)) * (age < 3 ? 0.8 : 0.2), 0, 1);
-      if (crossed(0.02)) { onSound?.("bell"); addRipple(E0[0], E0[1], P.strong ? 0.6 : 0.35); turb.push(); }
+      if (crossed(0.02)) { onSound?.("bell"); addRipple(E0[0], E0[1], P.strong ? 0.6 : 0.35); turb.push(); feel("bite", { strong: P.strong }, true); }
       if (P.strong && age < 2.4) turb.push({ x: toRef(E0[0], E0[1])[0], y: toRef(E0[0], E0[1])[1], r: 0.02, s: 0.3 * Math.exp(-age) });
       if (crossed(1.9) && P.strong) { onSound?.("bell"); addRipple(E0[0], E0[1], 0.5); }
     } else if (phase === "hooked") {
@@ -684,14 +700,16 @@ export function createActors(canvas, { onSound } = {}) {
       shake = surge * 0.7 * load;
       const [rx, ry] = toRef(fx, fy);
       turb.push({ x: rx, y: ry, r: 0.025 + 0.03 * surge, s: (0.15 + 0.6 * surge) * (0.4 + prof.splashy) });
-      if (crossed(0.02)) onSound?.("reelOn");
+      if (crossed(0.02)) { onSound?.("reelOn"); feel("hooked", {}, true); }
+      if (surge > 0.6 && (P.lastSurge ?? 0) <= 0.6) feel("pull", { tension, surge }); // each surge as it builds
+      P.lastSurge = surge;
       const persp = lerp(0.4, 1, depthAt(fy)), lenHere = fishCm * pxPerCm * persp;
       const heading = Math.sign(noise1((age + 0.05) * 0.22 * prof.tempo + P.s1) - run) || 1; // which way it's running
       // now and then the fish rolls on its side or slaps its tail at the surface (more often for lively fish)
       if (!roll && t > nextRollT && surge > 0.6 && seedR() < 0.25 + prof.splashy * 0.6) {
         roll = { t0: t, side: heading, tail: seedR() < 0.45 };
         splash(fx, fy, (0.45 + prof.splashy * 0.6) * P.size * persp, 14, { rnd: seedR, dir: heading });
-        onSound?.("splash");
+        onSound?.("splash"); feel("run");
       }
       if (roll) {
         const ra = t - roll.t0, dur = roll.tail ? 0.6 : 0.9;
@@ -722,11 +740,12 @@ export function createActors(canvas, { onSound } = {}) {
       if (hideLine) showLine = false;
       if (crossed(0.02)) onSound?.("reelOn");
       if (crossed(LT.T4 - 0.3)) onSound?.("reelOff");
+      if (crossed(LT.card)) feel("landed", {}, true);
     } else if (phase === "lost" || phase === "missed") {
       // the tension goes: the spring of the rod throws the tip back
       kT = 0; tipT = 0;
       slack = clamp(age / 0.6, 0.2, 1);
-      if (crossed(0.02)) { addRipple(E0[0], E0[1], 0.7); if (phase === "lost") { rodS.kv -= 1.6 * load; onSound?.("reelOff"); } }
+      if (crossed(0.02)) { addRipple(E0[0], E0[1], 0.7); feel(phase, {}, true); if (phase === "lost") { rodS.kv -= 1.6 * load; onSound?.("reelOff"); } }
     } else if (phase === "paused") {
       thT = th0 + 0.04; slack = 1;
     }
@@ -846,7 +865,9 @@ export function createActors(canvas, { onSound } = {}) {
       // the fish: thrashing beside the net, then drawn over it, then curled in the bag
       const { curl, amp } = kick();
       const beside = [S[0] + thrash(age) * W * 0.012, waterY - lenS * 0.22];
-      const inBag = [c[0] - dir * lenS * 0.4 * grow, c[1] + bag * 0.45];
+      // in the bag: the anchor is the fish's mouth and its body runs back from it, so the mouth goes on the side it
+      // faces and the body lies back across the middle of the hoop (it was the other side: the fish ended up outside)
+      const inBag = [c[0] + dir * lenS * 0.5 * grow, c[1] + bag * 0.45];
       const ax = lerp(beside[0], inBag[0], Math.max(fOver, fUp)), ay = lerp(beside[1], inBag[1], Math.max(fOver, fUp));
       end = [ax, ay];
       const ps = pose(dir, lerp(0.45, 0.18 + 0.25 * Math.sin(age * 3), fOver));

@@ -1,10 +1,12 @@
 // GET /api/pano?spot=<id>  A real 360° photo taken near a documented FishDock mark, from Mapillary.
 //
 // - Needs MAPILLARY_TOKEN (a free Mapillary client token) as a server secret; the phone never sees it. Without it
-//   this answers 503 and the 3D view uses the map-data place instead.
+//   this answers { pano: null } and the 3D view uses the map-data place instead.
 // - Only FishDock's public, documented marks, never an arbitrary position. The nearest panorama within about 250 m
 //   is chosen; photos are CC BY-SA 4.0 and shown with the photographer's name and a link to the photo.
 // - Kept for 12 hours (Mapillary's image links are signed and expire).
+// - Hidden from everyone until PANO_PUBLIC is "1" (a plain variable, set once coverage has been checked). Before that,
+//   ?preview=1 answers too: that's what tools/pano-coverage.mjs and the in-app preview (see World3D) use.
 
 import { json, err, guard, toResponse } from "./http.js";
 import { ensureSchema } from "./db.js";
@@ -13,23 +15,39 @@ import { markFor } from "./place3d.js";
 
 export const PANO_TTL = 12 * 3600e3;
 
-/** The nearest panorama to the mark from Mapillary's answer (pure, tested). */
-export function pickPano(answer, lat, lon) {
+// What makes a 360° photo good enough to show as the place: taken close to the mark, with Mapillary's corrected
+// position and corrected compass direction (so it faces the right way), and recent enough to look like the place now
+export const PANO_RULES = { nearM: 60, maxYears: 8 };
+
+/** The best panorama for the mark from Mapillary's answer (pure, tested): the nearest one that passes every check, or
+ *  failing that the nearest, with what's wrong with it (only shown in previews). */
+export function pickPano(answer, lat, lon, now = Date.now()) {
   const R = 111320, k = Math.cos((lat * Math.PI) / 180);
-  let best = null;
+  const all = [];
   for (const im of answer?.data || []) {
     const c = im.computed_geometry?.coordinates || im.geometry?.coordinates;
     if (!im.is_pano || !Array.isArray(c) || !/^https:\/\//.test(im.thumb_2048_url || "")) continue;
     const d = Math.hypot((c[0] - lon) * R * k, (c[1] - lat) * R);
     if (d > 250) continue;
-    if (!best || d < best.d) best = { d, im, c };
+    const captured = Number(im.captured_at) || null, years = captured ? (now - captured) / (365.25 * 864e5) : null;
+    const problems = [];
+    if (d > PANO_RULES.nearM) problems.push(`${Math.round(d)} m from the mark`);
+    if (!im.computed_geometry?.coordinates) problems.push("position not corrected by Mapillary");
+    if (im.computed_compass_angle == null || !Number.isFinite(Number(im.computed_compass_angle))) problems.push("direction not corrected by Mapillary");
+    if (years == null) problems.push("no date");
+    else if (years > PANO_RULES.maxYears) problems.push(`taken ${Math.floor(years)} years ago`);
+    all.push({ im, c, d, captured, problems });
   }
-  if (!best) return null;
-  const { im, c, d } = best, heading = Number(im.computed_compass_angle ?? im.compass_angle);
+  if (!all.length) return null;
+  all.sort((a, b) => (a.problems.length > 0) - (b.problems.length > 0) || a.d - b.d);
+  const { im, c, d, captured, problems } = all[0], heading = Number(im.computed_compass_angle ?? im.compass_angle);
+  const user = im.creator?.username ? String(im.creator.username).slice(0, 60) : null;
   return {
     id: String(im.id), url: im.thumb_2048_url, heading: Number.isFinite(heading) ? heading : 0, metres: Math.round(d),
-    at: [Math.round(c[1] * 1e5) / 1e5, Math.round(c[0] * 1e5) / 1e5], capturedAt: Number(im.captured_at) || null,
-    author: String(im.creator?.username || "a Mapillary contributor").slice(0, 60), licence: "CC BY-SA 4.0", page: `https://www.mapillary.com/app/?pKey=${encodeURIComponent(im.id)}`,
+    at: [Math.round(c[1] * 1e5) / 1e5, Math.round(c[0] * 1e5) / 1e5], capturedAt: captured,
+    author: user || "a Mapillary contributor", licence: "CC BY-SA 4.0", page: `https://www.mapillary.com/app/?pKey=${encodeURIComponent(im.id)}`,
+    profile: user ? `https://www.mapillary.com/profile/${encodeURIComponent(user)}` : null,
+    suitable: problems.length === 0, problems, candidates: all.length,
   };
 }
 
@@ -38,19 +56,24 @@ export async function handlePano(request, env, now = Date.now(), deps = {}) {
   if (blocked) return blocked;
   if (request.method !== "GET") return err(405, "method", "Use GET.");
   try {
-    const id = new URL(request.url).searchParams.get("spot") || "";
+    const url = new URL(request.url), id = url.searchParams.get("spot") || "";
     const mark = markFor(id);
     if (!mark) return err(404, "not_found", "That place isn't one of FishDock's documented marks.");
-    if (!env?.MAPILLARY_TOKEN) return err(503, "not_configured", "Real 360° photos aren't switched on yet.");
+    // switched off answers 200 with no photo (the 3D view just uses the map-built place; nothing to log as an error)
+    if (!env?.MAPILLARY_TOKEN) return json({ pano: null, off: "not_configured", message: "Real 360° photos aren't switched on yet." });
+    const preview = url.searchParams.get("preview") === "1";
+    if (env.PANO_PUBLIC !== "1" && !preview) return json({ pano: null, off: "not_public", message: "Real 360° photos aren't switched on yet." });
     if (env.DB) await ensureSchema(env.DB);
     const ctx = upstreamCtx(env.DB, now, deps);
     const dLat = 250 / 111320, dLon = 250 / (111320 * Math.cos((mark.lat * Math.PI) / 180));
     const bbox = [mark.lon - dLon, mark.lat - dLat, mark.lon + dLon, mark.lat + dLat].map((x) => x.toFixed(6)).join(",");
-    const got = await cachedJson(ctx, `pano:v1:${id}`, PANO_TTL, async () => {
+    const got = await cachedJson(ctx, `pano:v2:${id}`, PANO_TTL, async () => {
       const a = await ctx.upstreamJson("mapillary", `https://graph.mapillary.com/images?access_token=${encodeURIComponent(env.MAPILLARY_TOKEN)}&fields=id,thumb_2048_url,computed_compass_angle,compass_angle,computed_geometry,geometry,captured_at,is_pano,creator&is_pano=true&bbox=${bbox}&limit=100`);
       return pickPano(a, mark.lat, mark.lon);
     });
     if (!got.value) return err(404, "no_pano", "There's no 360° photo near this place yet.");
+    // a photo that fails a check is only ever shown in a preview (with what's wrong), never as the place
+    if (!got.value.suitable && !preview) return json({ pano: null, off: "unsuitable", message: "There's no suitable 360° photo near this place yet." });
     return json({ pano: got.value });
   } catch (e) {
     if (e instanceof UpstreamError) return err(502, "upstream", "Couldn't reach Mapillary just now.");

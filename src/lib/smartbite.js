@@ -3,6 +3,7 @@
 //   1. Rod-tip watch: the camera watches a box the angler draws round the rod tip and flags sudden movement.
 //   2. Bite-alarm listen: the microphone listens for the short electronic bleeps of a bite alarm.
 // Neither can reliably tell a bite from wind, waves, rain or a passing boat. They are prompts to look, not detectors.
+import { haptics } from "./haptics.js";
 
 // ---- rod-tip motion ----
 export function createMotionWatch({ video, roi, onTrigger, onLevel, sensitivity = 0.5 }) {
@@ -95,7 +96,7 @@ export function createAlarmListen({ stream, onTrigger, onLevel, learnedHz = null
 
 /** Alert the angler: vibration where the phone supports it, plus an optional short tone. */
 export function alertAngler({ sound = true } = {}) {
-  try { navigator.vibrate?.([180, 80, 180]); } catch { /* ignore */ }
+  haptics.feel("alert", { recorded: true }); // a real alert: felt where the phone can vibrate (haptics.js)
   if (!sound) return;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;

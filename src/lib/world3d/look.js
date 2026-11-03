@@ -9,24 +9,32 @@ export const wrap = (a) => ((a % TAU) + TAU + Math.PI) % TAU - Math.PI; // -π..
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { yaw: 0, pitch: -0.08 } } = {}) {
-  const s = { yaw, pitch, fov, vyaw: 0, vpitch: 0, aim: null, home: { ...home }, dragging: false, moved: 0, lastTap: 0 };
+  const s = { yaw, pitch, fov, vyaw: 0, vpitch: 0, aim: null, home: { ...home }, dragging: false, moved: 0, lastTap: 0, touched: -1e9, sens: 1, smooth: true };
   const api = {
     get yaw() { return s.yaw; }, get pitch() { return s.pitch; }, get fov() { return s.fov; }, get dragging() { return s.dragging; },
+    /** when the person last turned or zoomed the view themselves (performance.now() ms): the camera doesn't steer itself for a while after */
+    get touched() { return s.dragging ? performance.now() : s.touched; },
+    get home() { return { ...s.home }; },
     /** degrees per screen pixel follow the zoom, so a drag moves the view by about the same distance at any zoom */
     drag(dx, dy, viewH = 800) {
-      const k = ((s.fov * Math.PI) / 180) / Math.max(200, viewH);
+      const k = (((s.fov * Math.PI) / 180) / Math.max(200, viewH)) * s.sens;
       s.yaw = wrap(s.yaw - dx * k); s.pitch = clamp(s.pitch + dy * k, -1.25, 1.1);
-      s.vyaw = -dx * k * 60; s.vpitch = dy * k * 60; s.aim = null; s.moved += Math.abs(dx) + Math.abs(dy);
+      s.vyaw = -dx * k * 60; s.vpitch = dy * k * 60; s.aim = null; s.moved += Math.abs(dx) + Math.abs(dy); s.touched = performance.now();
     },
     start() { s.dragging = true; s.moved = 0; s.vyaw = 0; s.vpitch = 0; s.aim = null; },
-    end() { s.dragging = false; },
-    zoom(factor) { s.fov = clamp(s.fov / factor, FOV.min, FOV.max); },
+    end() { s.dragging = false; if (!s.smooth) { s.vyaw = 0; s.vpitch = 0; } },
+    /** how the view feels: sensitivity (0.5..2, 1 normal) and smoothing (the turn carries on a little after a flick) */
+    setFeel({ sens, smooth } = {}) { if (Number.isFinite(sens)) s.sens = clamp(sens, 0.4, 2.5); if (smooth != null) s.smooth = !!smooth; },
+    zoom(factor) { s.fov = clamp(s.fov / factor, FOV.min, FOV.max); s.touched = performance.now(); },
+    setFov(f) { s.fov = clamp(f, FOV.min, FOV.max); },
     /** turn smoothly to look at a heading (and pitch) */
     aim(yaw, pitch = s.pitch) { s.aim = { yaw: wrap(yaw), pitch: clamp(pitch, -1.25, 1.1) }; s.vyaw = 0; s.vpitch = 0; },
-    recenter() { api.aim(s.home.yaw, s.home.pitch); s.fov = FOV.base; },
+    recenter() { api.aim(s.home.yaw, s.home.pitch); s.fov = FOV.base; s.touched = -1e9; },
     setHome(yaw, pitch = s.home.pitch) { s.home = { yaw: wrap(yaw), pitch }; },
     /** a tap: returns true for a double tap (two taps within 320 ms that didn't move), which recentres */
     tap(now) { const dbl = now - s.lastTap < 320 && s.moved < 8; s.lastTap = dbl ? 0 : now; if (dbl) api.recenter(); return dbl; },
+    /** follow a heading (walking: the camera coming round behind you): k is how far to go this frame (0..1) */
+    follow(yaw, pitch, k) { if (s.dragging || s.aim || !(k > 0)) return; s.yaw = wrap(s.yaw + wrap(yaw - s.yaw) * k); if (pitch != null) s.pitch += (pitch - s.pitch) * k * 0.6; },
     /** advance by dt seconds: inertia after a flick, or easing towards an aim */
     step(dt) {
       if (s.dragging) return api;
@@ -45,6 +53,18 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     state: () => ({ ...s }),
   };
   return api;
+}
+
+// ---- the walking camera: behind you, coming round smoothly as you turn ----
+// It follows only while you're walking, never while you're dragging the view, and not for a moment after you let go
+// (so you can look round and then carry on); it doesn't swing round when you walk back towards it, and a slow walk
+// turns it more gently than a brisk one.
+export const FOLLOW = { wait: 1200, rate: 2.2, minSpeed: 0.3, pitch: -0.2, maxOff: 2.3 };
+/** How far (0..1) the walking camera turns towards where you're facing this frame. */
+export function walkFollow({ dragging = false, sinceTouch = 1e9, speed = 0, off = 0, dt = 0.016 } = {}) {
+  if (dragging || sinceTouch < FOLLOW.wait || speed < FOLLOW.minSpeed || Math.abs(wrap(off)) > FOLLOW.maxOff) return 0;
+  const ramp = Math.min(1, (sinceTouch - FOLLOW.wait) / 800); // easing in after a look round, not snapping back
+  return 1 - Math.exp(-dt * FOLLOW.rate * Math.min(1, speed / 1.2) * ramp);
 }
 
 /** The heading (yaw) and pitch from an eye position to a point. */
