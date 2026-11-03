@@ -19,7 +19,7 @@ def first(pattern_dirs):
     return None
 for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
 try:
-    base = HumanService.create_human(mask_helpers=True, detailed_helpers=False, extra_vertex_groups=True, feet_on_ground=True, scale=0.1, macro_detail_dict=SPEC["macro"])
+    base = HumanService.create_human(mask_helpers=True, detailed_helpers=True, extra_vertex_groups=True, feet_on_ground=True, scale=0.1, macro_detail_dict=SPEC["macro"])
     base.name = f"angler_{WHO}"; L("basemesh", len(base.data.vertices), "verts")
     skin = first([f"skins/{SPEC['skin']}/*.mhmat"]); L("skin", skin)
     if skin: HumanService.set_character_skin(skin, base, skin_type="MAKESKIN", material_instances=False)
@@ -30,6 +30,7 @@ try:
             except Exception as e: L("  failed", kind, repr(e)[:200])
     rig = HumanService.add_builtin_rig(base, "game_engine"); L("rig", rig.name if rig else None, len(rig.data.bones) if rig else 0)
     L("bones", [b.name for b in rig.data.bones][:80])
+    hb = rig.data.bones.get("hand_r"); L("hand_r rest head", list(hb.head_local) if hb else None)
     os.makedirs(OUT + "/source/people", exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=f"{OUT}/source/people/angler_{WHO}.blend")
     bpy.ops.export_scene.gltf(filepath=f"{OUT}/exports/angler_{WHO}.glb", export_format="GLB", export_apply=True, export_skins=True, export_morph=False, export_image_format="WEBP", export_jpeg_quality=82, export_cameras=False, export_lights=False)
