@@ -614,7 +614,10 @@ function mergeByMaterial(list, gltf) {
   for (const [k, ms] of byMat) {
     const first = ms[0], attrs = first.geometry.attributes;
     // only pieces that really share the vertices can be joined
-    if (!ms.every((m) => m.geometry.attributes.position.array === attrs.position.array && m.skeleton === first.skeleton)) { out.push(...ms); continue; }
+    // (the converted files repeat the whole set of vertices for every piece: the same vertices if the counts and a
+    // sample of positions match)
+    const P0 = attrs.position, same = (g) => { const P = g.attributes.position; if (P.count !== P0.count) return false; for (let i = 0; i < P.count; i += Math.max(1, Math.floor(P.count / 50))) if (P.getX(i) !== P0.getX(i) || P.getY(i) !== P0.getY(i) || P.getZ(i) !== P0.getZ(i)) return false; return true; };
+    if (!ms.every((m) => m.skeleton.bones[0] === first.skeleton.bones[0] && same(m.geometry))) { out.push(...ms); continue; }
     let geo = cache.get(k);
     if (!geo) {
       geo = new THREE.BufferGeometry();
