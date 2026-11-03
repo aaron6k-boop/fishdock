@@ -8,7 +8,7 @@ import "./styles/livefishing.css";
 
 /* global __BUILD_ID__ */
 // controls on the right for a right thumb, if this phone chose that (the 3D view's camera menu)
-try { if (JSON.parse(localStorage.getItem("fishdock.view3d.v1") || "{}").hand === "right") document.documentElement.dataset.hand = "right"; } catch { /* no storage */ }
+try { if (JSON.parse(localStorage.getItem("fishdock.view3d.v1") || "{}").side === "left") document.documentElement.dataset.hand = "left"; } catch { /* no storage */ } // (the fishing buttons are on the right unless you chose the left)
 createRoot(document.getElementById("root")).render(<App />);
 
 // Offline copy (production only, never in the phone preview), as DetectDock does.

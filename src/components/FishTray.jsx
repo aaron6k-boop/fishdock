@@ -21,9 +21,9 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
   const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
   const castAt = useRef(0);
-  const [power, setPower] = useState(null);
+  const [power, setPower] = useState(null), [tapFx, setTapFx] = useState(0), [pressed, setPressed] = useState(false);
   const hold = useRef(null);
-  let act = null, label = hint || "", busy = false;
+  let act = null, label = hint || "", busy = false, status = "", dist = null;
   if (autoplay) { label = "Playing it through"; }
   else if (phase === "idle" || phase === "ended" || (phase === "waiting" && !lineOut)) { act = "cast"; label = label || (power != null ? "Let go to cast" : last ? "Hold to cast again" : "Hold Cast, aim, let go"); }
   else if (phase === "cast") { busy = true; label = "Casting"; }
@@ -31,8 +31,9 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   else if (phase === "bite") { act = "strike"; label = "Bite! Strike now"; }
   else if (phase === "hooked") {
     act = fight?.near ? "land" : "reel";
-    const m = fight ? `\u00a0· ${Math.round(fight.dist)}\u00a0m` : "";
-    label = fight?.near ? "It's close: land it" : fight?.slipping ? `The drag's giving line${m}` : fight?.running ? `It's running! Keep it tight${m}` : opts.assisted ? (fight?.assisted ? `Winding: tap to stop${m}` : "Tap once to start winding") : `Tap to reel${m}`;
+    // what's happening, said only when it's true: a run only while the fish is taking line, the drag only while it slips
+    status = fight?.near ? "It's close: land it" : fight?.running ? "It's running: line going out" : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : "Tap Reel again and again";
+    dist = fight && !fight.near ? `${Math.round(fight.dist)}\u00a0m` : null; label = status;
   }
   else if (phase === "landing") { busy = true; label = "Landing it"; }
   else if (phase === "lost") { label = "Lost it"; }
@@ -87,11 +88,12 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
           {act === "land" ? (
             <button type="button" className="ft-main ft-land" onPointerDown={(e) => { e.preventDefault(); onLand?.(); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onLand?.(); } }}><Icon name="fish" /><span>Land</span></button>
           ) : (
-            <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
-              onPointerDown={(e) => { e.preventDefault(); onTap?.(); }} onContextMenu={(e) => e.preventDefault()}
+            <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
+              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onTap?.(); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => setPressed(false)} onPointerCancel={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onContextMenu={(e) => e.preventDefault()}
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
               <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - reel) }} /></svg>
-              <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span>Reel</span>
+              {tapFx ? <span key={tapFx} className="ft-tapfx" aria-hidden="true" /> : null}
+              <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span>REEL</span>
             </button>
           )}
           {opts.advanced && act === "reel" ? (
@@ -104,7 +106,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
       ) : null}
       {act === "wait" ? <button type="button" className="ft-pill ft-windin" onClick={() => onWindIn?.()} title="Wind your line in: then cast again, or walk about">Wind in</button> : null}
       {autoplay ? <button type="button" className="ft-pill" onClick={onStop}><Icon name="stop" />Stop</button> : null}
-      <span className="ft-label" aria-live="polite">{label}</span>
+      <span className="ft-label" aria-live="polite">{dist ? <b className="ft-dist">{dist}</b> : null}{label}</span>
     </div>
   );
 }

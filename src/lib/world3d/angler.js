@@ -179,8 +179,28 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // tackle box and bucket beside them
   // (they stay at the spot when you walk off)
   const kit = new THREE.Group(); world.add(kit);
-  part(new THREE.BoxGeometry(0.45, 0.28, 0.3), new THREE.MeshStandardMaterial({ color: 0x2f5a3a, roughness: 0.6 }), -0.55, 0.14, 0.25, kit);
-  part(new THREE.CylinderGeometry(0.14, 0.12, 0.3, 12), new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.7 }), -0.35, 0.15, 0.62, kit);
+  // a seat box (the tackle box sea anglers sit on): moulded base, a lighter lid with rounded edges, a carry handle on
+  // metal posts, two catches; and a bait bucket: tapered plastic with a rolled rim, a wire handle and a snap-on lid
+  {
+    const mBox = new THREE.MeshStandardMaterial({ color: 0x24402e, roughness: 0.55 }), mLid = new THREE.MeshStandardMaterial({ color: 0x31573f, roughness: 0.5 });
+    const mBlack = new THREE.MeshStandardMaterial({ color: 0x151719, roughness: 0.6 }), mSteel = new THREE.MeshStandardMaterial({ color: 0xb9bec2, roughness: 0.3, metalness: 0.85 });
+    const box = new THREE.Group(); box.position.set(-0.55, 0, 0.25); kit.add(box);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.27, 0.31, 2, 2, 2), mBox); base.position.y = 0.135; box.add(base);
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 24, 1), mLid); lid.scale.set(0.235, 0.05, 0.16); lid.position.y = 0.295; box.add(lid);
+    const lidTop = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.28), mLid); lidTop.position.y = 0.295; box.add(lidTop);
+    for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.06, 8), mSteel); post.position.set(sx * 0.13, 0.35, 0); box.add(post);
+      const clip = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.012), mSteel); clip.position.set(sx * 0.14, 0.255, -0.158); box.add(clip); }
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.28, 10), mBlack); grip.rotation.z = Math.PI / 2; grip.position.set(0, 0.385, 0); box.add(grip);
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.025, 0.32), mBlack); strap.position.y = 0.06; box.add(strap);
+    const mBucket = new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.45 }), mBlue = new THREE.MeshStandardMaterial({ color: 0x2e5a8c, roughness: 0.5 });
+    const bk = new THREE.Group(); bk.position.set(-0.32, 0, 0.64); kit.add(bk);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.105, 0.28, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.45, side: THREE.DoubleSide })); body.position.y = 0.14; bk.add(body);
+    const bottom = new THREE.Mesh(new THREE.CircleGeometry(0.105, 24), mBucket); bottom.rotation.x = -Math.PI / 2; bottom.position.y = 0.004; bk.add(bottom);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.008, 6, 28), mBucket); rim.rotation.x = Math.PI / 2; rim.position.y = 0.28; bk.add(rim);
+    const lidB = new THREE.Mesh(new THREE.CylinderGeometry(0.136, 0.136, 0.018, 24), mBlue); lidB.position.y = 0.29; bk.add(lidB);
+    const wire = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.003, 4, 20, Math.PI), mSteel); wire.position.y = 0.27; wire.rotation.y = 0.5; bk.add(wire);
+    for (const o of [box, bk]) o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  }
   // a landing net (rivers, lakes, estuaries) or a drop net with ropes (piers)
   // the net: knotted mesh you can see through (a drawn diamond pattern), hanging as a soft bag under a metal hoop
   const mNet = new THREE.MeshStandardMaterial({ color: 0x23302a, roughness: 1, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide, map: netTexture(), depthWrite: false });
@@ -445,7 +465,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const f = ease(seg(age, T1 + 0.5, T2)); netAt = deck.clone().lerp(railTop, f); netAt.y += Math.sin(f * Math.PI) * 0.25; netRest = 1 - ease(seg(age, T1 + 0.5, T1 + 1.0));
         } else if (age < T3) {
           // lowered hand over hand: in steps, the rope paid out a pull at a time, settling into the water and sinking
-          const f = seg(age, T2, T3), stepF = (Math.floor(f * 6) + ease((f * 6) % 1)) / 6;
+          const f = seg(age, T2, T3), stepF = clamp(ease(f) + Math.sin(f * Math.PI * 10) * 0.012 * (1 - f), 0, 1); // (smoothly, with a slight check at each pull of the rope)
           netAt = railTop.clone().lerp(foot, Math.min(1, stepF * 1.05)); netAt.y = stepF < 0.85 ? lerp(railTop.y, foot.y + 0.04, stepF / 0.85) : lerp(foot.y + 0.04, sunk, (stepF - 0.85) / 0.15);
           netRest = 0;
         } else if (age < swingIn) {
@@ -502,9 +522,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         if (tech === "dropnet") { netOn = true; ropesOn = true; netAt = toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.05 + 0.3 * ns, -0.08)); rigAt = netAt.clone(); inNet = true; netRest = 1; }
         else { const at0 = toWorld(new THREE.Vector3(-0.62, 0.06, -0.2)); keptPose = { mouth: at0.clone().addScaledVector(side, fishLen * 0.5), dir: side.clone().negate(), roll: Math.PI / 2, beat: 0.12, curl: Math.max(0, Math.sin(kt * 1.7)) ** 8 * 0.5 }; }
       } else if (kept.state === "inspect") {
-        // held up in front of you, turning slowly so you can see both sides
-        const c = toWorld(new THREE.Vector3(0, 1.3, -0.55)), a2 = kt * 0.7 + face, dir = new THREE.Vector3(Math.cos(a2), -0.04, Math.sin(a2)).normalize();
-        keptPose = { mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir, roll: 0, beat: 0.25, curl: Math.sin(kt * 2.2) * 0.08, centre: c };
+        // held up in front of you, level and side-on to whoever's looking (its flank, or a flatfish's back, towards the
+        // camera), one hand under its head and one by its tail: still, apart from its gills and a slow flick of the tail.
+        // One thing sets its orientation here, and it doesn't turn: no turntable
+        // (lifted out of the net on the deck and up into your hands over a second, not snapped there)
+        const lift = ease(Math.min(1, kt / 1.0)), fromNet = tech === "dropnet" ? toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.12 + 0.3 * ns, -0.08)) : toWorld(new THREE.Vector3(-0.62, 0.1, -0.2));
+        const c = fromNet.lerp(toWorld(new THREE.Vector3(0, 1.3 + Math.sin(kt * 1.3) * 0.004, -0.5)), lift); c.y += Math.sin(lift * Math.PI) * 0.12;
+        const dir = side.clone().negate(); dir.y = -0.03; dir.normalize();
+        keptPose = { mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir, roll: 0, beat: 0.05, curl: Math.max(0, Math.sin(kt * 1.1)) ** 6 * 0.06, centre: c };
       } else if (kept.state === "release") {
         const f = clamp(kt / 1.3, 0, 1), from = toWorld(new THREE.Vector3(0, 1.3, -0.55)), to = nearAt.clone(); to.y = -0.25;
         const c = from.clone().lerp(to, f); c.y += Math.sin(f * Math.PI) * 0.9;
@@ -550,7 +575,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (angled a little to the right of straight ahead, so the rod doesn't run up the middle of the view and hide the water)
       const e = fpE - 0.12, sw = fpYaw + 0.1;
       dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
-      const reelAt = fpEye().addScaledVector(vr, 0.12).addScaledVector(vu, -0.2).addScaledVector(vf, 0.47); // (above the bottom controls)
+      const reelAt = fpEye().addScaledVector(vr, 0.075).addScaledVector(vu, -0.235).addScaledVector(vf, 0.5); // (above and left of the Reel button, so your hand on the reel stays in sight)
       butt = reelAt.addScaledVector(dir, -R.seat);
     }
     // from one way of holding the rod to the next (onto the rail, into your hands, walking off with it) the rod moves
@@ -654,6 +679,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       hands[0] = { at: toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.2)).add(V3(0, -0.035, 0)), axis: d, palm: V3(0, 1, 0), kind: "fish" };
       hands[1] = { at: toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.74)).add(V3(0, -0.03, 0)), axis: d, palm: V3(0, 1, 0), kind: "fish" };
       lookAtW = keptPose.centre.clone();
+      // stooping to lift it out of the net, then standing with it
+      const cy = toLocal(keptPose.centre).y; crouch = clamp((1.05 - cy) * 0.9, 0, 0.75); lean = 0.1 + crouch * 0.35; brace = 0;
     }
     if (kept?.state === "deck" && !walking) lookAtW = fish.visible ? fish.position.clone() : lookAtW;
     handsNow = hands.map((h, i) => (h ? h.at.clone() : V3(i ? 0.28 : -0.28, 0.85, -0.05)));
