@@ -37,12 +37,19 @@ function loadGLB(name) {
 }
 // the walks' own speeds where a clip carries no travel of its own (measured from the feet), m/s at the model's size
 const LOCO = ["walk_slow", "walk", "walk_fast", "run"];
+// the retargeted poses blended in while standing (fish_idle: holding a rod; kneel and inspect: down by the fish or the
+// net; crouch: a lower stance)
+const POSES = ["fish_idle", "kneel", "inspect", "crouch"];
 const SPEED0 = { m: { walk_slow: 0.81, walk: 1.39, walk_fast: 1.49, run: 2.42 }, f: { walk_slow: 0.88, walk: 1.28, walk_fast: 1.51, run: 2.25 } };
 let clipsP = null;
 function clipSet() {
-  clipsP ||= loadGLB("anims").then((g) => {
+  clipsP ||= loadGLB("anims").then(async (g) => {
     const out = { m: {}, f: {} };
     for (const c of g.animations) { const sex = c.name.startsWith("f_") ? "f" : "m"; const key = c.name.slice(2); out[sex][key] = prepClip(c, SPEED0[sex][key]); }
+    // Mixamo movements retargeted onto the same skeleton in Blender (anims2.glb, source-assets/blender/
+    // retarget_mixamo.py): a fishing stance, kneeling, crouching, kneeling to look closely at something. Both sexes.
+    // Without it (offline, an old cache) the procedural poses stand in, as before
+    try { const g2 = await loadGLB("anims2"); for (const c of g2.animations) { const key = c.name.slice(2); if (c.name.startsWith("x_") && POSES.includes(key)) out.m[key] = out.f[key] = c; } } catch { /* the procedural poses */ }
     return out;
   });
   clipsP.catch(() => { clipsP = null; });
@@ -226,7 +233,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // ---- motion: the clips on one mixer ----
   const mixer = new THREE.AnimationMixer(model);
   const act = {};
-  for (const key of ["idle", "look", ...LOCO]) { const c = clips[key]; if (!c) continue; const a = mixer.clipAction(c); a.play(); a.setEffectiveWeight(key === "idle" ? 1 : 0); act[key] = a; }
+  for (const key of ["idle", "look", ...LOCO, ...POSES]) { const c = clips[key]; if (!c) continue; const a = mixer.clipAction(c); a.play(); a.setEffectiveWeight(key === "idle" ? 1 : 0); act[key] = a; }
   const speedOf = (key) => (clips[key]?.userData.travel || 1) / (clips[key]?.duration || 1) * k;
   // each walk's phase lined up (left heel down at 0), found once per set of clips
   const offs = clips.__offs || (clips.__offs = calibrate(mixer, act, B, clips));
@@ -397,6 +404,22 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       act.look.time = Math.min(act.look.getClip().duration - 0.01, act.look.time + dt);
       act.look.setEffectiveWeight(st.look * w.idle); act.idle?.setEffectiveWeight(w.idle * (1 - st.look));
     } else act.idle?.setEffectiveWeight(w.idle);
+    // the retargeted poses, eased in and out, sharing the standing weight: kneeling (looking closely at it with a hand
+    // on the fish), crouching, and the fishing stance while a rod is in hand
+    const hasPoses = !!act.kneel;
+    if (hasPoses) {
+      const kp = 1 - Math.exp(-dt * 3.5), hk = o.hands && (o.hands[0]?.kind || o.hands[1]?.kind);
+      st.kn = (st.kn || 0) + ((o.walk ? 0 : clamp((o.kneel || 0) * 1.2, 0, 1)) - (st.kn || 0)) * kp;
+      st.cr = (st.cr || 0) + ((o.walk ? 0 : clamp(((o.crouch || 0) - 0.3) * 2, 0, 1) * (1 - (o.kneel || 0))) - (st.cr || 0)) * kp;
+      st.rod = (st.rod || 0) + ((hk && /seat|crank|rod|rail/.test(hk) ? 1 : 0) - (st.rod || 0)) * kp;
+      st.ins = (st.ins || 0) + ((hk === "fish" ? 1 : 0) - (st.ins || 0)) * kp;
+      const base = w.idle, kn = ease(st.kn), cr = ease(st.cr) * (1 - kn), rest = 1 - kn - cr;
+      act.idle?.setEffectiveWeight((act.idle.getEffectiveWeight()) * rest * (1 - st.rod * 0.85)); act.look?.setEffectiveWeight(act.look.getEffectiveWeight() * rest * (1 - st.rod));
+      act.fish_idle?.setEffectiveWeight(base * rest * st.rod * 0.85);
+      act.kneel?.setEffectiveWeight(base * kn * (1 - st.ins * 0.7)); act.inspect?.setEffectiveWeight(base * kn * st.ins * 0.7);
+      act.crouch?.setEffectiveWeight(base * cr);
+      for (const key of POSES) { const a = act[key]; if (a) a.time = (a.time + dt) % a.getClip().duration; }
+    }
     mixer.update(0);
     inner.position.set(0, 0, 0);
     root.updateMatrixWorld(true);
@@ -404,7 +427,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     // ---- the body: lower the hips (crouch, brace), lean, turn the chest; the feet stay put ----
     const standing = w.idle > 0.5;
     // (kneel: right down by something on the ground, a deep crouch with the knees forward and the heels planted)
-    st.drop += (((o.walk?.air ? 0.1 : o.crouch || 0) * 0.13 + (o.brace || 0) * 0.05 + (o.walk ? 0 : o.kneel || 0) * 0.34) - st.drop) * k6;
+    st.drop += (((o.walk?.air ? 0.1 : o.crouch || 0) * 0.13 * (hasPoses ? 1 - (st.cr || 0) : 1) + (o.brace || 0) * 0.05 + (o.walk ? 0 : o.kneel || 0) * 0.34 * (hasPoses ? 1 - ease(st.kn || 0) : 1)) - st.drop) * k6; // (the kneel and crouch clips lower the hips themselves)
     st.lean += ((o.lean || 0) - (o.brace || 0) * 0.1 - st.lean) * k6;
     st.brace += ((standing ? o.brace || 0 : 0) - st.brace) * k6;
     st.twist += ((o.twist || 0) - st.twist) * k6;
