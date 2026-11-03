@@ -462,6 +462,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     /** ripples: up to 8 [x, z, age seconds, strength] */
     setRipples(list) { for (let i = 0; i < 8; i++) { const r = list[i]; wU.uRip.value[i].set(r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0); } },
     update(t, dt, cam) {
+      real?.skyline?.update(t);
       U.uTime.value = t; wU.uCam.value.set(Math.round(cam.position.x / 4) * 4, 0, Math.round(cam.position.z / 4) * 4);
       if (target && cur) {
         const k = 1 - Math.exp(-dt * EASE);

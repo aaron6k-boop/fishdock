@@ -9,6 +9,7 @@ import { unrle, GROUND, PLACE3D, inside } from "./osmPlace.js";
 import { concrete, sheetPiling, detail, noise2 } from "./textures3d.js";
 import { buildBuildings } from "./buildings3d.js";
 import { loadPart } from "./glbParts.js";
+import { buildSkyline } from "./skyline.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -426,6 +427,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // open sea only (outside the land and outside any mapped river, lake or harbour water), for boats
   place.waterAt = (x, z) => { const q = [x, z]; return !LR.some((bb) => inB(q, bb)) && !PR.some((bb) => inB(q, bb)) && !WR.some((bb) => inB(q, bb)); };
   place.perches = perches;
+  // beyond the mapped square: real landmarks where they are, an indicative low town over the land (skyline.js)
+  place.skyline = buildSkyline(group, place, { groundY: LAND, quality });
   return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c]; const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
 function segDist(q, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dz) / l2)); return Math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dz * t); }

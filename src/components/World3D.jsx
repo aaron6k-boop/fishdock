@@ -7,19 +7,28 @@ import { spotById } from "../data/spots.js";
 import { Icon } from "./ui.jsx";
 import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
+import { landCamOn } from "../lib/viewPrefs.js";
+import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
 import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/sceneAudio.js";
 
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
 // from where they happen: your friend's reel from their side, quieter further away) ----
 const VIEW_KEY = "fishdock.view3d.v1";
-// (landCam2: the landing camera, on unless turned off since it was reworked; an older "landCam" off is not carried over)
+// (landCam2: the landing camera. New users get it on; an earlier choice to turn it off ("landCam": false) is kept)
 export const VIEW_DEFAULTS = { track: true, spatial: true, side: "right", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto", camDist: "normal", autoBtn: false };
 // sound levels for the three kinds of sound (sceneAudio.js setVolumes), saved on this phone
 const LEVELS_KEY = "fishdock.sound.levels";
 export function loadLevels() { try { return { environment: 0.8, equipment: 0.8, events: 1, ...JSON.parse(localStorage.getItem(LEVELS_KEY) || "{}") }; } catch { return { environment: 0.8, equipment: 0.8, events: 1 }; } }
 export function saveLevels(v) { try { localStorage.setItem(LEVELS_KEY, JSON.stringify(v)); } catch { /* ignore */ } }
 export const LOOK_SENS = { low: 0.65, normal: 1, high: 1.5 };
-export function loadView() { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") }; } catch { return { ...VIEW_DEFAULTS }; } }
+export function loadView() {
+  try {
+    const v = { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") };
+    // the landing camera: on for anyone who hasn't chosen; someone who turned it off (then called "landCam") keeps it off
+    v.landCam2 = landCamOn(v);
+    return v;
+  } catch { return { ...VIEW_DEFAULTS }; }
+}
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
 const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
@@ -195,7 +204,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
       {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
       <div className={`w3d-label${about ? " open" : ""}`}>
         <button type="button" className="w3d-about" onClick={() => setAbout(!about)} aria-expanded={about} aria-label="About this view and its sources"><Icon name="info" /></button>
-        {about ? <span className="w3d-full">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</span>
+        {about ? <span className="w3d-full">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""}. {SKYLINE_NOTE} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</span>
           : <span className="w3d-short">{panoOn ? "360° photo, Mapillary" : real ? `${placeName || "This place"} · reconstruction · © OpenStreetMap contributors` : "A 3D drawing, not the real place"} · <b>Beta</b></span>}
       </div>
       {children}
