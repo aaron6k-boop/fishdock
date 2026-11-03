@@ -462,7 +462,12 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
         const palm = (spec.palm || reach.clone().cross(ax).multiplyScalar(-s)).clone();
         Zh = palm.addScaledVector(ax, -palm.dot(ax)); if (Zh.lengthSq() < 1e-6) Zh = V(0, -1, 0).addScaledVector(ax, ax.y); Zh.normalize();
         let X = ax.clone().multiplyScalar(s); Yh = Zh.clone().cross(X).normalize();
-        if (Yh.dot(reach) < -0.2 * reach.length()) { X.negate(); Yh.negate(); }
+        // which way round the hand goes is settled when it takes hold (changed only if plainly wrong), never flipped from
+        // frame to frame as the hand moves round a turning crank
+        const d = Yh.dot(reach) / Math.max(1e-6, reach.length());
+        if (hs.flip == null || hs.flipKind !== spec.kind) { hs.flip = d < -0.2; hs.flipKind = spec.kind; }
+        else if (hs.flip ? d > 0.6 : d < -0.6) hs.flip = !hs.flip;
+        if (hs.flip) { X.negate(); Yh.negate(); }
         wrist = at.clone().addScaledVector(Yh, -GRIP.y).addScaledVector(Zh, -GRIP.z);
       } else wrist = at;
       const pole = spec.pole ? spec.pole.clone() : V(s * 0.55, -0.45, 0.55);

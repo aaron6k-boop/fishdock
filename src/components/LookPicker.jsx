@@ -103,7 +103,7 @@ export default function LookPicker({ value, onChange }) {
         <Swatches label="Jacket" list={COATS} value={value.coat ?? 0} onPick={set("coat")} />
         <Swatches label="Trousers" list={LEGS} value={value.legs ?? 0} onPick={set("legs")} />
         <Chips label="Boots" list={FOOTWEAR} value={value.boots ?? 0} onPick={set("boots")} />
-        <Chips label="Hat" list={HATS} value={value.hat} onPick={set("hat")} />
+        <Chips label="Headwear" list={HATS} value={value.hat} onPick={set("hat")} />
         <div className="look-row look-pair">
           <Chips label="Life jacket" list={["No", "Yes"]} value={value.life ?? 0} onPick={set("life")} />
           <Chips label="Gloves" list={["No", "Yes"]} value={value.gloves ?? 0} onPick={set("gloves")} />

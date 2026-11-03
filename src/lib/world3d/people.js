@@ -17,7 +17,8 @@ export const HAIRS = [
   { hex: 0x231a15, name: "Black" }, { hex: 0x4a3223, name: "Dark brown" }, { hex: 0x7b5635, name: "Light brown" },
   { hex: 0xb38d55, name: "Fair" }, { hex: 0x8e3f1f, name: "Red" }, { hex: 0x9c9a96, name: "Grey" },
 ];
-export const HATS = ["Beanie", "Cap", "Bucket hat", "No hat"];
+// (headwear: "Hood down" was "No hat" before; "Hood up" was added in November 2026)
+export const HATS = ["Beanie", "Cap", "Bucket hat", "Hood down", "Hood up"];
 export const BEARDS = ["None", "Stubble", "Beard"];
 export const BUILDS = ["Slim", "Medium", "Broad"];
 export const LOOK_KEYS = { skin: SKINS.length, hair: HAIRS.length, hat: HATS.length, beard: BEARDS.length, build: BUILDS.length };
