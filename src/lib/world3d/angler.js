@@ -214,9 +214,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const bagGeo = new THREE.LatheGeometry(Array.from({ length: 9 }, (_, i) => { const u = i / 8; return new THREE.Vector2(0.35 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.15 * u) + 0.02, -0.5 * u); }), 18);
   const bag = new THREE.Mesh(bagGeo, mNet); net.add(bag);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1, 6), mMetal); world.add(pole); pole.visible = false;
+  // an unhooking mat (a padded, wipe-clean mat: where a fish you'll put back is laid to be looked at and unhooked)
+  const mat = new THREE.Group(); world.add(mat); mat.visible = false;
+  { const top = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.46), new THREE.MeshStandardMaterial({ color: 0x2f5a3c, roughness: 0.75 })); top.position.y = 0.022;
+    const edgeM = new THREE.MeshStandardMaterial({ color: 0x1f2c24, roughness: 0.8 });
+    for (const [w, d, x, z] of [[0.9, 0.05, 0, 0.235], [0.9, 0.05, 0, -0.235], [0.05, 0.5, 0.43, 0], [0.05, 0.5, -0.43, 0]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), edgeM); e.position.set(x, 0.025, z); mat.add(e); }
+    mat.add(top); mat.traverse((m) => { if (m.isMesh) { m.receiveShadow = true; m.castShadow = true; } }); }
   // the drop net's rope: thin braided polypropylene (a muted blue), and its three bridles to the hoop
   const mRope = new THREE.MeshStandardMaterial({ color: 0x3f5874, roughness: 0.9 });
-  const ropes = [0, 1, 2, 3].map(() => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 1, 5), mRope); world.add(r); r.visible = false; return r; });
+  const ropes = [0, 1, 2, 3, 4, 5].map(() => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 1, 5), mRope); world.add(r); r.visible = false; return r; });
 
   // ---- line, rig, fish: in the world ----
   const LN = 28, linePos = new Float32Array(LN * 3);
@@ -326,6 +332,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let walking = null; // walking about (walker.js): where, which way, how fast, the stride
   let tagOff = false;
   let landStage = null; // the drop net's stage while landing (for the hands): up | rod | pick | lower | lead | haul | in
+  let dropRig = null, ropePull = null, releaseInfo = null, releaseRope = null, matOn = false, releasePole = false, prevKt = -1; // the drop net's rope: over the rail where, hanging or not; which hand is pulling and how far through the pull
   const rodS = { butt: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0), key: "", until: 0, ok: false }; // the rod eased from one way of holding it to the next
   let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0; // first person: the rod held where you can see it; leaning over the rail to land a fish
   const toWorld = (v) => v.clone().applyMatrix4(root.matrixWorld);
@@ -350,6 +357,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const feel = (n, extra = {}, recorded = false) => onFeel?.(n, { ...fishInfo(), ...extra, real, recorded, key: recorded ? `${id}|${info.since}|${n}` : undefined });
     const sea = { swell: env.swell, wind: env.wind, windDir: env.windDir, kind: env.kind };
     const wh = (x, z) => waveHeight(x, z, t, sea);
+    // the drop net's places at this pier spot (ns: how much bigger than a 70 cm net it is): where it lies on the deck,
+    // the column it hangs in (clear of the pier's edge) and the water there, where its rope goes over the top rail, and
+    // the knot's height for so much rope out
+    const dropGeo = (ns) => {
+      const railZ = -Math.max(0.3, edge - 0.22), railY = 1.12, col = toWorld(new THREE.Vector3(-0.32, 0, -(edge + 0.25))), waterY = wh(col.x, col.z);
+      const bridle = 0.72 * ns, top = railY - 0.05, sink = 0.3 * ns;
+      return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.05 + 0.18 * ns, -0.08)), railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
+    };
 
     // ---- what the rod is doing ----
     // poses are in the angler's own space: x right, y up, -z forward
@@ -357,7 +372,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     let jumpWatch = false, jumpAt = null, netRest = 0; // netRest: 0 hanging, 1 set down on the deck (the bag flattens)
     let netOn = false, netAt = null, ropesOn = false, poleFrom = null, inNet = false;
     let fpE = 0.4, fpYaw = -0.03, fpView = null; // first person: the rod's angle up from level, and a little towards the middle
-    landStage = null;
+    landStage = null; dropRig = null; ropePull = null; releaseInfo = null; releaseRope = null; matOn = false; releasePole = false;
     const ph = info.phase;
     jumpWatch = false; jumpAt = null;
     if (ph === "idle" || ph === "ended" || ph === "paused") { held = false; showLine = false; }
@@ -453,51 +468,61 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         else if (age >= T2 && age < swingIn) { const sw = Math.sin((age - T2) * 3) * Math.exp(-(age - T2) * 0.8) * 0.5; rigAt = tip.clone().add(new THREE.Vector3(sw * 0.6, -1.1, sw * 0.3)); pitch = 1.25; bendT = 0.3 * load; }
         else if (age >= swingIn) { const f = ease(seg(age, swingIn, card)); rigAt = tip.clone().add(new THREE.Vector3(0, -1.1, 0)).lerp(hand, f); pitch = lerp(1.25, 0.6, f); yawOff = lerp(yawOff, 0.9, f); }
       } else if (tech === "dropnet") {
-        // the drop net, as it's done from a high pier: the fish is brought up beside the pier and held at the surface on
-        // a tight line; the rod goes onto the railing (the line stays tight from its tip); the net is picked up from the
-        // deck, lifted over the rail and lowered on its rope hand over hand until it sinks under the water at the foot of
-        // the pier; the fish is led over it; then it's hauled up slowly (heavy with the fish, water pouring out of the
-        // mesh, swinging a little), lifted back over the rail and set down on the deck with the fish in it
+        // the drop net, as it's done from a high pier. One thing decides where the net is: how much rope is out. The
+        // rope runs from your hands over the top rail and down to the knot where the net's three bridles meet, and the
+        // net hangs straight below it (swinging a little), so it can never be somewhere its rope doesn't reach. The fish
+        // is brought up beside the pier and held at the surface on a tight line; the rod is laid on the rail; the net is
+        // picked up off the deck, lifted over the rail and let down, the rope running through your hands, until it sinks
+        // under the water at the foot of the pier; the fish is led over it; it's hauled up hand over hand (a pull at a
+        // time, heavy with the fish, water pouring out of the mesh) and lifted back over the rail onto the deck
         ropesOn = true; netOn = true;
-        const railZ = -Math.max(0.3, edge - 0.22), ns = Math.max(1, (fishLen * 0.62) / 0.35);
-        const deck = toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.05 + 0.3 * ns, -0.08));
-        const railTop = toWorld(new THREE.Vector3(-0.32, 1.45, railZ - 0.32));
-        const foot = toWorld(new THREE.Vector3(-0.32, 0, -(edge + 0.55))); foot.y = wh(foot.x, foot.z);
-        const sunk = foot.y - 0.3 * ns, fishWait = surf.clone();
-        const B1 = T1 + 0.9; // the rod is on the rail by now
+        const ns = Math.max(1, (fishLen * 0.62) / 0.35), G = dropGeo(ns);
+        const B1 = T1 + 0.7; // the rod is on the rail by now
         if (age >= T1 + 0.1) held = false;
-        landStage = age < T1 ? "up" : age < B1 ? "rod" : age < T2 ? "pick" : age < T3 ? "lower" : age < T4 ? "lead" : age < swingIn ? "haul" : "in";
-        if (age < T1 + 0.5) { netAt = deck.clone(); netRest = 1; }
+        landStage = age < T1 ? "up" : age < B1 ? "rod" : age < T2 ? "pick" : age < T3 ? "lower" : age < T4 ? "lead" : age < swingIn ? "haul" : age < LT.end ? "in" : "done";
+        const { deck, col, waterY, railPt, bridle, sink, L, hangAt } = G;
+        let ropeOut = 0, hanging = false, sway = 0; ropePull = null;
+        if (age < B1 + 0.2) { netAt = deck.clone(); netRest = 1; }
         else if (age < T2) {
-          // up off the deck and over the rail (crouching to pick it up, then lifting it)
-          const f = ease(seg(age, T1 + 0.5, T2)); netAt = deck.clone().lerp(railTop, f); netAt.y += Math.sin(f * Math.PI) * 0.25; netRest = 1 - ease(seg(age, T1 + 0.5, T1 + 1.0));
-        } else if (age < T3) {
-          // lowered hand over hand: in steps, the rope paid out a pull at a time, settling into the water and sinking
-          const f = seg(age, T2, T3), stepF = clamp(ease(f) + Math.sin(f * Math.PI * 10) * 0.012 * (1 - f), 0, 1); // (smoothly, with a slight check at each pull of the rope)
-          netAt = railTop.clone().lerp(foot, Math.min(1, stepF * 1.05)); netAt.y = stepF < 0.85 ? lerp(railTop.y, foot.y + 0.04, stepF / 0.85) : lerp(foot.y + 0.04, sunk, (stepF - 0.85) / 0.15);
-          netRest = 0;
+          // stooping to the net on the deck, lifting it, over the rail (an arc up and over the top rail) and out
+          const f = ease(seg(age, B1 + 0.2, T2)), end = hangAt(0).sub(new THREE.Vector3(0, bridle, 0)), ctrl = railPt.clone().add(new THREE.Vector3(0, 0.45, 0));
+          netAt = deck.clone().multiplyScalar((1 - f) ** 2).addScaledVector(ctrl, 2 * f * (1 - f)).addScaledVector(end, f * f);
+          netRest = 1 - ease(seg(age, B1 + 0.2, B1 + 0.6));
         } else if (age < swingIn) {
-          netRest = 0;
-          if (age < T4) netAt = foot.clone().setY(sunk);
+          hanging = true; netRest = 0;
+          if (age < T3) {
+            // let down: the rope runs through your hands, checked now and then
+            const f = seg(age, T2, T3), g = ease(f); ropeOut = L * clamp(g + Math.sin(f * Math.PI * 9) * 0.01 * (1 - f), 0, 1);
+            sway = Math.sin((age - T2) * 2.2) * 0.06 * (1 - f);
+          } else if (age < T4) { ropeOut = L; sway = Math.sin((age - T3) * 1.7) * 0.03; }
           else {
-            // hauled up: slow at first (the weight of the fish and the water), dripping, swinging a little
-            const f = seg(age, T4, swingIn), g = f * f * (3 - 2 * f) * 0.6 + f * 0.4, sw = Math.sin((age - T4) * 2.6) * 0.12 * (1 - f);
-            netAt = foot.clone().lerp(railTop, g); netAt.y = lerp(sunk, railTop.y + 0.1, g); netAt.addScaledVector(new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]), sw);
-            if (netAt.y > foot.y - 0.05 && f < 0.85 && Math.floor(age / 0.1) !== Math.floor((age - dt) / 0.1)) splashCb?.(netAt.clone().add(new THREE.Vector3(0, -0.3 * ns, 0)), 0.08 + 0.1 * (1 - f));
-            if (crossed(T4 + 0.25)) onSound?.("drip", netAt);
+            // hauled up hand over hand: a pull at a time (each hand in turn), slower with the weight at first
+            const N = Math.max(4, Math.round(L / 0.6)), f = seg(age, T4, swingIn), q = f * N, k = Math.min(N - 1, Math.floor(q)), u = q - k;
+            const pulled = (k + ease(clamp((u - 0.15) / 0.75, 0, 1))) / N; ropeOut = L * (1 - pulled);
+            ropePull = { hand: k % 2, u }; sway = Math.sin((age - T4) * 2.6) * 0.1 * (1 - f) * (0.6 + 0.4 * Math.sin(u * Math.PI));
+            if (ropeOut < L - sink - 0.1 && f < 0.92 && Math.floor(age / 0.12) !== Math.floor((age - dt) / 0.12)) splashCb?.(hangAt(ropeOut).add(new THREE.Vector3(0, -bridle - 0.3 * ns, 0)), 0.06 + 0.1 * (1 - f)); // (water pouring out of the mesh)
+            if (crossed(T4 + 0.25)) onSound?.("drip", hangAt(ropeOut));
           }
+          const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]);
+          netAt = hangAt(ropeOut).sub(new THREE.Vector3(0, bridle, 0)).addScaledVector(side, sway * Math.min(1, ropeOut / 1.5));
         } else {
-          // over the railing in an arc and set down on the deck beside the angler (not round their feet), on its bag
-          const f = ease(seg(age, swingIn, LT.end - 0.1));
-          netAt = railTop.clone().add(new THREE.Vector3(0, 0.1, 0)).lerp(deck, f); netAt.y += Math.sin(f * Math.PI) * 0.3; netRest = ease(seg(age, swingIn + 0.4, LT.end - 0.1));
+          // at the rail: both hands on the hoop, up over the top rail in an arc and set down on the deck
+          const f = ease(seg(age, swingIn, LT.end - 0.1)), start = hangAt(0).sub(new THREE.Vector3(0, bridle, 0)), ctrl = railPt.clone().add(new THREE.Vector3(0, 0.5, 0));
+          netAt = start.clone().multiplyScalar((1 - f) ** 2).addScaledVector(ctrl, 2 * f * (1 - f)).addScaledVector(deck, f * f);
+          netRest = ease(seg(age, swingIn + 0.5, LT.end - 0.1));
         }
+        dropRig = { railPt, hanging, coil: G.coil };
         // the fish: at the surface beside the pier on a tight line, then led over the net, then in it
+        const fishWait = surf.clone(), under = col.clone(); under.y = waterY - sink * 0.6;
         if (age >= T1 && age < T3) { rigAt = fishWait.clone(); rigAt.y = surf.y - 0.06; }
-        else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(foot, f); rigAt.y = lerp(surf.y - 0.06, sunk + 0.12 * ns, f); }
+        else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(under, f); rigAt.y = lerp(surf.y - 0.06, under.y + 0.1, f); }
         else if (age >= T4) { rigAt = netAt.clone().add(new THREE.Vector3(0, -0.12 * ns, 0)); inNet = true; pitch = 0.7; bendT = 0.06; }
         if (age >= T1 && age < T4) { bendT = 0.18 * load; }
-        if (crossed(T3 - 0.35)) { const w = foot.clone(); splashCb?.(w, 0.35); rippleCb?.(w, 0.6); onSound?.("net", w); }
-        if (crossed(T4)) { splashCb?.(foot.clone(), 0.5); rippleCb?.(foot.clone(), 0.7); }
+        // the net going into the water, and coming out with the fish
+        const wet = hanging && netAt.y - 0.25 * ns < waterY;
+        if (wet && !P.netWet) { const w = col.clone(); w.y = waterY; splashCb?.(w, 0.35); rippleCb?.(w, 0.6); onSound?.("net", w); }
+        if (!wet && P.netWet && age > T4) { const w = col.clone(); w.y = waterY; splashCb?.(w, 0.55); rippleCb?.(w, 0.7); }
+        P.netWet = wet;
       } else if (tech === "net") {
         // the landing net reached out, the fish drawn over it, lifted in
         netOn = true; poleFrom = toWorld(new THREE.Vector3(-0.25, 1.05, -0.35));
@@ -524,29 +549,58 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     let keptPose = null;
     if (kept && kept.t0 == null) kept.t0 = t;
     if (kept && kept.state !== "gone" && !(ph === "landing" && age < LT.card)) {
-      const ns = Math.max(1, (fishLen * 0.62) / 0.35), kt = t - kept.t0;
+      const ns = Math.max(1, (fishLen * 0.62) / 0.35), kt = t - kept.t0, crossed2 = (k, m) => prevKt < m && k >= m;
       const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]);
       showFish = true; showLine = false;
+      const G = venue === "pier" ? dropGeo(ns) : null;
+      const matAt = toWorld(new THREE.Vector3(0.05, 0.004, -0.62)), onMat = matAt.clone().add(new THREE.Vector3(0, 0.04 + 0.02 * ns, 0));
+      const netDeck = G ? G.deck : toWorld(new THREE.Vector3(-0.62, 0.06, -0.2));
+      const lying = (c, kk) => ({ mouth: c.clone().addScaledVector(side, fishLen * 0.5), dir: side.clone().negate(), roll: Math.PI / 2, beat: kk.beat, curl: kk.curl, centre: c });
       if (kept.state === "deck") {
-        if (tech === "dropnet") { netOn = true; ropesOn = true; netAt = toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.05 + 0.3 * ns, -0.08)); rigAt = netAt.clone(); inNet = true; netRest = 1; }
-        else { const at0 = toWorld(new THREE.Vector3(-0.62, 0.06, -0.2)); keptPose = { mouth: at0.clone().addScaledVector(side, fishLen * 0.5), dir: side.clone().negate(), roll: Math.PI / 2, beat: 0.12, curl: Math.max(0, Math.sin(kt * 1.7)) ** 8 * 0.5 }; }
+        if (G) { netOn = true; ropesOn = true; netAt = G.deck.clone(); rigAt = netAt.clone(); inNet = true; netRest = 1; }
+        else if (tech === "net") { netOn = true; netAt = netDeck.clone().add(new THREE.Vector3(0, 0.12, 0)); rigAt = netAt.clone(); inNet = true; netRest = 1; } // (resting in the landing net on the bank)
+        else keptPose = lying(netDeck.clone(), { beat: 0.12, curl: Math.max(0, Math.sin(kt * 1.7)) ** 8 * 0.5 });
       } else if (kept.state === "inspect") {
-        // held up in front of you, level and side-on to whoever's looking (its flank, or a flatfish's back, towards the
-        // camera), one hand under its head and one by its tail: still, apart from its gills and a slow flick of the tail.
-        // One thing sets its orientation here, and it doesn't turn: no turntable
-        // (lifted out of the net on the deck and up into your hands over a second, not snapped there)
-        const lift = ease(Math.min(1, kt / 1.0)), fromNet = tech === "dropnet" ? toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.12 + 0.3 * ns, -0.08)) : toWorld(new THREE.Vector3(-0.62, 0.1, -0.2));
-        const c = fromNet.lerp(toWorld(new THREE.Vector3(0, 1.3 + Math.sin(kt * 1.3) * 0.004, -0.5)), lift); c.y += Math.sin(lift * Math.PI) * 0.12;
-        const dir = side.clone().negate(); dir.y = -0.03; dir.normalize();
-        keptPose = { mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir, roll: 0, beat: 0.05, curl: Math.max(0, Math.sin(kt * 1.1)) ** 6 * 0.06, centre: c };
+        // a look at it: lifted out of the net in both hands and laid on an unhooking mat in front of you (low, wet and
+        // soft: the way to handle a fish you'll put back), you crouching over it with a hand resting on it. Still apart
+        // from its gills and now and then a flick of the tail; nothing turns it
+        matOn = true; if (G) { netOn = true; ropesOn = true; netAt = G.deck.clone(); netRest = 1; }
+        const lift = ease(Math.min(1, kt / 1.1)), c = netDeck.clone().add(new THREE.Vector3(0, 0.05, 0)).lerp(onMat, lift); c.y += Math.sin(lift * Math.PI) * 0.32;
+        keptPose = lying(c, { beat: 0.12, curl: Math.max(0, Math.sin(kt * 1.1)) ** 10 * 0.25 });
+        keptPose.lift = kt < 1.15;
       } else if (kept.state === "release") {
-        const f = clamp(kt / 1.3, 0, 1), from = toWorld(new THREE.Vector3(0, 1.3, -0.55)), to = nearAt.clone(); to.y = -0.25;
-        const c = from.clone().lerp(to, f); c.y += Math.sin(f * Math.PI) * 0.9;
-        const dir = to.clone().sub(from).normalize(); dir.y = f < 0.5 ? 0.3 : -0.6; dir.normalize();
-        keptPose = { mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir, roll: 0, beat: 1, curl: Math.sin(kt * 9) * 0.3, centre: c };
-        if (f >= 1) { kept = { state: "gone", t0: t }; const sp2 = nearAt.clone(); sp2.y = 0; splashCb?.(sp2, 0.6); rippleCb?.(sp2, 0.8); onSound?.("splash", sp2); keptPose = null; showFish = false; }
+        // back to the water. Off a high pier it isn't dropped: it goes back in the drop net, let down to the water, and
+        // swims out of it; from a bank, in the landing net at the edge; on a beach, into the shallows. Shortened: after
+        // it's in the net (or picked up) the view cuts to it in the water (the page says so)
+        const toNet = ease(Math.min(1, kt / 0.9)), CUT = 1.0, rel = { stage: kt < CUT ? "deck" : "lead" };
+        if (kt < CUT) {
+          if (G) { netOn = true; ropesOn = true; netAt = G.deck.clone(); netRest = 1; }
+          const c = onMat.clone().lerp(netDeck.clone().add(new THREE.Vector3(0, 0.05, 0)), toNet); c.y += Math.sin(toNet * Math.PI) * 0.3;
+          keptPose = lying(c, { beat: 0.3, curl: Math.sin(kt * 5) * 0.12 }); keptPose.lift = true;
+        } else {
+          const u = clamp((kt - CUT - 0.6) / 2.6, 0, 1), away = new THREE.Vector3(dirOf(face)[0], 0, dirOf(face)[1]);
+          let start;
+          if (G) {
+            // the net hanging in the water at the foot of the pier, its rope up over the rail to your hands
+            netOn = true; ropesOn = true; netRest = 0; netAt = G.hangAt(G.L - G.sink * 0.85).sub(new THREE.Vector3(0, G.bridle, 0)); // (its ring just at the surface, so you see it swim out) dropRig = { railPt: G.railPt, hanging: true, coil: G.coil }; releaseRope = G;
+            start = netAt.clone().add(new THREE.Vector3(0, -0.08 * ns, 0)); if (u <= 0) inNet = true;
+          } else {
+            start = nearAt.clone().lerp(at, venue === "beach" ? 0.7 : 0.85); start.y = wh(start.x, start.z) - 0.08; rel.stage = "other";
+            // from a bank: in the landing net, held out on its handle with the net's rim at the surface
+            if (venue !== "beach") { netOn = true; netRest = 0; netAt = start.clone().add(new THREE.Vector3(0, 0.06, 0)); poleFrom = toWorld(new THREE.Vector3(-0.25, 1.05, -0.35)); releasePole = true; if (u <= 0) inNet = true; }
+          }
+          // it swims out: forwards, away from the pier, and down out of sight
+          const c = start.clone().addScaledVector(away, u * u * 2.2 * Math.max(1, fishLen * 2)); c.y = start.y - u * u * 0.9;
+          const dir = away.clone(); dir.y = -0.25 * u; dir.normalize();
+          if (!(G && u <= 0)) keptPose = { mouth: c.clone().addScaledVector(dir, fishLen * 0.5), dir, roll: 0, beat: 1.2, curl: Math.sin(kt * 8) * 0.3 * (0.4 + u), centre: c };
+          if (crossed2(kt, CUT + 0.65)) { const sp = start.clone(); sp.y = wh(sp.x, sp.z); rippleCb?.(sp, 0.5); onSound?.("splash", sp); }
+          rel.net = netAt ? netAt.clone() : null; rel.fish = c.clone();
+          if (u >= 1) { kept = { state: "gone", t0: t }; keptPose = null; showFish = false; netOn = false; dropRig = null; releaseRope = null; }
+        }
+        releaseInfo = rel;
       }
-    }
+      prevKt = kt;
+    } else prevKt = -1;
     // at a pier the drop net lies ready on the deck beside the tackle box (so it's there before it's needed, never conjured)
     let netIdle = false;
     if (!netOn && venue === "pier" && !walking) { netOn = true; netIdle = true; netAt = toWorld(new THREE.Vector3(-1.2, 0.35, -0.08)); netRest = 1; inNet = false; }
@@ -668,11 +722,20 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           hands[1] = { at: net0.clone().addScaledVector(sideL, rr * 0.8).add(V3(0, 0.03, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
           crouch = clamp(0.9 - net0.y * 0.7, 0, 0.75); lean = 0.25 * crouch; brace = 0;
         } else if (landStage === "lower" || landStage === "lead" || landStage === "haul") {
-          // hand over hand on the rope at the rail, leaning over it a little to watch the net
-          const k = age * (landStage === "haul" ? 4.2 : landStage === "lower" ? 3.6 : 0.6), base = V3(-0.22, 1.18, railZ + 0.18);
-          hands[0] = { at: base.clone().add(V3(-0.05, Math.sin(k) * 0.13, 0)), axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope" };
-          hands[1] = { at: base.clone().add(V3(0.1, Math.sin(k + Math.PI) * 0.13, 0)), axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope" };
-          lean = 0.22; crouch = 0.08; brace = 0; lookAtW = netAt ? netAt.clone() : lookAtW;
+          // both hands on the rope just behind the top rail, leaning over a little to watch the net. Letting it down,
+          // the rope runs through loose hands; hauling, one hand pulls down and back while the other reaches up for the
+          // next grip, then they change over (in time with the rope coming up: angler.js's ropePull)
+          const base = V3(-0.3, 1.12, railZ + 0.2);
+          const hold = (hi) => base.clone().add(V3(0, hi ? 0.1 : -0.22, hi ? -0.06 : 0.16));
+          let a0 = base.clone().add(V3(-0.05, 0.06, -0.04)), a1 = base.clone().add(V3(0.07, -0.12, 0.1));
+          if (landStage === "haul" && ropePull) {
+            const u = ease(clamp((ropePull.u - 0.15) / 0.75, 0, 1)), puller = hold(true).lerp(hold(false), u), reacher = hold(false).lerp(hold(true), ease(ropePull.u));
+            if (ropePull.hand) { a1 = puller; a0 = reacher.add(V3(-0.06, 0, 0)); } else { a0 = puller.add(V3(-0.06, 0, 0)); a1 = reacher; }
+          }
+          hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope" };
+          hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope" };
+          lean = 0.22; crouch = 0.06; brace = landStage === "haul" ? 0.25 : 0; lookAtW = netAt ? netAt.clone() : lookAtW;
+        } else if (landStage === "done") { lookAtW = netAt ? netAt.clone() : lookAtW; lean = 0.05; brace = 0;
         } else if (landStage === "in" && net0) {
           // reaching out over the rail for the hoop and bringing it round onto the deck
           hands[0] = { at: net0.clone().add(V3(-0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
@@ -683,14 +746,23 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (rigAt && age >= LT.card - 0.3 && tech !== "dropnet" && tech !== "net") hands[0] = { at: toLocal(rigAt).add(V3(0, 0.05, 0)), axis: V3(0, 1, 0), palm: V3(1, 0, 0), kind: "line" };
     }
     if (ph === "lost") { lean = 0.05; lookAtW = rigAt ? rigAt.clone() : null; }
-    if (keptPose?.centre && kept?.state === "inspect") {
-      // holding it up for a look: one hand under its head, the other under the tail
-      const d = toLocal(keptPose.mouth.clone().add(keptPose.dir)).sub(toLocal(keptPose.mouth));
-      hands[0] = { at: toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.2)).add(V3(0, -0.035, 0)), axis: d, palm: V3(0, 1, 0), kind: "fish" };
-      hands[1] = { at: toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.74)).add(V3(0, -0.03, 0)), axis: d, palm: V3(0, 1, 0), kind: "fish" };
-      lookAtW = keptPose.centre.clone();
-      // stooping to lift it out of the net, then standing with it
-      const cy = toLocal(keptPose.centre).y; crouch = clamp((1.05 - cy) * 0.9, 0, 0.75); lean = 0.1 + crouch * 0.35; brace = 0;
+    let kneel = 0;
+    if (keptPose?.centre && (kept?.state === "inspect" || (kept?.state === "release" && keptPose.lift))) {
+      // both hands under it while it's carried (one behind the head, one by the tail), then one hand resting on its side
+      // while it lies on the mat; crouched down over it, looking at it
+      const d = toLocal(keptPose.mouth.clone().add(keptPose.dir)).sub(toLocal(keptPose.mouth)), upL = V3(0, 1, 0);
+      const under = (k) => toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * k)).add(V3(0, -0.035 * Math.max(1, fishLen * 2), 0));
+      if (keptPose.lift) { hands[0] = { at: under(0.25), axis: d, palm: upL, kind: "fish" }; hands[1] = { at: under(0.72), axis: d, palm: upL, kind: "fish" }; }
+      else { hands[1] = { at: toLocal(keptPose.centre).add(V3(0.02, 0.045 * Math.max(1, fishLen * 2), 0.03)), axis: d, palm: V3(0, -1, 0), kind: "fish" }; hands[0] = null; }
+      lookAtW = keptPose.centre.clone(); kneel = 1; crouch = 0.6; lean = 0.42; brace = 0;
+    }
+    if (kept?.state === "release" && releasePole && poleFrom && netAt) { hands[0] = { at: toLocal(poleFrom), axis: toLocal(netAt).sub(toLocal(poleFrom)), palm: V3(0, 1, 0), kind: "pole" }; lean = 0.2; lookAtW = netAt.clone(); }
+    if (kept?.state === "release" && releaseRope && !keptPose?.lift) {
+      // letting it go from the drop net: both hands on the rope at the rail, watching it swim out
+      const base = V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2);
+      hands[0] = { at: base.clone().add(V3(-0.05, 0.06, -0.04)), axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope" };
+      hands[1] = { at: base.clone().add(V3(0.07, -0.12, 0.1)), axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope" };
+      lean = 0.22; crouch = 0.06; brace = 0; lookAtW = releaseInfo?.fish || lookAtW;
     }
     if (kept?.state === "deck" && !walking) lookAtW = fish.visible ? fish.position.clone() : lookAtW;
     handsNow = hands.map((h, i) => (h ? h.at.clone() : V3(i ? 0.28 : -0.28, 0.85, -0.05)));
@@ -712,7 +784,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       fpv.pose({ hands: walking ? [null, null] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt });
     }
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFig(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
-    fig.pose({ t, dt, emote, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFig(toLocal(lookAtW)) : null, speaking, hood: fig.look?.hat === 4, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
+    fig.pose({ t, dt, emote, kneel, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFig(toLocal(lookAtW)) : null, speaking, hood: fig.look?.hat === 4, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
     tag.position.y = fig.top + 0.3; talk.position.y = tag.position.y + 0.31;
     if (!fp && !walking && (ph === "waiting" || ph === "idle" || ph === "ended" || ph === "paused")) { const ey = fig.eyeAt?.y; if (ey > 1.2 && ey < 2) eyeH += (ey - eyeH) * (1 - Math.exp(-dt * 0.5)); }
 
@@ -761,16 +833,25 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (age >= LT.card - 0.3) hangDir.set(1, -0.25, 0).applyQuaternion(root.quaternion);
       poseFish(rigAt, hangDir, t, { beat: age < LT.T4 ? 1 : 0.3, curl: Math.sin(t * 2.3) * 0.2 * (age > LT.T2 && age < LT.swingIn ? 1 : 0) });
     }
-    net.visible = netOn && !!netAt; pole.visible = net.visible && tech === "net"; ropes.forEach((r) => (r.visible = net.visible && !netIdle && (tech === "dropnet" || ropesOn)));
+    mat.visible = matOn || (kept?.state === "release" && !!keptPose?.lift);
+    if (mat.visible) { mat.position.copy(toWorld(new THREE.Vector3(0.05, 0, -0.62))); mat.rotation.y = root.rotation.y; }
+    net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r) => (r.visible = net.visible && !netIdle && (tech === "dropnet" || ropesOn)));
     if (net.visible) {
       net.position.copy(netAt);
-      if (tech === "net" && poleFrom) between(pole, poleFrom, netAt, 1);
+      if ((tech === "net" || releasePole) && poleFrom) between(pole, poleFrom, netAt, 1);
       if (tech === "dropnet" && !netIdle) {
-        // three bridles from the ring to a knot above it, one rope from the knot up to the hands (or slack on the deck)
-        const knot = netAt.clone().add(new THREE.Vector3(0, 0.75 * net.scale.x * (1 - netRest * 0.8), 0));
+        // three bridles from the hoop to the knot; from the knot the rope goes up over the top rail to your hands and
+        // on to its coil on the deck (while the net hangs), or lies from the knot to the coil (the net on the deck or in
+        // your hands): never a net without its rope
+        const knot = netAt.clone().add(new THREE.Vector3(0, 0.72 * net.scale.x * (1 - netRest * 0.8), 0));
         ropes.forEach((r, i) => { if (i > 2) return; const a = (i / 3) * Math.PI * 2; between(r, knot, netAt.clone().add(new THREE.Vector3(Math.cos(a) * 0.35 * net.scale.x, 0, Math.sin(a) * 0.35 * net.scale.x)), 1); });
-        const grip = netRest > 0.98 ? knot.clone().add(new THREE.Vector3(0.4, -0.1, 0.3)) : toWorld(handsNow[0].clone().lerp(handsNow[1], 0.5));
-        between(ropes[3], grip, knot, 1);
+        const coil = dropRig?.coil || toWorld(new THREE.Vector3(-0.42, 0.02, 0.18));
+        if (dropRig?.hanging) {
+          fig.group.updateMatrixWorld(true);
+          const hw = [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h) : toWorld(handsNow[i]); });
+          const hm = hw[0].clone().lerp(hw[1], 0.5);
+          between(ropes[3], hm, dropRig.railPt, 1); between(ropes[4], dropRig.railPt, knot, 1); between(ropes[5], hm, coil, 1);
+        } else { between(ropes[3], knot, coil, 1); ropes[4].visible = false; ropes[5].visible = false; }
       }
     }
     prevAge = age;
@@ -779,7 +860,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const eyeNow = fpEye(); // (the eye the rod and your body were placed from this frame: the camera uses the same one)
     const leanTo = fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
     leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * 2.5));
-    return { phase: ph, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
+    return { phase: ph, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
   // shoulders and your arms together, and your hands still reach the rod
@@ -828,6 +909,6 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     onSplash(f) { splashCb = f; }, onRipple(f) { rippleCb = f; },
     frame,
     real,
-    dispose() { world.remove(root, kit, line, rig, fish, net, pole, ...ropes); fig.dispose(); fpv?.dispose(); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },
+    dispose() { world.remove(root, kit, line, rig, fish, net, pole, mat, ...ropes); mat.traverse((o) => o.geometry?.dispose?.()); fig.dispose(); fpv?.dispose(); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },
   };
 }

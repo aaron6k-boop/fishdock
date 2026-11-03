@@ -403,7 +403,8 @@ function makeHuman(L, gltf, clips, outfit, venue) {
 
     // ---- the body: lower the hips (crouch, brace), lean, turn the chest; the feet stay put ----
     const standing = w.idle > 0.5;
-    st.drop += (((o.walk?.air ? 0.1 : o.crouch || 0) * 0.13 + (o.brace || 0) * 0.05) - st.drop) * k6;
+    // (kneel: right down by something on the ground, a deep crouch with the knees forward and the heels planted)
+    st.drop += (((o.walk?.air ? 0.1 : o.crouch || 0) * 0.13 + (o.brace || 0) * 0.05 + (o.walk ? 0 : o.kneel || 0) * 0.34) - st.drop) * k6;
     st.lean += ((o.lean || 0) - (o.brace || 0) * 0.1 - st.lean) * k6;
     st.brace += ((standing ? o.brace || 0 : 0) - st.brace) * k6;
     st.twist += ((o.twist || 0) - st.twist) * k6;
