@@ -10,6 +10,8 @@
 // Everything far is hazed towards the sky's own haze colour each frame, so it sits back in the air at any hour.
 import * as THREE from "three";
 import { projector, PLACE3D, inside } from "./osmPlace.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+const merge = (geos) => mergeGeometries(geos, false);
 
 /** Landmarks: lat, lon, and what to draw. Sources in the comments. */
 export const LANDMARKS = [
@@ -45,29 +47,31 @@ export function buildSkyline(group, place, { groundY = 2.2, quality = 1 } = {}) 
     const [x, z] = P(L.lat, L.lon), d = Math.hypot(x, z);
     if (d > 12000 || d < H) continue;
     if (L.kind === "column") {
-      const mat = hazeMat(0xd9d2c2, 0.75), g = new THREE.Group(); g.position.set(x, groundY, z);
-      const add = (geo, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; g.add(m); hazed(m, d, far); };
-      add(new THREE.BoxGeometry(7, 2, 7), 1); add(new THREE.BoxGeometry(4.6, 6, 4.6), 5);
-      add(new THREE.CylinderGeometry(1.25, 1.45, L.h - 14, 16), 8 + (L.h - 14) / 2);
-      add(new THREE.BoxGeometry(3.2, 0.8, 3.2), L.h - 5.6); add(new THREE.CylinderGeometry(1.1, 1.4, 2.4, 10), L.h - 4); // the capital, the caryatids' drum
-      add(new THREE.SphereGeometry(0.9, 10, 8), L.h - 2.2); add(new THREE.ConeGeometry(0.55, 2.2, 8), L.h - 0.6); // Britannia on her globe
-      group.add(g);
+      // one mesh (the pieces merged): a plinth, the pedestal, the fluted column, the capital and the caryatids' drum,
+      // Britannia on her globe
+      const geos = [[new THREE.BoxGeometry(7, 2, 7), 1], [new THREE.BoxGeometry(4.6, 6, 4.6), 5], [new THREE.CylinderGeometry(1.25, 1.45, L.h - 14, 16), 8 + (L.h - 14) / 2],
+        [new THREE.BoxGeometry(3.2, 0.8, 3.2), L.h - 5.6], [new THREE.CylinderGeometry(1.1, 1.4, 2.4, 10), L.h - 4], [new THREE.SphereGeometry(0.9, 10, 8), L.h - 2.2], [new THREE.ConeGeometry(0.55, 2.2, 8), L.h - 0.6]]
+        .map(([g, y]) => g.translate(0, y, 0).toNonIndexed());
+      const m = new THREE.Mesh(merge(geos), hazeMat(0xd9d2c2, 0.75)); m.position.set(x, groundY, z); group.add(m); hazed(m, d, far);
     } else if (L.kind === "windfarm") {
+      // instanced: the towers in one draw, the blades in another (their matrices turned each frame)
       const white = hazeMat(0xe9ecee, 0.9), b = (L.bearing * Math.PI) / 180, along = [Math.sin(b), -Math.cos(b)], across = [Math.cos(b), Math.sin(b)];
-      const per = Math.ceil(L.n / L.rows), sp = 330, rowSp = 480;
+      const per = Math.ceil(L.n / L.rows), sp = 330, rowSp = 480, face = Math.atan2(-across[0], -across[1]); // (facing the prevailing south-west wind, roughly)
       const tower = new THREE.CylinderGeometry(1.6, 2.4, L.hub, 8); tower.translate(0, L.hub / 2, 0);
       const blade = new THREE.BoxGeometry(1.4, L.rotor / 2, 0.4); blade.translate(0, L.rotor / 4, 0);
+      const spots = [];
       for (let r = 0; r < L.rows; r++) for (let i = 0; i < per && r * per + i < L.n; i++) {
         const o = (i - (per - 1) / 2) * sp, q = (r - (L.rows - 1) / 2) * rowSp;
-        let tx = x + along[0] * o + across[0] * q, tz = z + along[1] * o + across[1] * q; const td = Math.hypot(tx, tz);
+        const tx = x + along[0] * o + across[0] * q, tz = z + along[1] * o + across[1] * q, td = Math.hypot(tx, tz);
         // (past the camera's far plane each one is drawn nearer and smaller in proportion: from the pier it looks the same)
-        const sc = Math.min(1, NEAR_AS / td); tx *= sc; tz *= sc;
-        const t = new THREE.Mesh(tower, white); t.position.set(tx, 0, tz); t.scale.setScalar(sc); group.add(t); hazed(t, td, far);
-        const hub = new THREE.Group(); hub.position.set(tx, L.hub * sc, tz); hub.scale.setScalar(sc); hub.rotation.y = Math.atan2(-across[0], -across[1]); group.add(hub); // facing the prevailing south-west wind, roughly
-        const rot = new THREE.Group(); hub.add(rot);
-        for (let k = 0; k < 3; k++) { const bl = new THREE.Mesh(blade, white); bl.rotation.z = (k * Math.PI * 2) / 3; rot.add(bl); hazed(bl, td, far); }
-        rotors.push({ rot, ph: (r * 7 + i * 3) % 6 });
+        const sc = Math.min(1, NEAR_AS / td); spots.push({ x: tx * sc, z: tz * sc, sc, ph: (r * 7 + i * 3) % 6 });
       }
+      const towers = new THREE.InstancedMesh(tower, white, spots.length), blades = new THREE.InstancedMesh(blade, white, spots.length * 3), mx = new THREE.Matrix4();
+      spots.forEach((p, k) => { mx.compose(new THREE.Vector3(p.x, 0, p.z), new THREE.Quaternion(), new THREE.Vector3(p.sc, p.sc, p.sc)); towers.setMatrixAt(k, mx); });
+      for (const m of [towers, blades]) { m.frustumCulled = false; group.add(m); hazed(m, d, far); }
+      const qa = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), face), qb = new THREE.Quaternion(), z1 = new THREE.Vector3(0, 0, 1), sv = new THREE.Vector3(), pv = new THREE.Vector3();
+      rotors.push({ update(t) { spots.forEach((p, k) => { for (let j = 0; j < 3; j++) { qb.setFromAxisAngle(z1, t * 1.6 + p.ph + (j * Math.PI * 2) / 3); mx.compose(pv.set(p.x, L.hub * p.sc, p.z), qa.clone().multiply(qb), sv.setScalar(p.sc)); blades.setMatrixAt(k * 3 + j, mx); } }); blades.instanceMatrix.needsUpdate = true; } });
+      rotors[rotors.length - 1].update(0);
     }
   }
   // ---- the indicative town: low roofs over the land beyond the mapped square ----
@@ -105,6 +109,6 @@ export function buildSkyline(group, place, { groundY = 2.2, quality = 1 } = {}) 
   return {
     count: rotors.length,
     /** the rotors turning (slowly, about 15 turns a minute, each its own phase) */
-    update(t) { for (const r of rotors) r.rot.rotation.z = t * 1.6 + r.ph; },
+    update(t) { for (const r of rotors) r.update(t); },
   };
 }
