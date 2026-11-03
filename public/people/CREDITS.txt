@@ -42,3 +42,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 The hats, hood, life jacket and wellies drawn over them, and the clothing colours, are FishDock's own.
+
+anims2.glb: kneeling, kneeling to look closely, crouching and a fishing stance, from Adobe Mixamo (https://www.mixamo.com;
+Fishing Idle, Kneeling Idle, Kneeling Inspecting, Crouching Idle), retargeted in Blender from Mixamo's Y Bot rig onto
+the Rocketbox skeleton (source-assets/blender/retarget_mixamo.py). Mixamo's animations may be used royalty-free in
+personal, commercial and non-profit projects under Adobe's terms; the files themselves aren't redistributed as such.
