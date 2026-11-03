@@ -193,8 +193,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // (in front of you and a little to the side, looking down at the fish on its mat with you crouched behind it; aimed
       // a little below it, so it sits in the top half of the picture, clear of the card along the bottom)
       // (from beside you on the bank or the deck, never out over the water: a bank's edge between hid the mat. Off to
-      // your right and a little forward, looking down across the mat at the fish)
-      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(sx * 1.55 + fx * 0.55, 1.35, sz * 1.55 + fz * 0.55));
+      // your right, looking down across the mat at the fish)
+      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(sx * 1.5 - fx * 0.4, 1.3, sz * 1.5 - fz * 0.4)); // (a little back from it, so the railing is behind the fish, not across it)
       { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
       camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);

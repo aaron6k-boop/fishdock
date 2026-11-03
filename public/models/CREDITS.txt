@@ -13,3 +13,7 @@ pierprops.glb (the pier's lamps, lifebuoy stations, bollards and benches): the b
 modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and the buoy Poly Haven's "Lifebuoy"
 (https://polyhaven.com), CC0 1.0. The pier deck's concrete (public/textures/pier_concrete_*.jpg) is Poly Haven's
 "Concrete Floor 02", CC0 1.0. Credited with thanks to Poly Haven and its artists.
+
+fish.glb (cod, bass, whiting, mackerel, plaice and pollack bodies, fins and eyes) was modelled in Blender for FishDock
+from the outlines of FishDock's own species pictures (source-assets/blender/build_fish.py); the pictures are laid
+over it in the app.

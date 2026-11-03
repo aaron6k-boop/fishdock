@@ -87,6 +87,35 @@ function netTexture() {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(10, 4); return t;
 }
 
+// ---- the species modelled in Blender (public/models/fish.glb, source-assets/blender/build_fish.py) ----
+const MODELLED_FISH = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack"]);
+const modelledCache = new Map();
+/** One geometry for a modelled species: its body, fins and eyes as three groups (materials 0, 1 and 2), its uvs the
+ *  picture's (turned the way a canvas texture reads them). A fresh copy each time (the fish is bent in place). */
+function modelledFish(scene, species) {
+  if (!modelledCache.has(species)) {
+    const node = scene.getObjectByName("fish_" + species); if (!node) return null;
+    const parts = { fish_body: null, fish_fin: null, fish_eye: null };
+    node.updateWorldMatrix(true, true);
+    node.traverse((o) => { if (o.isMesh && o.material?.name in parts) parts[o.material.name] = o.geometry.clone().applyMatrix4(o.matrixWorld); });
+    const list = [parts.fish_body, parts.fish_fin, parts.fish_eye].filter(Boolean); if (!list.length || !parts.fish_body) return null;
+    const pos = [], uv = [], idx = [], groups = []; let base = 0;
+    list.forEach((g, gi) => {
+      const p = g.attributes.position.array, t = g.attributes.uv.array, ix = g.index ? g.index.array : [...Array(p.length / 3).keys()];
+      for (let i = 0; i < p.length; i++) pos.push(p[i]);
+      for (let i = 0; i < t.length; i += 2) { uv.push(t[i], 1 - t[i + 1]); }
+      groups.push([idx.length, ix.length, [parts.fish_body, parts.fish_fin, parts.fish_eye].indexOf(g)]);
+      for (const k of ix) idx.push(k + base); base += p.length / 3;
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(base > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+    for (const [st, n, m] of groups) geo.addGroup(st, n, m);
+    geo.computeVertexNormals(); modelledCache.set(species, geo);
+  }
+  return modelledCache.get(species).clone();
+}
+
 /** A generic fish (for species without a FishDock picture): a smooth lofted body and a forked tail. */
 function genericFishGeometry() {
   const pos = [], idx = [], uv = [], K = 22, M = 12;
@@ -279,6 +308,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   if (floatRig) { part(new THREE.CylinderGeometry(0.012, 0.02, 0.14, 8), new THREE.MeshStandardMaterial({ color: 0xff5a1f, emissive: 0x401000 }), 0, 0.06, 0, rig); part(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffd83a }), 0, 0, 0, rig); }
   else part(new THREE.SphereGeometry(0.03, 8, 6), mMetal, 0, 0, 0, rig);
   const fishMat = new THREE.MeshStandardMaterial({ color: 0xb8c0c4, roughness: 0.45, metalness: 0.1, side: THREE.DoubleSide, alphaTest: 0.5 });
+  const eyeMat = new THREE.MeshStandardMaterial({ roughness: 0.06, metalness: 0.0 }); // (a wet, glassy eye)
   let fishGeo = genericFishGeometry(), fishBase = fishGeo.attributes.position.array.slice();
   const fish = new THREE.Mesh(fishGeo, fishMat); fish.visible = false; fish.castShadow = true; world.add(fish);
   let fishFor = "", fishLen = 0.45, prof = fightProfile(null), load = 1, LT = landingTimes(null, 45, null, venue), tech = "lift";
@@ -288,7 +318,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (key === fishFor) return; fishFor = key;
     prof = fightProfile(species); fishLen = clamp((lengthCm || 40) / 100, 0.12, 2);
     load = fishLoad(species, lengthCm, weightKg); LT = landingTimes(species, lengthCm, weightKg, venue); tech = landingTech(species, lengthCm, weightKg, venue);
-    fish.geometry = fishGeo = genericFishGeometry(); fishBase = fishGeo.attributes.position.array.slice(); { const sk = hasArt(species) ? null : fishSkin(species); fishMat.map = sk; fishMat.color.set(sk ? 0xffffff : 0xb8c0c4); } fishMat.needsUpdate = true;
+    fish.material = fishMat; fish.geometry = fishGeo = genericFishGeometry(); fishBase = fishGeo.attributes.position.array.slice(); { const sk = hasArt(species) ? null : fishSkin(species); fishMat.map = sk; fishMat.color.set(sk ? 0xffffff : 0xb8c0c4); } fishMat.needsUpdate = true;
     if (species && hasArt(species)) {
       const img = new Image();
       img.onload = () => {
@@ -310,7 +340,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           geo.setIndex(new THREE.BufferAttribute(new Uint16Array([...m.idx, ...m.finIdx]), 1)); geo.computeVertexNormals();
           const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
           fish.geometry = fishGeo = geo; fishBase = geo.attributes.position.array.slice();
-          fishMat.map = tex; fishMat.color.set(0xffffff); fishMat.needsUpdate = true;
+          fishMat.map = tex; fishMat.color.set(0xffffff); fishMat.needsUpdate = true; fish.material = fishMat;
+          // the species modelled in Blender (fish.glb: a rounder body, a fuller belly, eyes standing proud), where there
+          // is one: the same picture over it, the same bending
+          if (MODELLED_FISH.has(species)) loadPart("fish").then((sc) => {
+            if (fishFor !== key) return;
+            const geoBlend = modelledFish(sc, species); if (!geoBlend) return;
+            fish.geometry = fishGeo = geoBlend; fishBase = geoBlend.attributes.position.array.slice();
+            eyeMat.map = tex; eyeMat.needsUpdate = true; fish.material = [fishMat, fishMat, eyeMat];
+          }).catch(() => {});
         } catch { /* keep the generic fish */ }
       };
       img.src = artUrl(species, "s");
@@ -563,7 +601,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (and as it's hauled out it leaves the waves over its first half metre)
           // (a few centimetres proud of the true wave height: the drawn water's surface is coarser than the waves and
           // otherwise covers the hoop between its points)
-          { const k = clamp(1 - (L - ropeOut) / 0.5, 0, 1); netAt.y += (Math.max(0, wh(netAt.x, netAt.z) - waterY) + sink + 0.06) * k; }
+          // never under a passing wave either (as it's let down, as it's hauled up): the hoop stays just above the surface,
+          // the bag below it in the water
+          netAt.y = Math.max(netAt.y, wh(netAt.x, netAt.z) + 0.05);
         } else {
           // at the rail: both hands on the hoop, up over the top rail in an arc and set down on the deck
           const f = ease(seg(age, swingIn, LT.end - 0.1)), start = hangAt(0).sub(new THREE.Vector3(0, bridle, 0)), ctrl = railPt.clone().add(new THREE.Vector3(0, 0.5, 0));
