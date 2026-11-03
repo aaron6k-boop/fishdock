@@ -27,7 +27,7 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method === "GET" && e.request.mode === "cors" && e.request.url.startsWith(PHOTO_HOST)) { e.respondWith(photo(e.request)); return; }
   if (e.request.method !== "GET" || url.origin !== location.origin) return; // tiles and outside hosts: network
   if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/__/")) return; // live data is never cached here
-  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/fish/")) {
+  if (url.pathname.startsWith("/assets/") || url.pathname.startsWith("/fish/") || url.pathname.startsWith("/people/")) { // (the 3D people: kept once seen)
     e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
       if (res.ok) caches.open(CACHE).then((c) => c.put(e.request, res.clone()));
       return res;

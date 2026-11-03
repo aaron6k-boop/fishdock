@@ -14,10 +14,11 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
-  // ---- walking about (Roblox-style): a thumbstick, jump, sprint, and "Fish here" at the water's edge ----
+  // ---- walking about: a stick on the left (one thumb), a small Sprint and Jump, and Start fishing at the water's edge ----
   const [walk, setWalk] = useState(null), [walkMsg, setWalkMsg] = useState("");
   const say = (m) => { setWalkMsg(m); setTimeout(() => setWalkMsg((x) => (x === m ? "" : x)), 3200); };
-  const startWalk = () => { const why = w.current?.walk(true); if (why) say(why); else { setMenu(false); say("Walking (Beta): use the stick, drag to look round, pinch to zoom. Find the water's edge to fish."); } };
+  const [view, setView] = useState(loadView);
+  const startWalk = () => { const why = w.current?.walk(true, { dist: view.camDist }); if (why) say(why); else { setMenu(false); say("Walk with the stick and drag to look round. At the water's edge, tap Start fishing."); } };
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
   const [sprint, setSprint] = useState(false);
@@ -38,7 +39,6 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   useEffect(() => { if (!kept) { setLooking(false); } }, [kept]);
   useEffect(() => { if (kept === null && landed && !looking) setLanded(null); }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!walk) setSprint(false); }, [walk]);
-  const [view, setView] = useState(loadView);
   const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "look" || k === "smooth") w.current?.setLookFeel(next); if (k === "hand") { if (v === "right") document.documentElement.dataset.hand = "right"; else delete document.documentElement.dataset.hand; } };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
@@ -75,14 +75,13 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
         {walk ? (
           <>
             <Joystick size={view.stick} float={view.stickFloat} onMove={(x, y) => w.current?.setWalkInput({ x, y, sprint })} />
-            <div className="walk-buttons">
-              <button type="button" className={`walk-btn small${walk.auto ? " on" : ""}`} aria-pressed={!!walk.auto} onClick={() => w.current?.autoWalk(!walk.auto)} title="Keep walking where you look; touch the stick to stop">Auto</button>
-              <button type="button" className={`walk-btn small${sprint ? " on" : ""}`} aria-pressed={sprint} onClick={() => setSprint(!sprint)}>Sprint</button>
-              <button type="button" className="walk-btn jump" onPointerDown={(e) => { e.preventDefault(); w.current?.jump(); }} aria-label="Jump"><Icon name="jump" /></button>
-            </div>
-            <div className="walk-top">
-              {walk.canFish ? <button type="button" className="walk-prompt" onClick={fishHere}><span className="key">Tap</span>Fish here</button> : null}
-              <button type="button" className="walk-done" onClick={stopWalk}>Back to my spot <span className="beta-pill">Beta</span></button>
+            <div className="walk-actions">
+              {walk.canFish ? <button type="button" className="walk-fish" onClick={fishHere}><Icon name="target" />Start fishing</button> : walk.crowded ? <span className="walk-note">Too close to someone to fish: move along a little</span> : null}
+              <div className="walk-small">
+                {view.autoBtn ? <button type="button" className={`walk-pill${walk.auto ? " on" : ""}`} aria-pressed={!!walk.auto} onClick={() => w.current?.autoWalk(!walk.auto)} title="Keep walking where you look; touch the stick to stop">Auto</button> : null}
+                <button type="button" className={`walk-pill${sprint ? " on" : ""}`} aria-pressed={sprint} onClick={() => setSprint(!sprint)}>Sprint</button>
+                <button type="button" className="walk-pill" onPointerDown={(e) => { e.preventDefault(); w.current?.jump(); }} aria-label="Jump"><Icon name="jump" /></button>
+              </div>
             </div>
           </>
         ) : null}
@@ -90,7 +89,8 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
         {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is in the net: have a look</button></div> : null}
         {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
         <div className="w3d-tools">
-          {!walk ? <button type="button" className="fs-btn" onClick={startWalk} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
+          {walk ? <button type="button" className="fs-btn on" onClick={stopWalk} aria-label="Stop walking" title="Stop walking and go back to where you were fishing"><Icon name="walk" /></button>
+            : <button type="button" className="fs-btn" onClick={startWalk} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button>}
           {menu ? (
             <div className="cam-menu" role="menu" aria-label="Camera">
               {MODES.filter(([m]) => m !== "spectator" || others.length).map(([m, l]) => <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} className={`ft-pill${mode === m ? " on" : ""}`} onClick={() => pick(m)}>{l}</button>)}
@@ -102,6 +102,8 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               <button type="button" role="menuitemcheckbox" aria-checked={view.smooth !== false} className={`ft-pill${view.smooth !== false ? " on" : ""}`} onClick={() => setOpt("smooth", view.smooth === false)} title="The view carries on turning a little after a flick">Smooth camera</button>
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("stick", { s: "m", m: "l", l: "s" }[view.stick] || "m")} title="The walking stick's size">Stick size: {{ s: "Small", m: "Medium", l: "Large" }[view.stick] || "Medium"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={!!view.stickFloat} className={`ft-pill${view.stickFloat ? " on" : ""}`} onClick={() => setOpt("stickFloat", !view.stickFloat)} title="Touch anywhere in the lower left to walk, instead of a stick in the corner">Floating stick</button>
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("camDist", { near: "normal", normal: "far", far: "near" }[view.camDist] || "normal")} title="How far behind you the camera follows when you walk about (pinch to change it as you go)">Walking camera: {{ near: "Near", normal: "Normal", far: "Far" }[view.camDist] || "Normal"}</button>
+              <button type="button" role="menuitemcheckbox" aria-checked={!!view.autoBtn} className={`ft-pill${view.autoBtn ? " on" : ""}`} onClick={() => setOpt("autoBtn", !view.autoBtn)} title="An Auto button when you walk about: keep walking where you look until you touch the stick">Auto-walk button</button>
               {reelOpts ? <>
                 <hr className="cam-sep" />
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.assisted} className={`ft-pill${reelOpts.assisted ? " on" : ""}`} onClick={() => onReelOpts?.({ assisted: !reelOpts.assisted })} title="One tap starts winding at a steady rate, another stops it, instead of tapping again and again">Assisted reeling</button>

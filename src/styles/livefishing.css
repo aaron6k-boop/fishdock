@@ -330,7 +330,7 @@ html[data-hand="right"] .ft-fight { flex-direction: row-reverse; }
 .w3d-fail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #fff; background: #0b1620; }
 .w3d-compass { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 96px); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #0a141bb3; border: 1px solid #ffffff26; color: #fff; pointer-events: none; }
 .w3d-compass span { position: absolute; inset: 3px; display: grid; justify-items: center; transition: transform .15s linear; }
-.w3d-compass span b { font-size: 10px; color: #ff6b5e; line-height: 1; }
+.w3d-compass span b { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 7px solid #ff6b5e; margin-top: 1px; } /* the north pointer: a red marker that turns (the letters say which way you face) */
 .w3d-compass i { font-style: normal; font-size: 10px; font-weight: 700; margin-top: 10px; }
 /* what the place is (and its credits): under the top bar, out of the way of the fishing controls at the bottom */
 .w3d-label { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 86px); width: max-content; max-width: min(76vw, 560px); text-align: center; font-size: 10.5px; line-height: 1.3; color: #dbe6ec; text-shadow: 0 1px 2px #000; pointer-events: none; opacity: .8; }
@@ -427,19 +427,22 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 .stick-s { --js: 104px; } .stick-m { --js: 128px; } .stick-l { --js: 156px; }
 .stick-s .joystick-knob { width: 48px; height: 48px; } .stick-l .joystick-knob { width: 68px; height: 68px; }
 .joystick-knob { width: 58px; height: 58px; border-radius: 50%; background: #ffffffd9; box-shadow: 0 4px 14px #0006; transition: transform .05s; pointer-events: none; }
-.walk-buttons { position: absolute; z-index: 6; right: max(18px, env(safe-area-inset-right)); bottom: calc(30px + env(safe-area-inset-bottom)); display: flex; align-items: flex-end; gap: 12px; }
-.walk-btn { border: 2px solid #ffffff55; background: #0a141bb3; color: #fff; border-radius: 50%; width: 74px; height: 74px; display: grid; place-items: center; font-weight: 700; touch-action: none; }
-.walk-btn.small { width: 56px; height: 56px; font-size: 12px; }
-.walk-btn.on { background: var(--action); color: #04201d; border-color: transparent; }
-.walk-btn.jump svg { width: 30px; height: 30px; }
-.walk-top { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 96px); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+/* walking: Start fishing (only at the water's edge) above a row of small pills, bottom right, clear of the left thumb */
+.walk-actions { position: absolute; z-index: 6; right: max(14px, env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; max-width: 58%; }
+.walk-small { display: flex; gap: 8px; }
+.walk-pill { min-width: 46px; height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid #ffffff40; background: #0a141bb3; color: #fff; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; touch-action: none; }
+.walk-pill svg { width: 20px; height: 20px; }
+.walk-pill.on { background: var(--action); color: #04201d; border-color: transparent; }
+.walk-fish { display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 20px 0 16px; border-radius: 999px; border: 0; background: var(--action); color: #04201d; font-weight: 800; font-size: 16px; box-shadow: 0 6px 18px #0007; animation: prompt-in .25s ease both; }
+.walk-fish svg { width: 22px; height: 22px; }
+.walk-note { background: #0a141be0; color: #fff; font-size: 12.5px; padding: 7px 12px; border-radius: 12px; text-align: right; }
+.walk-top { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 150px); display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
 .walk-top button { pointer-events: auto; }
 .walk-prompt { display: flex; align-items: center; gap: 10px; padding: 10px 18px 10px 10px; border-radius: 14px; border: 0; background: #0a141be6; color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 6px 20px #0008; animation: prompt-in .25s ease both; }
 .walk-prompt .key { background: #fff; color: #0a141b; border-radius: 8px; padding: 4px 8px; font-size: 12px; }
 @keyframes prompt-in { from { transform: scale(.85); opacity: 0; } }
-.walk-done { border: 1px solid #ffffff40; background: #0a141bb3; color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 13px; }
 .walk-msg { position: absolute; z-index: 7; left: 50%; transform: translateX(-50%); bottom: calc(170px + env(safe-area-inset-bottom)); max-width: 86%; text-align: center; padding: 8px 14px; border-radius: 12px; background: #0a141be6; color: #fff; font-size: 13px; }
-@media (prefers-reduced-motion: reduce) { .walk-prompt { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .walk-prompt, .walk-fish { animation: none; } }
 
 /* ---- having a look at your landed fish (Stage3D): a compact panel low down, the fish held up above it ---- */
 .fish-look { position: absolute; z-index: 7; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); max-width: 520px; margin: 0 auto; max-height: 44%; overflow-y: auto; padding: 14px 16px; border-radius: 18px; background: #0d171ef2; border: 1px solid #ffffff1c; box-shadow: 0 18px 50px #000b; color: var(--text); display: flex; flex-direction: column; gap: 6px; animation: fs-rise .4s cubic-bezier(.2, 1.1, .3, 1) both; }
@@ -456,6 +459,14 @@ html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-
 
 /* ---- choosing your angler's look ---- */
 .look-picker { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: start; }
+.look-people { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.look-people + .look-people { margin-top: 2px; }
+.look-person { flex: 0 0 auto; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; background: var(--elev); line-height: 0; }
+.look-person img { width: 48px; height: 60px; object-fit: cover; display: block; }
+.look-person.on { border-color: var(--action); }
+.look-sw.own { background: conic-gradient(#7a5a3a 0 25%, #3d4a5c 0 50%, #7a5a3a 0 75%, #3d4a5c 0); }
+.look-pair { grid-template-columns: 1fr 1fr; gap: 10px; }
+.look-preview { position: sticky; top: 0; }
 .look-preview { width: 112px; height: 168px; border-radius: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--action) 12%, var(--elev)), var(--elev)); border: 1px solid var(--line); }
 .look-opts { display: grid; gap: 10px; min-width: 0; }
 .look-row { display: grid; gap: 5px; }

@@ -9,7 +9,7 @@ import { biteTaps, fightProfile, fightStyle, fishLoad, landingTimes, landingTech
 import { fishShape, buildFishMesh, bodyWidth } from "../fish3d.js";
 import { hasArt, artUrl } from "../../data/fishart.js";
 import { castPoint, dirOf } from "./spots.js";
-import { createFigure } from "./figure3d.js";
+import { createPerson } from "./human3d.js";
 import { lookFor } from "./people.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -100,8 +100,9 @@ function genericFishGeometry() {
 export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, look = null, local = false, real = false, rail = false, onSound, onFeel } = {}) {
   const root = new THREE.Group(); world.add(root);
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
-  // the person (figure3d.js): their own look if they chose one, otherwise a steady one from their id
-  const fig = createFigure({ id, look: lookFor(id, look), outfit: O, venue }); root.add(fig.group);
+  // the person (human3d.js: a realistic person, with the simple figure3d.js figure standing in while it loads): their
+  // own look if they chose one, otherwise a steady one from their id
+  const fig = createPerson({ id, look: lookFor(id, look), outfit: O, venue }); root.add(fig.group);
   const part = (geo, mat, x, y, z, parent = root) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
   const tagY = fig.look.height + 0.3;
   let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, tagY, 0); root.add(tag);
@@ -493,8 +494,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (ph === "waiting" || ph === "bite") { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     } else { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     if (!held || (ph !== "cast" && ph !== "hooked" && ph !== "landing" && ph !== "lost")) { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); held = false; }
-    // walking about: the rod carried upright in the right hand, the line wound in
-    if (walking) { butt = new THREE.Vector3(0.27, 0.62, 0.02); dir = new THREE.Vector3(0.03, 0.96, 0.28).normalize(); held = true; showLine = false; showFish = false; }
+    // walking about: the rod carried in the right hand at the reel, low by your side, its tip leading forwards and up
+    // (clear of your legs, the rail and anyone behind you), bobbing a little with your stride; the line wound in
+    if (walking) {
+      const bob = Math.sin((walking.phase || 0) * 2) * 0.025 * Math.min(1, (walking.speed || 0) / 2);
+      dir = new THREE.Vector3(0.07, 0.58 + bob, -0.81).normalize();
+      butt = new THREE.Vector3(0.25, 0.86 + bob * 0.5, -0.05).addScaledVector(dir, -R.seat * 0.7); held = true; showLine = false; showFish = false;
+    }
     // first person: whenever the line is out the rod is in your hands, low and to the right with the reel in view and
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
@@ -606,7 +612,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     fig.group.rotation.y = -figYaw;
     const toFig = (v) => (v && figYaw ? v.clone().applyAxisAngle(UP, figYaw) : v);
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFig(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
-    fig.pose({ t, dt, emote, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFig(toLocal(lookAtW)) : null, speaking, hood: (env.rain || 0) > 0.35 });
+    fig.pose({ t, dt, emote, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFig(toLocal(lookAtW)) : null, speaking, hood: (env.rain || 0) > 0.35, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
+    tag.position.y = fig.top + 0.3; talk.position.y = tag.position.y + 0.31;
 
     // ---- line, rig, fish, net ----
     line.visible = showLine;

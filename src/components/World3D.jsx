@@ -12,7 +12,7 @@ import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
 // from where they happen: your friend's reel from their side, quieter further away) ----
 const VIEW_KEY = "fishdock.view3d.v1";
-export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto" };
+export const VIEW_DEFAULTS = { track: true, spatial: true, hand: "left", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto", camDist: "normal", autoBtn: false };
 // sound levels for the three kinds of sound (sceneAudio.js setVolumes), saved on this phone
 const LEVELS_KEY = "fishdock.sound.levels";
 export function loadLevels() { try { return { environment: 0.8, equipment: 0.8, events: 1, ...JSON.parse(localStorage.getItem(LEVELS_KEY) || "{}") }; } catch { return { environment: 0.8, equipment: 0.8, events: 1 }; } }
@@ -92,7 +92,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
-          setWalk((o) => (!wk ? (o ? null : o) : !o || o.canFish !== wk.canFish || o.sprint !== wk.sprint || o.auto !== wk.auto || o.going !== wk.going ? wk : o));
+          setWalk((o) => (!wk ? (o ? null : o) : !o || o.canFish !== wk.canFish || o.crowded !== wk.crowded || o.sprint !== wk.sprint || o.auto !== wk.auto || o.going !== wk.going ? wk : o));
           setHeading((h) => { const deg = Math.round(((props.current.facing + (view.yaw * 180) / Math.PI) % 360 + 360) % 360); return Math.abs(deg - h) >= 2 ? deg : h; });
           for (const [id, o] of Object.entries(outs)) {
             const key = `${o.phase}|${o.info.since}`, prev = phases.current[id];
@@ -164,7 +164,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
     setTrack: (on) => W.current?.setTrack(on),
     inspectFish: (on) => W.current?.inspectFish(on), keepFish: () => W.current?.keepFish(), releaseFish: () => W.current?.releaseFish(),
     setSpeaking: (id, on) => W.current?.setSpeaking(id, on),
-    walk: (on) => W.current?.walk(on), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
+    walk: (on, o) => W.current?.walk(on, o), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
     onPose: (f) => W.current?.onPose(f), emote: (k) => W.current?.emote(k),
     setLookFeel: (v) => W.current?.look.setFeel({ sens: LOOK_SENS[v.look] ?? 1, smooth: v.smooth !== false }),
     autoWalk: (on) => W.current?.autoWalk(on), get autoWalking() { return !!W.current?.autoWalking; },
@@ -179,7 +179,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
       <canvas ref={canvas} className="w3d-canvas" tabIndex={0} aria-label="3D view: drag to look round, pinch to zoom, double tap to face your rod" />
       {!ready && !failed ? <div className="fs-loading"><span className="loading-dots" aria-label="Loading the 3D view" /></div> : null}
       {failed ? <div className="w3d-fail">This browser can't draw the 3D view. The photo view still works.</div> : null}
-      <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b>N</b></span><i>{compassPoint(heading)}</i></div>
+      <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b aria-hidden="true" /></span><i>{compassPoint(heading)}</i></div>
       {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
       <div className="w3d-label">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</div>
       {children}

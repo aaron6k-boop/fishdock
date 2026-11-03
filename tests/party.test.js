@@ -289,6 +289,12 @@ test("an angler's look: small whole numbers, cleaned, shared with the party; any
   const them = await h.sock(r.body.code, j.body.member.key);
   const sam = them.last("hello").members.find((m) => m.name === "Sam");
   assert.equal(sam.look, null, "an out-of-range look isn't kept");
+  // the realistic person and their kit go to everyone too (and nothing else)
+  const kit = { ...look, person: 8, coat: 4, legs: 2, boots: 1, life: 1, gloves: 1 };
+  const k = await h.c("POST", `/${r.body.code}/join`, { body: { secret: r.body.secret, name: "Jo", role: "angler", look: { ...kit, person: 3, gps: [52.6, 1.7] } } });
+  assert.equal(k.status, 200, k.text);
+  const jo = (await h.sock(r.body.code, k.body.member.key)).last("hello").members.find((m) => m.name === "Jo");
+  assert.deepEqual(jo.look, { ...kit, person: 3 });
 });
 
 test("a virtual cast keeps its distance and aim (cleaned); a real trip's cast carries none", async () => {

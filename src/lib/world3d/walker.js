@@ -5,7 +5,7 @@
 // (so a railing guides you along the edge instead of stopping you dead). Steps up onto a pier or quay are taken
 // smoothly; anything higher than a step needs a jump.
 
-export const WALK = { speed: 4.2, sprint: 7, turn: 10, jump: 5.2, gravity: 16, step: 0.45, accel: 14, stop: 18, dead: 0.12 };
+export const WALK = { speed: 1.8, sprint: 4.2, turn: 10, jump: 5.2, gravity: 16, step: 0.45, accel: 14, stop: 18, dead: 0.12 };
 
 /** A fresh walker standing at (x, z), facing `face` (radians, 0 = -z). */
 export function walker(x, z, face, y = 0) { return { x, z, y, vy: 0, vx: 0, vz: 0, face, speed: 0, air: false, phase: 0 }; }
@@ -62,3 +62,16 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
   else n.y = g;
   return n;
 }
+
+// ---- room for everyone (Fish Together): nobody walks through anyone else or fishes on top of them ----
+export const ROOM = { body: 0.7, fish: 1.8 };
+/** Your position pushed out of anyone you've walked into (others: [[x, z]]). */
+export function keepApart(x, z, others = [], min = ROOM.body) {
+  for (const [ox, oz] of others) {
+    const dx = x - ox, dz = z - oz, d = Math.hypot(dx, dz);
+    if (d < min) { const k = d > 1e-6 ? min / d : 0; if (k) { x = ox + dx * k; z = oz + dz * k; } else x = ox + min; }
+  }
+  return { x, z };
+}
+/** Whether there's room to fish here: nobody else's spot or person within a rod's width or so. */
+export function roomToFish(x, z, others = [], min = ROOM.fish) { return others.every(([ox, oz]) => Math.hypot(x - ox, z - oz) >= min); }

@@ -31,7 +31,7 @@ function basisQ(dir, hint, out = new THREE.Quaternion()) {
 }
 
 // two-bone IK: from A towards T with lengths L1, L2, bending towards `pole`. Returns the joint and the (reachable) end.
-function twoBone(A, T, L1, L2, pole) {
+export function twoBone(A, T, L1, L2, pole) {
   const d = T.clone().sub(A); let dist = d.length() || 1e-4; d.multiplyScalar(1 / dist);
   dist = clamp(dist, Math.abs(L1 - L2) + 1e-3, L1 + L2 - 1e-4);
   const C = A.clone().addScaledVector(d, dist);
