@@ -267,7 +267,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // gliding there across empty sea)
         const low = (x) => (x === "lower" || x === "lead" || x === "haul") && landing.water != null;
         // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
-        const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (low(st) && landShot.stage && !low(landShot.stage));
+        const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage)); // (and back up from it: climbing the wall it passed close over the deck)
         landShot.stage = st;
         landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "lead" || st === "haul";
         anglers.get(localId)?.a.showTag(false);
@@ -430,7 +430,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       get lag() { return film ? nowFn() - film.now : 0; },
       get scene() { return scene; },
       floor(x, z) { return env.floorAt ? env.floorAt(x, z) : null; },
-      get me() { const x = anglers.get(localId); return x?.out ? { at: x.out.at.toArray(), face: x.out.face, phase: x.out.phase } : null; },
+      get me() { const x = anglers.get(localId); return x?.out ? { at: x.out.at.toArray(), face: x.out.face, phase: x.out.phase, land: x.out.land ? { stage: x.out.land.stage, net: x.out.land.net?.toArray().map((v) => +v.toFixed(2)), water: x.out.land.water } : null } : null; },
       ground: env.ground,
     };
   }

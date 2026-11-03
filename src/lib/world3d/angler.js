@@ -561,7 +561,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           netAt = hangAt(ropeOut).sub(new THREE.Vector3(0, bridle, 0)).addScaledVector(side, sway * Math.min(1, ropeOut / 1.5));
           // let right down, the hoop rides the waves (just breaking the surface) rather than vanishing under each crest
           // (and as it's hauled out it leaves the waves over its first half metre)
-          { const k = clamp(1 - (L - ropeOut) / 0.5, 0, 1); netAt.y += Math.max(0, wh(netAt.x, netAt.z) - waterY) * k; }
+          // (a few centimetres proud of the true wave height: the drawn water's surface is coarser than the waves and
+          // otherwise covers the hoop between its points)
+          { const k = clamp(1 - (L - ropeOut) / 0.5, 0, 1); netAt.y += (Math.max(0, wh(netAt.x, netAt.z) - waterY) + sink + 0.06) * k; }
         } else {
           // at the rail: both hands on the hoop, up over the top rail in an arc and set down on the deck
           const f = ease(seg(age, swingIn, LT.end - 0.1)), start = hangAt(0).sub(new THREE.Vector3(0, bridle, 0)), ctrl = railPt.clone().add(new THREE.Vector3(0, 0.5, 0));
@@ -572,7 +574,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // the fish: at the surface beside the pier on a tight line, then led over the net, then in it
         const fishWait = surf.clone(), under = col.clone(); under.y = waterY - sink * 0.6;
         if (age >= T1 && age < T3) { rigAt = fishWait.clone(); rigAt.y = surf.y - 0.06; }
-        else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(under, f); rigAt.y = lerp(surf.y - 0.06, (netAt ? netAt.y : under.y) + 0.1, f); }
+        else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(under, f); rigAt.y = lerp(surf.y - 0.06, (netAt ? netAt.y - 0.04 : under.y + 0.1), f); }
         else if (age >= T4) { rigAt = netAt.clone().add(new THREE.Vector3(0, -0.12 * ns, 0)); inNet = true; pitch = 0.7; bendT = 0.06; }
         if (age >= T1 && age < T4) { bendT = 0.18 * load; }
         // the net going into the water, and coming out with the fish
