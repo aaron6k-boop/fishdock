@@ -146,7 +146,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           + (.015 + .04*uWind)*sin(dot(p, normalize(wd + wx*.8))*1.2 + uTime*3.1);
         // fine ripples carried along by the wind; a river's current drifts them downstream
         vec2 flow = uKind > 1.5 && uKind < 2.5 ? vec2(-uTime*.6, 0.) : -wd*uTime*.35;
-        h += (noise(p*vec2(2.6, 3.4) + flow) - .5)*(.03 + .06*uWind) + (noise(p*7.3 + flow*1.6) - .5)*(.008 + .02*uWind);
+        // (two scales of ripple at odd angles to each other, so no pattern repeats; the finest kept gentle)
+        vec2 q = mat2(.8, -.6, .6, .8)*p;
+        h += (noise(p*vec2(2.6, 3.4) + flow) - .5)*(.024 + .05*uWind) + (noise(q*6.1 + flow*1.6) - .5)*(.004 + .011*uWind);
         return h;
       }
       void main(){
@@ -170,13 +172,16 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float churn = 0.;
         for (int i = 0; i < 8; i++) { vec4 r = uRip[i]; if (r.w <= 0.) continue; float d = length(p - r.xy); float fr = (d - r.z*1.4)*7.; n.xz += normalize(p - r.xy + .001)*sin(fr)*exp(-fr*fr*.08)*r.w*.35;
           churn += r.w*smoothstep(1.8, 0., r.z)*(1. - smoothstep(.25 + r.z*.9, .55 + r.z*1.3, d))*smoothstep(.25, .75, noise(p*2.4 + uTime*1.5)); }
-        n = normalize(n);
+        // far off, the fine detail is smaller than a pixel: calm it rather than let it shimmer
+        n = normalize(mix(n, vec3(0., 1., 0.), smoothstep(40., 260., dist)*.55));
         vec3 v = normalize(cameraPosition - vW);
         vec3 r = reflect(-v, n); r.y = abs(r.y);
         float F = .02 + .98*pow(1. - max(dot(n, v), 0.), 5.);
         vec3 refl = skyColour(normalize(r));
         float lit = uDay + uDusk*.6 + uNight*.2;
         vec3 body = uWater*lit*(.75 + .35*smoothstep(-.3, .4, vH)) + vec3(.008, .016, .03)*uNight;
+        // close below you, light comes back up out of the water: the foreground isn't a black pool
+        body *= 1. + .45*(1. - smoothstep(3., 26., dist));
         // near land: lighter, greener shallows, and the dark of a wall or bank mirrored close to it
         float sd = shoreDist(p);
         body = mix(body*1.35 + vec3(.01, .03, .02)*lit, body, smoothstep(0., 14., sd)*.75 + .25);

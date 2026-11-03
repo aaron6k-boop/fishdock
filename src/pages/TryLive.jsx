@@ -133,18 +133,19 @@ export default function TryLive({ initialPlace, initialSpecies }) {
     <>
       <div className="fs-top">
               <span className="live-badge s-replay">Demo</span>
-              <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}</span>
-              {c?.windKph != null ? <span className="fs-chip"><Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</span> : null}
+              <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
               <span className="grow" />
-              <button type="button" className={`fs-btn${view3d ? " on" : ""}`} onClick={() => setView3d(!view3d)} aria-pressed={view3d} aria-label={view3d ? "Back to the photo view" : "Look around in 3D (Beta)"} title="360° look-around (Beta)"><Icon name="compass" /></button>
-              {view3d ? <button type="button" className="fs-btn" onClick={() => setLookOpen(true)} aria-label="Your angler" title="Your angler"><Icon name="person" /></button> : null}
-              <button type="button" className="fs-btn" onClick={() => setInvite(true)} aria-label="Invite a friend here" title="Invite a friend here"><Icon name="users" /></button>
-              <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
-              <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
+              {/* in 3D these live in the view's one menu (top right); the photo view keeps its buttons */}
+              {!view3d ? <>
+                <button type="button" className="fs-btn" onClick={() => setView3d(true)} aria-label="Look around in 3D (Beta)" title="360° look-around (Beta)"><Icon name="compass" /></button>
+                <button type="button" className="fs-btn" onClick={() => setInvite(true)} aria-label="Invite a friend here" title="Invite a friend here"><Icon name="users" /></button>
+                <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
+                <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
+              </> : null}
             </div>
             <div className="fs-bottom">
-              <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
+              <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
     </>
   );
@@ -153,7 +154,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "photo", label: "Photo view", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (

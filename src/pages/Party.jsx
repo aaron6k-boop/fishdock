@@ -235,7 +235,7 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D feel={haptics.feel} fight={mode === "virtual" ? vf.fight : null} reelOpts={mode === "virtual" ? vf.opts : null} onReelOpts={vf.setOpts} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D onWindIn={mode === "virtual" ? vf.windIn : undefined} feel={haptics.feel} fight={mode === "virtual" ? vf.fight : null} reelOpts={mode === "virtual" ? vf.opts : null} onReelOpts={vf.setOpts} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>
@@ -250,7 +250,7 @@ function PartyLive({ code, mkey }) {
           <div className="fs-bottom">
             {voiceState.on && voiceState.ptt ? <button type="button" className="ft-pill ptt" onPointerDown={() => voice.current?.talk(true)} onPointerUp={() => voice.current?.talk(false)} onPointerLeave={() => voice.current?.talk(false)}><Icon name="mic" />Hold to talk</button> : null}
             {!fishing ? <span className="ft-label">Watching{meM?.role === "spectator" ? "" : " (no spot free)"}</span>
-              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={false} onCast={vf.cast} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} />
+              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={false} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} />
               : <div className="fish-tray real-tray" role="group" aria-label="Log what happens">{realNext.map(([l, f, ic]) => <button key={l} type="button" className="ft-pill" onClick={f}><Icon name={ic} />{l}</button>)}<span className="ft-label">{meM?.presence === "water" ? "At the water" : "Not at the water"}</span></div>}
           </div>
         </Stage3D>

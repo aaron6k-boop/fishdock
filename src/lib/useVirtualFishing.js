@@ -109,6 +109,8 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
       const now = Date.now(); taps.current = [...taps.current.filter((t) => now - t < 2000), now]; tapN.current++;
     },
     land,
+    /** wind the line in (between bites): ready to cast again or walk about; nothing happens if it isn't out */
+    windIn: () => { if (last && (last.type === "cast" || last.type === "missed")) { clearTimers(); add("reelin"); return true; } return false; },
     setDrag: (d) => { dragRef.current = Math.max(DRAG.min, Math.min(DRAG.max, d)); },
     setOpts: (o) => { const next = { ...optsRef.current, ...o }; setOptsNow(next); saveReelOpts(next); },
     hold: (on) => { holding.current = !!on; },

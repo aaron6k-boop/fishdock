@@ -46,3 +46,18 @@ test("only shareable events and fields leave the phone; catches carry the specie
   assert.equal(sc[2].data.species, "cod");
   assert.equal(sc[2].data.name, "Cod");
 });
+
+test("your line: in the water after a cast or a bite, wound in after a catch, a lost fish or winding in (never 'reel in first' with nothing out)", async () => {
+  const { lineState, phaseAt } = await import("../src/lib/liveEvents.js");
+  const ev = (type, t) => ({ type, t, id: `${type}${t}` });
+  assert.equal(lineState([]), "in");
+  assert.equal(lineState([ev("cast", 1)]), "out");
+  assert.equal(lineState([ev("cast", 1), ev("bite", 2), ev("missed", 3)]), "out", "the bait's still out after a missed bite");
+  assert.equal(lineState([ev("cast", 1), ev("bite", 2), ev("hooked", 3)]), "hooked");
+  assert.equal(lineState([ev("cast", 1), ev("bite", 2), ev("hooked", 3), ev("catch", 4)]), "in", "a landed fish: the line's in, even once the scene says 'waiting'");
+  assert.equal(lineState([ev("cast", 1), ev("bite", 2), ev("hooked", 3), ev("lost", 4)]), "in");
+  assert.equal(lineState([ev("cast", 1), ev("reelin", 9)]), "in");
+  // winding in: back to the start, ready to cast (no bite can follow it)
+  const p = phaseAt([ev("cast", 1000), ev("reelin", 9000)], 9500); assert.equal(p.phase, "idle");
+  const q = phaseAt([ev("cast", 1000), ev("bite", 2000), ev("hooked", 3000), ev("reelin", 4000)], 4500); assert.equal(q.phase, "hooked", "you can't wind in a hooked fish away");
+});

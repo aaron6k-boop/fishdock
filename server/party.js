@@ -59,7 +59,7 @@ export const PARTY = {
   spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, maxSpeed: 12, signalBytes: 16000, photoBytes: 400e3,
 };
 export const VENUES = ["pier", "beach", "estuary", "river", "lake"];
-export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch"];
+export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch", "reelin"];
 export const REACTIONS = { nice: "Nice one", wow: "Wow", clap: "Well done", fish: "Fish on!" };
 export const CHALLENGES = { biggest: "Biggest fish", most: "Most fish", species: "Most species", longest: "Longest fish" };
 const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -166,7 +166,7 @@ export class PartyRoom {
     if (this.s.mode === "real") return true; // a real log: people log what happened, in whatever order they could
     const last = this.lastOf(mid)?.type || null;
     const lineOut = last === "cast" || last === "missed" || last === "bite";
-    return ({ cast: last !== "hooked", bite: lineOut && last !== "bite", missed: last === "bite", hooked: last === "bite", lost: last === "hooked", catch: last === "hooked" })[type] ?? false;
+    return ({ cast: last !== "hooked", bite: lineOut && last !== "bite", missed: last === "bite", hooked: last === "bite", lost: last === "hooked", catch: last === "hooked", reelin: last === "cast" || last === "missed" })[type] ?? false;
   }
   cleanEvent(mid, ev) {
     const type = ev?.type, d = ev?.data || {};

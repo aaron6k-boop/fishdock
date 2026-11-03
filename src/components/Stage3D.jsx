@@ -10,7 +10,7 @@ import { speciesById } from "../data/species.js";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts }) {
+export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState("first"), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -18,13 +18,17 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
   const [walk, setWalk] = useState(null), [walkMsg, setWalkMsg] = useState("");
   const say = (m) => { setWalkMsg(m); setTimeout(() => setWalkMsg((x) => (x === m ? "" : x)), 3200); };
   const [view, setView] = useState(loadView);
-  const startWalk = () => { const why = w.current?.walk(true, { dist: view.camDist }); if (why) say(why); else { setMenu(false); say("Walk with the stick and drag to look round. At the water's edge, tap Start fishing."); } };
+  const startWalk = (retry = false) => {
+    const why = w.current?.walk(true, { dist: view.camDist });
+    // your line's still in the water: wind it in, then walk (one step, never "reel in first" with nothing to reel)
+    if (why === "line") { if (!retry && onWindIn?.()) setTimeout(() => startWalk(true), 250); else say("Wind your line in first."); return; }
+    if (why) say(why); else { setMenu(false); say(retry ? "Line wound in. Walk with the stick; at the water's edge, tap Start fishing." : "Walk with the stick and drag to look round. At the water's edge, tap Start fishing."); }
+  };
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
   const [sprint, setSprint] = useState(false);
   // emotes: wave, cheer or clap (the others in a Fish Together party see it too)
-  const [emotes, setEmotes] = useState(false);
-  const emote = (k) => { w.current?.emote(k); onEmote?.(k); setEmotes(false); };
+  const emote = (k) => { w.current?.emote(k); onEmote?.(k); };
   const hasMe = anglers.some((a) => a.local);
   // voice chat: a light above whoever's talking
   const spokeRef = useRef(new Set());
@@ -80,7 +84,7 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               <div className="walk-small">
                 {view.autoBtn ? <button type="button" className={`walk-pill${walk.auto ? " on" : ""}`} aria-pressed={!!walk.auto} onClick={() => w.current?.autoWalk(!walk.auto)} title="Keep walking where you look; touch the stick to stop">Auto</button> : null}
                 <button type="button" className={`walk-pill${sprint ? " on" : ""}`} aria-pressed={sprint} onClick={() => setSprint(!sprint)}>Sprint</button>
-                <button type="button" className="walk-pill" onPointerDown={(e) => { e.preventDefault(); w.current?.jump(); }} aria-label="Jump"><Icon name="jump" /></button>
+                <button type="button" className="walk-pill" onClick={stopWalk} aria-label="Stop walking" title="Stop walking and go back to where you were fishing">Stop</button>
               </div>
             </div>
           </>
@@ -88,16 +92,29 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
         {walkMsg ? <div className="walk-msg" role="status">{walkMsg}</div> : null}
         {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is in the net: have a look</button></div> : null}
         {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
-        <div className="w3d-tools">
-          {walk ? <button type="button" className="fs-btn on" onClick={stopWalk} aria-label="Stop walking" title="Stop walking and go back to where you were fishing"><Icon name="walk" /></button>
-            : <button type="button" className="fs-btn" onClick={startWalk} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button>}
+        {/* one menu for everything that isn't fishing or walking (top right): the page's own items (your angler, sound,
+            settings, inviting a friend), the camera, emotes, watching a friend, and the view's settings */}
+        <div className="w3d-menuwrap">
+          <button type="button" className={`fs-btn w3d-menubtn${menu ? " on" : ""}`} onClick={() => setMenu(!menu)} aria-label="Menu" aria-expanded={menu} title="Menu: camera, sound, settings, Fish Together"><Icon name="more" /></button>
           {menu ? (
-            <div className="cam-menu" role="menu" aria-label="Camera">
+            <div className="cam-menu w3d-menu" role="menu" aria-label="Menu">
+              {pageMenu?.length ? <>
+                {pageMenu.map((it) => <button key={it.key} type="button" role={it.on != null ? "menuitemcheckbox" : "menuitem"} aria-checked={it.on != null ? !!it.on : undefined} className={`ft-pill${it.on ? " on" : ""}`} onClick={() => { setMenu(false); it.onClick(); }}>{it.icon ? <Icon name={it.icon} /> : null}{it.label}</button>)}
+                <hr className="cam-sep" />
+              </> : null}
+              <span className="cam-head">Camera</span>
               {MODES.filter(([m]) => m !== "spectator" || others.length).map(([m, l]) => <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} className={`ft-pill${mode === m ? " on" : ""}`} onClick={() => pick(m)}>{l}</button>)}
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); w.current?.lookAtRod(); }}><Icon name="rod" />Look at my rod</button>
+              {others.length ? <button type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); watchNext(); }}><Icon name="users" />Watch {others.find((a) => a.id === watch)?.name || others[0].name}</button> : null}
+              {hasMe ? <>
+                <hr className="cam-sep" />
+                <span className="cam-head">Say hello</span>
+                <div className="cam-row">{[["wave", "Wave"], ["cheer", "Cheer"], ["clap", "Clap"]].map(([k, l]) => <button key={k} type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); emote(k); }}>{l}</button>)}</div>
+              </> : null}
               <hr className="cam-sep" />
+              <span className="cam-head">Settings</span>
               <button type="button" role="menuitemcheckbox" aria-checked={view.track} className={`ft-pill${view.track ? " on" : ""}`} onClick={() => setOpt("track", !view.track)} title="The camera turns to a leaping fish, unless you're moving the view yourself">Follow jumps</button>
               <button type="button" role="menuitemcheckbox" aria-checked={view.hand === "right"} className={`ft-pill${view.hand === "right" ? " on" : ""}`} onClick={() => setOpt("hand", view.hand === "right" ? "left" : "right")} title="Cast, Strike and Reel at the bottom right, for your right thumb">Controls on the right</button>
-              <hr className="cam-sep" />
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("look", { low: "normal", normal: "high", high: "low" }[view.look] || "normal")} title="How far the view turns for a drag">Look speed: {{ low: "Low", normal: "Normal", high: "High" }[view.look] || "Normal"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={view.smooth !== false} className={`ft-pill${view.smooth !== false ? " on" : ""}`} onClick={() => setOpt("smooth", view.smooth === false)} title="The view carries on turning a little after a flick">Smooth camera</button>
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("stick", { s: "m", m: "l", l: "s" }[view.stick] || "m")} title="The walking stick's size">Stick size: {{ s: "Small", m: "Medium", l: "Large" }[view.stick] || "Medium"}</button>
@@ -105,7 +122,6 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("camDist", { near: "normal", normal: "far", far: "near" }[view.camDist] || "normal")} title="How far behind you the camera follows when you walk about (pinch to change it as you go)">Walking camera: {{ near: "Near", normal: "Normal", far: "Far" }[view.camDist] || "Normal"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={!!view.autoBtn} className={`ft-pill${view.autoBtn ? " on" : ""}`} onClick={() => setOpt("autoBtn", !view.autoBtn)} title="An Auto button when you walk about: keep walking where you look until you touch the stick">Auto-walk button</button>
               {reelOpts ? <>
-                <hr className="cam-sep" />
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.assisted} className={`ft-pill${reelOpts.assisted ? " on" : ""}`} onClick={() => onReelOpts?.({ assisted: !reelOpts.assisted })} title="One tap starts winding at a steady rate, another stops it, instead of tapping again and again">Assisted reeling</button>
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.advanced} className={`ft-pill${reelOpts.advanced ? " on" : ""}`} onClick={() => onReelOpts?.({ advanced: !reelOpts.advanced })} title="Set the drag yourself while you fight a fish: too tight and the line can break">Advanced fight</button>
               </> : null}
@@ -114,16 +130,9 @@ export default function Stage3D({ spotId = null, placeName = "", feel = null, ve
               {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
           ) : null}
-          {emotes ? (
-            <div className="cam-menu" role="menu" aria-label="Emotes">
-              {[["wave", "Wave"], ["cheer", "Cheer"], ["clap", "Clap"]].map(([k, l]) => <button key={k} type="button" role="menuitem" className="ft-pill" onClick={() => emote(k)}>{l}</button>)}
-            </div>
-          ) : null}
-          {hasMe ? <button type="button" className={`fs-btn${emotes ? " on" : ""}`} onClick={() => { setEmotes(!emotes); setMenu(false); }} aria-label="Emotes" aria-expanded={emotes} title="Wave, cheer or clap"><Icon name="hand" /></button> : null}
-          <button type="button" className={`fs-btn${menu ? " on" : ""}`} onClick={() => { setMenu(!menu); setEmotes(false); }} aria-label="Camera" aria-expanded={menu}><Icon name="camera" /></button>
-          {others.length ? <button type="button" className="fs-btn" onClick={watchNext} aria-label={`Watch ${others.find((a) => a.id === watch)?.name || others[0].name}`} title="Watch a friend"><Icon name="users" /></button> : null}
-          <button type="button" className="fs-btn" onClick={() => w.current?.lookAtRod()} aria-label="Look at my rod" title="Look at my rod"><Icon name="rod" /></button>
         </div>
+        {/* walking about: its own button, bottom right (while walking, the walking controls take its place) */}
+        {!walk ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
         {card ? <div className="w3d-card"><CatchCard ev={card.ev} demo={demo} compact photoUrl={catchPhoto?.(card.ev)} onClose={() => setCard(null)} who={card.who} /></div> : null}
       </World3D>
     </div>

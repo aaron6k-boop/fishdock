@@ -320,3 +320,12 @@ test("walking poses must be possible: a jump across the place is ignored, ordina
   room.message(host.id, { t: "pose", p: null }, 3000);
   assert.equal(send(200, 3100), 1, "back at a spot, then walking from somewhere new, starts afresh");
 });
+
+test("virtual party: you can wind your line in between bites (and only then)", () => {
+  const room = new PartyRoom(); room.s = { mode: "virtual", events: [] };
+  const mine = (type) => room.s.events.push({ who: "a", type });
+  assert.equal(room.allowed("a", "reelin"), false, "nothing to wind in");
+  mine("cast"); assert.equal(room.allowed("a", "reelin"), true);
+  mine("reelin"); assert.equal(room.allowed("a", "bite"), false, "no bite once it's wound in"); assert.equal(room.allowed("a", "cast"), true);
+  mine("cast"); mine("bite"); mine("hooked"); assert.equal(room.allowed("a", "reelin"), false, "not with a fish on");
+});

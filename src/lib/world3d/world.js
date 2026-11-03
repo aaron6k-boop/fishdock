@@ -25,6 +25,7 @@ export function autoQuality3d() {
   return "balanced";
 }
 export const HOME_PITCH = -0.09;
+const ease01 = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 export const CAMERA_MODES = [
   { id: "first", label: "First person" }, { id: "third", label: "Third person" }, { id: "spectator", label: "Spectator" },
   { id: "cinematic", label: "Cinematic" }, { id: "free", label: "Free look" },
@@ -56,6 +57,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const look = createLook({ pitch: -0.12 });
   let homeFor = null;
   let mode = "first", focusId = null, localId = null, anglers = new Map(), envState = { swell: 0.3, wind: 0.3, windDir: [0.3, -1], kind: 0 };
+  let landShot = null, releaseAimed = false; // the landing shot (see updateCamera); turned to watch your fish go back
   let followId = null, followUntil = 0, steering = false; // watching another angler's catch; the camera steering itself
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
 
@@ -175,22 +177,27 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     } else if (followId && t >= followUntil) followId = null;
     else if (out && focus?.a.local && (mode === "first" || mode === "third") && (out.phase === "hooked" || out.phase === "landing") && !(out.phase === "landing" && out.landed)) {
       steerTo = out.phase === "landing" ? (out.fishAt || out.rig) : (out.rig ? out.tip.clone().lerp(out.rig, 0.55) : null);
+      // never swung round to the pier or the town by a fish running sideways: within 25° of the water you face
+      if (steerTo) { const l = lookAt(out.eye.toArray(), steerTo.toArray()), off = wrap(l.yaw - out.face), lim = 0.44; if (Math.abs(off) > lim) { const a = out.face + Math.sign(off) * lim, d = Math.hypot(steerTo.x - out.eye.x, steerTo.z - out.eye.z); steerTo = new THREE.Vector3(out.eye.x + Math.sin(a) * d, steerTo.y, out.eye.z - Math.cos(a) * d); } }
     }
     const leap = track && mode !== "free" && idle ? (watched && t < followUntil ? watched.jump : (mode === "first" || mode === "third" || mode === "spectator" || mode === "cinematic") ? out?.jump : null) : null;
     if (leap) steerTo = leap;
     // closer in for a far leap, so a 50 cm fish 40 m out is more than a few pixels (the camera zooms; the fish isn't scaled)
     jumpZoom += ((leap ? Math.max(0.4, Math.min(0.8, 12 / Math.max(1, camPos.distanceTo(leap)))) : 1) - jumpZoom) * (1 - Math.exp(-dt * (leap ? 3 : 1.5)));
     const mk = anglers.get(localId)?.out;
-    if (mk?.keptAt && (mk.kept === "inspect" || mk.kept === "release")) {
+    if (mk?.kept === "release" && (mode === "first" || mode === "third") && performance.now() - look.touched > 1500 && !releaseAimed) { releaseAimed = true; const l = lookAt(mk.eye.toArray(), [mk.near.x, 0, mk.near.z]); look.aim(l.yaw, Math.max(-0.7, l.pitch)); }
+    if (mk?.kept !== "release") releaseAimed = false;
+    if (mk?.keptAt && mk.kept === "inspect") {
       // looking at your fish: in front of you, a little to the side, looking back at it as you hold it up
       const [fx, fz] = [Math.sin(mk.face), -Math.cos(mk.face)], c = mk.kept === "inspect" ? mk.keptAt : inspectFrom || mk.keptAt;
       if (!inspectFrom) inspectFrom = mk.keptAt.clone();
+      anglers.get(localId)?.a.setFirstPerson(false); // (the camera's in front of you: all of you shows, head and all)
       // (far enough back that you see the fish held up against you, like a catch photo, not your arm)
       const at0 = mk.at.clone().add(new THREE.Vector3(fx * 2.1 - fz * 0.45, 1.22, fz * 2.1 + fx * 0.45));
       camPos.lerp(at0, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
       camera.fov = 44; camera.updateProjectionMatrix(); camera.lookAt(mk.kept === "release" ? mk.keptAt : c);
       return { yaw, pitch };
-    } else inspectFrom = null;
+    } else { if (inspectFrom) modeSince = t; inspectFrom = null; } // (and back from it with a glide, not a cut)
     if (W) {
       // behind and a little above you, coming round smoothly as you turn (not while you drag to look round, and not for a
       // moment after: then it eases back behind you as you walk on); closer or further as you pinch; very close is first
@@ -211,6 +218,42 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       camera.lookAt(camera.position.clone().add(d));
       if (camOverride) { camera.position.copy(camOverride); camera.lookAt(tgt.clone().add(new THREE.Vector3(0, -0.6, 0))); } // test hook only
       return { yaw, pitch };
+    }
+    // landing your fish (first or third person): the camera steps back beside you for a moment, so you see the whole
+    // thing (the rod laid on the rail, the net going down, the fish led in, the net hauled up and brought over) instead
+    // of an arm filling the view, then glides back. Drag and you look round from there as usual
+    const landing = out && focus?.a.local && (mode === "first" || mode === "third") && out.land ? out.land : null;
+    if (landShot && !out) landShot = null;
+    if (landing || landShot) {
+      if (landing) {
+        const [fx, fz] = [Math.sin(out.face), -Math.cos(out.face)], side = [-fz, fx];
+        const shot = new THREE.Vector3(out.at.x - side[0] * 0.75 - fx * 2.5, out.at.y + 2.55, out.at.z - side[1] * 0.75 - fz * 2.5); // (behind you and a little to the net's side: a phone held upright sees little side to side, so you and the net both need to be ahead)
+        const rail = new THREE.Vector3(out.at.x + fx * landing.edge, out.at.y + 1.0, out.at.z + fz * landing.edge);
+        const you = out.at.clone().add(new THREE.Vector3(0, 1.1, 0)), focusAt = (landing.net && landing.stage !== "up" && landing.stage !== "rod" ? landing.net : landing.fish || rail).clone().lerp(you, 0.35);
+        if (!landShot) landShot = { since: t };
+        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t;
+        anglers.get(localId)?.a.setFirstPerson(false); anglers.get(localId)?.a.showTag(false);
+      }
+      if (!landing && t - landShot.until > 0.9) { landShot = null; anglers.get(localId)?.a.showTag(true); }
+      else {
+        if (landing) camPos.lerp(landShot.pos, 1 - Math.exp(-dt * 2.6));
+        else {
+          // back to where you were: in an arc over your shoulder (your head's out of the way in first person), facing the
+          // water again
+          if (!landShot.back) { landShot.back = camPos.clone(); if (mode === "first" || mode === "third") { const h = look.home; look.aim(h.yaw, h.pitch); } if (mode === "first") anglers.get(localId)?.a.setFirstPerson(true); }
+          const f = ease01((t - landShot.until) / 0.9), to = mode === "first" ? out.eye : camPos;
+          camPos.copy(landShot.back).lerp(to, f); camPos.y += Math.sin(f * Math.PI) * 0.35;
+        }
+        if (landing && performance.now() - look.touched > 1500) { const l = lookAt(camPos.toArray(), landShot.focus.toArray()); look.aim(l.yaw, Math.max(-1.1, Math.min(0.3, l.pitch))); }
+        // the view widens a little for the shot and narrows back as you return (no jump in zoom)
+        const normalFov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1), shotFov = 52 * (camera.aspect < 0.8 ? 1.12 : 1);
+        landShot.fov = landShot.fov ?? normalFov; landShot.fov += ((landing ? shotFov : normalFov) - landShot.fov) * (1 - Math.exp(-dt * 3));
+        camera.position.copy(camPos); camera.fov = landShot.fov; camera.updateProjectionMatrix();
+        const d2 = new THREE.Vector3(Math.sin(look.yaw) * Math.cos(look.pitch), Math.sin(look.pitch), -Math.cos(look.yaw) * Math.cos(look.pitch));
+        camera.lookAt(camera.position.clone().add(d2));
+        if (camOverride) camera.position.copy(camOverride);
+        lastMode = mode; return { yaw: look.yaw, pitch: look.pitch };
+      }
     }
     if (!out) { camera.position.copy(pos); }
     else if (mode === "first" || mode === "free") {
@@ -399,8 +442,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         if (W) return null;
         if (!env.ground) return "You can't walk about in this view.";
         if (!me) return "Join as an angler to walk about.";
-        const ph = me.out?.phase;
-        if (ph && !["idle", "ended", "missed", "paused", "lost"].includes(ph) && !(ph === "landing" && me.out.landed)) return "Reel in first: you can walk about between casts.";
+        // free to walk once the line is in; with a fish on, a bite or a cast in the air, finish that first. With the
+        // line just sitting in the water the page winds it in for you ("line")
+        const ph = me.out?.phase, line = me.a.line;
+        if (line === "hooked" || ph === "hooked") return "Land the fish first (or lose it): then walk about.";
+        if (ph === "bite") return "Strike or let the bite go first.";
+        if (ph === "cast") return "Wait for your cast to land.";
+        if (ph === "landing" && !me.out.landed) return "Landing your fish: one moment.";
+        if (line === "out") return "line";
         const p = me.a.root.position;
         W = walker(p.x, p.z, me.out?.face ?? 0, p.y); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
         fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56 }[dist] || 47); look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);

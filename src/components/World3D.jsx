@@ -24,6 +24,15 @@ export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringif
 const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
+  // the phone can take the 3D drawing away (low memory, the browser in the background): when it gives it back the
+  // view is rebuilt, with a plain "restoring" message meanwhile rather than a black screen
+  const [gen, setGen] = useState(0), [lost, setLost] = useState(false), [about, setAbout] = useState(false);
+  useEffect(() => {
+    const c = canvas.current; if (!c) return undefined;
+    const off = (e) => { e.preventDefault(); setLost(true); }, on = () => { setLost(false); setGen((g) => g + 1); };
+    c.addEventListener("webglcontextlost", off); c.addEventListener("webglcontextrestored", on);
+    return () => { c.removeEventListener("webglcontextlost", off); c.removeEventListener("webglcontextrestored", on); };
+  }, []);
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
   const [walk, setWalk] = useState(null); // { on, canFish, sprint } while walking about
   useEffect(() => { props.current.onWalk?.(walk); }, [walk]);
@@ -105,7 +114,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();
     return () => { gone = true; w?.dispose(); W.current = null; setReady(false); };
-  }, [venue, quality, real, panoOn]);
+  }, [venue, quality, real, panoOn, gen]);
 
   useEffect(() => { W.current?.setFight(fight); }, [fight, ready]);
   useEffect(() => { W.current?.setAnglers(anglers); setOthers(anglers.filter((a) => !a.local).map((a) => ({ id: a.id, name: a.name }))); }, [anglers, ready]);
@@ -141,6 +150,8 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
           clearTimeout(tapTimer);
           // walking about: a tap on the ground walks you there (a double tap still recentres the view)
           if (W.current?.walking) { const r = el.getBoundingClientRect(), nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1); if (!L.tap(performance.now())) tapTimer = setTimeout(() => { if (!W.current?.walkTo(nx, ny)) props.current.onTap?.(); }, 260); }
+          // (while a fish is on, a tap that misses the Reel button does nothing: no recentring, no hiding the controls)
+          else if (props.current.fight) { /* fighting a fish */ }
           else if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330);
         }
       }
@@ -175,13 +186,17 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   }), [mode, walk]);
 
   return (
-    <div ref={wrap} className={`w3d ${className}`}>
+    <div ref={wrap} className={`w3d ${className}${ready && !lost ? " is-ready" : " is-waiting"}`}>
       <canvas ref={canvas} className="w3d-canvas" tabIndex={0} aria-label="3D view: drag to look round, pinch to zoom, double tap to face your rod" />
-      {!ready && !failed ? <div className="fs-loading"><span className="loading-dots" aria-label="Loading the 3D view" /></div> : null}
+      {(!ready || lost) && !failed ? <div className="fs-loading w3d-loading" role="status"><div className="w3d-load-card"><b>{lost ? "Restoring the 3D view" : `Setting up ${real ? placeName || "the place" : "the view"}`}</b><span className="loading-dots" aria-hidden="true" /></div></div> : null}
       {failed ? <div className="w3d-fail">This browser can't draw the 3D view. The photo view still works.</div> : null}
       <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b aria-hidden="true" /></span><i>{compassPoint(heading)}</i></div>
       {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
-      <div className="w3d-label">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</div>
+      <div className={`w3d-label${about ? " open" : ""}`}>
+        <button type="button" className="w3d-about" onClick={() => setAbout(!about)} aria-expanded={about} aria-label="About this view and its sources"><Icon name="info" /></button>
+        {about ? <span className="w3d-full">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</span>
+          : <span className="w3d-short">{panoOn ? "360° photo, Mapillary" : real ? `${placeName || "This place"} · reconstruction · © OpenStreetMap contributors` : "A 3D drawing, not the real place"} · <b>Beta</b></span>}
+      </div>
       {children}
     </div>
   );

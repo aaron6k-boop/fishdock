@@ -16,16 +16,18 @@ const HOLD_CYCLE = 1150; // ms from no power to full (then back down: let go at 
  * phase: the scene phase; last: the last event type; reel: 0..1; fight: the fight's state while a fish is on
  * (useVirtualFishing); note: a short message; opts: { assisted, advanced }.
  */
-export default function FishTray({ phase, last, reel = 0, fight = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onLand, onDrag, onStop, onNudge, hint }) {
+export default function FishTray({ phase, last, reel = 0, fight = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
   const world = useContext(WorldCtx);
-  const lineOut = !(last === "catch" || last === "lost") && last != null;
+  // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
+  const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
+  const castAt = useRef(0);
   const [power, setPower] = useState(null);
   const hold = useRef(null);
   let act = null, label = hint || "", busy = false;
   if (autoplay) { label = "Playing it through"; }
   else if (phase === "idle" || phase === "ended" || (phase === "waiting" && !lineOut)) { act = "cast"; label = label || (power != null ? "Let go to cast" : last ? "Hold to cast again" : "Hold Cast, aim, let go"); }
   else if (phase === "cast") { busy = true; label = "Casting"; }
-  else if (phase === "waiting" || phase === "missed") { label = phase === "missed" ? "Missed it. The bait's still out" : "Waiting for a bite"; }
+  else if (phase === "waiting" || phase === "missed") { act = onWindIn && !autoplay ? "wait" : null; label = phase === "missed" ? "Missed it. The bait's still out" : "Waiting for a bite"; }
   else if (phase === "bite") { act = "strike"; label = "Bite! Strike now"; }
   else if (phase === "hooked") {
     act = fight?.near ? "land" : "reel";
@@ -51,14 +53,15 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
     return () => cancelAnimationFrame(raf);
   }, [power != null]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => world?.current?.aimCast?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
-  const castDown = (e) => { e.preventDefault(); e.currentTarget.setPointerCapture?.(e.pointerId); hold.current = { t0: performance.now(), p: 0 }; setPower(0); };
+  // (one cast at a time: a second press straight after a cast, before the scene has caught up, is ignored)
+  const castDown = (e) => { e.preventDefault(); if (performance.now() - castAt.current < 900) return; e.currentTarget.setPointerCapture?.(e.pointerId); hold.current = { t0: performance.now(), p: 0 }; setPower(0); };
   const castUp = () => {
     const h = hold.current; if (!h) return; hold.current = null;
     // a quick tap is a gentle cast; holding sets the power
     const p = performance.now() - h.t0 < 180 ? 0.5 : h.p;
     const params = world?.current?.castParams?.(p) || { power: p };
     world?.current?.aimCast?.(null); setPower(null);
-    onCast?.(params);
+    castAt.current = performance.now(); onCast?.(params);
   };
   const castCancel = () => { if (!hold.current) return; hold.current = null; world?.current?.aimCast?.(null); setPower(null); };
 
@@ -99,6 +102,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
           ) : null}
         </div>
       ) : null}
+      {act === "wait" ? <button type="button" className="ft-pill ft-windin" onClick={() => onWindIn?.()} title="Wind your line in: then cast again, or walk about">Wind in</button> : null}
       {autoplay ? <button type="button" className="ft-pill" onClick={onStop}><Icon name="stop" />Stop</button> : null}
       <span className="ft-label" aria-live="polite">{label}</span>
     </div>
