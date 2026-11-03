@@ -191,8 +191,11 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const inner = new THREE.Group(); inner.rotation.y = Math.PI; inner.add(model); // the models face +z; the figure faces -z
   const root = new THREE.Group(); root.name = "human"; root.add(inner);
   const k = 0.97 + ((L.seed >>> 4) & 255) / 255 * 0.06; root.scale.setScalar(k); // a little taller or shorter, per person
-  const bone = {}; const skinned = [];
+  const bone = {}; let skinned = [];
   model.traverse((o) => { if (o.isBone || o.name?.startsWith("Bip01")) bone[o.name] = o; if (o.isSkinnedMesh) skinned.push(o); });
+  // fewer draw calls: the model comes as several pieces sharing one set of vertices; joined into one mesh per material
+  // (body, head, hair), the joined geometry made once per model and shared by everyone who chose that person
+  skinned = mergeByMaterial(skinned, gltf);
   const B = (n) => bone["Bip01_" + n];
 
   // ---- materials: the clothes recolourable, the hair soft-edged ----
@@ -600,6 +603,32 @@ function roundedBox(p = 3.2) {
   const g = new THREE.BoxGeometry(2, 2, 2, 8, 8, 8), a = g.attributes.position;
   for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), r = (Math.abs(x) ** p + Math.abs(y) ** p + Math.abs(z) ** p) ** (1 / p) || 1; a.setXYZ(i, x / r, y / r, z / r); }
   g.computeVertexNormals(); return g;
+}
+
+function mergeByMaterial(list, gltf) {
+  if (list.length <= 3) return list;
+  const cache = gltf.userData.fdMerged || (gltf.userData.fdMerged = new Map());
+  const byMat = new Map();
+  for (const m of list) { const k = m.material.name || m.material.uuid; if (!byMat.has(k)) byMat.set(k, []); byMat.get(k).push(m); }
+  const out = [];
+  for (const [k, ms] of byMat) {
+    const first = ms[0], attrs = first.geometry.attributes;
+    // only pieces that really share the vertices can be joined
+    if (!ms.every((m) => m.geometry.attributes.position.array === attrs.position.array && m.skeleton === first.skeleton)) { out.push(...ms); continue; }
+    let geo = cache.get(k);
+    if (!geo) {
+      geo = new THREE.BufferGeometry();
+      for (const [n, a] of Object.entries(attrs)) geo.setAttribute(n, a);
+      const idx = []; for (const m of ms) { const ix = m.geometry.index; if (ix) for (let i = 0; i < ix.count; i++) idx.push(ix.getX(i)); }
+      geo.setIndex(idx); cache.set(k, geo);
+    }
+    const mesh = new THREE.SkinnedMesh(geo, first.material); mesh.name = first.name;
+    mesh.position.copy(first.position); mesh.quaternion.copy(first.quaternion); mesh.scale.copy(first.scale);
+    first.parent.add(mesh); mesh.bind(first.skeleton, first.bindMatrix);
+    for (const m of ms) m.parent?.remove(m);
+    out.push(mesh);
+  }
+  return out;
 }
 
 /** Load a person's model ahead of time (the picker, a party member who just joined). */

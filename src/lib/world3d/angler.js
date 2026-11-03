@@ -392,6 +392,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       bendT = 0.16 + 0.26 * tension; tipT = 0.05 * surge + (st.pump ? 0.05 * Math.max(0, Math.sin(age * 5.5)) : 0);
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
       fpE = 0.5 + 0.1 * surge; fpYaw = clamp(run * 0.22 * st.runWidth, -0.3, 0.3);
+      // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
+      const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
+      pitch += 0.38 * strikeK; fpE += 0.32 * strikeK; bendT += 0.25 * strikeK;
       P.tension = tension;
       if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); feel("hooked", {}, true); }
       if (fl) {
@@ -465,7 +468,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(foot, f); rigAt.y = lerp(surf.y - 0.06, sunk + 0.12 * ns, f); }
         else if (age >= T4) { rigAt = netAt.clone().add(new THREE.Vector3(0, -0.12 * ns, 0)); inNet = true; pitch = 0.7; bendT = 0.06; }
         if (age >= T1 && age < T4) { bendT = 0.18 * load; }
-        if (crossed(T3 - 0.35)) { const w = foot.clone(); splashCb?.(w, 0.35); rippleCb?.(w, 0.6); onSound?.("splash", w); }
+        if (crossed(T3 - 0.35)) { const w = foot.clone(); splashCb?.(w, 0.35); rippleCb?.(w, 0.6); onSound?.("net", w); }
         if (crossed(T4)) { splashCb?.(foot.clone(), 0.5); rippleCb?.(foot.clone(), 0.7); }
       } else if (tech === "net") {
         // the landing net reached out, the fish drawn over it, lifted in
@@ -763,7 +766,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     get fishMesh() { return fish; },
     get spot() { return curSpot; },
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
-    setFirstPerson(on) { if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on; },
+    setFirstPerson(on) { if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on && !tagOff; },
     /** the name label over their head (hidden for your own angler in the landing shot) */
     showTag(on) { tagOff = !on; },
     onSplash(f) { splashCb = f; }, onRipple(f) { rippleCb = f; },

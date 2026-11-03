@@ -232,17 +232,26 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         const you = out.at.clone().add(new THREE.Vector3(0, 1.1, 0)), focusAt = (landing.net && landing.stage !== "up" && landing.stage !== "rod" ? landing.net : landing.fish || rail).clone().lerp(you, 0.35);
         if (!landShot) landShot = { since: t };
         landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t;
-        anglers.get(localId)?.a.setFirstPerson(false); anglers.get(localId)?.a.showTag(false);
+        anglers.get(localId)?.a.showTag(false);
+        // out of your own head by going up first (never back through it), then round to the shot; your head shows once
+        // the camera's clear of it
+        const above = out.eye.clone().add(new THREE.Vector3(0, 0.95, 0));
+        if (!landShot.clear) { landShot.via = above; if (mode !== "first" || camPos.distanceTo(out.eye) > 0.85) landShot.clear = true; }
+        anglers.get(localId)?.a.setFirstPerson(mode === "first" && !landShot.clear);
       }
       if (!landing && t - landShot.until > 0.9) { landShot = null; anglers.get(localId)?.a.showTag(true); }
       else {
-        if (landing) camPos.lerp(landShot.pos, 1 - Math.exp(-dt * 2.6));
+        if (landing) {
+          if (mode === "first" && !landShot.up) { camPos.lerp(landShot.via, 1 - Math.exp(-dt * 4)); if (camPos.distanceTo(landShot.via) < 0.15) landShot.up = true; }
+          else camPos.lerp(landShot.pos, 1 - Math.exp(-dt * 2.6));
+        }
         else {
           // back to where you were: in an arc over your shoulder (your head's out of the way in first person), facing the
           // water again
           if (!landShot.back) { landShot.back = camPos.clone(); if (mode === "first" || mode === "third") { const h = look.home; look.aim(h.yaw, h.pitch); } if (mode === "first") anglers.get(localId)?.a.setFirstPerson(true); }
-          const f = ease01((t - landShot.until) / 0.9), to = mode === "first" ? out.eye : camPos;
-          camPos.copy(landShot.back).lerp(to, f); camPos.y += Math.sin(f * Math.PI) * 0.35;
+          // (over your head and down into it: the body never fills the view on the way)
+          const f = ease01((t - landShot.until) / 0.9), to = mode === "first" ? out.eye : camPos, over = to.clone().add(new THREE.Vector3(0, 0.95, 0));
+          if (f < 0.6) camPos.copy(landShot.back).lerp(over, ease01(f / 0.6)); else camPos.copy(over).lerp(to, ease01((f - 0.6) / 0.4));
         }
         if (landing && performance.now() - look.touched > 1500) { const l = lookAt(camPos.toArray(), landShot.focus.toArray()); look.aim(l.yaw, Math.max(-1.1, Math.min(0.3, l.pitch))); }
         // the view widens a little for the shot and narrows back as you return (no jump in zoom)
@@ -303,11 +312,23 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   let raf = 0, last = 0, visible = true, slow = 0, onFrame = null, clock0 = performance.now(), nowFn = Date.now;
   const vis = () => { visible = document.visibilityState !== "hidden"; };
   document.addEventListener("visibilitychange", vis);
+  // steady frame pacing on a phone: if frames keep coming late (the GPU can't keep up at this sharpness), draw at a
+  // slightly lower resolution, a step at a time, and back up again once there's room. Better an even 60 (or 30) than
+  // a jerky one
+  const dprMax = Math.min(window.devicePixelRatio || 1, Q.dpr); let dprNow = dprMax, late = 0, paceAt = 0, easyFor = 0;
+  function pace(ts, dt) {
+    late = late * 0.96 + (dt > 0.024 ? 1 : 0) * 0.04;
+    if (ts - paceAt < 2000) return; paceAt = ts;
+    if (late > 0.4 && dprNow > 1) { dprNow = Math.max(1, dprNow - 0.25); renderer.setPixelRatio(dprNow); resize(); late = 0.2; easyFor = 0; }
+    else if (late < 0.05 && dprNow < dprMax) { easyFor += 2; if (easyFor >= 20) { dprNow = Math.min(dprMax, dprNow + 0.25); renderer.setPixelRatio(dprNow); resize(); easyFor = 0; } }
+    else easyFor = 0;
+  }
   function frame(ts) {
     raf = requestAnimationFrame(frame);
     if (!visible || film) return;
     const dt = Math.min(0.1, (ts - (last || ts)) / 1000); last = ts;
     tick((ts - clock0) / 1000, nowFn(), dt);
+    pace(ts, dt);
   }
   // ---- the sky as light and reflection: a soft gradient (sky above, haze at the horizon, the ground below) made into
   // an environment map once per change of light, so glass, wet concrete, metal railings and the reel catch the sky,
@@ -346,6 +367,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       at(x, y, z) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); },
       get walker() { return W ? { x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed } : null; },
       walkInput(x, y, sprint = false) { walkIn = { x, y, sprint }; },
+      get stats() { const r = renderer.info.render, m = renderer.info.memory; return { dpr: dprNow, late: +late.toFixed(2), calls: r.calls, triangles: r.triangles, geometries: m.geometries, textures: m.textures, programs: renderer.info.programs?.length }; },
       get yaw() { return look.yaw; },
       get lag() { return film ? nowFn() - film.now : 0; },
       get scene() { return scene; },
