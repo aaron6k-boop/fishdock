@@ -367,7 +367,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the knot's height for so much rope out
     const dropGeo = (ns) => {
       const railZ = -Math.max(0.3, edge - 0.22), railY = 1.12, col = toWorld(new THREE.Vector3(-0.32, 0, -(edge + 0.25))), waterY = wh(col.x, col.z);
-      const bridle = 0.72 * ns, top = railY - 0.05, sink = 0.1 * ns; // (the hoop just under the surface: you see the fish go over it)
+      const bridle = 0.72 * ns, top = railY - 0.05, sink = 0.02 * ns; // (the hoop right at the surface, breaking it: you see the net and the fish go over it)
       return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.05 + 0.18 * ns, -0.08)), railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
     };
 
@@ -517,6 +517,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           }
           const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]);
           netAt = hangAt(ropeOut).sub(new THREE.Vector3(0, bridle, 0)).addScaledVector(side, sway * Math.min(1, ropeOut / 1.5));
+          // let right down, the hoop rides the waves (just breaking the surface) rather than vanishing under each crest
+          // (and as it's hauled out it leaves the waves over its first half metre)
+          { const k = clamp(1 - (L - ropeOut) / 0.5, 0, 1); netAt.y += Math.max(0, wh(netAt.x, netAt.z) - waterY) * k; }
         } else {
           // at the rail: both hands on the hoop, up over the top rail in an arc and set down on the deck
           const f = ease(seg(age, swingIn, LT.end - 0.1)), start = hangAt(0).sub(new THREE.Vector3(0, bridle, 0)), ctrl = railPt.clone().add(new THREE.Vector3(0, 0.5, 0));
@@ -527,7 +530,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // the fish: at the surface beside the pier on a tight line, then led over the net, then in it
         const fishWait = surf.clone(), under = col.clone(); under.y = waterY - sink * 0.6;
         if (age >= T1 && age < T3) { rigAt = fishWait.clone(); rigAt.y = surf.y - 0.06; }
-        else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(under, f); rigAt.y = lerp(surf.y - 0.06, under.y + 0.1, f); }
+        else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(under, f); rigAt.y = lerp(surf.y - 0.06, (netAt ? netAt.y : under.y) + 0.1, f); }
         else if (age >= T4) { rigAt = netAt.clone().add(new THREE.Vector3(0, -0.12 * ns, 0)); inNet = true; pitch = 0.7; bendT = 0.06; }
         if (age >= T1 && age < T4) { bendT = 0.18 * load; }
         // the net going into the water, and coming out with the fish

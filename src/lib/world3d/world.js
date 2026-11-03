@@ -250,7 +250,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
             // (letting it down too: from low by the water you see the net come down the pier's side towards you)
             const k = st === "lead" || st === "lower" ? 0 : Math.max(0, Math.min(1, (net.y - landing.water) / Math.max(0.5, out.at.y + 1.1 - landing.water)));
             shot = from(-1.9, landing.edge + 2.3 - 0.6 * k, Math.max(wl + 1.25, wl + 1.25 + (2.3 - wl - 1.25) * k));
-            focusAt = net.clone().lerp(rail, st === "lead" ? 0.12 : st === "lower" ? 0.3 : 0.2);
+            focusAt = net.clone().lerp(rail, st === "lead" ? 0 : st === "lower" ? 0.15 : 0.1); focusAt.y += st === "lead" ? 0.15 : 0;
           }
         } else if (st === "lower" || st === "lead" || st === "haul") {
           shot = from(-4.3, landing.edge + 0.5, 3.0); focusAt = rail.clone().lerp(landing.net || landing.fish || rail, 0.45);
@@ -262,7 +262,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         if (!landShot) landShot = { since: t };
         // (putting it back is shortened: where it cuts to the fish in the water, the camera cuts too, rather than
         // gliding there across empty sea)
-        const cutTo = out.release && st !== "deck" && landShot.stage === "deck";
+        const low = (x) => (x === "lower" || x === "lead" || x === "haul") && landing.water != null;
+        // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
+        const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (low(st) && landShot.stage && !low(landShot.stage));
         landShot.stage = st;
         landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "lead" || st === "haul";
         anglers.get(localId)?.a.showTag(false);
