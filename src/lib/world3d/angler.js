@@ -433,6 +433,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (surgeNow > 0.6 && (P.lastSurge ?? 0) <= 0.6) feel("pull", { tension: load * (0.72 + 0.4 * surgeNow) * st.heavy, surge: surgeNow });
       P.lastSurge = surgeNow;
       fightPos = f; rigAt = f; slack = 0;
+      // where the line cuts the surface over the fish: a small wake of rings as it moves, stronger as it surges or
+      // comes up near the top
+      if (!jumping && Math.floor(age / 0.7 + P.s1) !== Math.floor((age - dt) / 0.7 + P.s1)) { const w = f.clone(); w.y = wh(w.x, w.z); rippleCb?.(w, (0.16 + 0.22 * surge) * (f.y > -1.5 ? 1.6 : 1)); }
       const tension = fl ? (0.35 + 1.05 * fl.tension) * Math.max(0.8, load) : load * (0.72 + 0.4 * surge) * st.heavy;
       bendT = 0.16 + 0.26 * tension; tipT = 0.05 * surge + (st.pump ? 0.05 * Math.max(0, Math.sin(age * 5.5)) : 0);
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);

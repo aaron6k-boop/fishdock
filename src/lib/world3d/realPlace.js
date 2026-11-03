@@ -45,7 +45,7 @@ function segIndex(segs, cell = 8) {
 // Wet (rain) darkens it and makes it shine. Until the photographs have loaded (or if they can't) the drawn one shows.
 export const PIER_TEX = "/textures/pier_concrete_";
 const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
-function pierConcrete(mat) {
+function pierConcrete(mat, quality = 1) {
   const wet = { value: 0 };
   if (typeof document === "undefined") return wet;
   const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
@@ -61,7 +61,7 @@ function pierConcrete(mat) {
         {
           vec2 pu = vMapUv * ${PHOTO_TILE.toFixed(3)};
           vec3 a = texture2D(pDiff, pu).rgb, b = texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb;
-          float m = smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6);
+          float m = ${quality < 1 ? "0.0" : "smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6)"}; // (one sample on Performance)
           vec3 avg = texture2D(pDiff, vec2(0.5), 12.0).rgb; // its smallest mip: the photograph's own average colour
           vec3 p = mix(a, b, m) / max(avg, vec3(0.02)); // over its average: the drawn colour stays the colour
           p = mix(vec3(dot(p, vec3(0.3, 0.59, 0.11))), p, 0.35);
@@ -70,7 +70,7 @@ function pierConcrete(mat) {
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = mix(0.7, 1.0, roughnessFactor) * (1.0 - uWet * 0.55);`);
     };
-    mat.customProgramCacheKey = () => "fdpier1";
+    mat.customProgramCacheKey = () => "fdpier1" + (quality < 1 ? "p" : "");
     mat.needsUpdate = true;
   }).catch(() => {});
   return wet;
@@ -96,7 +96,7 @@ function placeProps(group, stand, props, glowGlass) {
   }).catch(() => {}); // (the simple shapes stay)
 }
 
-export function buildRealPlace(group, place, M, solids = []) {
+export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const spots = place.spots || [], nearSpot = (x, z, r = NEAR_SOLID) => spots.some((sp) => Math.hypot(x - sp.at[0], z - sp.at[2]) < r);
   const xs = place.grid.xs, n = xs.length, cls = unrle(place.grid.cls, n * n);
   const inland = place.venue === "river" || place.venue === "lake";
@@ -169,7 +169,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   g.computeVertexNormals();
   const cTex = concrete({ seed: 3 }), dTex = detail(13);
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
-  place.deckWet = pierConcrete(deckMat);
+  place.deckWet = pierConcrete(deckMat, quality);
   const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
@@ -277,7 +277,7 @@ export function buildRealPlace(group, place, M, solids = []) {
   const addAt = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = true; stand.add(m); return m; };
   const props = { lamp: [], station: [], bollard: [], bench: [] }; // where each goes: [x, y, z, turn]
   // the lamps' lanterns: lit after dark with the rest (environment.js drives buildingGlow)
-  const glowGlass = new THREE.MeshStandardMaterial({ color: 0xe8e2d2, emissive: 0xffd9a0, emissiveIntensity: 0, roughness: 0.15, transparent: true, opacity: 0.8 });
+  const glowGlass = new THREE.MeshStandardMaterial({ color: 0xe8e2d2, emissive: new THREE.Color().setRGB(2.4, 1.75, 0.95), emissiveIntensity: 0, roughness: 0.15, transparent: true, opacity: 0.85 });
   let acc = 0;
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
