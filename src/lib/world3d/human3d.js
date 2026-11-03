@@ -40,6 +40,8 @@ const LOCO = ["walk_slow", "walk", "walk_fast", "run"];
 // the retargeted poses blended in while standing (fish_idle: holding a rod; kneel and inspect: down by the fish or the
 // net; crouch: a lower stance)
 const POSES = ["fish_idle", "kneel", "inspect", "crouch"];
+// and the moves played on cue (pose({ act: { key, t, w } }): the clip at time t, blended in at weight w)
+const ACTS = ["cast", "pull_rope", "turn_l", "turn_r", "pick_up"];
 const SPEED0 = { m: { walk_slow: 0.81, walk: 1.39, walk_fast: 1.49, run: 2.42 }, f: { walk_slow: 0.88, walk: 1.28, walk_fast: 1.51, run: 2.25 } };
 let clipsP = null;
 function clipSet() {
@@ -49,7 +51,7 @@ function clipSet() {
     // Mixamo movements retargeted onto the same skeleton in Blender (anims2.glb, source-assets/blender/
     // retarget_mixamo.py): a fishing stance, kneeling, crouching, kneeling to look closely at something. Both sexes.
     // Without it (offline, an old cache) the procedural poses stand in, as before
-    try { const g2 = await loadGLB("anims2"); for (const c of g2.animations) { const key = c.name.slice(2); if (c.name.startsWith("x_") && POSES.includes(key)) out.m[key] = out.f[key] = c; } } catch { /* the procedural poses */ }
+    try { const g2 = await loadGLB("anims2"); for (const c of g2.animations) { const key = c.name.slice(2); if (c.name.startsWith("x_") && (POSES.includes(key) || ACTS.includes(key))) out.m[key] = out.f[key] = c; } } catch { /* the procedural poses */ }
     return out;
   });
   clipsP.catch(() => { clipsP = null; });
@@ -233,7 +235,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // ---- motion: the clips on one mixer ----
   const mixer = new THREE.AnimationMixer(model);
   const act = {};
-  for (const key of ["idle", "look", ...LOCO, ...POSES]) { const c = clips[key]; if (!c) continue; const a = mixer.clipAction(c); a.play(); a.setEffectiveWeight(key === "idle" ? 1 : 0); act[key] = a; }
+  for (const key of ["idle", "look", ...LOCO, ...POSES, ...ACTS]) { const c = clips[key]; if (!c) continue; const a = mixer.clipAction(c); a.play(); a.setEffectiveWeight(key === "idle" ? 1 : 0); act[key] = a; }
   const speedOf = (key) => (clips[key]?.userData.travel || 1) / (clips[key]?.duration || 1) * k;
   // each walk's phase lined up (left heel down at 0), found once per set of clips
   const offs = clips.__offs || (clips.__offs = calibrate(mixer, act, B, clips));
@@ -419,6 +421,10 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       act.kneel?.setEffectiveWeight(base * kn * (1 - st.ins * 0.7)); act.inspect?.setEffectiveWeight(base * kn * st.ins * 0.7);
       act.crouch?.setEffectiveWeight(base * cr);
       for (const key of POSES) { const a = act[key]; if (a) a.time = (a.time + dt) % a.getClip().duration; }
+      // a move on cue, eased in and out by its weight: the others give way to it
+      for (const key of ACTS) { const a = act[key]; if (!a) continue; const on = o.act?.key === key; const wt = on ? clamp(o.act.w ?? 1, 0, 1) : 0; a.setEffectiveWeight(wt); if (on) a.time = clamp(o.act.t || 0, 0, a.getClip().duration - 0.001); }
+      const aw = o.act && act[o.act.key] ? clamp(o.act.w ?? 1, 0, 1) : 0;
+      if (aw > 0) for (const [key, a] of Object.entries(act)) if (!ACTS.includes(key)) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - aw));
     }
     mixer.update(0);
     inner.position.set(0, 0, 0);
