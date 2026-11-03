@@ -12,6 +12,7 @@ import { castPoint, dirOf } from "./spots.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpHands } from "./fpHands.js";
+import { stepHandle, handleState } from "../reelHandle.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -432,7 +433,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // the handle: each accepted tap is half a turn more for it to make, and it goes round to it smoothly (a critically
       // damped follow: it speeds up, carries on round and slows to a stop, never overshooting or springing back), so
       // steady tapping turns it steadily and stopping lets it run down. It only ever turns for taps
-      if (fl) crank(fl.turns * Math.PI * 2, dt);
+      if (fl) crank(fl.turns, dt);
       else reel.userData.spin = (reel.userData.spin || 0) + dt * 12; // (someone else's fight: their taps aren't shared)
     } else if (ph === "landing") {
       // up from wherever the fight had got to, through the surface, then landed this place's way
@@ -786,17 +787,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // both hang off it, so they can never be a frame apart. Your eye height is taken from your body while you stand in
   // third person; leaning out over the rail takes the eye forward and a little down; a slow breath)
   function fpEye() { return new THREE.Vector3(0, eyeH - leanNow * 0.25 + Math.sin(tNow * 1.4) * 0.006, -0.08 - leanNow * 0.85); }
-  // the reel's handle towards a target angle, critically damped (exact for any frame time, so it's the same at 30 or
-  // 60 frames a second); a long way behind (a jump in the fight's state) it catches up at once rather than whirring
-  function crank(target, dt) {
-    const u = reel.userData; let x = u.spin || 0, v = u.spinV || 0;
-    // (a new fight counts its turns from nought: carry on from where the handle is, never wound backwards)
-    if (u.spinT == null || target < u.spinT - 1e-6) u.spinBase = x - target;
-    u.spinT = target; target += u.spinBase || 0;
-    if (target - x > Math.PI * 6) { x = target - Math.PI; v = 0; }
-    const w = 11, d = x - target, c = v + w * d, e = Math.exp(-w * dt);
-    u.spin = target + (d + c * dt) * e; u.spinV = (c - w * (d + c * dt)) * e;
-  }
+  // the reel's handle for your taps (reelHandle.js)
+  function crank(turns, dt) { const u = reel.userData; u.hs = stepHandle(u.hs || handleState(u.spin || 0), turns, dt); u.spin = u.hs.angle; }
   function tipWorld() { root.updateMatrixWorld(true); return toWorld(pts[NSEG]); }
 
   return {
