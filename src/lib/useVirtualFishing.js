@@ -39,7 +39,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
   const autoplayRef = useRef(false); autoplayRef.current = autoplay;
   const holding = useRef(false), timers = useRef([]), reelRef = useRef(0), fish = useRef({ species, name, lengthCm });
   // tapping the reel: recent tap times, the fight's state (reelModel.js), assisted winding on or off, the drag
-  const taps = useRef([]), fightRef = useRef(null), assistOn = useRef(false), dragRef = useRef(DRAG.standard), tapN = useRef(0);
+  const taps = useRef([]), pending = useRef(0), fightRef = useRef(null), assistOn = useRef(false), dragRef = useRef(DRAG.standard), tapN = useRef(0);
   const [fight, setFight] = useState(null), [opts, setOptsNow] = useState(loadReelOpts), [note, setNote] = useState("");
   const optsRef = useRef(opts); optsRef.current = opts;
   const say = (t) => { setNote(t); setTimeout(() => setNote((n) => (n === t ? "" : n)), 2600); };
@@ -75,16 +75,18 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     if (last?.type !== "hooked") { reelRef.current = 0; setReel(0); holding.current = false; assistOn.current = false; taps.current = []; fightRef.current = null; setFight(null); return undefined; }
     const f = fish.current, castEv = [...events].reverse().find((e) => e.type === "cast");
     fightRef.current = createFight({ species: f.species, lengthCm: f.lengthCm, startM: castEv?.data?.dist || 30, mode: optsRef.current.advanced ? "advanced" : "standard", seed: Math.floor(last.t % 100000) });
-    let prev = performance.now();
+    let prev = performance.now(); pending.current = 0;
+    // twenty steps a second; the taps made since the last one each wind in there and then
     const id = setInterval(() => {
       const now = performance.now(), dt = Math.min(0.3, (now - prev) / 1000); prev = now;
-      const assisted = assistOn.current || holding.current || autoplayRef.current;
-      const s = fightStep(fightRef.current, dt, { rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
+      const assisted = assistOn.current || autoplayRef.current;
+      const n = pending.current; pending.current = 0;
+      const s = fightStep(fightRef.current, dt, { taps: n, rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
       fightRef.current = s; reelRef.current = s.progress; setReel(s.progress);
-      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, mode: s.mode });
+      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode });
       if (s.out) { clearInterval(id); say(s.out === "broke" ? "The line broke. Ease the drag off when it runs." : "The hook came free. Keep the line tight."); add("lost", { why: s.out }); return; }
       if (s.near && autoplayRef.current) { clearInterval(id); land(); }
-    }, 100);
+    }, 50);
     return () => clearInterval(id);
   }, [last?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -106,7 +108,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     tap: () => {
       if (last?.type !== "hooked") return;
       if (optsRef.current.assisted) { assistOn.current = !assistOn.current; return; }
-      const now = Date.now(); taps.current = [...taps.current.filter((t) => now - t < 2000), now]; tapN.current++;
+      const now = Date.now(); taps.current = [...taps.current.filter((t) => now - t < 2000), now]; tapN.current++; pending.current++;
     },
     land,
     /** wind the line in (between bites): ready to cast again or walk about; nothing happens if it isn't out */
@@ -114,7 +116,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     setDrag: (d) => { dragRef.current = Math.max(DRAG.min, Math.min(DRAG.max, d)); },
     setOpts: (o) => { const next = { ...optsRef.current, ...o }; setOptsNow(next); saveReelOpts(next); },
     hold: (on) => { holding.current = !!on; },
-    nudge: () => { const now = Date.now(); taps.current = [...taps.current, now]; tapN.current++; }, // a key press: a tap
+    nudge: () => { if (last?.type !== "hooked") return; const now = Date.now(); taps.current = [...taps.current.filter((t) => now - t < 2000), now]; tapN.current++; pending.current++; }, // a key press: a tap
     reset: () => { clearTimers(); setAutoplay(false); setEvents([]); },
     playAll: () => { clearTimers(); setEvents([]); setAutoplay(true); setTimeout(() => add("cast"), 300); },
     stop: () => { clearTimers(); setAutoplay(false); setEvents([]); },

@@ -1,5 +1,6 @@
 // ---- reelModel: fighting a fish by tapping the reel (virtual fishing; pure, tested) ----
-// Every tap turns the reel's handle and wins some line. How fast you tap sets how fast you wind, with a sensible curve:
+// Every tap turns the reel's handle half a turn and winds in some line, there and then: tap and line comes in, stop and
+// it stops. How much each tap wins depends on how hard the fish is pulling (and nothing while the drag is slipping);
 // three to five taps a second works well, and frantic tapping adds less and less. The fish pulls back in its own way
 // (fightProfile: heavy and steady for cod and rays, quick runs for mackerel and bass), tiring as the fight goes on.
 // When the line's tension passes the drag, the drag slips: the reel gives line instead of gaining it, however fast you
@@ -10,7 +11,7 @@
 import { fightProfile, fightSeconds } from "./sceneActors.js";
 import { DUR } from "./liveEvents.js";
 
-export const REEL = { window: 1.2, sweet: 4, turnsPerTap: 0.5, assistedRate: 3.6, nearAt: 0.93, slackFree: 6, breakAfter: 0.9 };
+export const REEL = { window: 0.8, sweet: 4, turnsPerTap: 0.5, assistedRate: 3.6, nearAt: 0.93, slackFree: 6, breakAfter: 0.9 };
 export const DRAG = { min: 0.45, max: 1.05, standard: 0.78, step: 0.08 };
 
 /** Taps a second, from the times (ms) of recent taps. */
@@ -39,7 +40,7 @@ export function createFight({ species = null, lengthCm = 40, startM = 30, mode =
     species, lengthCm, startM: Math.max(3, startM), mode, seed,
     pull: p.pull, tempo: p.tempo, long: p.long, need: fightSeconds(species, lengthCm), runs,
     progress: 0, dist: Math.max(3, startM), tension: 0, slipping: false, near: false, out: null, drag: DRAG.standard,
-    age: 0, slack: 0, over: 0, turns: 0, fishPull: 0, running: false,
+    age: 0, slack: 0, over: 0, turns: 0, fishPull: 0, running: false, taking: false,
   };
 }
 
@@ -53,16 +54,20 @@ export function fishPull(s, age = s.age) {
 }
 
 /**
- * One step of `dt` seconds. input: { rate (taps a second), assisted, drag (advanced mode) }. Returns the new state.
- * Tension 1 is where the line would part; the drag slips before that (always, in Standard mode).
+ * One step of `dt` seconds. input: { taps (taps since the last step: each one winds), rate (taps a second lately: how
+ * hard you're winding, for the tension), assisted (winding steadily by itself), drag (advanced mode) }. Returns the
+ * new state. Tension 1 is where the line would part; the drag slips before that (always, in Standard mode).
+ * `running` is true only while the fish is actually taking line (the distance growing), never just because it's
+ * pulling; `taking` is that line going out, whatever the cause (a run, the drag slipping, no one winding).
  */
 export function fightStep(s0, dt, input = {}) {
   const s = { ...s0 };
   if (s.out || s.progress >= 1) return s;
   s.age += dt;
-  const rate = input.assisted ? REEL.assistedRate : input.rate || 0, e = effort(rate), e4 = effort(REEL.sweet);
+  const rate = input.assisted ? REEL.assistedRate : input.rate || 0, e = effort(rate);
+  const taps = input.assisted ? REEL.assistedRate * dt : Math.max(0, input.taps || 0);
   const { pull, running } = fishPull(s);
-  s.fishPull = pull; s.running = running;
+  s.fishPull = pull;
   const pullN = Math.min(1.2, pull / 1.4);
   // the drag: set by you in Advanced mode, otherwise set to give before the line could part
   s.drag = s.mode === "advanced" ? Math.max(DRAG.min, Math.min(DRAG.max, input.drag ?? s.drag)) : DRAG.standard;
@@ -71,14 +76,18 @@ export function fightStep(s0, dt, input = {}) {
   s.slipping = tension > s.drag;
   if (s.slipping) tension = s.drag + (tension - s.drag) * (s.mode === "advanced" ? 0.35 : 0.12); // the drag gives
   s.tension = tension;
-  // line won: tapping (with its curve), less against a strong pull; scaled so a fish takes about its fight's length
-  const span = 1 / (s.need * 0.95);
-  let dp = (e / e4) * span * (1 - 0.5 * pullN) * dt;
-  if (s.slipping) dp -= (tension - s.drag + 0.08 + 0.25 * (running ? 1 : 0)) * span * 2.4 * dt + dp * 0.75; // the fish takes line
-  if (rate < 0.3) dp -= span * 0.22 * pullN * dt; // not winding: it slowly swims off
+  // line won: each tap's half turn of the handle, less against a strong pull and less again when tapping frantically,
+  // nothing while the drag slips (the spool turns, the line doesn't come in); scaled so a fish tapped in at about four
+  // a second takes about its fight's length
+  const span = 1 / (s.need * 0.95), perTap = span / REEL.sweet;
+  const frantic = rate > REEL.sweet ? (effort(rate) / effort(REEL.sweet)) * (REEL.sweet / rate) : 1;
+  let dp = taps * perTap * (1 - 0.5 * pullN) * frantic * (s.slipping ? 0.1 : 1);
+  if (s.slipping) dp -= (tension - s.drag + 0.08 + 0.25 * (running ? 1 : 0)) * span * 2.4 * dt; // the fish takes line
+  if (rate < 0.3 && !input.assisted) dp -= span * 0.22 * pullN * dt; // not winding: it slowly swims off
   s.progress = Math.max(0, Math.min(1, s.progress + dp));
   s.dist = s.startM * (1 - s.progress);
-  s.turns += (rate * REEL.turnsPerTap) * dt;
+  s.turns += taps * REEL.turnsPerTap; // the handle turns with each tap, exactly
+  s.taking = dp < -1e-6; s.running = running && s.taking;
   s.near = s.progress >= REEL.nearAt;
   // slack: a long time with hardly any pressure and the hook can come out
   s.slack = tension < 0.12 && !s.near ? s.slack + dt : Math.max(0, s.slack - dt * 2);
@@ -91,8 +100,11 @@ export function fightStep(s0, dt, input = {}) {
 
 /** Seconds to land a fish tapping steadily at `rate` (for tests and tuning); Infinity if it never lands. */
 export function timeToLand(opts, rate, { assisted = false, maxS = 240, drag } = {}) {
-  let s = createFight(opts);
-  for (let t = 0; t < maxS; t += 0.05) { s = fightStep(s, 0.05, { rate, assisted, drag }); if (s.near) return t; if (s.out) return Infinity; }
+  let s = createFight(opts), acc = 0;
+  for (let t = 0; t < maxS; t += 0.05) {
+    acc += rate * 0.05; const taps = Math.floor(acc); acc -= taps; // taps at a steady rate
+    s = fightStep(s, 0.05, { taps, rate, assisted, drag }); if (s.near) return t; if (s.out) return Infinity;
+  }
   return Infinity;
 }
 

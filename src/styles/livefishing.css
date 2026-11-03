@@ -6,7 +6,7 @@
 .fs-fx { pointer-events: none; }
 .fs-cam { position: absolute; inset: 0; will-change: transform; }
 .fs-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #0b162088; z-index: 2; }
-.fs-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; display: flex; flex-direction: column; justify-content: space-between; padding: 10px; }
+.fs-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 10px max(14px, env(safe-area-inset-bottom)); }
 .fs-overlay button, .fs-overlay a { pointer-events: auto; }
 .fs-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-right: 42px; }
 .fs-fsbtn { position: absolute; top: 10px; right: 10px; z-index: 4; }
@@ -286,7 +286,19 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .ft-reel:active { transform: scale(.96); }
 .ft-ring-bg { fill: none; stroke: #ffffff26; stroke-width: 4; }
 .ft-ring { fill: none; stroke: var(--action); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
-.ft-label { font-size: 13.5px; font-weight: 650; color: #fff; text-shadow: 0 1px 3px #000c; max-width: 52vw; line-height: 1.25; }
+.ft-label { font-size: 14.5px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000, 0 0 10px #0009; max-width: 52vw; line-height: 1.25; }
+.ft-label .ft-dist { display: block; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+html:not([data-hand="left"]) .ft-label { text-align: right; }
+/* the Reel button: the thing you press most, so the biggest and clearest; it answers every tap */
+.ft-reel { width: 92px !important; height: 92px !important; background: color-mix(in srgb, var(--action) 88%, #000) !important; color: #04201d !important; border: 3px solid #fff !important; box-shadow: 0 6px 20px #0008; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.ft-reel span:not(.ft-handle) { font-size: 15px; font-weight: 900; letter-spacing: .06em; }
+.ft-reel .ft-handle svg { width: 28px; height: 28px; }
+.ft-reel.pressed { transform: scale(.92); transition: transform .05s; }
+.ft-tapfx { position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #fff; animation: ft-tap .32s ease-out forwards; pointer-events: none; }
+@keyframes ft-tap { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.28); } }
+.ft-main { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.ft-strike { width: 92px !important; height: 92px !important; border: 3px solid #fff !important; }
+@media (prefers-reduced-motion: reduce) { .ft-tapfx { animation: none; display: none; } }
 .ft-pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #ffffff2a; background: #0a141bb3; color: #fff; font-size: 13px; font-weight: 650; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .ft-pill svg { width: 15px; height: 15px; }
 /* hold to cast, tap to reel, the tension gauge, land */
@@ -313,7 +325,7 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .ft-drag { display: grid; gap: 6px; }
 .ft-drag .ft-pill { min-height: 30px; padding: 0 10px; font-size: 12px; }
 @keyframes ft-shiver { 50% { transform: translateX(1px); } }
-html[data-hand="right"] .ft-fight { flex-direction: row-reverse; }
+html:not([data-hand="left"]) .ft-fight { flex-direction: row-reverse; }
 @media (prefers-reduced-motion: reduce) { .ft-land, .ft-tension.slip { animation: none; } }
 @keyframes ft-pulse { 50% { transform: scale(1.06); box-shadow: 0 0 0 8px #f2b84b33, 0 8px 22px #0007; } }
 @media (prefers-reduced-motion: reduce) { .ft-strike { animation: none; } .fish-tray { transition: none; } }
@@ -360,7 +372,7 @@ html[data-hand="right"] .ft-fight { flex-direction: row-reverse; }
 .cam-row { display: flex; gap: 6px; } .cam-row .ft-pill { flex: 1; justify-content: center; }
 .w3d-walkbtn { position: absolute; z-index: 5; right: max(14px, env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; border: 1px solid #ffffff33; background: #0a141bc4; color: #fff; pointer-events: auto; }
 .w3d-walkbtn svg { width: 24px; height: 24px; }
-html[data-hand="right"] .w3d-walkbtn { right: auto; left: max(14px, env(safe-area-inset-left)); }
+html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(safe-area-inset-left)); }
 .stage3d.walking .w3d-walkbtn, .immersive.ui-hidden .w3d-walkbtn, .immersive.ui-hidden .w3d-menuwrap { opacity: 0; pointer-events: none; }
 .w3d-tools { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: auto; }
 .immersive.ui-hidden .w3d-tools, .immersive.ui-hidden .w3d-compass { opacity: 0; pointer-events: none; }
@@ -368,9 +380,9 @@ html[data-hand="right"] .w3d-walkbtn { right: auto; left: max(14px, env(safe-are
 .cam-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: #0a141be6; border: 1px solid #ffffff26; }
 .cam-menu button { text-align: left; }
 /* controls on the right (for a right thumb): Cast, Strike and Reel bottom right, the camera tools bottom left */
-html[data-hand="right"] .fs-bottom { align-self: flex-end; align-items: flex-end; }
-html[data-hand="right"] .fish-tray { flex-direction: row-reverse; }
-html[data-hand="right"] .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
+html:not([data-hand="left"]) .fs-bottom { align-self: flex-end; align-items: flex-end; }
+html:not([data-hand="left"]) .fish-tray { flex-direction: row-reverse; }
+html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
 .cam-sep { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid #ffffff26; }
 /* the catch card sits under the top bar: the landed fish (in the hands, or the net) is in the lower part of the view */
 .w3d-card { position: absolute; z-index: 6; left: 0; right: 0; top: calc(max(10px, env(safe-area-inset-top)) + 50px); padding: 0 12px; pointer-events: none; display: flex; justify-content: center; }

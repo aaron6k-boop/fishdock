@@ -4,10 +4,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { tapRate, effort, createFight, fightStep, timeToLand, REEL, DRAG } from "../src/lib/reelModel.js";
 
+// tapping steadily at `rate` taps a second: the taps that fall in each step
+const tapper = (rate) => { let acc = 0; return (dt) => { acc += rate * dt; const n = Math.floor(acc); acc -= n; return { taps: n, rate }; }; };
+
 test("taps a second come from the last moment of taps; a single tap still winds a little", () => {
   assert.equal(tapRate([], 1000), 0);
   assert.equal(tapRate([900], 1000), 1.4);
-  const four = [0, 250, 500, 750, 1000];
+  const four = [400, 550, 700, 850, 1000];
   assert.ok(Math.abs(tapRate(four, 1100) - 5 / REEL.window) < 1e-9);
   assert.equal(tapRate([0], 5000), 0, "old taps don't count");
 });
@@ -26,9 +29,9 @@ test("3 to 5 taps a second works; frantic tapping adds less and less; slow tappi
 
 test("a run takes line back even while you're tapping; the drag slips before the line could break", () => {
   let s = createFight({ species: "bass", lengthCm: 65, startM: 50, seed: 7 });
-  let slipped = false, lostLine = false, prev = 0;
+  let slipped = false, lostLine = false, prev = 0; const tap9 = tapper(9);
   for (let t = 0; t < 60 && !s.near; t += 0.05) {
-    s = fightStep(s, 0.05, { rate: 9 });
+    s = fightStep(s, 0.05, tap9(0.05));
     if (s.slipping) slipped = true;
     if (s.progress < prev - 1e-6) lostLine = true;
     prev = s.progress;
@@ -42,7 +45,8 @@ test("Advanced mode: a drag screwed down tight with hard winding can break the l
   let broke = false;
   for (let seed = 1; seed < 8 && !broke; seed++) {
     let s = createFight({ species: "conger", lengthCm: 130, startM: 40, mode: "advanced", seed });
-    for (let t = 0; t < 60 && !s.out && !s.near; t += 0.05) s = fightStep(s, 0.05, { rate: 9, drag: DRAG.max });
+    const tap9 = tapper(9);
+    for (let t = 0; t < 60 && !s.out && !s.near; t += 0.05) s = fightStep(s, 0.05, { ...tap9(0.05), drag: DRAG.max });
     broke = s.out === "broke";
   }
   assert.ok(broke);
@@ -57,4 +61,29 @@ test("leave it slack for a long time and the hook can come out; assisted reeling
   assert.ok(Number.isFinite(a) && a < 30);
   // the same fight with the same seed plays the same way
   assert.equal(timeToLand({ species: "cod", lengthCm: 55, startM: 40, seed: 5 }, 4), timeToLand({ species: "cod", lengthCm: 55, startM: 40, seed: 5 }, 4));
+});
+
+test("each tap winds there and then; stop tapping and the winding stops; the handle turns half a turn a tap", () => {
+  const base = createFight({ species: "whiting", lengthCm: 25, startM: 30, seed: 4 });
+  const one = fightStep(base, 0.05, { taps: 1, rate: 1.4 });
+  assert.ok(one.progress > base.progress, "one tap brings line in");
+  assert.equal(one.turns, REEL.turnsPerTap);
+  // no taps: no line comes in (it can only go out), however fast you were tapping a moment ago
+  let s = one; for (let i = 0; i < 20; i++) { const n = fightStep(s, 0.05, { taps: 0, rate: 4 }); assert.ok(n.progress <= s.progress + 1e-12, "nothing comes in without a tap"); s = n; }
+  assert.equal(s.turns, one.turns, "the handle doesn't turn without a tap");
+  // holding the button (no repeated taps) doesn't reel: it's one tap
+  // more taps, more line (within reason)
+  const slow = fightStep(base, 0.5, { taps: 1, rate: 2 }), fast = fightStep(base, 0.5, { taps: 3, rate: 6 });
+  assert.ok(fast.progress > slow.progress);
+});
+
+test("'running' only while the fish is really taking line: the distance grows whenever it says so", () => {
+  for (const [species, cm] of [["bass", 65], ["cod", 70], ["mackerel", 35], ["thornback-ray", 60], ["conger", 120]]) {
+    let s = createFight({ species, lengthCm: cm, startM: 50, seed: 9 }); const tap = tapper(4);
+    for (let t = 0; t < 40 && !s.near && !s.out; t += 0.05) {
+      const before = s.dist; s = fightStep(s, 0.05, tap(0.05));
+      if (s.running) assert.ok(s.dist > before, `${species}: says it's running while the distance fell`);
+      if (s.dist > before + 1e-9) assert.ok(s.taking, `${species}: line went out without a cause`);
+    }
+  }
 });
