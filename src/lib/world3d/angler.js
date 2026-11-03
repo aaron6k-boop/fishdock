@@ -12,6 +12,7 @@ import { castPoint, dirOf } from "./spots.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpHands } from "./fpHands.js";
+import { loadPart, fitReel, fitNet } from "./glbParts.js";
 import { stepHandle, handleState } from "../reelHandle.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -165,6 +166,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   }
   const handle = reel.userData.crank;
   reel.scale.setScalar(R.reel);
+  // the reel modelled in Blender (public/models/reel.glb), in place of the simple one once it has loaded
+  loadPart("reel").then((sc) => fitReel(reel, sc)).catch(() => {});
   // the line from the spool up through the rings to the tip
   const guideLinePos = new Float32Array((GUIDES.length + 2) * 3), guideLineGeo = new THREE.BufferGeometry(); guideLineGeo.setAttribute("position", new THREE.BufferAttribute(guideLinePos, 3));
   const guideLine = new THREE.Line(guideLineGeo, new THREE.LineBasicMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.7 })); guideLine.frustumCulled = false; root.add(guideLine);
@@ -212,7 +215,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const net = new THREE.Group(); world.add(net); net.visible = false;
   const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.015, 6, 24), mMetal); hoop.rotation.x = Math.PI / 2; net.add(hoop);
   const bagGeo = new THREE.LatheGeometry(Array.from({ length: 9 }, (_, i) => { const u = i / 8; return new THREE.Vector2(0.35 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.15 * u) + 0.02, -0.5 * u); }), 18);
-  const bag = new THREE.Mesh(bagGeo, mNet); net.add(bag);
+  let bag = new THREE.Mesh(bagGeo, mNet); net.add(bag);
+  // the nets modelled in Blender (public/models/nets.glb): a drop net at a pier, a landing net elsewhere
+  loadPart("nets").then((sc) => { const b = fitNet(net, sc, venue === "pier" ? "drop" : "landing"); if (b) bag = b; }).catch(() => {});
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1, 6), mMetal); world.add(pole); pole.visible = false;
   // an unhooking mat (a padded, wipe-clean mat: where a fish you'll put back is laid to be looked at and unhooked)
   const mat = new THREE.Group(); world.add(mat); mat.visible = false;
@@ -811,7 +816,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const netScale = Math.max(1, (fishLen * 0.62) / 0.35);
     net.scale.setScalar(netScale);
     // the bag hangs heavy with a fish in it, and slumps flat once it's set down
-    bag.scale.y = lerp(inNet ? 1 + 0.25 * Math.min(1, load) : 1, 0.35, netRest);
+    if (bag.morphTargetDictionary) {
+      // (the Blender net: its own shapes for heavy with a fish, and slumped flat)
+      const d = bag.morphTargetDictionary, mi = bag.morphTargetInfluences;
+      if (d.laden != null) mi[d.laden] = (inNet ? 0.55 + 0.45 * Math.min(1, load) : 0) * (1 - netRest);
+      if (d.flat != null) mi[d.flat] = netRest;
+    } else bag.scale.y = lerp(inNet ? 1 + 0.25 * Math.min(1, load) : 1, 0.35, netRest);
     tag.visible = !fp && !tagOff && !(kept && (kept.state === "inspect" || kept.state === "release")); // (no name label in your catch photo)
     talk.visible = speaking && !fp; if (speaking) { const k = 0.3 + Math.abs(Math.sin(t * 6)) * 0.08; talk.scale.set(k, k, 1); }
     if (keptPose) poseFish(keptPose.mouth, keptPose.dir, t, { beat: keptPose.beat, curl: keptPose.curl, roll: keptPose.roll });

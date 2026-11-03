@@ -1,0 +1,413 @@
+{
+ "note": "Every third-party asset used for FishDock: where it came from, who made it, its licence and what it is used for.",
+ "assets": [
+  {
+   "id": "polyhaven:gray_pier",
+   "name": "Gray Pier",
+   "source": "https://polyhaven.com/a/gray_pier",
+   "author": "Sergey Rudavin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "hdris",
+   "resolution": "2k",
+   "use": "sky and light for piers",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/gray_pier/gray_pier_2k.hdr",
+     "bytes": 6079929,
+     "sha256": "972e46bdb88be37a2f478e56a87a2bfbe8a254ab1dba48bd29bc9aa674af5909",
+     "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/gray_pier_2k.hdr"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:concrete_pavement",
+   "name": "Concrete Pavement",
+   "source": "https://polyhaven.com/a/concrete_pavement",
+   "author": "Charlotte Baglioni",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "2k",
+   "use": "pier deck",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/concrete_pavement/concrete_pavement_2k.gltf",
+     "bytes": 2822,
+     "sha256": "01e5bf375fadf743ff738249de7e6b99356d9fbb2745fcbc9bbddb75404be985",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/2k/concrete_pavement/concrete_pavement_2k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_pavement/textures/concrete_pavement_arm_2k.jpg",
+     "bytes": 3465289,
+     "sha256": "1ee3ab8013a6204c739b40ef9b87ccfdff32711525bccf94ee9b3c171aa731f6",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_pavement/concrete_pavement_arm_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_pavement/textures/concrete_pavement_nor_gl_2k.jpg",
+     "bytes": 5179971,
+     "sha256": "72def937e418ccc9d7736c9b1f51ae22a127fa2a53a54f4d1fe4d3cf828b781c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_pavement/concrete_pavement_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_pavement/textures/concrete_pavement_diff_2k.jpg",
+     "bytes": 3817566,
+     "sha256": "e5a1cecfe7765cc0b24a6ab0abf492bd21c9e7af64e97fc46ef6021d0645fbd3",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_pavement/concrete_pavement_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_pavement/concrete_pavement.bin",
+     "bytes": 2370292,
+     "sha256": "ea2cccf7aa051a0bbd962ff812c1b6283e6549c9770060454d0a71066f58037e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/8k/concrete_pavement/concrete_pavement.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:concrete_moss",
+   "name": "Concrete Moss",
+   "source": "https://polyhaven.com/a/concrete_moss",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "2k",
+   "use": "pier walls near the water",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/concrete_moss/concrete_moss_2k.gltf",
+     "bytes": 2790,
+     "sha256": "ce74cfc932f70647f6332f53c684ca7109265f8f5fe19ec4862c9c33f4197ae2",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/2k/concrete_moss/concrete_moss_2k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_moss/textures/concrete_moss_nor_gl_2k.jpg",
+     "bytes": 3713471,
+     "sha256": "4b680afc05e0e02aa96e8b3ad213d28e4805e980895f2c082c979a5c7ba8b3c2",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_moss/concrete_moss_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_moss/textures/concrete_moss_diff_2k.jpg",
+     "bytes": 2777857,
+     "sha256": "764e43763490672a2067d3bd644ab0602a9d477533e598bcc0e3b3b01d8b937a",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_moss/concrete_moss_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_moss/concrete_moss.bin",
+     "bytes": 2369588,
+     "sha256": "ad689e564de188e8d51c8a2bf54f16ce8238a9e1875b4b33f1e7dda79590aac6",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/8k/concrete_moss/concrete_moss.bin"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_moss/textures/concrete_moss_arm_2k.jpg",
+     "bytes": 1437824,
+     "sha256": "f1bcb619fa41bfb5e7a575424b8a929a34ab93afe5f9575904ffb76f427042c5",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_moss/concrete_moss_arm_2k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:rusty_painted_metal",
+   "name": "Rusty Painted Metal",
+   "source": "https://polyhaven.com/a/rusty_painted_metal",
+   "author": "Amal Kumar",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "2k",
+   "use": "railings and fittings",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/rusty_painted_metal/rusty_painted_metal_2k.gltf",
+     "bytes": 2832,
+     "sha256": "38fca404dafdbd427f78ab271f2f0b1fa7f80f546b4f9c964b5da197010a5532",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/2k/rusty_painted_metal/rusty_painted_metal_2k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/rusty_painted_metal/textures/rusty_painted_metal_nor_gl_2k.jpg",
+     "bytes": 2293576,
+     "sha256": "2289c10422d5082aea3cf37661008b281c4aec20f6d0b574df6d7887573eb70c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_painted_metal/rusty_painted_metal_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rusty_painted_metal/textures/rusty_painted_metal_diff_2k.jpg",
+     "bytes": 1930544,
+     "sha256": "883118fafabb56304f9e33ea2da3c183379b1c1b1c5a4702fdc335b0cf84614f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_painted_metal/rusty_painted_metal_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rusty_painted_metal/textures/rusty_painted_metal_arm_2k.jpg",
+     "bytes": 1552679,
+     "sha256": "56f5428c8417f75cd0826fb8aa555d3f2e9cae872640912f32376b6357fac8d7",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_painted_metal/rusty_painted_metal_arm_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rusty_painted_metal/rusty_painted_metal.bin",
+     "bytes": 2368212,
+     "sha256": "5de5be8dd4dba655ffdd9948f670e0b8d8e2ccc8ea2042501109d2aec4ee3880",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/8k/rusty_painted_metal/rusty_painted_metal.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:lifebuoy",
+   "name": "Lifebuoy",
+   "source": "https://polyhaven.com/a/lifebuoy",
+   "author": "Hank Kaamura",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "pier prop",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/lifebuoy/lifebuoy_1k.gltf",
+     "bytes": 2724,
+     "sha256": "d9c76a8f2471249f314b3efcffe0d3956ba2d3f0b8ba528cc0f2b861561580f3",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/lifebuoy/lifebuoy_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/lifebuoy/textures/lifebuoy_nor_gl_1k.jpg",
+     "bytes": 907524,
+     "sha256": "df02aca2cca3aa87daa0f1d4cd5fa2584d60ecea85672517fa334aea725dbf23",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/lifebuoy/lifebuoy_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/lifebuoy/textures/lifebuoy_diff_1k.jpg",
+     "bytes": 841106,
+     "sha256": "f0095beca9e97996692ffdab3d3ace3fae64a3c3adf5c8eff71172add4e4cb2e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/lifebuoy/lifebuoy_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/lifebuoy/textures/lifebuoy_arm_1k.jpg",
+     "bytes": 614864,
+     "sha256": "fe33182e45c2b1049195641a8081ab22e90e520b2c0dafa9cce568a53af7a207",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/lifebuoy/lifebuoy_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/lifebuoy/lifebuoy.bin",
+     "bytes": 255280,
+     "sha256": "aa45c8d43ee11e12a4ab9f46bfb06d1baa6c687d61776ad9b06ea6b5664c0bc2",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/lifebuoy/lifebuoy.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:coast_rocks_01",
+   "name": "Coast Rocks 01",
+   "source": "https://polyhaven.com/a/coast_rocks_01",
+   "author": "Rob Tuytel, Rico Cilliers",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "rocks at the foot of the pier",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/coast_rocks_01/coast_rocks_01_1k.gltf",
+     "bytes": 2810,
+     "sha256": "9d45b232fe8bfc8f9d84aaa900ba28f150764e4b40accf7d50fbb45a3de54c51",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/coast_rocks_01/coast_rocks_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_01/coast_rocks_01.bin",
+     "bytes": 19320352,
+     "sha256": "3d1c33b18fdcf0efebab46526e94d17efccbc3c9a06dc14b89b04b93109fa3d2",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/coast_rocks_01/coast_rocks_01.bin"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_01/textures/coast_rocks_01_nor_gl_1k.jpg",
+     "bytes": 918464,
+     "sha256": "848292bb5fd720fefd37fa94326071bc81e2290bbf409bb019efb6fb30399809",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_01/coast_rocks_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_01/textures/coast_rocks_01_arm_1k.jpg",
+     "bytes": 602817,
+     "sha256": "13fddfb9051fa36720b5c35f4f52a49826b1e3a4063f66e440a7033dd90c30cc",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_01/coast_rocks_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_01/textures/coast_rocks_01_diff_1k.jpg",
+     "bytes": 839761,
+     "sha256": "a6814ce9c023fc7c90eb38c2afe658a3076b94ed44d136c2dbd3605d18fade7b",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_01/coast_rocks_01_diff_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:plastic_crate_01",
+   "name": "Plastic Crate 01",
+   "source": "https://polyhaven.com/a/plastic_crate_01",
+   "author": "PierreB3D",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "bait crate prop",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/plastic_crate_01/plastic_crate_01_1k.gltf",
+     "bytes": 2793,
+     "sha256": "42556fc8e39e5834ebf474dff79d4c0524fd3074be6c86c0c6704a10be8b3756",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/plastic_crate_01/plastic_crate_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/plastic_crate_01/textures/plastic_crate_01_nor_gl_1k.jpg",
+     "bytes": 884228,
+     "sha256": "6f0c44778216d50672d6a23660b22dec8b96bb6e71518d699c24630c34cf9217",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/plastic_crate_01/plastic_crate_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/plastic_crate_01/textures/plastic_crate_01_diff_1k.jpg",
+     "bytes": 518288,
+     "sha256": "d9109a42e397e39bbd7f42976d93122dbd5ccdef8ff64bce353571e1c1b994f6",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/plastic_crate_01/plastic_crate_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/plastic_crate_01/textures/plastic_crate_01_arm_1k.jpg",
+     "bytes": 993636,
+     "sha256": "9a4af28d6fe8d5459a3c1a8706c0f8877221873ac9b83de580e6cfa63c3ecaa0",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/plastic_crate_01/plastic_crate_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/plastic_crate_01/plastic_crate_01.bin",
+     "bytes": 789920,
+     "sha256": "59b307238a27f304739aeef0b1c9622d1e4efb31a96d805d2cfc0c461f9bb06d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/plastic_crate_01/plastic_crate_01.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:street_lamp_01",
+   "name": "Street Lamp 01",
+   "source": "https://polyhaven.com/a/street_lamp_01",
+   "author": "Josh Dean",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "pier lamp",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/polyhaven/street_lamp_01/street_lamp_01_1k.gltf",
+     "bytes": 6419,
+     "sha256": "5d0358ede168b5e04547780b99d8e6d651cbe644e468e67cb505019047cbd5c8",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/street_lamp_01/street_lamp_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/street_lamp_01/textures/street_lamp_01_arm_1k.jpg",
+     "bytes": 664324,
+     "sha256": "4b5487a6c7ee300c3cf5449629e01c35409e5c7ac1695edb9fe69d4821853c7c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_01/street_lamp_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/street_lamp_01/textures/street_lamp_01_diff_1k.jpg",
+     "bytes": 307889,
+     "sha256": "3e9d3471b33eb1f8075ed741c2b1932103598626d057ca12ef38005ea5fcb165",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_01/street_lamp_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/street_lamp_01/textures/street_lamp_01_nor_gl_1k.jpg",
+     "bytes": 438623,
+     "sha256": "172af0fd7ed4999e9f520b9f56e1f357a6dba87adbd7b8aa87e0a0b95840c63d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/street_lamp_01/street_lamp_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/street_lamp_01/street_lamp_01.bin",
+     "bytes": 748908,
+     "sha256": "c283db9b6d95835d9e8fc1692829acadcb21a0623b2daaa7231cec1440488401",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/street_lamp_01/street_lamp_01.bin"
+    }
+   ]
+  },
+  {
+   "id": "ambientcg:Net001A",
+   "name": "Net001A",
+   "source": "https://ambientcg.com/view?id=Net001A",
+   "author": "Lennart Demes (ambientCG)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "material",
+   "resolution": "2K-JPG",
+   "use": "drop net and landing net mesh",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/ambientcg/Net001A/Net001A_2K-JPG.zip",
+     "bytes": 12886614,
+     "sha256": "31ee4a7fc9c8347527383bdc08a9de3c08b523768725c44ce697ed335a1c6139",
+     "url": "https://ambientcg.com/get?file=Net001A_2K-JPG.zip"
+    }
+   ]
+  },
+  {
+   "id": "ambientcg:Net002A",
+   "name": "Net002A",
+   "source": "https://ambientcg.com/view?id=Net002A",
+   "author": "Lennart Demes (ambientCG)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "material",
+   "resolution": "2K-JPG",
+   "use": "fine knotless net mesh",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/ambientcg/Net002A/Net002A_2K-JPG.zip",
+     "bytes": 16237994,
+     "sha256": "a9d7fd1101c6f40d81817335510fa8e017e58c0e7152bfc06d21dbe812de462d",
+     "url": "https://ambientcg.com/get?file=Net002A_2K-JPG.zip"
+    }
+   ]
+  },
+  {
+   "id": "ambientcg:Rope001",
+   "name": "Rope001",
+   "source": "https://ambientcg.com/view?id=Rope001",
+   "author": "Lennart Demes (ambientCG)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "material",
+   "resolution": "2K-JPG",
+   "use": "drop-net rope",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/ambientcg/Rope001/Rope001_2K-JPG.zip",
+     "bytes": 12187172,
+     "sha256": "598e49d2007e02e3d801050c33617e9359df4a91f94dfd98cb5dee36548ab9db",
+     "url": "https://ambientcg.com/get?file=Rope001_2K-JPG.zip"
+    }
+   ]
+  },
+  {
+   "id": "ambientcg:Fabric085",
+   "name": "Fabric085",
+   "source": "https://ambientcg.com/view?id=Fabric085",
+   "author": "Lennart Demes (ambientCG)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "material",
+   "resolution": "2K-JPG",
+   "use": "waterproof jacket fabric",
+   "downloaded": "2026-11-03",
+   "files": [
+    {
+     "file": "downloads/ambientcg/Fabric085/Fabric085_2K-JPG.zip",
+     "bytes": 32434671,
+     "sha256": "8a77034f0539d10297925879d433791db927a8cb2d2494e1f20e312235807bb8",
+     "url": "https://ambientcg.com/get?file=Fabric085_2K-JPG.zip"
+    }
+   ]
+  }
+ ]
+}
