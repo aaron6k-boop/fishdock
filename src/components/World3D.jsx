@@ -12,6 +12,7 @@ import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
 // from where they happen: your friend's reel from their side, quieter further away) ----
 const VIEW_KEY = "fishdock.view3d.v1";
+// (landCam2: the landing camera, on unless turned off since it was reworked; an older "landCam" off is not carried over)
 export const VIEW_DEFAULTS = { track: true, spatial: true, side: "right", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto", camDist: "normal", autoBtn: false };
 // sound levels for the three kinds of sound (sceneAudio.js setVolumes), saved on this phone
 const LEVELS_KEY = "fishdock.sound.levels";
@@ -109,7 +110,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
             if (o.landed && !phases.current[id].landed) { phases.current[id].landed = true; props.current.onLanded?.(id, o.info.ev); }
           }
         });
-        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.landCam !== false); }
+        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.landCam2 !== false); }
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();

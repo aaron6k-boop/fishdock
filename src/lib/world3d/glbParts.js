@@ -65,6 +65,9 @@ export function fitNet(net, scene, kind = "drop") {
     net.add(c);
     c.traverse((o) => {
       if (!o.isMesh) return;
+      // the hoop and its weight ring: a dull, pale galvanised finish that reads against dark water from any angle (as
+      // polished metal it mirrored the dark sea and vanished at the surface)
+      if (/hoop|weight|ring/i.test(o.name) && !o.morphTargetDictionary) { const m = o.material = o.material.clone(); m.metalness = Math.min(m.metalness ?? 0, 0.35); m.roughness = Math.max(m.roughness ?? 0.5, 0.5); m.color?.setRGB(0.72, 0.74, 0.75); }
       if (/bag/.test(o.name) || o.morphTargetDictionary) {
         bag = o;
         // the mesh's cords are in the texture's alpha: seen from both sides, blended (a hard cut-out loses the fine cords

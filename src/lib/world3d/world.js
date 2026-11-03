@@ -192,7 +192,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       anglers.get(localId)?.a.setFirstPerson(false); // (the camera's in front of you: all of you shows, head and all)
       // (in front of you and a little to the side, looking down at the fish on its mat with you crouched behind it; aimed
       // a little below it, so it sits in the top half of the picture, clear of the card along the bottom)
-      const at0 = mk.at.clone().add(new THREE.Vector3(fx * 2.7 - fz * 0.6, 1.85, fz * 2.7 + fx * 0.6));
+      // (from beside you on the bank or the deck, never out over the water: a bank's edge between hid the mat. Off to
+      // your right and a little forward, looking down across the mat at the fish)
+      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(sx * 1.55 + fx * 0.55, 1.35, sz * 1.55 + fz * 0.55));
+      { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
       camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
       camera.fov = 52; camera.updateProjectionMatrix(); camera.lookAt(c.clone().add(new THREE.Vector3(0, -0.34, 0)));
@@ -264,7 +267,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // gliding there across empty sea)
         const low = (x) => (x === "lower" || x === "lead" || x === "haul") && landing.water != null;
         // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
-        const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (low(st) && landShot.stage && !low(landShot.stage));
+        const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage)); // (and back up from it: climbing the wall it passed close over the deck)
         landShot.stage = st;
         landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "lead" || st === "haul";
         anglers.get(localId)?.a.showTag(false);
@@ -426,7 +429,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       get yaw() { return look.yaw; },
       get lag() { return film ? nowFn() - film.now : 0; },
       get scene() { return scene; },
-      get me() { const x = anglers.get(localId); return x?.out ? { at: x.out.at.toArray(), face: x.out.face, phase: x.out.phase } : null; },
+      floor(x, z) { return env.floorAt ? env.floorAt(x, z) : null; },
+      get me() { const x = anglers.get(localId); return x?.out ? { at: x.out.at.toArray(), face: x.out.face, phase: x.out.phase, land: x.out.land ? { stage: x.out.land.stage, net: x.out.land.net?.toArray().map((v) => +v.toFixed(2)), water: x.out.land.water } : null } : null; },
       ground: env.ground,
     };
   }
@@ -453,7 +457,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
           else { camYaw = Math.atan2(dx, -dz); input = { x: 0, y: Math.min(1, 0.45 + d * 0.25), sprint: false }; }
         }
         const x0 = W.x, z0 = W.z;
+        const ph0 = W.phase;
         while (rem > 1e-4) { const h = Math.min(0.05, rem); W = stepWalker(W, { ...input, camYaw, jump: walkJump }, h, env.ground); walkJump = false; rem -= h; }
+        // a footstep each time a foot comes down (twice a stride), quieter at a stroll
+        if (!W.air && W.speed > 0.3 && Math.floor(W.phase / Math.PI) !== Math.floor(ph0 / Math.PI)) onSound?.(W.speed > 5 ? "stepRun" : "step", new THREE.Vector3(W.x, W.y, W.z), localId);
         // never through someone else (Fish Together): pushed round them, as long as that's somewhere you can stand
         const near = othersAt();
         if (near.length) { const p = keepApart(W.x, W.z, near); if ((p.x !== W.x || p.z !== W.z) && env.ground.walkable(p.x, p.z)) W = { ...W, x: p.x, z: p.z }; }

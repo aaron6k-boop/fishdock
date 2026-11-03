@@ -139,11 +139,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       float hgt(vec2 p){
         vec2 wd = uWindDir, wx = vec2(-wd.y, wd.x);
         float sea = uKind < .5 ? 1. : uKind < 1.5 ? .5 : 0.;
+        // the wind's waves bent about by a slow, broad warp, so their crests wander instead of running in ruled lines
+        vec2 pw = p + (vec2(noise(p*.035), noise(p*.035 + 17.)) - .5)*10.;
         float h = (.18 + .55*uSwell)*sea*sin(dot(p, normalize(vec2(.2, -1.)))*.09 + uTime*.9)
           + (.10 + .3*uSwell)*sea*sin(dot(p, normalize(vec2(-.35, -1.)))*.14 + uTime*1.15)
-          + (.05 + .14*uWind)*sin(dot(p, normalize(wd + wx*.3))*.45 + uTime*1.9)
-          + (.03 + .08*uWind)*sin(dot(p, normalize(wd - wx*.4))*.7 + uTime*2.4)
-          + (.015 + .04*uWind)*sin(dot(p, normalize(wd + wx*.8))*1.2 + uTime*3.1);
+          + (.05 + .14*uWind)*sin(dot(pw, normalize(wd + wx*.3))*.45 + uTime*1.9)
+          + (.03 + .08*uWind)*sin(dot(pw, normalize(wd - wx*.4))*.7 + uTime*2.4)
+          + (.015 + .04*uWind)*sin(dot(pw, normalize(wd + wx*.8))*1.2 + uTime*3.1);
         // fine ripples carried along by the wind; a river's current drifts them downstream
         vec2 flow = uKind > 1.5 && uKind < 2.5 ? vec2(-uTime*.6, 0.) : -wd*uTime*.35;
         // (two scales of ripple at odd angles to each other, so no pattern repeats; the finest kept gentle)
@@ -207,8 +209,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float wash = smoothstep(-3., .5, p.y - uShoreZ + noise(vec2(p.x*.2, uTime*.4))*2.)*(uShoreZ > -1e3 ? 1. : 0.);
         // foam washing against walls, piers and banks, pulsing as each wave arrives
         float pulse = sin(uTime*1.1 + dot(p, uWindDir)*.25 + noise(p*.08)*4.)*(.5 + .7*uSwell + .4*uWind);
-        float edge = (1. - smoothstep(.4, 2.6 + pulse*.8, sd + (noise(p*1.3 + uTime*.4) - .5)*1.6))*smoothstep(.3, .65, noise(p*vec2(2.2, 1.6) - uTime*.35));
-        float foam = clamp(cap*.7 + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.65*uShoreOn + churn*.8, 0., .92);
+        // (thin, lacy streaks drawn out along the wall and broken up, thickest right against it, never pale blobs: a ridge
+        // of one noise, thinned by a second finer one)
+        float en1 = noise(p*vec2(3.1, 2.3) - uTime*.35), en2 = noise(p*7.3 + vec2(uTime*.2, -uTime*.3));
+        float lace = smoothstep(.8, .97, 1. - abs(en1*2. - 1.))*(.45 + .55*en2);
+        float eband = 1. - smoothstep(.15, 1.5 + pulse*.6, sd + (en2 - .5)*.7);
+        float edge = eband*lace + eband*eband*.14*smoothstep(.45, .85, en2);
+        float foam = clamp(cap*.7 + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.55*uShoreOn + churn*.8, 0., .92);
         col = mix(col, vec3(.92, .94, .95)*lit, foam);
         // the far water fades into the haze at the horizon
         float fogK = smoothstep(uFogFar*.12, uFogFar, dist);
@@ -348,7 +355,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   } else {
     const near = new THREE.Mesh(new THREE.PlaneGeometry(900, 140), M.grass); near.rotation.x = -Math.PI / 2; near.position.set(0, L.deck, 70.5); near.receiveShadow = true; group.add(near);
     box(900, L.deck + 1.5, 1, new THREE.MeshStandardMaterial({ color: 0x55462f, roughness: 1 }), 0, L.deck / 2 - 0.75, 0.4);
-    for (const s of L.spots) box(3.2, 0.12, 2.4, M.wood, s.at[0], L.deck + 0.06, s.at[2] - 0.6); // wooden swims
+    for (const s of L.spots) box(3.2, 0.12, 2.4, M.wood, s.at[0], L.deck - 0.055, s.at[2] - 0.6); // wooden swims (their tops level with the bank, where you stand: they were 12 cm proud, over your boots and the mat)
     const far = new THREE.Mesh(new THREE.PlaneGeometry(2400, 500), M.grass); far.rotation.x = -Math.PI / 2; far.position.set(0, 1, L.farBank - 250); group.add(far);
     for (let x = -700; x < 700; x += 7 + Math.random() * 10) tree(x, L.farBank - 2 - Math.random() * 40, 1.2 + Math.random(), 1);
     for (let x = -260; x < 260; x += 16 + Math.random() * 20) if (Math.abs(x) > 8) tree(x, 10 + Math.random() * 40, 1 + Math.random() * 0.6, L.deck);
@@ -420,7 +427,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     hemi.color.setRGB(0.7 + 0.1 * st.day, 0.8, 0.95).multiplyScalar(1 - 0.2 * st.cloud); hemi.groundColor.setRGB(0.25, 0.22, 0.18);
     // the haze matches the horizon's colour, closer in rain
     const hz = new THREE.Color().setRGB(0.70, 0.8, 0.88).multiplyScalar(st.day).add(new THREE.Color(0.95, 0.6, 0.4).multiplyScalar(st.dusk)).add(new THREE.Color(0.04, 0.05, 0.08).multiplyScalar(st.night)).lerp(new THREE.Color(0.6, 0.63, 0.66).multiplyScalar(st.day + st.dusk * 0.5 + st.night * 0.06), st.cloud > 0.55 ? (st.cloud - 0.55) * 1.6 : 0);
-    scene.fog.color.copy(hz); scene.fog.far = 2600 - st.rain * 1900; scene.fog.near = 200 - st.rain * 150; wU.uFogC.value.copy(hz); wU.uFogFar.value = scene.fog.far;
+    scene.fog.color.copy(hz); scene.fog.far = 1900 - st.rain * 1250; scene.fog.near = 90 - st.rain * 60; // (enough haze that the town across the water sits back in the air) wU.uFogC.value.copy(hz); wU.uFogFar.value = scene.fog.far;
     const lampOn = st.night * 1 + st.dusk * 0.3;
     for (const pl of pointLights) pl.intensity = lampOn * 60;
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }

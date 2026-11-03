@@ -168,6 +168,12 @@ function realArms(scene, { gloves, skinHex }) {
     const src = o.material, mt = o.material = new THREE.MeshStandardMaterial({ map: src.map || null, normalMap: src.normalMap || null, roughness: 0.62, metalness: 0 });
     if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
     else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); } // (your skin tone over the model's)
+    // light through the skin at its edges (a warm glow where the fingers turn away from you, as real skin does: a cheap
+    // stand-in for subsurface scattering); neoprene gloves get a faint cool sheen there instead
+    mt.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
+      { float rim = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.4);
+        reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.95, 0.38, 0.26) * rim * 0.4"}; }`); };
+    mt.customProgramCacheKey = () => "fdskin" + (gloves ? "g" : "");
   });
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
