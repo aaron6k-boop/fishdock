@@ -1,7 +1,7 @@
 // The light for each condition (src/lib/world3d/skyLook.js): believable, never crushed, never a glare in rain.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { lightingFor, horizonColour, lampPools, lookQuality } from "../src/lib/world3d/skyLook.js";
+import { lightingFor, horizonColour, lampPools, poolLight, lookQuality } from "../src/lib/world3d/skyLook.js";
 
 const DAY = { day: 1, dusk: 0, night: 0, cloud: 0.25, rain: 0, moonLight: 0 };
 const OVERCAST = { ...DAY, cloud: 0.9 };
@@ -44,6 +44,8 @@ test("lamp pools: the nearest lamp posts to the anglers, none far away", () => {
   assert.deepEqual(lampPools(perches, [0, 0], 2), [[3, 6, 2], [-10, 6, 0]]);
   assert.equal(lampPools(perches, [0, 0], 9).length, 3);
   assert.deepEqual(lampPools([], [0, 0], 3), []);
+  assert.equal(lampPools([[3, 6, 2], [3.2, 6, 2.1], [9, 6, 0]], [0, 0], 2)[1][0], 9, "a lamp listed twice lights once");
+  assert.ok(poolLight(9.6).intensity > poolLight(4.8).intensity * 3 && poolLight(9.6).distance > 18, "a tall column lamp lights further");
 });
 
 test("each graphics setting draws more than the one below it", () => {

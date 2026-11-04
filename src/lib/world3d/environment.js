@@ -7,7 +7,7 @@ import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
 import { SHORE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
-import { lightingFor, lampPools, lookQuality } from "./skyLook.js";
+import { lightingFor, lampPools, poolLight, lookQuality } from "./skyLook.js";
 
 // ---- shared shader pieces: noise and the sky's colour in any direction ----
 export const GLSL_NOISE = /* glsl */`
@@ -57,14 +57,14 @@ vec4 cloudAt(vec3 d, float q){
       shade = clamp(.55 + (n1 - fbm3(cp*1.2 + warp + normalize(uSunDir.xz + vec2(1e-4))*.16))*3.2, 0., 1.);
     #endif
   } else n1 = fbm3(cp*1.2);
-  float thr = mix(.80, .30, uCloud);
+  float thr = mix(.66, .30, uCloud);
   float cover = max(smoothstep(thr, thr + .2, n1), smoothstep(.78, 1., uCloud));
   float thick = smoothstep(thr, thr + .5, n1);
   vec3 lit = vec3(.98, .97, .95)*uDay + vec3(1., .80, .66)*uDusk*.85 + vec3(.11, .12, .15)*uNight*(.3 + uMoonLight);
   vec3 dark = vec3(.58, .62, .70)*uDay + vec3(.36, .33, .42)*uDusk + vec3(.025, .028, .04)*uNight;
   vec3 cc = mix(dark, lit, shade*(1. - thick*.45));
   // a grey deck: mottled, darker the thicker; darker still in rain
-  cc *= mix(1., .62 + .25*n1, smoothstep(.55, 1., uCloud))*(1. - uRain*.35);
+  cc *= mix(1., .48 + .55*smoothstep(.25, .75, n1), smoothstep(.55, 1., uCloud))*(1. - uRain*.35);
   // far off they melt into the haze along the horizon
   cc = mix(cc, skyBase(d), exp(-d.y*7.)*.55);
   return vec4(cc, cover*smoothstep(0., .06, d.y));
@@ -392,12 +392,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     // a lamp over the anglers after dark (piers, quays and promenades are lit), like the drawn pier's
     const sp = real.spots || [];
     if (sp.length) {
-      const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 34, 1.5); pl.position.set(c[0], c[1] + 5.5, c[2]); group.add(pl); pointLights.push(pl);
+      const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 48, 1.2); pl.position.set(c[0], c[1] + 8, c[2]); pl.userData.cd = 30; group.add(pl); pointLights.push(pl); // (a soft wash along the fishing stretch)
       // the lamp posts nearest the anglers cast warm pools on the deck round them: a light at each of the nearest few
       // (none on Performance, two on Balanced, three on High quality), and the nearest four shine on the water
       lampPools(real.perches || [], [c[0], c[2]], 4).forEach((q, i) => {
         const at = [q[0], q[1] + 0.8, q[2]]; lampSpots.push(at);
-        if (i < LQ.lampLights) { const l = new THREE.PointLight(0xffc98a, 0, 18, 2); l.position.set(at[0], at[1], at[2]); l.userData.pool = true; group.add(l); pointLights.push(l); }
+        if (i < LQ.lampLights) { const pk = poolLight(at[1] - c[1]), l = new THREE.PointLight(0xffc98a, 0, pk.distance, 2); l.position.set(at[0], at[1], at[2]); l.userData.cd = pk.intensity; group.add(l); pointLights.push(l); }
       });
       if (!lampSpots.length) lampSpots.push(pl.position.toArray());
     }
@@ -522,7 +522,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     envSky.uniforms.uEnvGround.value.copy(wU.uWater.value).multiplyScalar(0.8 * (st.day + st.dusk * 0.5 + st.night * 0.08));
     // ---- lamps after dark: the pools by the anglers, the lanterns and windows, their streaks on the water ----
     const lampOn = look.lampOn;
-    for (const pl of pointLights) pl.intensity = lampOn * (pl.userData.pool ? 30 : LQ.lampLights && real ? 40 : 60);
+    for (const pl of pointLights) pl.intensity = lampOn * (pl.userData.cd || 60);
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     for (let i = 0; i < 4; i++) { const q = lampSpots[i]; wU.uLamps.value[i].set(q ? q[0] : 0, q ? q[1] : 0, q ? q[2] : 0, q ? lampOn : 0); }
     if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain (wetLook.js)

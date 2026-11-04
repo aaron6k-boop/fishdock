@@ -47,15 +47,18 @@ export function lightingFor(st) {
 }
 
 // ---- lamps: which of a place's lamp posts light the deck round the anglers ----
-/** perches: [[x, y, z]] lamp tops; centre: [x, z]; n: how many. Nearest first, none further than maxDist. */
+/** perches: [[x, y, z]] lamp tops; centre: [x, z]; n: how many. Nearest first, none further than maxDist, and one
+ * lamp once (a lamp on the corner of two walls is listed twice). */
 export function lampPools(perches = [], centre = [0, 0], n = 2, maxDist = 70) {
-  return perches
-    .map((p) => ({ p, d: Math.hypot(p[0] - centre[0], p[2] - centre[1]) }))
-    .filter((q) => q.d <= maxDist)
-    .sort((a, b) => a.d - b.d)
-    .slice(0, Math.max(0, n))
-    .map((q) => q.p);
+  const out = [];
+  for (const q of perches.map((p) => ({ p, d: Math.hypot(p[0] - centre[0], p[2] - centre[1]) })).filter((q) => q.d <= maxDist).sort((a, b) => a.d - b.d)) {
+    if (out.length >= n) break;
+    if (!out.some((o) => Math.hypot(o[0] - q.p[0], o[2] - q.p[2]) < 4)) out.push(q.p);
+  }
+  return out;
 }
+/** A lamp's light for its height above the ground (m): a taller lamp needs more to light the same pool. */
+export const poolLight = (height) => ({ intensity: 30 * Math.max(1, (height / 4.8) ** 2), distance: Math.max(18, height * 3) });
 
 // ---- quality: what each graphics setting draws for the water, sky and light ----
 /** q: world.js's QUALITY3D q (0.5 Performance, 1 Balanced, 2 High quality). */

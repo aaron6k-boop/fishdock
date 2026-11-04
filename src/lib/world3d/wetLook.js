@@ -21,7 +21,7 @@ export const WET_PREP = /* glsl */`
     #define FDH(o) fract(sin(dot(fi + o, vec2(127.1, 311.7))) * 43758.5453)
     float fn = mix(mix(FDH(vec2(0., 0.)), FDH(vec2(1., 0.)), fu.x), mix(FDH(vec2(0., 1.)), FDH(vec2(1., 1.)), fu.x), fu.y);
     #undef FDH
-    fdPud = smoothstep(.6, .78, fn);
+    fdPud = smoothstep(.64, .8, fn);
     fdWet = uWet * (1. - fdGrass * .5);
     fdShine = uWet * fdLevel * fdNear * (1. - fdGrass);
   }
@@ -29,4 +29,4 @@ export const WET_PREP = /* glsl */`
 // (a factor for diffuseColor: wet concrete is darker, puddles darker still)
 export const WET_DARKEN = "(1.0 - fdWet * (0.3 + 0.16 * fdPud))";
 // (the new roughnessFactor, given the dry one: unchanged when dry; satin when wet; puddles close to a mirror)
-export const wetRough = (dry) => `mix(${dry}, ${dry} * mix(0.6, 0.12, fdPud), fdShine)`;
+export const wetRough = (dry) => `mix(${dry}, ${dry} * mix(0.6, 0.2, fdPud), fdShine)`;
