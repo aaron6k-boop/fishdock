@@ -536,7 +536,9 @@ function makeHuman(L, gltf, clips, outfit, venue) {
 
     // ---- the feet on the deck: a foot that's come down stays where it landed until it lifts (no sliding however the
     // walk is blended, turned or sped up), set on the ground's own height there; the hips drop if a leg can't reach ----
-    const footOn = (w.idle < 0.98 || st.pw > 0.02) && walking && !fp;
+    // (on the whole time you're walking about: coming to a stop, the feet stay where they came down rather than
+    // sliding back into the standing pose)
+    const footOn = walking && !fp;
     if (footOn) {
       const floor = o.walk?.floor, gy = gp.y;
       // (the planted heights for the blend of moves playing: the heel's and the toe's)
@@ -544,7 +546,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       let refA = 0, refT = 0, rw = 0;
       for (const [key, ww] of Object.entries(wts)) if (ww > 0 && footRef[key]) { refA += ww * footRef[key].a; refT += ww * footRef[key].t; rw += ww; }
       if (rw > 0) { refA /= rw; refT /= rw; } else { refA = footRef.idle?.a ?? 0.09; refT = footRef.idle?.t ?? 0.02; }
-      const lw = clamp((1 - w.idle) * 3 + st.pw * 2, 0, 1), aims = [];
+      const lw = 1, aims = [], piv = st.pw > 0.4;
       for (const sd of ["L", "R"]) {
         // the planted point: the heel from when it strikes, then the ball of the foot as the heel lifts, until the toe
         // leaves the ground, and the way the foot points while it's down (a pivot turns on the planted foot, not by
@@ -553,14 +555,16 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         const P = pre[sd], ank = P.a, toe0 = P.t;
         const yaw0 = Math.atan2(toe0.x - ank.x, toe0.z - ank.z);
         const hA = wFig(ank).y - refA, hT = wFig(toe0).y - refT;
-        const mode = hA < 0.022 ? "heel" : hT < 0.018 ? "toe" : null;
+        // (a pivot turns on the ball of the foot: the toe held, the foot free to turn about it)
+        const mode = piv ? (hT < 0.02 ? "toe" : hA < 0.022 ? "heel" : null) : hA < 0.022 ? "heel" : hT < 0.018 ? "toe" : null;
         if (mode && !fs.mode) fs.yaw = yaw0 + fs.dyaw;
+        if (piv) fs.yaw = yaw0 + fs.dyaw * Math.exp(-dt * 10);
         fs.dyaw = mode ? clamp(wrapA(fs.yaw - yaw0), -0.9, 0.9) : fs.dyaw * Math.exp(-dt * 10);
         const cy = Math.cos(fs.dyaw * lw), sy = Math.sin(fs.dyaw * lw), rx = toe0.x - ank.x, rz = toe0.z - ank.z;
         const toe = V(ank.x + rx * cy + rz * sy, toe0.y, ank.z - rx * sy + rz * cy), at = mode === "toe" ? toe : ank;
         if (mode && mode !== fs.mode) fs.lock.set(at.x + fs.corr.x, 0, at.z + fs.corr.z);
         fs.mode = mode;
-        if (mode) { fs.corr.set(fs.lock.x - at.x, 0, fs.lock.z - at.z); if (fs.corr.length() > 0.3) { fs.mode = null; fs.corr.setLength(0.3); } }
+        if (mode) { fs.corr.set(fs.lock.x - at.x, 0, fs.lock.z - at.z); if (fs.corr.length() > 0.42) { fs.mode = null; fs.corr.setLength(0.42); } }
         else fs.corr.multiplyScalar(Math.exp(-dt * 12));
         const tgt = ank.clone().addScaledVector(fs.corr, lw);
         if (floor) { const fy = floor(tgt.x, tgt.z); if (Number.isFinite(fy)) tgt.y += clamp(fy - gy, -0.25, 0.25); }
