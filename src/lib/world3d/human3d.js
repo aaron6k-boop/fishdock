@@ -214,6 +214,7 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
     get headAt() { return who().headAt; },
     get eyeAt() { return who().eyeAt; },
     hand(i) { return who().hand(i); },
+    get chest() { return H ? H.chest : null; },
     setFirstPerson(on) { fp = !!on; H?.setFirstPerson(fp); show(); },
     dispose() { gone = true; stand.dispose(); H?.dispose(); },
   };
@@ -380,7 +381,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   }
 
   // ---- posing ----
-  const st = { u: 0, v: 0, turn: 0, lastYaw: null, look: 0, lookUntil: 0, nextLook: 6 + rnd() * 10, blink: 0, nextBlink: 1 + rnd() * 3, jaw: 0, yaw: 0, pitch: 0, drop: 0, lean: 0, brace: 0, twist: 0, hand: [{ w: 0, kind: null, from: V(), out: V(), u: 1, last: null }, { w: 0, kind: null, from: V(), out: V(), u: 1, last: null }], t: 0 };
+  const st = { u: 0, v: 0, turn: 0, lastYaw: null, look: 0, lookUntil: 0, nextLook: 6 + rnd() * 10, blink: 0, nextBlink: 1 + rnd() * 3, jaw: 0, yaw: 0, pitch: 0, drop: 0, lean: 0, brace: 0, twist: 0, hand: [{ w: 0, kind: null, from: V(), out: V(), u: 1, last: null }, { w: 0, kind: null, from: V(), out: V(), u: 1, last: null }], t: 0, foot: {} };
   const save = {}; const ARM = ["UpperArm", "Forearm", "Hand"];
   const FINGERS = { L: [], R: [] };
   for (const s of ["L", "R"]) for (const f of [1, 2, 3, 4]) for (const j of ["", "1", "2"]) { const b = B(`${s}_Finger${f}${j}`); if (b) FINGERS[s].push([b, j === "" ? 0.75 : j === "1" ? 1.15 : 0.8]); }
@@ -394,6 +395,8 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const figDirW = (v) => v.clone().transformDirection(groupOf().matrixWorld); // a direction too (made unit length)
   const gq = new THREE.Quaternion(), figVecW = (v) => v.clone().applyQuaternion(groupOf().getWorldQuaternion(gq)); // an offset, kept its length
   const wFig = (w) => groupOf().worldToLocal(w.clone());
+  const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  const LM = { p: V(), a: V(), b: V(), q: new THREE.Quaternion() };
 
   function pose(o) {
     const dt = Math.min(0.1, o.dt || 0.016), t = o.t || 0; st.t = t;
@@ -401,21 +404,48 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     g.updateWorldMatrix(true, false);
     const k6 = 1 - Math.exp(-dt * 6);
 
-    // ---- locomotion: walks blended by speed, their phase from the ground covered ----
-    const v = o.walk && !o.walk.air ? Math.max(0, o.walk.speed || 0) : 0;
-    st.v += (v - st.v) * (1 - Math.exp(-dt * 8));
-    // turning on the spot: small steps
+    // ---- locomotion: walks blended by speed, their phase from the ground actually covered ----
+    // (how far the figure really moved and turned this frame is what the feet have to match: for you, and for a friend
+    // whose walk arrives over the network)
+    const gp = g.getWorldPosition(LM.p);
+    let moved = 0;
+    if (st.gp) { moved = Math.hypot(gp.x - st.gp.x, gp.z - st.gp.z); if (moved > 1.5) { moved = 0; st.foot = {}; } } else st.gp = V();
+    st.gp.copy(gp);
+    const walking = !!o.walk && !o.walk.air;
+    const v = walking ? Math.max(0, o.walk.speed ?? moved / dt) : 0;
+    const v0 = st.v; st.v += (v - st.v) * (1 - Math.exp(-dt * 12));
+    st.acc = (st.acc || 0) + ((st.v - v0) / dt - (st.acc || 0)) * (1 - Math.exp(-dt * 6));
+    // turning: the rate (+ to the right), from how the figure turned
     const yawNow = Math.atan2(-g.matrixWorld.elements[8], g.matrixWorld.elements[10]);
-    if (st.lastYaw != null) { const d = Math.atan2(Math.sin(yawNow - st.lastYaw), Math.cos(yawNow - st.lastYaw)); st.turn += (Math.abs(d) / dt - st.turn) * (1 - Math.exp(-dt * 6)); }
+    let dyaw = st.lastYaw == null ? 0 : wrapA(yawNow - st.lastYaw);
+    if (Math.abs(dyaw) > 1.2) dyaw = 0; // (put somewhere else, not a turn)
     st.lastYaw = yawNow;
-    const turning = o.walk && st.v < 0.4 ? clamp((st.turn - 0.8) / 2, 0, 1) : 0;
+    st.yr = (st.yr || 0) + (dyaw / dt - (st.yr || 0)) * (1 - Math.exp(-dt * 10)); st.turn = Math.abs(st.yr);
+    // a turn on the spot is a pivot: the turning steps (x_turn_l, x_turn_r: about a quarter turn each) played through
+    // as far as the turn has got, their own swing of the hips taken out (the walker sets which way you face)
+    const canPivot = !!(act.turn_l && act.turn_r);
+    const pivotOn = canPivot && walking && st.v < 0.7 && st.turn > 0.7;
+    if (pivotOn && (!st.piv || st.piv.end || Math.sign(st.yr) !== st.piv.dir)) st.piv = { dir: Math.sign(st.yr) || 1, done: 0, total: Math.max(Math.PI / 2, Math.abs(o.walk.off || 0) + Math.abs(dyaw)) };
+    if (st.piv) {
+      if (Math.sign(dyaw) === st.piv.dir) st.piv.done = Math.min(st.piv.total, st.piv.done + Math.abs(dyaw));
+      if (!pivotOn && (st.v > 0.9 || st.turn < 0.3 || !walking)) st.piv.end = true;
+    }
+    const pwWant = st.piv && !st.piv.end ? 1 : 0;
+    st.pw = (st.pw || 0) + (pwWant - (st.pw || 0)) * (1 - Math.exp(-dt * (pwWant ? 14 : 7)));
+    if (st.piv?.end && st.pw < 0.02) { st.piv = null; st.pw = 0; }
+    // (without the turning steps, as before: small steps of the slow walk)
+    const turning = !canPivot && o.walk && st.v < 0.4 ? clamp((st.turn - 0.8) / 2, 0, 1) : 0;
     const vs = Math.max(st.v, turning * 0.55 * speedOf("walk_slow"));
     const sp = LOCO.map(speedOf), w = { idle: 0, walk_slow: 0, walk: 0, walk_fast: 0, run: 0 };
     if (vs < 0.05) w.idle = 1;
     else if (vs < sp[0]) { const f = vs / sp[0]; w.idle = 1 - f; w.walk_slow = f; }
     else { let i = 0; while (i < 3 && vs > sp[i + 1]) i++; if (i >= 3) w.run = 1; else { const f = clamp((vs - sp[i]) / Math.max(0.01, sp[i + 1] - sp[i]), 0, 1); w[LOCO[i]] = 1 - f; w[LOCO[i + 1]] = f; } }
     let stride = 0, ws = 0; for (const key of LOCO) { stride += w[key] * (clips[key]?.userData.travel || 1) * k; ws += w[key]; }
-    if (ws > 0 && !o.walk?.air) st.u = (st.u + (vs * dt) / (stride / ws)) % 1;
+    // (faster than the run was filmed at, a sprint: longer strides as well as quicker ones, the planted foot held by the
+    // leg IK below, rather than legs spinning)
+    if (ws > 0) stride *= clamp(Math.sqrt(Math.max(1, vs / sp[3])), 1, 1.35);
+    const adv = moved + turning * 0.55 * speedOf("walk_slow") * dt;
+    if (ws > 0 && walking) st.u = (st.u + adv / (stride / ws)) % 1;
     for (const key of LOCO) { const a = act[key]; if (!a) continue; a.setEffectiveWeight(w[key]); a.time = (((st.u + (offs[key] || 0)) % 1) + 1) % 1 * a.getClip().duration; }
     // standing: the idle, and now and then a look round (when nothing in particular holds their eye)
     if (act.idle) act.idle.time = (act.idle.time + dt) % act.idle.getClip().duration;
@@ -445,9 +475,30 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       for (const key of ACTS) { const a = act[key]; if (!a) continue; const on = o.act?.key === key; const wt = on ? clamp(o.act.w ?? 1, 0, 1) : 0; a.setEffectiveWeight(wt); if (on) a.time = clamp(o.act.t || 0, 0, a.getClip().duration - 0.001); }
       const aw = o.act && act[o.act.key] ? clamp(o.act.w ?? 1, 0, 1) : 0;
       if (aw > 0) for (const [key, a] of Object.entries(act)) if (!ACTS.includes(key)) a.setEffectiveWeight(a.getEffectiveWeight() * (1 - aw));
+      // a pivot: the turning steps, as far through as the turn has got, the rest giving way to them
+      if (st.pw > 0.001 && st.piv && !(o.act && ACTS.includes(o.act.key))) {
+        const a = act[st.piv.dir > 0 ? "turn_r" : "turn_l"], u = clamp(st.piv.done / st.piv.total, 0, 1);
+        for (const x of Object.values(act)) if (x !== a) x.setEffectiveWeight(x.getEffectiveWeight() * (1 - st.pw));
+        a.setEffectiveWeight(st.pw); a.time = u * (a.getClip().duration - 0.001);
+      }
     }
     mixer.update(0);
     inner.position.set(0, 0, 0);
+
+    // ---- balance: leaning into setting off, stopping and turning (about the feet, as a body does), a moment's weight
+    // shift before the first step and a settle at the end; the turning steps' own swing of the hips taken out ----
+    let yc = 0;
+    inner.rotation.set(0, Math.PI, 0);
+    if (st.pw > 0.002) { root.updateMatrixWorld(true); yc = -wrapA(latAt() - latRef) * clamp(st.pw * 4, 0, 1); }
+    const fwdT = walking ? clamp(-st.acc * 0.028, -0.07, 0.05) : 0;
+    const rollT = walking ? clamp(0.55 * Math.atan((st.v * st.yr) / 9.8), -0.16, 0.16) : 0;
+    const kb = 1 - Math.exp(-dt * 7);
+    st.lf = (st.lf || 0) + (fwdT - (st.lf || 0)) * kb; st.lr = (st.lr || 0) + (rollT - (st.lr || 0)) * kb;
+    inner.rotation.set(st.lf, Math.PI + yc, st.lr);
+    if (walking && v0 < 0.03 && st.v >= 0.03 && t - (st.stopT ?? -9) > 0.25) st.antT = t;
+    if (v0 >= 0.25 && st.v < 0.25) st.stopT = t;
+    const ba = st.antT != null ? (t - st.antT) / 0.45 : 9, bs = st.stopT != null ? (t - st.stopT) / 0.5 : 9;
+    st.dip = (ba < 1 ? Math.sin(ba * Math.PI) * 0.014 : 0) + (bs < 1 ? Math.sin(bs * Math.PI) * 0.01 : 0);
     root.updateMatrixWorld(true);
 
     // ---- the body: lower the hips (crouch, brace), lean, turn the chest; the feet stay put ----
@@ -459,10 +510,16 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     st.twist += ((o.twist || 0) - st.twist) * k6;
     const feet = {};
     if (standing) for (const s of ["L", "R"]) feet[s] = { p: wp(B(s + "_Foot")), q: wq(B(s + "_Foot")) };
-    if (st.drop > 0.002 || st.brace > 0.01) { inner.position.y = -st.drop / k; root.updateMatrixWorld(true); }
+    if (st.drop > 0.002 || st.brace > 0.01 || st.dip > 0.0005) { inner.position.y = -(st.drop + st.dip) / k; root.updateMatrixWorld(true); }
     const right = figDirW(V(1, 0, 0)), up = figDirW(V(0, 1, 0));
     turnW(B("Spine1"), right, -st.lean * 0.45); turnW(B("Spine2"), right, -st.lean * 0.4); turnW(B("Neck"), right, -st.lean * 0.15);
     turnW(B("Spine1"), up, -st.twist * 0.45); turnW(B("Spine2"), up, -st.twist * 0.35);
+    // turning, the chest and head lead into it a little (never past the shoulders); standing, a slow breath
+    const lead = clamp(-st.yr * 0.07, -0.2, 0.2) * clamp(st.v / 0.8 + st.pw, 0, 1);
+    st.lead = (st.lead || 0) + (lead - (st.lead || 0)) * (1 - Math.exp(-dt * 6));
+    if (Math.abs(st.lead) > 1e-3) { turnW(B("Spine1"), up, st.lead * 0.35); turnW(B("Spine2"), up, st.lead * 0.25); if (!o.look) turnW(B("Head"), up, st.lead * 0.5); }
+    const br = Math.sin((t * Math.PI * 2) / 4.3) * 0.011 * w.idle * (1 - (st.kn || 0));
+    if (Math.abs(br) > 1e-4) { turnW(B("Spine1"), right, br * 0.5); turnW(B("Spine2"), right, br * 0.6); turnW(B("Neck"), right, -br * 0.9); }
     if (standing && (st.drop > 0.002 || st.brace > 0.01)) {
       for (const [s, sx, fz] of [["L", -1, -0.13], ["R", 1, 0.07]]) {
         const target = feet[s].p.clone().add(figVecW(V(sx * 0.05 * st.brace, 0, fz * st.brace)));
@@ -471,6 +528,41 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         aim(B(s + "_Thigh"), B(s + "_Calf"), r.B); aim(B(s + "_Calf"), B(s + "_Foot"), r.C); setWQ(B(s + "_Foot"), feet[s].q);
       }
     }
+
+    // ---- the feet on the deck: a foot that's come down stays where it landed until it lifts (no sliding however the
+    // walk is blended, turned or sped up), set on the ground's own height there; the hips drop if a leg can't reach ----
+    const footOn = (w.idle < 0.98 || st.pw > 0.02) && walking && !fp;
+    if (footOn) {
+      const floor = o.walk?.floor, gy = gp.y;
+      let ref = 0, rw = 0; for (const key of ["idle", ...LOCO]) { const ww = w[key] || 0; if (ww > 0 && ankRef[key] != null) { ref += ww * ankRef[key]; rw += ww; } }
+      ref = rw > 0 ? ref / rw : ankRef.idle || 0.09;
+      const lw = clamp((1 - w.idle) * 3 + st.pw * 2, 0, 1), aims = [];
+      for (const sd of ["L", "R"]) {
+        const fs = st.foot[sd] || (st.foot[sd] = { lock: null, off: V() });
+        const fb = B(sd + "_Foot"), ank = wp(fb), hA = wFig(ank).y - ref;
+        const c = 1 - clamp((hA - 0.012) / 0.03, 0, 1);
+        const tgt = ank.clone();
+        if (!fs.lock && c > 0.6) fs.lock = ank.clone();
+        if (fs.lock && (c < 0.15 || Math.hypot(fs.lock.x - ank.x, fs.lock.z - ank.z) > 0.3)) { fs.off.set(fs.lock.x - ank.x, 0, fs.lock.z - ank.z).multiplyScalar(c * lw); fs.lock = null; }
+        if (fs.lock) { tgt.x += (fs.lock.x - ank.x) * c * lw; tgt.z += (fs.lock.z - ank.z) * c * lw; }
+        else { tgt.add(fs.off); fs.off.multiplyScalar(Math.exp(-dt * 14)); }
+        if (floor) { const fy = floor(tgt.x, tgt.z); if (Number.isFinite(fy)) tgt.y += clamp(fy - gy, -0.25, 0.25); }
+        aims.push([sd, tgt, wq(fb)]);
+      }
+      // (a leg stretched past its length: the hips come down to it)
+      let need = 0;
+      for (const [sd, tgt] of aims) { const hip = wp(B(sd + "_Thigh")), len = legLen(sd); need = Math.max(need, hip.distanceTo(tgt) - len * 0.995); }
+      st.ikDrop = (st.ikDrop || 0) + (clamp(need, 0, 0.06) - (st.ikDrop || 0)) * (1 - Math.exp(-dt * 20));
+      if (st.ikDrop > 1e-4) { inner.position.y -= st.ikDrop / k; root.updateMatrixWorld(true); }
+      const fwdW = figDirW(V(0, 0, -1));
+      for (const [sd, tgt, fq] of aims) {
+        const hip = wp(B(sd + "_Thigh")), knee = wp(B(sd + "_Calf")), ank = wp(B(sd + "_Foot"));
+        const pole = knee.clone().sub(hip.clone().add(ank).multiplyScalar(0.5)); if (pole.lengthSq() < 1e-6) pole.copy(fwdW); pole.normalize().addScaledVector(fwdW, 0.3);
+        const L1 = hip.distanceTo(knee), L2 = knee.distanceTo(ank);
+        const r = twoBone(hip, tgt, L1, L2, pole);
+        aim(B(sd + "_Thigh"), B(sd + "_Calf"), r.B); aim(B(sd + "_Calf"), B(sd + "_Foot"), r.C); setWQ(B(sd + "_Foot"), fq);
+      }
+    } else if (st.foot.L || st.foot.R) { st.foot = {}; st.ikDrop = 0; }
 
     // ---- the head: towards what they're watching, within the neck's reach ----
     {
@@ -576,6 +668,25 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // the figure faces -z, which is +z in the model)
   mixer.update(0); root.updateMatrixWorld(true);
   const headFwd = V(0, 0, 1).transformDirection(inner.matrixWorld).applyQuaternion(wq(B("Head")).invert()).normalize();
+  // ---- the planted ankle's height in each walk (the figure's space, measured on this person), the legs' length and
+  // the hips' heading at rest (for taking the turning steps' own swing out) ----
+  const latAt = () => { const l = inner.worldToLocal(wp(B("L_Thigh"))), r = inner.worldToLocal(wp(B("R_Thigh"))); return Math.atan2(-(l.z - r.z), l.x - r.x); };
+  const latRef = latAt();
+  const legL = {}; for (const sd of ["L", "R"]) legL[sd] = wp(B(sd + "_Thigh")).distanceTo(wp(B(sd + "_Calf"))) + wp(B(sd + "_Calf")).distanceTo(wp(B(sd + "_Foot")));
+  const legLen = (sd) => legL[sd];
+  const ankRef = {};
+  {
+    const save = Object.entries(act).map(([kk, a]) => [kk, a.getEffectiveWeight(), a.time]);
+    for (const key of ["idle", ...LOCO]) {
+      const a = act[key]; if (!a) continue;
+      for (const [k2, a2] of Object.entries(act)) a2.setEffectiveWeight(k2 === key ? 1 : 0);
+      let lo = Infinity; const N = key === "idle" ? 1 : 24;
+      for (let i = 0; i < N; i++) { a.time = (i / N) * a.getClip().duration; mixer.update(0); root.updateMatrixWorld(true); for (const sd of ["L", "R"]) lo = Math.min(lo, wp(B(sd + "_Foot")).y); }
+      ankRef[key] = lo;
+    }
+    for (const [kk, wt, tm] of save) { act[kk].setEffectiveWeight(wt); act[kk].time = tm; }
+    mixer.update(0); root.updateMatrixWorld(true);
+  }
 
   let fp = false;
   return {
@@ -584,6 +695,8 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     get headAt() { return wFigSafe(B("Head")); },
     get eyeAt() { const a = B("LEye"), b = B("REye"); if (!a || !b) return wFigSafe(B("Head")).add(V(0, 0.1, -0.08)); return wFigSafe(a).add(wFigSafe(b)).multiplyScalar(0.5).add(V(0, 0, -0.02)); },
     hand(i) { return wFigSafe(B(i ? "R_Hand" : "L_Hand")); },
+    /** the shoulders' middle (the figure's space) and which way they face: a carried rod moves with them */
+    get chest() { const l = wFigSafe(B("L_UpperArm")), r = wFigSafe(B("R_UpperArm")); return { p: l.clone().add(r).multiplyScalar(0.5), yaw: Math.atan2(-(l.z - r.z), l.x - r.x) }; },
     setFirstPerson(on) { fp = !!on; },
     dispose() { root.parent?.remove(root); mixer.stopAllAction(); mixer.uncacheRoot(model); for (const m of mats) m.dispose(); for (const m of extraMats) m.dispose(); for (const o of extra) o.geometry?.dispose?.(); },
   };

@@ -8,7 +8,7 @@ import { checkScene } from "./sceneCheck.js";
 import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor } from "./walker.js";
 import { createEnvironment } from "./environment.js";
 import { createAngler } from "./angler.js";
-import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist } from "./look.js";
+import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
 import { planCast } from "./castAim.js";
@@ -148,6 +148,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     out.y = Math.max(out.y, (env.floorAt ? env.floorAt(out.x, out.z) : 0) + 0.6);
     return out;
   }
+  // the walking camera: the picture's edges kept clear as well as its middle (a ray a little to each side too), so
+  // sliding past a wall, the lighthouse or a shelter never puts the side of the view inside it. How far back is clear
+  function clearBack(from, want, yaw) {
+    let d = unblocked(from, want).distanceTo(from);
+    const side = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw)).multiplyScalar(0.24), dir = new THREE.Vector3();
+    if (solids.length) for (const sg of [-1, 1]) {
+      const f2 = from.clone().addScaledVector(side, sg), w2 = want.clone().addScaledVector(side, sg); dir.subVectors(w2, f2); const len = dir.length(); if (len < 0.01) continue;
+      ray.set(f2, dir.multiplyScalar(1 / len)); ray.far = len + 0.35;
+      const hit = ray.intersectObjects(solids, false)[0]; if (hit) d = Math.min(d, Math.max(0.35, hit.distance - 0.35));
+    }
+    return d;
+  }
   let camOverride = null, lookOverride = null, inspectFrom = null;
   // where your fish sits on screen while you look at it (normalised: 0 the middle, 1 the top), above the card that
   // tells you about it along the bottom (Stage3D FishLook, its height capped in livefishing.css)
@@ -155,7 +167,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
   // auto-walk (keeps walking where you look until you touch the stick) and tap-to-move (walks to a point you tapped)
   let autoWalk = false, walkTarget = null, walkStuck = 0, modeSince = -10, lastMode = "first";
-  let crowded = false;
+  let crowded = false, aheadN = 0, aheadD = null;
   // where everyone else is standing (their spot, or where they've walked to)
   const othersAt = () => { const o = []; for (const [id, x] of anglers) if (id !== localId && x.out?.at) o.push([x.out.at.x, x.out.at.z]); return o; };
   let W = null, walkIn = { x: 0, y: 0, sprint: false }, walkJump = false, canFish = false, fishTest = 0, modeBeforeWalk = "first", fovBeforeWalk = null, onPose = null;
@@ -242,7 +254,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // person. The horizon stays level (the camera never rolls)
       // (the speed it follows at is the walker's eased speed, not a frame's, so it doesn't twitch with uneven frames)
       W.camSpeed = (W.camSpeed || 0) + ((W.speed || 0) - (W.camSpeed || 0)) * (1 - Math.exp(-dt * 6));
-      look.follow(W.face, FOLLOW.pitch, walkFollow({ dragging: look.dragging, sinceTouch: performance.now() - look.touched, speed: W.camSpeed, off: W.face - look.yaw, dt }));
+      // (the turn eases its own speed up and down; the pitch comes back to its level on its own after a look up or down,
+      // walking or standing, and a double tap recentres behind you)
+      const sinceTouch = performance.now() - look.touched;
+      look.follow(W.face, null, walkFollow({ dragging: look.dragging, sinceTouch, speed: W.camSpeed, off: W.face - look.yaw, dt }), dt);
+      look.easePitch(WALK_PITCH.level, walkPitchBack({ dragging: look.dragging, sinceTouch, dt }));
+      look.setHome(W.face, WALK_PITCH.level);
       yaw = look.yaw; pitch = look.pitch;
       // the height it looks from eases after you (a step up, a jump, a ramp onto the pier), never jolting
       pivotY = pivotY == null || Math.abs(W.y - pivotY) > 3 ? W.y : pivotY + (W.y - pivotY) * (1 - Math.exp(-dt * (W.air ? 4 : 9)));
@@ -264,7 +281,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // (a little higher: you sit lower in the view, with the way ahead above you). Something in the way brings the
         // camera in at once; when it clears, the camera eases back out rather than popping
         const want = tgt.clone().addScaledVector(d, -dist).add(new THREE.Vector3(0, 0.3, 0)); pivot.copy(tgt);
-        const free = unblocked(pivot, want), wantD = free.distanceTo(pivot);
+        const wantD = clearBack(pivot, want, yaw);
         followAt = followDist(followAt, wantD, dt);
         pos.copy(pivot).addScaledVector(want.clone().sub(pivot).normalize(), followAt);
         { const fl = env.floorAt ? env.floorAt(pos.x, pos.z) : null; if (fl != null) pos.y = Math.max(pos.y, fl + 0.6); }
@@ -504,7 +521,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     let walkInfo = null;
     if (W) {
       const me = anglers.get(localId);
-      if (!me) W = null;
+      if (!me) { W = null; look.setPitchRange(); look.setBaseFov(null); }
       else {
         // in small steps (never through a railing), however slowly the phone draws
         let rem = Math.min(0.25, dt || 0.016);
@@ -533,6 +550,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         if (near.length) { const p = keepApart(W.x, W.z, near); if ((p.x !== W.x || p.z !== W.z) && env.ground.walkable(p.x, p.z)) W = { ...W, x: p.x, z: p.z }; }
         // tapped somewhere you can't get to: give up rather than push against the rail for ever
         if (walkTarget || autoWalk) { walkStuck = Math.hypot(W.x - x0, W.z - z0) < 0.004 ? walkStuck + (dt || 0.016) : 0; if (walkStuck > 0.6) { walkTarget = null; autoWalk = false; walkStuck = 0; } }
+        // what's close ahead, up where a carried rod goes (a wall, the lighthouse): the rod is held more upright to clear it
+        if (++aheadN % 3 === 0) { if (solids.length) { ray.set(new THREE.Vector3(W.x, W.y + 1.4, W.z), new THREE.Vector3(Math.sin(W.face), 0.4, -Math.cos(W.face)).normalize()); ray.far = 4; const h = ray.intersectObjects(solids, false)[0]; aheadD = h ? h.distance * 0.92 : null; } else aheadD = null; }
+        W.ahead = aheadD;
         me.a.setWalk(W);
         if (++fishTest % 8 === 0) { const edge = !!env.ground.fishHere(W.x, W.z); crowded = edge && !roomToFish(W.x, W.z, othersAt()); canFish = edge && !crowded; }
         walkInfo = { on: true, canFish, crowded, sprint: !!walkIn.sprint, auto: autoWalk, going: !!walkTarget };
@@ -606,14 +626,17 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         if (ph === "landing" && !me.out.landed) return "Landing your fish: one moment.";
         if (line === "out") return "line";
         const p = me.a.root.position;
-        W = walker(p.x, p.z, me.out?.face ?? 0, p.y); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
+        W = walker(p.x, p.z, me.out?.face ?? 0, p.y); W.floor = (x, z) => env.ground.heightAt(x, z); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
         fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56 }[dist] || 47); look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);
         // (from your eyes out to behind you as a glide; a drag turns the view by what the walking camera shows)
         followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8);
+        // (a comfortable range to look up and down while walking, no vertical flick; a double tap recentres behind you at
+        // this distance rather than at the fishing view's)
+        look.setPitchRange(WALK_PITCH.min, WALK_PITCH.max, false); look.setBaseFov(look.fov); look.setHome(W.face, WALK_PITCH.level);
         return null;
       }
       if (!W) return null;
-      { const s0 = me?.a.spot, at = s0?.at; blendFor(s0?.face ?? look.yaw, at ? Math.hypot(at[0] - W.x, at[2] - W.z) : 0); } look.setDragFov(null);
+      { const s0 = me?.a.spot, at = s0?.at; blendFor(s0?.face ?? look.yaw, at ? Math.hypot(at[0] - W.x, at[2] - W.z) : 0); } look.setDragFov(null); look.setPitchRange(); look.setBaseFov(null);
       W = null; autoWalk = false; walkTarget = null; me?.a.setWalk(null); onPose?.(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       const s2 = me?.a.spot; if (s2) { look.setHome(s2.face, HOME_PITCH); look.aim(s2.face, HOME_PITCH); }
       return null;
@@ -661,7 +684,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const me = anglers.get(localId); if (!W || !me) return null;
       const sp = env.ground.fishHere(W.x, W.z); if (!sp || !roomToFish(W.x, W.z, othersAt())) return null;
       const spot = { ...me.a.spot, ...sp, id: me.a.spot?.id ?? 1, name: "Where you chose" };
-      blendFor(spot.face); look.setDragFov(null);
+      blendFor(spot.face); look.setDragFov(null); look.setPitchRange(); look.setBaseFov(null);
       me.a.place(spot); W = null; autoWalk = false; walkTarget = null; me.a.setWalk(null); onPose?.({ ...spot, spotAt: true }); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       look.setHome(spot.face, HOME_PITCH); look.aim(spot.face, HOME_PITCH);
       return spot;
