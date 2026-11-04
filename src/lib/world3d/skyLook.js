@@ -36,8 +36,10 @@ export function lightingFor(st) {
   const skyIntensity = (day * (0.72 + 0.5 * over) + dusk * (0.78 + 0.3 * over) + night * (0.34 + 0.22 * moonLight)) * (1 - 0.12 * rain);
   // shadows: crisp in sun, faint under a grey sky, soft by moonlight
   const shadow = mix(mix(0.85, 0.32, over), 0.55, night);
-  // haze (exponential, the same for the land and the water): further in rain, a little at dusk and at night
-  const fogDensity = (0.00052 + 0.0003 * over + 0.00015 * dusk + 0.00025 * night) + rain * 0.0024;
+  // haze (exponential, the same for the land and the water): further in rain, a little at dusk and at night. Even on a
+  // clear day sea air softens the far shore (about a tenth hazed at 500 m, two fifths at a kilometre), so the distant
+  // piers and dunes sit back instead of looking as sharp as the deck
+  const fogDensity = (0.00068 + 0.0003 * over + 0.00015 * dusk + 0.00025 * night) + rain * 0.0024;
   // the eye adapts: dusk and night are lifted, a grey day a touch, so nothing is crushed to black
   const exposure = 1 + 0.22 * dusk + 0.5 * night + 0.08 * over * (1 - night) + 0.06 * rain;
   // how strongly the sky shows in reflections (wet ground in rain shows more of it)

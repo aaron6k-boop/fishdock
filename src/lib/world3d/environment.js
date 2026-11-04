@@ -321,7 +321,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float clump = smoothstep(.45, .72, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
         float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
         float edge = eband*(clump*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
-        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.9*uShoreOn + churn*.7;
+        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.8*uShoreOn + churn*.7;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
         foam = clamp(foam, 0., .8);
         vec3 foamC = mix(uWater*2.2 + vec3(.3, .33, .34), vec3(.8, .83, .84), smoothstep(.2, .7, foam));
