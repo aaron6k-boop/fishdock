@@ -186,7 +186,7 @@ function realArms(scene, { gloves, skinHex }) {
     const up0 = Z.clone().addScaledVector(dir0, -Z.dot(dir0)).normalize(), fr0 = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(dir0.clone().cross(up0), dir0, up0));
     // each finger's bones, with the axis it curls about (towards the palm) in its own frame
     const chain = (name, axisW) => [1, 2, 3].map((k) => { const b = bone(`${name}_0${k}_${sfx}`); return { b, rest: b.quaternion.clone(), axis: axisW.clone().applyQuaternion(wq(b).invert()).normalize() }; });
-    const fingers = DIG.map((d) => chain(d, X));
+    const fingers = DIG.map((d) => chain(d, s > 0 ? X : X.clone().negate())); // (the left hand is the right's mirror: its fingers curl the other way about its own across axis)
     const tDir = wp(bone("thumb_02_" + sfx)).sub(wp(bone("thumb_01_" + sfx))).normalize(), tAxis = tDir.clone().cross(Z).normalize().multiplyScalar(s); // (towards the palm, as the fingers: the other way stood it straight up)
     const thumb = chain("thumb", tAxis);
     return { hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone() };
