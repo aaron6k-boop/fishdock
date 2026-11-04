@@ -445,7 +445,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       new THREE.SphereGeometry(0.038, 6, 3).translate(0, RAIL.h * 0.5, 0),
       new THREE.CylinderGeometry(0.075, 0.08, 0.018, 8, 1).translate(0, 0.009, 0),
       new THREE.CylinderGeometry(0.036, 0.036, 0.05, 7, 1, true).translate(0, 0.043, 0), // (the post's welded collar)
-      ...[0, 1, 2, 3].map((k) => new THREE.CylinderGeometry(0.009, 0.009, 0.016, 6, 1).translate(Math.cos(k * Math.PI / 2 + 0.785) * 0.055, 0.024, Math.sin(k * Math.PI / 2 + 0.785) * 0.055)),
+      ...[0, 1, 2, 3].map((k) => new THREE.CylinderGeometry(0.009, 0.009, 0.016, 4, 1).translate(Math.cos(k * Math.PI / 2 + 0.785) * 0.055, 0.024, Math.sin(k * Math.PI / 2 + 0.785) * 0.055)),
     ].map((g2) => g2.toNonIndexed());
     for (const g2 of parts) g2.deleteAttribute("uv");
     const fm = new THREE.InstancedMesh(mergeGeometries(parts), jointMat, posts.length);
