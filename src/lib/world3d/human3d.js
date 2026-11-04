@@ -125,8 +125,25 @@ function regionMeans(map, uv, reg) {
   } catch { /* a texture we can't read: the default brightness */ }
   return out;
 }
+// ---- a fine woven-fabric normal map (drawn once): the jacket and trousers read as cloth up close, not painted plastic ----
+let weaveTex = null;
+function weave() {
+  if (weaveTex || typeof document === "undefined") return weaveTex;
+  const n = 64, c = document.createElement("canvas"); c.width = c.height = n; const g = c.getContext("2d"), img = g.createImageData(n, n);
+  const h = (x, y) => 0.5 + 0.32 * Math.sin(((x + (y >> 2) * 2) % 8) / 8 * Math.PI * 2) * (((x >> 2) + (y >> 2)) % 2 ? 1 : -1);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const dx = (h((x + 1) % n, y) - h((x + n - 1) % n, y)) * 1.4, dy = (h(x, (y + 1) % n) - h(x, (y + n - 1) % n)) * 1.4, l = Math.hypot(dx, dy, 1), i = (y * n + x) * 4;
+    img.data[i] = (-dx / l * 0.5 + 0.5) * 255; img.data[i + 1] = (-dy / l * 0.5 + 0.5) * 255; img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  weaveTex = new THREE.CanvasTexture(c); weaveTex.wrapS = weaveTex.wrapT = THREE.RepeatWrapping; weaveTex.repeat.set(48, 48); weaveTex.anisotropy = 4;
+  return weaveTex;
+}
 function clothMaterial(src, U) {
   const m = src.clone();
+  // the cloth's weave over the model's own colour; each garment its own finish: a softshell jacket, cotton trousers,
+  // rubber wellies with a soft sheen (roughness by region, below)
+  if (!m.normalMap && weave()) { m.normalMap = weave(); m.normalScale = new THREE.Vector2(0.35, 0.35); }
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
     sh.vertexShader = sh.vertexShader
@@ -145,9 +162,10 @@ function clothMaterial(src, U) {
         diffuseColor.rgb = c * (1.0 - clamp(wsum, 0.0, 1.0)) + acc;
         diffuseColor.rgb *= 1.0 - uWet * 0.25 * clamp(vReg.x + vReg.y + vReg.z, 0.0, 1.0);
       }`)
-      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.32, uWet * clamp(vReg.x + vReg.y + vReg.z, 0.0, 1.0));");
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n{ float wr = vReg.x + vReg.y + vReg.z + vReg.w; if (wr > 0.01) roughnessFactor = (vReg.x * 0.74 + vReg.y * 0.86 + vReg.z * 0.42 + vReg.w * 0.55) / wr; }\nroughnessFactor = mix(roughnessFactor, 0.32, uWet * clamp(vReg.x + vReg.y + vReg.z, 0.0, 1.0));")
+      .replace("#include <normal_fragment_maps>", "#include <normal_fragment_maps>\n#ifdef USE_NORMALMAP\n{ }\n#endif");
   };
-  m.customProgramCacheKey = () => "fdcloth1";
+  m.customProgramCacheKey = () => "fdcloth2";
   return m;
 }
 const tint = (hex, on = 1) => (hex == null ? new THREE.Vector4(0, 0, 0, 0) : (() => { const c = new THREE.Color(hex); return new THREE.Vector4(c.r, c.g, c.b, on); })());
