@@ -296,7 +296,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // ---- the drop net off a high pier (landing it, and putting it back): one continuous story, framed ----
         // each moment's shot (landCam.js) is chosen by what has to be seen in it (the fish, the net, you), always from
         // out over the water on your left, so the camera eases from one to the next and never cuts or swings round you
-        const dropStage = venue === "pier" && (out.tech === "dropnet" || !out.land) ? (out.release ? { deck: "carry", in: "over", lower: "rlower", swim: "swim", haul: "rhaul" }[st] : st) : null;
+        const dropStage = venue === "pier" && (out.tech === "dropnet" || !out.land) ? (out.release ? { deck: "carry", in: "over", lower: "rlower", swim: "swim", swum: "rhaul", haul: "rhaul" }[st] : st) : null;
         const shotFov = (dropStage === "lower" || dropStage === "haul" || dropStage === "rlower" || dropStage === "rhaul" ? 60 : 52) * (camera.aspect < 0.8 ? 1.12 : 1), tanV = Math.tan((shotFov * Math.PI) / 360);
         const arr = (v) => (v ? v.toArray() : null);
         const framed = dropStage ? shotFor(dropStage, { fish: arr(landing.fish), net: arr(landing.net), head: arr(out.at.clone().add(new THREE.Vector3(0, 1.72, 0))), feet: arr(out.at.clone().add(new THREE.Vector3(0, 0.05, 0))) }, out.face, { tanV, tanH: tanV * camera.aspect, margin: 0.8 }) : null;
