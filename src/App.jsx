@@ -26,6 +26,7 @@ const Watch = lazy(() => import("./pages/Watch.jsx"));
 const TryLive = lazy(() => import("./pages/TryLive.jsx"));
 const Together = lazy(() => import("./pages/Together.jsx"));
 const Party = lazy(() => import("./pages/Party.jsx"));
+const SpotMap = lazy(() => import("./pages/SpotMap.jsx"));
 
 const TABS = [
   { id: "home", label: "Home", icon: "home" },
@@ -35,8 +36,8 @@ const TABS = [
   { id: "community", label: "Community", icon: "users" },
 ];
 // Screens that aren't tabs light their parent tab, as DetectDock's MOBILE_PARENTS does.
-const PARENT = { live: "home", cast: "home", settings: "home", admin: "home" };
-const ROUTES = new Set(["home", "explore", "tackle", "catches", "community", "live", "cast", "settings", "admin"]);
+const PARENT = { live: "home", cast: "home", settings: "home", admin: "home", map: "home" };
+const ROUTES = new Set(["home", "explore", "tackle", "catches", "community", "live", "cast", "settings", "admin", "map"]);
 
 class ScreenBoundary extends Component {
   constructor(p) { super(p); this.state = { err: null }; }
@@ -57,19 +58,20 @@ class ScreenBoundary extends Component {
 function routeFromHash() {
   const h = (location.hash || "").replace(/^#\/?/, "");
   if (/^spot\/[a-z0-9-]+$/.test(h)) return "explore";
+  if (/^map\/[a-z0-9-]+$/.test(h)) return "map"; // the UK spot map, opened at a mark (#map/<id>)
   return ROUTES.has(h) ? h : "home";
 }
 /** A shared link to a documented mark (#spot/<id>) opens it in Explore. Only documented marks: pins are never shared. */
 function navFromHash() {
-  const m = (location.hash || "").match(/^#\/?spot\/([a-z0-9-]+)$/);
+  const m = (location.hash || "").match(/^#\/?(?:spot|map)\/([a-z0-9-]+)$/);
   return m && spotById(m[1]) ? { spot: m[1] } : null;
 }
 
 /** A private Live Fishing View link (#watch/<token>) opens the viewer on its own: no onboarding, no tabs. */
 const watchToken = () => (location.hash.match(/^#\/?watch\/([A-Za-z0-9_-]{30,64})$/) || [])[1] || null;
 // The labelled demo of the Live Fishing View: #try, #try/<place>, #try/<place>/<species>, and /3d on the end opens
-// the 360° 3D view.
-const tryRoute = () => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?$/); return m ? { place: m[1] === "3d" ? null : m[1] || null, species: m[2] === "3d" ? null : m[2] || null, view3d: !!m[3] } : null; };
+// the 360° 3D view; /p<n> after it starts at fishing position n (chosen on the UK spot map).
+const tryRoute = () => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?(?:\/p([1-4]))?$/); return m ? { place: m[1] === "3d" ? null : m[1] || null, species: m[2] === "3d" ? null : m[2] || null, view3d: !!m[3], point: m[3] && m[4] ? Number(m[4]) : null } : null; };
 // Fish Together: #together (start, join, continue) and a party, #party/<code>/<secret> (or /code, or just the code to
 // come back to one this phone has joined).
 const togetherRoute = () => /^#\/?together$/.test(location.hash);
@@ -85,7 +87,7 @@ export default function Root() {
   if (token) return <Suspense fallback={wait}><Watch token={token} /></Suspense>;
   if (party) return <Suspense fallback={wait}><Party key={party.code} code={party.code} secret={party.secret} /></Suspense>;
   if (tg) return <Suspense fallback={wait}><Together /></Suspense>;
-  if (demo) return <Suspense fallback={wait}><TryLive initialPlace={demo.place} initialSpecies={demo.species} /></Suspense>;
+  if (demo) return <Suspense fallback={wait}><TryLive initialPlace={demo.place} initialSpecies={demo.species} initialPoint={demo.point} /></Suspense>;
   return <App />;
 }
 
@@ -166,6 +168,7 @@ function App() {
               {tab === "cast" && <CastAdvisor />}
               {tab === "settings" && <Settings />}
               {tab === "admin" && <Admin />}
+              {tab === "map" && <SpotMap />}
             </Suspense>
           </ScreenBoundary>
         )}

@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import "./styles/base.css";
 import "./styles/app.css";
 import "./styles/livefishing.css";
+import "./styles/spotmap.css";
 
 /* global __BUILD_ID__ */
 // controls on the right for a right thumb, if this phone chose that (the 3D view's camera menu)

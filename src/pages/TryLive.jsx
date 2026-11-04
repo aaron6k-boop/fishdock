@@ -41,7 +41,7 @@ const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { win
 
 /** A time today that gives the chosen light at this place, found from the real sun. */
 
-export default function TryLive({ initialPlace, initialSpecies }) {
+export default function TryLive({ initialPlace, initialSpecies, initialPoint = null }) {
   // the chips offer the demo places, but a link to any documented mark opens that mark (never a different place)
   const [placeId, setPlaceId] = useState(initialPlace && (initialPlace === GORLESTON.id || spotById(initialPlace)) ? initialPlace : GORLESTON.id);
   const place = placeOf(placeId);
@@ -71,14 +71,20 @@ export default function TryLive({ initialPlace, initialSpecies }) {
   const [lookOpen, setLookOpen] = useState(false), [look, setLookNow] = useState(myLook);
   const setLook = (v) => { setLookNow(v); saveLook(v); };
   const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
-  const [view3d, setView3d] = useState(() => /\/3d$/.test(location.hash)); // the 360° 3D view (Beta)
+  const [view3d, setView3d] = useState(() => /\/3d(\/p[1-4])?$/.test(location.hash)); // the 360° 3D view (Beta)
   const sceneRef = useRef(null);
+  // ---- arriving from the UK spot map (#map): the fishing position chosen there, a way back, and a short label ----
+  const [point] = useState(initialPoint); // 1 to 4, or null for the best one (the first safe position, spawn.js)
+  const fromMap = useMemo(() => { try { return sessionStorage.getItem("fishdock.fromMap") === placeId; } catch { return false; } }, [placeId]);
+  const [arrived, setArrived] = useState(true);
+  // (it goes when its fade ends, which in 3D starts only once the place is ready: spotmap.css; the timer is a backstop)
+  useEffect(() => { setArrived(true); const t = setTimeout(() => setArrived(false), 60000); return () => clearTimeout(t); }, [placeId]);
   const vfReset = useRef(null); // a new place starts afresh
 
   useEffect(() => { // address bar follows the choice, so the page can be shared or bookmarked
-    const h = `#try/${placeId}/${species}${view3d ? "/3d" : ""}`;
+    const h = `#try/${placeId}/${species}${view3d ? "/3d" : ""}${view3d && point && placeId === initialPlace ? `/p${point}` : ""}`;
     if (location.hash !== h) history.replaceState(null, "", h);
-  }, [placeId, species, view3d]);
+  }, [placeId, species, view3d, point]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { vfReset.current?.(); setPhotos(null); setPick(0); setView(defaultView()); setCond(null); setOwn(null);
     // the photo that best suits a rod at the water's edge here; if none does (only views from high up, no water
     // where the line lands, a blocked foreground), the drawn scene, labelled as representative
@@ -127,11 +133,12 @@ export default function TryLive({ initialPlace, initialSpecies }) {
 
   const venue = from === "auto" ? venueOf(place) : from;
   const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
-  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length, look]);
+  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: (placeId === initialPlace && point) || 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length, look, placeId, point]); // eslint-disable-line react-hooks/exhaustive-deps
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (
     <>
       <div className="fs-top">
+              {fromMap ? <a className="fs-chip map-back" href={`#map/${placeId}`} aria-label="Back to map" title="Back to map"><Icon name="back" /><Icon name="explore" /></a> : null}
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
@@ -144,6 +151,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
                 <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
               </> : null}
             </div>
+            {arrived ? <div className="arrive-label" role="status" onAnimationEnd={() => setArrived(false)}><b>{place.name.replace(/ \(.*\)$/, "")}</b><span>{place.region ? `${place.region} · ` : ""}Virtual fishing: catches are simulated, never logged</span></div> : null}
             <div className="fs-bottom">
               <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
@@ -154,7 +162,7 @@ export default function TryLive({ initialPlace, initialSpecies }) {
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D onWindIn={vf.windIn} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "photo", label: "Photo view", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "Photo view", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (
