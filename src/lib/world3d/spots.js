@@ -62,6 +62,27 @@ export const LAYOUTS = {
   },
 };
 export const layoutFor = (venue) => LAYOUTS[venue] || LAYOUTS.pier;
+
+// ---- the drawn place's ground, for walking about (walker.js) and checking where anglers arrive (spawn.js) ----
+// Where you can stand (never the water, kept 45 cm in from a railing or wall), how high the ground is, and where you
+// could fish from (the water's edge within reach, facing it).
+export function drawnGround(venue) {
+  const L = layoutFor(venue), K = 0.45, edgeFish = (at, face, edge, cast) => ({ at, face, edge: Math.max(0.3, edge), cast });
+  if (venue === "pier") {
+    const hw = L.width / 2;
+    return {
+      walkable: (x, z) => Math.abs(x) <= hw - K && z >= L.to + K && z <= L.from,
+      heightAt: (x, z) => (Math.abs(x) <= hw && z >= L.to && z <= L.from ? L.deck : 0),
+      fishHere: (x, z) => { const dl = x + hw, dr = hw - x, de = z - L.to, m = Math.min(dl, dr, de); if (m > 1.6) return null; return m === de ? edgeFish([x, L.deck, z], 0, de, 34) : edgeFish([x, L.deck, z], m === dl ? -Math.PI / 2 : Math.PI / 2, m, 26); },
+    };
+  }
+  if (venue === "beach") {
+    const h = (z) => Math.max(-2.5, Math.min(5, z * 0.15));
+    return { walkable: (x, z) => Math.abs(x) < 300 && z >= 1.5 && z <= 30, heightAt: (x, z) => (z > 0 ? h(z) : 0), ramp: () => true, fishHere: (x, z) => (z < 8 ? edgeFish([x, h(z), z], 0, z, 70) : null) };
+  }
+  // a quay (estuary) or a bank (river, lake) along z = 0, the water to the north
+  return { walkable: (x, z) => Math.abs(x) < 240 && z >= K && z <= 50, heightAt: (x, z) => (z >= 0 ? L.deck : 0), fishHere: (x, z) => (z < 1.8 ? edgeFish([x, L.deck, z], 0, z, venue === "river" ? 14 : 30) : null) };
+}
 export const MAX_ANGLERS = 4;
 
 /** Which way a heading points: 0 is out to sea (-z), positive turns to the right (towards +x). */

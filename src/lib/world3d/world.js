@@ -10,6 +10,7 @@ import { createEnvironment } from "./environment.js";
 import { createAngler } from "./angler.js";
 import { createLook, lookAt, wrap, walkFollow, FOLLOW } from "./look.js";
 import { layoutFor } from "./spots.js";
+import { safeSpots, spawnFor } from "./spawn.js";
 import { planCast } from "./castAim.js";
 
 export const QUALITY3D = { performance: { dpr: 1.25, shadows: 0, q: 0.5 }, balanced: { dpr: 2, shadows: 1, q: 1 }, high: { dpr: 2, shadows: 1, q: 2 } };
@@ -43,7 +44,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano });
   const buildMs = Math.round(performance.now() - tBuild);
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
-  const realCheck = real && real.targets ? checkScene(real, real.targets) : null;
+  let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
   // a real place brings its own fishing spots (on its pier or along its shore); in a 360° photo everyone stands
   // where the photo was taken, side by side, facing the water
@@ -52,7 +53,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const face = real?.spots?.[0]?.face ?? ((pano.heading || 0) * Math.PI) / 180, sx = Math.cos(face), sz = Math.sin(face);
     L = { ...L, deck: 1, spots: [0, 1, 2, 3].map((k) => { const off = [0, 3.5, -3.5, 7][k]; return { id: k + 1, name: L.spots[k]?.name || `Spot ${k + 1}`, at: [sx * off, 0.9, sz * off], face, cast: 26 }; }) };
   }
-  const spotOf = (id) => L.spots.find((s) => s.id === id) || L.spots[0];
+  // ---- where anglers arrive: every position checked against this place's ground first (spawn.js) ----
+  // a blocked one moves to the nearest safe place; a real place with nowhere safe to stand isn't used
+  const spawn = env.ground && !pano ? safeSpots(L.spots, env.ground, { venue }) : { spots: L.spots, report: [] };
+  if (spawn.report.some((r) => r.problem)) console.info("FishDock 3D: arrival positions checked", spawn.report);
+  if (spawn.spots.length) L = { ...L, spots: spawn.spots };
+  else if (realCheck) realCheck = { ok: false, why: ["nowhere safe to stand", ...(realCheck.why || [])] };
+  const spotOf = (id, takenIds = []) => spawnFor(L.spots, id, takenIds);
   const world = new THREE.Group(); scene.add(world);
   const look = createLook({ pitch: -0.12 });
   let homeFor = null;
@@ -99,7 +106,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     for (const a of list) {
       seen.add(a.id);
       let x = anglers.get(a.id);
-      const spot = spotOf(a.spot);
+      const spot = spotOf(a.spot, list.filter((o) => o.id !== a.id).map((o) => o.spot));
       // a new name (someone going "away" and coming back) only changes the label: rebuilding the angler would make
       // them jump and could play the moment they're in again
       const lookKey = a.look ? JSON.stringify(a.look) : "";
@@ -119,7 +126,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (!focusId || !anglers.has(focusId)) focusId = localId || [...anglers.keys()][0] || null;
     const me = anglers.get(localId) || anglers.get(focusId);
     // start looking out the way the spot faces, a little down towards where the line goes in
-    if (me && homeFor !== me.a.id) { homeFor = me.a.id; const s = spotOf(me.spotId); look.setHome(s.face, HOME_PITCH); look.aim(s.face, HOME_PITCH); }
+    if (me && homeFor !== me.a.id) { homeFor = me.a.id; const s = me.a.spot || spotOf(me.spotId); look.setHome(s.face, HOME_PITCH); look.aim(s.face, HOME_PITCH); }
   }
 
   // ---- camera ----
@@ -516,6 +523,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     look, camera,
     setAnglers,
     realCheck,
+    /** The checked arrival positions and what was wrong with any that moved or were left out (spawn.js). */
+    spawn: { spots: L.spots.map(({ id, name, at, face, movedBy }) => ({ id, name, at, face, movedBy: movedBy || 0 })), report: spawn.report },
+    /** Where your own angler stands now. */
+    get mySpot() { const me = anglers.get(localId); const s = me?.a.spot; return s ? { id: s.id, name: s.name, at: s.at, face: s.face } : null; },
     setNow(f) { nowFn = f || Date.now; },
     setEnv: setEnvAll,
     /** Walk about (true) or stand at your spot again (false). Returns null when it worked, or why not. */
