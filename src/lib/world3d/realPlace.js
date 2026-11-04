@@ -124,7 +124,7 @@ function placeProps(group, stand, props, glowGlass, wet) {
       const bb = new THREE.Box3(); for (const m of meshes) { const g = m.geometry.clone().applyMatrix4(new THREE.Matrix4().copy(src.matrixWorld).invert().multiply(m.matrixWorld)); g.computeBoundingBox(); bb.union(g.boundingBox); g.dispose(); }
       if (!bb.isEmpty()) {
         const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2, w = (bb.max.x - bb.min.x) * 1.3 + 0.25, d = (bb.max.z - bb.min.z) * 1.3 + 0.25;
-        group.add(contactShadows(list.map(([x, y, z, ry]) => [x + cx * Math.cos(ry) + cz * Math.sin(ry), y, z - cx * Math.sin(ry) + cz * Math.cos(ry), ry, w, d]), name === "bench" ? 0.55 : 0.45));
+        group.add(contactShadows(list.map(([x, y, z, ry]) => [x + cx * Math.cos(ry) + cz * Math.sin(ry), y, z - cx * Math.sin(ry) + cz * Math.cos(ry), ry, w, d]), name === "bench" ? 0.65 : 0.55));
       }
     }
     group.remove(stand);

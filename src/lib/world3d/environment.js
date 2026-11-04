@@ -315,12 +315,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float pulse = sin(uTime*1.1 + dot(p, uWindDir)*.25 + noise(p*.08)*4.)*(.5 + .7*uSwell + .4*uWind);
         // small ragged patches of bubbles in a narrow band hard against the wall, thickest right at it, the band
         // breathing in and out as each wave arrives and drains (two noises at small scales thresholded into clumps,
-        // a third opening gaps between them). The band is cut off within about a metre and a half of the wall, as the
-        // shore map is only good to a couple of metres, and fades with distance so it never shimmers far off
+        // a third opening gaps between them, the clumps sparser away from the wall). The band reaches a metre or two
+        // out (further as bigger waves arrive), on the fine shore map, and fades with distance so it never shimmers
         float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
-        float clump = smoothstep(.45, .72, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
+        float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
         float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
-        float edge = eband*(clump*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
+        float edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
         float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.8*uShoreOn + churn*.7;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
         foam = clamp(foam, 0., .8);

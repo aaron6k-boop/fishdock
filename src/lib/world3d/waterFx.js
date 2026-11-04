@@ -34,5 +34,5 @@ export function stepRipples(list, dt) {
 export function contactFalloff(r) {
   if (r >= 1) return 0;
   const t = Math.max(0, r);
-  return Math.pow(1 - t * t, 2.2) * (0.75 + 0.25 * (1 - t));
+  return Math.pow(1 - t * t, 1.5) * (0.8 + 0.2 * (1 - t));
 }

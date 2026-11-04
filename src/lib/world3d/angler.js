@@ -139,8 +139,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the person (human3d.js: a realistic person, with the simple figure3d.js figure standing in while it loads): their
   // own look if they chose one, otherwise a steady one from their id
   const fig = createPerson({ id, look: lookFor(id, look), outfit: O, venue }); root.add(fig.group);
-  // the soft dark round your feet where you stand (contactShadow.js; hidden in a jump)
-  const feetShadow = contactShadow(0.95, 0.8, 0.55); root.add(feetShadow);
+  // the soft dark round your feet where you stand (contactShadow.js; hidden in a jump, and in first person with your body)
+  const feetShadow = contactShadow(1.0, 0.85, 0.75); root.add(feetShadow);
   // your forearms and hands in first person (only ever your own angler's are needed: made the first time they're shown)
   let fpv = null;
   const part = (geo, mat, x, y, z, parent = root) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
@@ -259,7 +259,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const wire = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.003, 4, 20, Math.PI), mSteel); wire.position.y = 0.27; wire.rotation.y = 0.5; bk.add(wire);
     for (const o of [box, bk]) o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     // ---- contact shadows: the dark just under the box and the bucket (contactShadow.js) ----
-    box.add(contactShadow(0.8, 0.62, 0.7)); bk.add(contactShadow(0.48, 0.48, 0.65));
+    box.add(contactShadow(0.82, 0.64, 0.8)); bk.add(contactShadow(0.5, 0.5, 0.75));
   }
   // a landing net (rivers, lakes, estuaries) or a drop net with ropes (piers)
   // the net: knotted mesh you can see through (a drawn diamond pattern), hanging as a soft bag under a metal hoop
@@ -1167,8 +1167,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     place,
     /** Walking about (walker.js state, world coordinates), or null to stand at the spot again. */
     setWalk(w) {
-      if (w) { walking = w; root.position.set(w.x, w.y, w.z); root.rotation.y = -w.face; feetShadow.visible = !w.air; }
-      else if (walking) { walking = null; place(curSpot); feetShadow.visible = true; }
+      if (w) { walking = w; root.position.set(w.x, w.y, w.z); root.rotation.y = -w.face; feetShadow.visible = !fp && !w.air; }
+      else if (walking) { walking = null; place(curSpot); feetShadow.visible = !fp; }
     },
     setSpeaking(on) { speaking = !!on; },
     /** Wave, cheer or clap (Fish Together). Only free hands join in: not while fighting a fish. */
@@ -1181,7 +1181,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     get spot() { return curSpot; },
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
     setFirstPerson(on) {
-      if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on && !tagOff;
+      if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on && !tagOff; feetShadow.visible = !fp && !walking?.air;
       if (fp && !fpv) { const L = fig.look || {}; fpv = createFpHands({ gloves: !!L.gloves, skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48 }); root.add(fpv.group); }
       fpv?.show(fp);
     },
