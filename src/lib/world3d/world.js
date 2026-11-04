@@ -119,7 +119,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (!x || x.spotId !== a.spot || x.outfit !== a.outfit || x.lookKey !== lookKey) {
         if (x) x.a.dispose();
         // only your own angler is felt (other people's catches arrive as a party notification instead)
-        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, look: a.look || null, local: !!a.local, real: !!a.real, rail: !!real && (venue === "pier" || venue === "estuary"), onSound: (n, p) => onSound?.(n, p, a.id), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
+        const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, look: a.look || null, local: !!a.local, real: !!a.real, rail: !!real && (venue === "pier" || venue === "estuary"), onSound: (n, p, d) => onSound?.(n, p, a.id, d), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
         made.onSplash(splash); made.onRipple(ripple);
         x = { a: made, spotId: a.spot, outfit: a.outfit, lookKey, name: a.name, out: null };
         anglers.set(a.id, x);

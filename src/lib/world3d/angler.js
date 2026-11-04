@@ -16,7 +16,7 @@ import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpHands } from "./fpHands.js";
 import { loadPart, fitNet } from "./glbParts.js";
 import { fitRodReel, buildRod } from "./rodKit.js";
-import { stepHandle, handleState } from "../reelHandle.js";
+import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -525,7 +525,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       for (const tj of P.jumps) if (crossed(tj)) feel("run");
       // each surge of the fight, as it builds (never a continuous buzz: haptics.js spaces them and caps a minute's worth)
       const surgeNow = surge;
-      if (surgeNow > 0.6 && (P.lastSurge ?? 0) <= 0.6) feel("pull", { tension: load * (0.72 + 0.4 * surgeNow) * st.heavy, surge: surgeNow });
+      if (surgeNow > 0.6 && (P.lastSurge ?? 0) <= 0.6) { feel("pull", { tension: load * (0.72 + 0.4 * surgeNow) * st.heavy, surge: surgeNow }); if (local) onSound?.("strain", at, { tension: P.tension ?? load }); }
       P.lastSurge = surgeNow;
       fightPos = f; rigAt = f; slack = 0;
       // near the top it can be seen swimming: its head into the pull or away on a run, turning at a fish's pace (its
@@ -558,17 +558,17 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (fl) {
         // the handle turns as you tap; each half turn clicks; the drag giving line ratchets and the tip shivers
         // (your own reel's clicks only: a friend's fight is seen, not heard)
-        if (local && Math.floor(fl.turns * 2) > Math.floor(lastTurns * 2)) onSound?.("reelTap", at);
+        // (the clicks themselves come from the handle going round: crank() below)
         lastTurns = fl.turns;
         if (fl.slipping && t - lastDragSound > 0.3) { lastDragSound = t; if (local) onSound?.("drag", at); spr.tipv += 0.6; }
         reel.userData.slipping = !!fl.slipping;
       }
-      if (!st.leaps && prof.splashy > 0.3 && Math.floor(age * 0.5 + P.s1) !== Math.floor((age - dt) * 0.5 + P.s1) && seed() < prof.splashy * 0.5 && age > 2) { const sp = f.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.35 + prof.splashy * 0.4); rippleCb?.(sp, 0.5); onSound?.("splash", sp); }
+      if (!st.leaps && prof.splashy > 0.3 && surfNow - f.y < 0.45 && Math.floor(age * 0.5 + P.s1) !== Math.floor((age - dt) * 0.5 + P.s1) && seed() < prof.splashy * 0.5 && age > 2) { const sp = f.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.35 + prof.splashy * 0.4); rippleCb?.(sp, 0.5); onSound?.("splash", sp); }
       // the handle: each accepted tap is half a turn more for it to make, and it goes round to it smoothly (a critically
       // damped follow: it speeds up, carries on round and slows to a stop, never overshooting or springing back), so
       // steady tapping turns it steadily and stopping lets it run down. It only ever turns for taps
-      if (fl) crank(fl.turns, dt);
-      else reel.userData.spin = (reel.userData.spin || 0) + dt * 12; // (someone else's fight: their taps aren't shared)
+      // (no fresh word of the fight: the handle runs down where it is rather than whirring round on its own)
+      crank(fl ? fl.turns : lastTurns, dt, local);
     } else if (ph === "landing") {
       // up from wherever the fight had got to, through the surface, then landed this place's way
       const { T1, T2, T3, T4, swingIn, card } = LT;
@@ -684,7 +684,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (age >= card - 0.3 && (tech === "lift" || tech === "beach")) { rigAt = hand; showLine = true; }
       if (crossed(card)) feel("landed", {}, true);
       // (winding the fish up to the surface at the start, slowing to a stop; then the handle's left alone)
-      if (age < T1) reel.userData.spin = (reel.userData.spin || 0) + dt * 7 * (1 - age / T1);
+      if (age < T1) { const a0 = reel.userData.spin || 0; reel.userData.spin = a0 + dt * 7 * (1 - age / T1); handleClicks(a0, reel.userData.spin, local); }
       if (crossed(T4)) onSound?.("reelOff", at);
     } else if (ph === "lost") {
       rigAt = (fightPos || castAt).clone().lerp(at, ease(age / 2)); rigAt.y = Math.min(0, rigAt.y); slack = 0.6; bendT = 0.02;
@@ -921,7 +921,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       hands[1] = rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"); // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below
       // the other hand: on the butt to cast, on the reel's handle to wind (while a fish is on and landing it); free
       // while you wait
-      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "hooked" || ph === "landing" || ph === "lost" ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank" } : null;
+      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "hooked" || ph === "landing" || ph === "lost" ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0 } : null;
     }
     if (ph === "bite" && !held) {
       // a hand out over the rod, ready to strike: to the nearest part of it within reach, bending down to it if it's low
@@ -1144,7 +1144,22 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // third person; leaning out over the rail takes the eye forward and a little down; a slow breath)
   function fpEye() { return new THREE.Vector3(0, eyeH - leanNow * 0.25 + Math.sin(tNow * 1.4) * 0.006, -0.08 - leanNow * 0.85); }
   // the reel's handle for your taps (reelHandle.js)
-  function crank(turns, dt) { const u = reel.userData; u.hs = stepHandle(u.hs || handleState(u.spin || 0), turns, dt); u.spin = u.hs.angle; }
+  // ---- the reel's handle ----
+  // for your taps (reelHandle.js). Something else may have turned it since (winding a fish up to land it): the follow
+  // takes up from where the handle really is, and never winds back to make up for it. Each half turn the handle
+  // actually makes clicks (the gears' pawl), so the clicks keep time with the handle you see, not with your taps
+  function crank(turns, dt, audible = false) {
+    const u = reel.userData, sp = u.spin || 0;
+    if (u.hs && Math.abs(u.hs.angle - sp) > 1e-6) { const tgt = (u.hs.last ?? 0) * Math.PI * 2 + (u.hs.base ?? 0); u.hs = { ...u.hs, angle: sp, v: 0, base: (u.hs.base ?? 0) + Math.max(0, sp - tgt) }; }
+    u.hs = stepHandle(u.hs || handleState(sp), turns, dt); u.spin = u.hs.angle;
+    handleClicks(sp, u.spin, audible);
+  }
+  function handleClicks(a0, a1, audible) {
+    if (!audible || halfTurnsPassed(a0, a1) < 1) return;
+    // (one click however far it went in a frame, quieter as it spins faster: a whirr, not a machine gun)
+    onSound?.("reelTap", at, { speed: clamp(Math.abs(reel.userData.hs?.v || 0) / 25, 0, 1) });
+    if (typeof window !== "undefined" && window.__fdSoundLog) window.__fdSoundLog.push({ s: "click", a: +a1.toFixed(3), t: +tNow.toFixed(3) });
+  }
   function tipWorld() { root.updateMatrixWorld(true); return toWorld(pts[NSEG]); }
 
   return {
