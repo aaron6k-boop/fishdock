@@ -707,9 +707,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // held up in front of you, at chest height as you kneel: upright, its belly on your palms, turned so its flank
       // faces the camera (world.js looks from behind you on your left), its head towards the water; far enough in
       // from the rail that its head stays clear of it
-      const holdDir = side.clone().multiplyScalar(0.6).addScaledVector(away, -0.8).normalize();
-      const railIn = -Math.max(0.3, edge - 0.22) + 0.06, holdZ = Math.max(railIn + fishLen * 0.4, -(0.26 + 0.3 * fishLen));
-      const hold = toWorld(new THREE.Vector3(-0.08, 0.8, holdZ));
+      // (well out in front at arm's length, its tail off to your right: held close, a big fish's tail went into your
+      // shoulder)
+      const holdDir = side.clone().multiplyScalar(0.85).addScaledVector(away, -0.53).normalize();
+      const railIn = -Math.max(0.3, edge - 0.22) + 0.06, holdZ = Math.max(railIn + fishLen * 0.3, -(0.4 + 0.3 * fishLen));
+      const hold = toWorld(new THREE.Vector3(-0.12 - 0.1 * fishLen, 0.74, holdZ));
       const poseD = (c, dir, roll, kk) => ({ mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir: dir.clone().normalize(), roll, beat: kk.beat ?? 0.1, curl: kk.curl ?? 0, centre: c, lift: !!kk.lift });
       const pose = (c, roll, kk) => poseD(c, side.clone().negate(), roll, kk);
       const LIE = -Math.PI / 2; // (on its side: rolled this way its tail lifts, rather than digging into the mat, as it flaps)
@@ -987,7 +989,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const under = (k) => toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * k)).add(V3(0, -below, 0));
       if (keptPose.lift) { hands[0] = { at: under(0.28), axis: d, palm: upL, kind: "fish" }; hands[1] = { at: under(0.7), axis: d, palm: upL, kind: "fish" }; }
       else { hands[1] = { at: toLocal(keptPose.centre).add(V3(0.02, halfThick() + 0.02, 0.03)), axis: d, palm: V3(0, -1, 0), kind: "fish" }; hands[0] = null; }
-      lookAtW = keptPose.centre.clone(); kneel = 1; crouch = 0.6; lean = keptPose.lift ? 0.3 : 0.42; brace = 0;
+      lookAtW = keptPose.centre.clone(); kneel = 1; crouch = 0.6; lean = keptPose.lift ? 0.06 : 0.42; brace = 0; // (upright while holding it out, so your head stays clear of it)
     }
     if (kept?.state === "release" && relStep === "over" && venue === "pier" && netAt) {
       // putting it back: the drop net, the fish in it, lifted over the top rail in both hands

@@ -95,7 +95,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
           </>
         ) : null}
         {walkMsg ? <div className="walk-msg" role="status">{walkMsg}</div> : null}
-        {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is in the net: have a look</button></div> : null}
+        {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is landed: have a look</button></div> : null}
         {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
         {/* one menu for everything that isn't fishing or walking (top right): the page's own items (your angler, sound,
             settings, inviting a friend), the camera, emotes, watching a friend, and the view's settings */}

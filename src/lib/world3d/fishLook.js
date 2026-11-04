@@ -91,7 +91,7 @@ export function paintSkin(img, shape, species) {
       if (S.net) { const sx = ((x - x0) / Math.max(3, L / 38) + (Math.floor((y - tp) / Math.max(3, L / 52)) % 2) * 0.5) % 1, sy = ((y - tp) / Math.max(3, L / 52)) % 1; const e = Math.min(1, Math.hypot(sx - 0.5, sy - 0.5) * 2); col = col.map((c) => c * (1 - S.net * 0.22 * e ** 4)); }
     } else col = mix(finCol, S.side, 0.15); // (fins and tail)
     // the donor's detail over it
-    const d = clamp(lum[k] / Math.max(0.04, blur[k]), 0.45, 1.6), dd = body ? Math.pow(d, 0.7) : Math.pow(d, 0.9);
+    const d = clamp(lum[k] / Math.max(0.04, blur[k]), 0.45, 1.6), dd = body ? Math.pow(d, 0.4) : Math.pow(d, 0.85); // (softly on the body: the borrowed fish's own stripes or spots mustn't show)
     px[k * 4] = clamp(col[0] * dd, 0, 255); px[k * 4 + 1] = clamp(col[1] * dd, 0, 255); px[k * 4 + 2] = clamp(col[2] * dd, 0, 255);
   }
   // the markings, on the body only
