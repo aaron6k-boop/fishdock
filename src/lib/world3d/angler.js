@@ -12,7 +12,8 @@ import { castPoint, dirOf } from "./spots.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpHands } from "./fpHands.js";
-import { loadPart, fitReel, fitNet } from "./glbParts.js";
+import { loadPart, fitNet } from "./glbParts.js";
+import { fitRodReel, buildRod } from "./rodKit.js";
 import { stepHandle, handleState } from "../reelHandle.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -200,7 +201,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const mRing = new THREE.MeshStandardMaterial({ color: 0xc4cacf, roughness: 0.18, metalness: 0.9 });
   const mReel = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.35, metalness: 0.6 });
   const unitCyl = new THREE.CylinderGeometry(1, 1, 1, 12);
-  const NSEG = 16;
+  const NSEG = 24;
   const mCork = new THREE.MeshStandardMaterial({ color: 0xc49a62, roughness: 0.9 });
   // a feeder rod's quiver tip: the last part of the blank painted bright, so bites show
   const mTip = R.tip ? new THREE.MeshStandardMaterial({ color: R.tip.col, roughness: 0.4, emissive: R.tip.col, emissiveIntensity: 0.15 }) : null;
@@ -235,8 +236,23 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   }
   const handle = reel.userData.crank;
   reel.scale.setScalar(R.reel);
-  // the reel modelled in Blender (public/models/reel.glb), in place of the simple one once it has loaded
-  loadPart("reel").then((sc) => fitReel(reel, sc)).catch(() => {});
+  // the rod and reel modelled in Blender (public/models/rodkit.glb, rodKit.js), in place of the simple ones once they've
+  // loaded: the same curve bends it, the same handle angle turns the reel (the simple parts are then hidden, not drawn)
+  let rodKit = null;
+  loadPart("rodkit").then((sc) => {
+    if (!fitRodReel(reel, sc)) return;
+    rodKit = buildRod(sc, R); if (!rodKit) return;
+    root.add(rodKit.group);
+    for (const sg of rodSegs) sg.m.visible = false; for (const hp of handleParts) hp.m.visible = false; for (const gd of guides) gd.g.visible = false;
+  }).catch(() => {});
+  // the bend along the rod: curvature goes with the bending moment (most at the butt, none at the tip) over the blank's
+  // stiffness (its radius to the fourth: the slim tip gives most), and none along the handle, the stiff butt section.
+  // BEND[i]: how much of the total turn the rod has made by point i (0 at the butt, 1 at the tip)
+  const BEND = (() => {
+    const s0 = Math.min(0.5, (R.handle[R.handle.length - 1][1] + 0.02) / R.len), k = [], out = [0];
+    for (let i = 0; i < NSEG; i++) { const s = (i + 0.5) / NSEG, r = (R.r0 + (R.r1 - R.r0) * Math.pow(s, 0.8)) / R.r0; k.push(s < s0 ? 0 : (1.05 - s) / Math.pow(r, 4)); }
+    const tot = k.reduce((a, b) => a + b, 0); let c = 0; for (const x of k) { c += x / tot; out.push(c); } return out;
+  })();
   // the line from the spool up through the rings to the tip
   const guideLinePos = new Float32Array((GUIDES.length + 2) * 3), guideLineGeo = new THREE.BufferGeometry(); guideLineGeo.setAttribute("position", new THREE.BufferAttribute(guideLinePos, 3));
   const guideLine = new THREE.Line(guideLineGeo, new THREE.LineBasicMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.7 })); guideLine.frustumCulled = false; root.add(guideLine);
@@ -425,6 +441,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
 
   function frame(t, now, dt, env) {
     root.updateMatrixWorld(true); tNow = t;
+    reel.userData.slipping = false;
     const info = phaseAt(events, now);
     const age = Math.max(0, (now - info.since) / 1000);
     const key = `${info.phase}|${info.since}`;
@@ -533,6 +550,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         if (local && Math.floor(fl.turns * 2) > Math.floor(lastTurns * 2)) onSound?.("reelTap", at);
         lastTurns = fl.turns;
         if (fl.slipping && t - lastDragSound > 0.3) { lastDragSound = t; if (local) onSound?.("drag", at); spr.tipv += 0.6; }
+        reel.userData.slipping = !!fl.slipping;
       }
       if (!st.leaps && prof.splashy > 0.3 && Math.floor(age * 0.5 + P.s1) !== Math.floor((age - dt) * 0.5 + P.s1) && seed() < prof.splashy * 0.5 && age > 2) { const sp = f.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.35 + prof.splashy * 0.4); rippleCb?.(sp, 0.5); onSound?.("splash", sp); }
       // the handle: each accepted tap is half a turn more for it to make, and it goes round to it smoothly (a critically
@@ -743,10 +761,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // the reel stays put in the view (lower right, from the eye where it is now: leaning over the rail moves it); the
       // rod swings about it, up for a cast, after a running fish, down to land it
       // (from the lower right, leaning in a little towards the middle, so it doesn't run straight up the view)
-      const e = fpE - 0.12, sw = fpYaw - 0.06;
+      // (as you'd hold it yourself: the reel low in the middle of the view, the rod rising away up and to the left,
+      // both hands on it, the water and the line beyond)
+      const e = fpE - 0.2, sw = fpYaw - 0.3;
       dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
       fpView = { vr, vu, vf };
-      const reelAt = fpEye().addScaledVector(vr, 0.08).addScaledVector(vu, -0.16).addScaledVector(vf, 0.5); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
+      const reelAt = fpEye().addScaledVector(vr, 0.06).addScaledVector(vu, -0.115).addScaledVector(vf, 0.4); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
       butt = reelAt.addScaledVector(dir, -R.seat);
     }
     // from one way of holding the rod to the next (onto the rail, into your hands, walking off with it) the rod moves
@@ -760,9 +780,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const toT = target.clone().sub(butt).normalize();
     const bendDir = toT.clone().sub(dir.clone().multiplyScalar(toT.dot(dir))); if (bendDir.lengthSq() < 1e-6) bendDir.set(0, -1, 0); bendDir.normalize();
     const k = clamp(spr.k, -0.1, 0.75);
-    for (let i = 0; i <= NSEG; i++) {
-      const s = i / NSEG;
-      pts[i].copy(butt).addScaledVector(dir, R.len * s * (1 - 0.3 * k * s * s)).addScaledVector(bendDir, R.len * (k * s * s * 0.55 + spr.tip * s ** 6));
+    // the rod's shape: its direction turned towards the line a little more at each step, by its share of the whole bend
+    // (BEND), so the butt stays straight, the middle curves and the tip curves most. The total turn grows with the pull,
+    // but never takes the tip past the line's own direction (under a heavy fish the tip points down the line). The tip's
+    // spring adds a quick flick of the last part (a sudden pull, the drag slipping) that dies away
+    const toLine = Math.acos(clamp(toT.dot(dir), -1, 1));
+    const turn = Math.sign(k) * Math.min(Math.abs(k) * 3.0, Math.max(0.15, toLine * 0.98));
+    pts[0].copy(butt);
+    for (let i = 0; i < NSEG; i++) {
+      const s = (i + 0.5) / NSEG, th = turn * (BEND[i] + BEND[i + 1]) / 2 + spr.tip * 2.2 * Math.pow(s, 5);
+      pts[i + 1].copy(pts[i]).addScaledVector(dir, Math.cos(th) * R.len / NSEG).addScaledVector(bendDir, Math.sin(th) * R.len / NSEG);
     }
     for (let i = 0; i < NSEG; i++) between(rodSegs[i].m, pts[i], pts[i + 1], rodSegs[i].r);
     // the handle, the reel and the rings, each square to the blank with the rings and reel underneath it
@@ -770,14 +797,30 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const frame = (t) => { const up = tmpUp.set(0, 1, 0).addScaledVector(t, -t.y); if (up.lengthSq() < 1e-4) up.set(1, 0, 0); up.normalize(); const x = new THREE.Vector3().crossVectors(up, t); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, up, t)); };
     for (const hp of handleParts) { const a = along(hp.a).p, b = along(hp.b).p; between(hp.m, a, b, hp.r); }
     const seat = along(R.seat); reel.position.copy(seat.p); reel.quaternion.copy(frame(seat.t));
-    handle.rotation.x = -(reel.userData.spin || 0); reel.userData.rotor.rotation.z = (reel.userData.spin || 0) * 1.6;
-    guideLinePos.set(seat.p.clone().add(new THREE.Vector3(0, -0.072, 0.06).multiplyScalar(R.reel).applyQuaternion(reel.quaternion)).toArray(), 0);
-    guides.forEach((gd, i) => {
+    // the reel: the handle at its angle; the rotor geared up from it (about five turns to one, as a sea spinning reel);
+    // the spool moving in and out once a turn to lay the line; the drag letting the spool turn back while a fish takes
+    // line; the bail open for the cast until the rig's down, then flipped over
+    { const u = reel.userData, sp = u.spin || 0;
+      handle.rotation.x = -sp; u.rotor.rotation.z = sp * 5.2;
+      if (u.spool) { u.spool.position.z = u.spoolZ + 0.0055 * (1 - Math.cos(sp)) - 0.004; u.slip = (u.slip || 0) + (u.slipping ? dt * 9 : 0); u.spool.rotation.z = -u.slip; }
+      if (u.bail) { const open = ph === "cast" && age < 2.25 ? 1 : 0; u.bailK = (u.bailK ?? 0) + (open - (u.bailK ?? 0)) * Math.min(1, dt * (open ? 14 : 22)); u.bail.rotation.x = -1.95 * u.bailK; } }
+    if (rodKit) {
+      // the modelled rod: bent along the same curve; the line from the line roller (going round with the rotor) through
+      // each ring's centre to the tip ring
+      rodKit.update(pts, frame);
+      reel.updateMatrixWorld(true); root.updateMatrixWorld(true);
+      const u = reel.userData, rol = u.bail.localToWorld(u.roller.clone());
+      guideLinePos.set(toLocal(rol).toArray(), 0);
+      rodKit.ringCentres.forEach((c, i) => guideLinePos.set(c.toArray(), (i + 1) * 3));
+      guideLinePos.set(rodKit.tipRing.toArray(), (GUIDES.length + 1) * 3);
+    } else guideLinePos.set(seat.p.clone().add(new THREE.Vector3(0, -0.072, 0.06).multiplyScalar(R.reel).applyQuaternion(reel.quaternion)).toArray(), 0);
+    if (!rodKit) guides.forEach((gd, i) => {
       const a = along(gd.s * R.len); gd.g.position.copy(a.p); gd.g.quaternion.copy(frame(a.t));
       const br = rodSegs[Math.min(NSEG - 1, Math.floor(gd.s * NSEG))].r; gd.wrap.scale.set(br * 1.3, 0.024, br * 1.3);
       guideLinePos.set(a.p.clone().add(new THREE.Vector3(0, -(gd.r * 1.35 + 0.006), 0).applyQuaternion(gd.g.quaternion)).toArray(), (i + 1) * 3);
     });
-    guideLinePos.set(pts[NSEG].toArray(), (GUIDES.length + 1) * 3); guideLineGeo.attributes.position.needsUpdate = true;
+    if (!rodKit) guideLinePos.set(pts[NSEG].toArray(), (GUIDES.length + 1) * 3);
+    guideLineGeo.attributes.position.needsUpdate = true;
     guideLine.visible = showLine !== false;
     rest.visible = !walking && (!held || venue === "beach");
 
@@ -790,7 +833,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const tension = ph === "hooked" ? clamp(P.tension || 0.6, 0, 1.6) : 0;
     // the reel's handle, for the left hand to wind (it's on the left of a spinning reel)
     reel.updateMatrixWorld(true);
-    const knob = toLocal(handle.localToWorld(V3(0.016, -0.048, 0))), knobAx = toLocal(handle.localToWorld(V3(-0.01, -0.048, 0))).sub(knob);
+    const kn = reel.userData.knob || V3(0.016, -0.048, 0);
+    const knob = toLocal(handle.localToWorld(kn.clone())), knobAx = toLocal(handle.localToWorld(kn.clone().add(V3(-0.026, 0, 0)))).sub(knob);
     if (walking) hands[1] = rodGrip(R.seat * 0.7, V3(-1, 0, 0.2), "carry");
     else if (held) {
       hands[1] = rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"); // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below

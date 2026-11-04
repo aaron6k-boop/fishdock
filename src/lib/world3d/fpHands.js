@@ -35,7 +35,7 @@ const THUMB = { at: V(0.026, 0.03, 0.012), len: [0.028, 0.024, 0.02], r: 0.0102 
 const GRIPS = {
   rest: { f: [[0.35, 0.45, 0.3], [0.4, 0.5, 0.32], [0.45, 0.55, 0.35], [0.5, 0.6, 0.38]], t: [0.25, 0.2, 0.15], spread: 0.06 },
   seat: { f: [[1.25, 1.3, 0.8], [1.25, 1.35, 0.85], [1.35, 1.4, 0.9], [1.4, 1.4, 0.95]], t: [0.85, 0.35, 0.25], spread: 0.0 },
-  crank: { f: [[0.95, 1.15, 0.85], [1.25, 1.3, 0.9], [1.4, 1.35, 0.9], [1.5, 1.35, 0.95]], t: [0.7, 0.5, 0.45], spread: 0.0 },
+  crank: { f: [[1.3, 1.35, 0.95], [1.4, 1.4, 1.0], [1.45, 1.4, 1.0], [1.5, 1.4, 1.0]], t: [0.75, 0.55, 0.45], spread: 0.0 }, // (a closed hand round the knob)
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fish: { f: [[0.25, 0.3, 0.2], [0.3, 0.35, 0.22], [0.35, 0.38, 0.25], [0.4, 0.4, 0.28]], t: [0.1, 0.15, 0.1], spread: 0.05 },
 };
@@ -43,7 +43,7 @@ let BETA = 1.0; export const _tune = (o) => { if (o.beta != null) BETA = o.beta;
 const gripOf = (kind) => (kind === "seat" ? GRIPS.seat : kind === "crank" ? GRIPS.crank : kind === "fish" ? GRIPS.fish : kind ? GRIPS.fist : GRIPS.rest);
 // where what's held runs through the hand (hand frame): in the curl of the fingers, in front of the palm; for the reel's
 // handle, between the thumb and the curled index finger
-const CHANNEL = { seat: V(0.004, 0.102, 0.03), crank: V(0.03, 0.098, 0.026), fish: V(0, 0.06, -0.02), fist: V(0, 0.1, 0.03) };
+const CHANNEL = { seat: V(0.004, 0.102, 0.03), crank: V(0.012, 0.105, 0.032), fish: V(0, 0.06, -0.02), fist: V(0, 0.1, 0.03) };
 const channelOf = (kind) => CHANNEL[kind] || CHANNEL.fist;
 
 // ---- geometry ----
@@ -156,6 +156,33 @@ function mirror(geo) {
 
 // ---- the real (MPFB) arms: rest frames worked out once from the bones, then posed from the frames above ----
 const SIDES = ["l", "r"], DIG = ["index", "middle", "ring", "pinky"];
+// ---- fine detail drawn once: skin (pores and the fine creases across it) and the jacket's woven fabric ----
+let DETAIL = null;
+function detailMaps() {
+  if (DETAIL || typeof document === "undefined") return DETAIL;
+  const hsh = (x, y) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };
+  const make = (n, h, k, rough) => {
+    const c = document.createElement("canvas"); c.width = c.height = n; const g = c.getContext("2d"), img = g.createImageData(n, n), H = new Float32Array(n * n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) H[y * n + x] = h(x, y);
+    const at = (x, y) => H[((y + n) % n) * n + ((x + n) % n)];
+    const r = document.createElement("canvas"); r.width = r.height = n; const gr = r.getContext("2d"), ir = gr.createImageData(n, n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * k, dy = (at(x, y + 1) - at(x, y - 1)) * k, l = Math.hypot(dx, dy, 1), i = (y * n + x) * 4;
+      img.data.set([(-dx / l * 0.5 + 0.5) * 255, (-dy / l * 0.5 + 0.5) * 255, (1 / l * 0.5 + 0.5) * 255, 255], i);
+      const v = rough(x, y, at(x, y)) * 255; ir.data.set([v, v, v, 255], i);
+    }
+    g.putImageData(img, 0, 0); gr.putImageData(ir, 0, 0);
+    const T = (cv) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; return t; };
+    return { normal: T(c), rough: T(r) };
+  };
+  // skin: small pores, a soft grain and fine creases running across (oilier, shinier between them)
+  const skin = make(256, (x, y) => 0.5 + (hsh(x >> 1, y >> 1) > 0.93 ? -0.35 : 0) + 0.06 * hsh(x, y) + 0.12 * Math.sin((y + Math.sin(x * 0.07) * 6) * 0.42) * (hsh(x >> 4, y >> 3) > 0.5 ? 1 : 0.3), 2.2, (x, y, h) => 0.62 + 0.06 * (h - 0.5) + 0.06 * hsh(x >> 4, y >> 4));
+  // softshell fabric: a fine twill
+  const cloth = make(64, (x, y) => 0.5 + 0.35 * Math.sin(((x + y) % 8) / 8 * Math.PI * 2) * ((x >> 2) % 2 ? 1 : 0.6), 1.6, (x, y, h) => 0.72 + 0.12 * h);
+  DETAIL = { skin, cloth };
+  return DETAIL;
+}
+
 function realArms(scene, { gloves, skinHex }) {
   const root = cloneSkinned(scene); root.updateMatrixWorld(true);
   const bone = (n) => root.getObjectByName(n);
@@ -165,15 +192,20 @@ function realArms(scene, { gloves, skinHex }) {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = false;
     // (a plain opaque skin material: the export marks it see-through and physical, neither of which a hand needs)
-    const src = o.material, mt = o.material = new THREE.MeshStandardMaterial({ map: src.map || null, normalMap: src.normalMap || null, roughness: 0.62, metalness: 0 });
+    const src = o.material, D = detailMaps();
+    // skin: the model's colour with fine pores and creases over it (a normal and a roughness map, tiled), a little oilier
+    // than before (real skin has a soft sheen, not a matte plastic look)
+    const mt = o.material = new THREE.MeshStandardMaterial({ map: src.map || null, roughness: 1, metalness: 0, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.14, 0.14) });
+    if (D && !gloves) { D.skin.normal.repeat.set(22, 22); D.skin.rough.repeat.set(6, 6); }
     if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
     else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); } // (your skin tone over the model's)
     // light through the skin at its edges (a warm glow where the fingers turn away from you, as real skin does: a cheap
     // stand-in for subsurface scattering); neoprene gloves get a faint cool sheen there instead
     mt.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
       { float rim = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.4);
-        reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.95, 0.38, 0.26) * rim * 0.4"}; }`); };
-    mt.customProgramCacheKey = () => "fdskin" + (gloves ? "g" : "");
+        reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.95, 0.38, 0.26) * rim * 0.45 + diffuseColor.rgb * vec3(0.22, 0.06, 0.04) * 0.12"};
+        ${gloves ? "" : "reflectedLight.directDiffuse *= vec3(1.0, 0.95, 0.9);"} }`); };
+    mt.customProgramCacheKey = () => "fdskin2" + (gloves ? "g" : "");
   });
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
@@ -224,8 +256,11 @@ function realArms(scene, { gloves, skinHex }) {
 export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f } = {}) {
   const group = new THREE.Group(); group.name = "fp-hands"; group.visible = false;
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: gloves ? 0.55 : 0.6, metalness: 0 });
-  const sleeveMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.78 });
-  const hemMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(coatHex).multiplyScalar(0.6), roughness: 0.85 });
+  // the jacket's sleeve: a woven softshell (seen from inside too, so its open end never shows a hole) and a ribbed cuff
+  const D0 = detailMaps();
+  const sleeveMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.8, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, roughnessMap: D0?.cloth.rough || null, normalScale: new THREE.Vector2(0.6, 0.6) });
+  if (D0) { D0.cloth.normal.repeat.set(10, 18); D0.cloth.rough.repeat.set(10, 18); }
+  const hemMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(coatHex).multiplyScalar(0.55), roughness: 0.9, normalMap: D0?.cloth.normal || null, normalScale: new THREE.Vector2(0.8, 0.8) });
   const built = buildHand(gloves, skinHex);
   bakeRest(built.geo, built.bones);
   const geoL = built.geo.clone(); mirror(geoL);
@@ -239,8 +274,10 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
     // the sleeve: from the wrist back past the elbow (out of sight), with a hem at the cuff
     const sleeve = new THREE.Group();
     const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.047, 0.5, 20, 1, true), sleeveMat); tube.geometry.translate(0, -0.25, 0); tube.scale.set(1, 1, 0.84);
-    const hem = new THREE.Mesh(new THREE.TorusGeometry(0.037, 0.005, 6, 24), hemMat); hem.rotation.x = Math.PI / 2; hem.scale.set(1, 1, 0.84);
-    sleeve.add(tube, hem);
+    // the cuff: a band of elastic rib, a little tighter than the sleeve, in three rolls
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.038, 0.045, 24, 1, true), hemMat); cuff.geometry.translate(0, -0.02, 0); cuff.scale.set(1, 1, 0.84); cuff.material.side = THREE.DoubleSide;
+    const hem = new THREE.Group(); for (const y of [0.0, -0.016, -0.032]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.0375, 0.0045, 6, 24), hemMat); r.rotation.x = Math.PI / 2; r.position.y = y; r.scale.set(1, 1, 0.84); hem.add(r); }
+    sleeve.add(tube, cuff, hem);
     group.add(mesh, sleeve);
     return { mesh, sleeve, bones: b.bones, joints: b.joints, s: i ? 1 : -1, cur: null, from: null, u: 1, kind: undefined, curl: GRIPS.rest };
   });

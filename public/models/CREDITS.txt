@@ -17,3 +17,7 @@ modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and 
 fish.glb (cod, bass, whiting, mackerel, plaice and pollack bodies, fins and eyes) was modelled in Blender for FishDock
 from the outlines of FishDock's own species pictures (source-assets/blender/build_fish.py); the pictures are laid
 over it in the app.
+
+rodkit.glb (the sea-spinning rod: its handle, reel seat, guides, whippings, tip ring and blank, and the spinning reel with
+its rotor, bail, line roller, spool and handle) was modelled in Blender for FishDock (source-assets/blender/
+build_rodkit.py); no third-party assets. The game bends the blank and turns the reel.
