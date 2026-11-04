@@ -16,6 +16,7 @@ export function noise2(x, y, period = 256, seed = 1) {
 }
 export function fbm(x, y, period, seed = 1, oct = 4) { let s = 0, a = 0.5, f = 1, n = 0; for (let o = 0; o < oct; o++) { s += a * noise2(x * f, y * f, period * f, seed + o); n += a; a *= 0.5; f *= 2; } return s / n; }
 
+const smoothstep01 = (t) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
 function canvas(w, h = w) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
 function toTex(c, { srgb = true, repeat = true } = {}) {
   const t = new THREE.CanvasTexture(c);
@@ -101,6 +102,8 @@ export function facade(kind = "brick", seed = 7) {
       if (kind === "brick") { const row = Math.floor(y / 5), off = row % 2 ? 6 : 0, mortar = y % 5 === 0 || (x + off) % 12 === 0; L *= mortar ? 1.35 : 0.9 + hash(Math.floor((x + off) / 12), row, seed) * 0.22; }
       if (kind === "cladding") { const p = (x % 10) / 10; L *= p < 0.2 ? 0.8 : 1.02; }
       if (kind === "render") L *= 0.97 + hash(x >> 2, y >> 2, seed) * 0.04;
+      // weathering: rain runs down the wall (more towards the foot of each storey) and dirt splashed up at the bottom
+      L *= 1 - smoothstep01((fbm((x0 + x) / 3, y / 48, 512 / 3, seed + 21, 2) - 0.5) * 4) * 0.1 * (0.3 + y / T) - (y > T * 0.88 ? (y - T * 0.88) / (T * 0.12) * 0.07 : 0);
       img.data.set([Math.min(255, base[0] * L), Math.min(255, base[1] * L), Math.min(255, base[2] * L), 255], (y * T + x) * 4);
     }
     g.putImageData(img, x0, 0);
@@ -111,6 +114,9 @@ export function facade(kind = "brick", seed = 7) {
       g.fillStyle = trim; g.fillRect(x - 4, y - 4, w + 8, h + 8); glass(x, y, w, h);
       g.fillStyle = trim; g.fillRect(x, y + h / 2 - 2, w, 4); g.fillRect(x + w / 2 - 1.5, y, 3, h); // sash bars
       g.fillStyle = kind === "brick" ? "#d8d2c4" : "#d6d0c4"; g.fillRect(x - 7, y + h + 4, w + 14, 5); // sill
+      // grime run off the sill's ends and under it
+      const run = g.createLinearGradient(0, y + h + 9, 0, y + h + 34); run.addColorStop(0, "rgba(40,36,30,.22)"); run.addColorStop(1, "rgba(40,36,30,0)");
+      g.fillStyle = run; g.fillRect(x - 6, y + h + 9, 5, 25); g.fillRect(x + w + 1, y + h + 9, 5, 25); g.fillRect(x + 2, y + h + 9, w - 4, 10);
       if (kind === "brick") { g.fillStyle = "#8a4636"; for (let k = 0; k < 6; k++) g.fillRect(x - 4 + (k * (w + 8)) / 6, y - 10, (w + 8) / 6 - 1, 6); } // lintel
     } else if (t === FACADE_TILE.window) { glass(x0 + T * 0.3, T * 0.35, T * 0.4, T * 0.18); }
     if (t === FACADE_TILE.door) {
@@ -140,7 +146,8 @@ export function roof(kind = "slate", seed = 11) {
     const tileV = kind === "felt" ? 0 : 0.85 + hash(cIdx, r, seed) * 0.3;
     const edge = kind === "felt" ? 0 : fy < 0.12 ? 0.6 : 1, gap = kind === "felt" ? 1 : ((x / n) * cols + off) % 1 < 0.04 ? 0.7 : 1;
     const moss = fbm(x / 32, y / 32, 4, seed, 2) > 0.68 ? 0.25 : 0;
-    const L = (kind === "felt" ? 0.9 + hash(x, y, seed) * 0.15 : tileV) * edge * gap;
+    const lich = kind !== "felt" && hash(x >> 1, y >> 1, seed + 3) > 0.985 ? 0.35 : 0; // (lichen: pale yellow-grey spots)
+    const L = (kind === "felt" ? 0.9 + hash(x, y, seed) * 0.15 : tileV) * edge * gap * (0.92 + fbm(x / 20, y / 64, 128 / 20, seed + 5, 2) * 0.16) + lich;
     img.data.set([base[0] * L * (1 - moss) + 70 * moss, base[1] * L * (1 - moss) + 86 * moss, base[2] * L * (1 - moss) + 40 * moss, 255], (y * n + x) * 4);
     hf[y * n + x] = fy * (kind === "felt" ? 0 : 1) * gap;
   }

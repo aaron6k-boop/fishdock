@@ -688,6 +688,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   place.perches = perches;
   // beyond the mapped square: real landmarks where they are, an indicative low town over the land (skyline.js)
   place.skyline = buildSkyline(group, place, { groundY: LAND, quality, industry: local?.industry || null });
+  if (place.skyline?.glow?.length) place.buildingGlow = [...(place.buildingGlow || []), ...place.skyline.glow];
   return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c]; const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
 // ---- the other kinds of fence a photograph shows (localDetail.js): runs of [a, b, deck height] ----
@@ -704,7 +705,7 @@ function buildFences(group, timber, bars, dTex, wet) {
     }
     // weathered softwood: silvered grain with open cracks along it (drawn, textures3d.woodTex), sampled along each
     // piece's own length so a long rail keeps its grain the right size; greener and darker at the foot of the posts
-    const timberMat = (grain) => weather(new THREE.MeshStandardMaterial({ color: 0x9a8f80, roughness: 0.92 }), { wood: grain, scale: 1, mottle: 0.2, bump: 0.9, grime: [GROUND.land, GROUND.land + 0.35, 0.3], rough: [0.9, 1.1], wet });
+    const timberMat = (grain) => weather(new THREE.MeshStandardMaterial({ color: 0xb3a999, roughness: 0.92 }), { wood: grain, scale: 1, mottle: 0.2, bump: 0.35, grime: [GROUND.land, GROUND.land + 0.35, 0.3], rough: [0.9, 1.1], wet });
     const wood = timberMat("y"), woodX = timberMat("x");
     const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.17, H, 0.17), wood, P.length);
     P.forEach(([x, y, z, ang], k) => { mx.compose(v.set(x, y + H / 2, z), q.setFromAxisAngle(up, -ang), sc.set(1, 1, 1)); pm.setMatrixAt(k, mx); });

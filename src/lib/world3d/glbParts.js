@@ -90,7 +90,7 @@ export function fitNet(net, scene, kind = "drop") {
 // darkens them and makes them shine.
 const PROP_WEAR = {
   cast_iron: { color: [0.05, 0.055, 0.058], roughness: 0.6, metalness: 0.25, o: { scale: 0.25, mottle: 0.45, bump: 0.9, rust: [0.3, 0.14, 0.055, 0.024], grime: [2.2, 2.55, 0.25], rough: [0.8, 1.3] } },
-  bench_wood: { color: [0.3, 0.26, 0.2], roughness: 0.85, metalness: 0, o: { wood: "x", scale: 1, mottle: 0.2, bump: 0.8, rough: [0.9, 1.1] } },
+  bench_wood: { color: [0.3, 0.26, 0.2], roughness: 0.85, metalness: 0, o: { wood: "x", scale: 1, mottle: 0.2, bump: 0.35, rough: [0.9, 1.1] } },
   housing_red: { color: [0.46, 0.08, 0.06], roughness: 0.6, metalness: 0.05, o: { scale: 0.3, mottle: 0.4, bump: 0.5, rust: [0.18, 0.14, 0.055, 0.024], grime: [2.2, 2.8, 0.2], rough: [0.85, 1.3] } },
   galvanised: { color: [0.5, 0.52, 0.52], roughness: 0.62, metalness: 0.55, o: { scale: 0.5, mottle: 0.35, bump: 0.5, rust: [0.12, 0.16, 0.065, 0.028], grime: [2.2, 2.6, 0.2], rough: [0.8, 1.25] } },
 };
