@@ -455,7 +455,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // above the deck, and a real pier's deck stands metres above the sea. It was the rail's height above the deck,
       // so on a raised deck the rope was far too short: the net hardly rose as it was hauled, then leapt to the rail)
       const bridle = 0.72 * ns, top = toWorld(new THREE.Vector3(0, railY - 0.05, railZ)).y, sink = 0.02 * ns; // (the hoop right at the surface, breaking it: you see the net and the fish go over it)
-      return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(1.2 + 0.45 * ns), 0.05 + 0.18 * ns, -0.22)), /* (on the deck clear of the tackle box: it lay half on it) */ railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
+      return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(0.55 + 0.35 * ns), 0.05 + 0.18 * ns, -Math.min(0.3, Math.max(0.05, railZ * -1 - 0.4 * ns)))), /* (on the deck by your left foot, in front of the tackle box and clear of the mat: within reach as you kneel to lift the fish out. It was 1.65 m off to the side, out of reach, so the fish flew from the net to your hands) */ railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
     };
 
     // ---- what the rod is doing ----
@@ -806,7 +806,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // the empty net hauled back up the wall, hand over hand (lighter now), then lifted over the rail and laid back
           // where it waits on the deck: never vanishing at the foot of the wall and appearing on the deck
           netOn = true; ropesOn = true; inNet = false; rel.water = G.waterY;
-          const over = plan.haul - 1.1, full = G.L - G.sink * 0.85, idle = toWorld(new THREE.Vector3(-1.2, 0.35, -0.08));
+          const over = plan.haul - 1.1, full = G.L - G.sink * 0.85, idle = G.deck;
           if (kt < over) {
             const N = Math.max(3, Math.round(full / 0.75)), f = seg(kt, plan.swim, over), q = f * N, k = Math.min(N - 1, Math.floor(q)), u = q - k;
             const out2 = full * (1 - (k + ease(clamp((u - 0.15) / 0.75, 0, 1))) / N);
@@ -832,7 +832,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (keptPose) lastKept = { c: keptPose.centre.clone(), roll: keptPose.roll };
     // at a pier the drop net lies ready on the deck beside the tackle box (so it's there before it's needed, never conjured)
     let netIdle = false;
-    if (!netOn && venue === "pier" && !walking) { netOn = true; netIdle = true; netAt = toWorld(new THREE.Vector3(-1.2, 0.35, -0.08)); netRest = 1; inNet = false; }
+    if (!netOn && venue === "pier" && !walking) { netOn = true; netIdle = true; netAt = dropGeo(Math.max(1, (fishLen * 0.62) / 0.35)).deck; netRest = 1; inNet = false; } // (where it's set down after a landing and laid back after a release: it never moves by itself)
     // ---- springs, then the rod's shape ----
     spring("k", "kv", bendT * R.flex, 8, 0.35, dt); spring("tip", "tipv", tipT, 18, 0.25, dt);
     const sway = n1(t * 0.4 + id.length) * 0.02 * (1 + env.wind), breath = Math.sin(t * 1.6 + id.length) * 0.008;
@@ -1013,6 +1013,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (keptPose.lift) { hands[0] = { at: under(0.28), axis: d, palm: upL, kind: "fish" }; hands[1] = { at: under(0.7), axis: d, palm: upL, kind: "fish" }; }
       else { hands[1] = { at: toLocal(keptPose.centre).add(V3(0.02, halfThick() + 0.02, 0.03)), axis: d, palm: V3(0, -1, 0), kind: "fish" }; hands[0] = null; }
       lookAtW = keptPose.centre.clone(); kneel = 1; crouch = 0.6; lean = keptPose.lift ? 0.06 : 0.42; brace = 0; // (upright while holding it out, so your head stays clear of it)
+      // the shoulders turned towards it (it's off to one side lifting it from the net, in front on the mat), and bent
+      // over it a little more the lower it is, so the arms reach it rather than stretching out straight
+      { const c = toLocal(keptPose.centre); twist = clamp(Math.atan2(c.x, -c.z) * 0.45, -0.55, 0.55); lean += clamp((0.7 - c.y) * 0.25, 0, 0.15); }
     }
     if (kept?.state === "release" && relStep === "over" && venue === "pier" && netAt) {
       // putting it back: the drop net, the fish in it, lifted over the top rail in both hands

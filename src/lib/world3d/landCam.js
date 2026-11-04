@@ -45,7 +45,9 @@ export const SHOTS = {
   over: { from: [-0.5, 0.55, 0.68], must: ["net", "head"], want: ["feet"], near: 3, far: 10 },
   rlower: { from: [-0.68, 0.26, 0.7], must: ["net", "head"], want: ["feet"], near: 3.4, far: 13, wide: true },
   // swimming free: close on the fish and the net at the foot of the wall, the fish big enough to see
-  swim: { from: [-0.55, 0.42, 0.72], must: ["fish", "net"], want: [], near: 2.4, far: 6.5 },
+  // (from higher, looking down onto the water so the wall doesn't fill the picture, and with room round the fish, which
+  // moves off quickly: it was framed tight and swam out of the side of the picture)
+  swim: { from: [-0.45, 0.68, 0.58], must: ["fish", "net"], want: [], near: 3, far: 7.5, margin: 0.6 },
   // the empty net hauled back up to the rail, then onto the deck
   rhaul: { from: [-0.66, 0.3, 0.7], must: ["net", "head"], want: ["feet"], near: 3.4, far: 12, wide: true },
 };
@@ -93,7 +95,7 @@ export function shotFor(stage, named, face, lens) {
   const must = S.must.map((k) => named[k]).filter(Boolean);
   if (!must.length) return null;
   const all = [...must, ...S.want.map((k) => named[k]).filter(Boolean)];
-  const opt = { ...lens, near: S.near, far: S.far };
+  const opt = { ...lens, near: S.near, far: S.far, ...(S.margin ? { margin: S.margin } : {}) };
   let fit = fitShot(all, dir, { ...opt, far: 1e9 });
   if (fit.dist > S.far) fit = fitShot(must, dir, opt);
   else fit = fitShot(all, dir, opt);

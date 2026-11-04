@@ -235,6 +235,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // (the fish a little above the middle, at the height of the clear band between the top bar and the card about it
       // along the bottom: the card never covers it)
       camera.fov = 52; camera.updateProjectionMatrix(); camera.lookAt(c); camera.rotateX(-Math.atan(Math.tan((camera.fov * Math.PI) / 360) * FISH_NDC_Y));
+      if (camOverride) { camera.position.copy(camOverride); camera.lookAt(lookOverride || c); } // test hook only
       return { yaw, pitch };
     } else { if (inspectFrom) modeSince = t; inspectFrom = null; } // (and back from it with a glide, not a cut)
     if (W) {
@@ -355,7 +356,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
           else {
             // from one shot to the next over the top (a long way to go: higher on the way), never through you
             const far = camPos.distanceTo(landShot.pos), to = landShot.pos.clone(); to.y += Math.min(1.3, Math.max(0, far - 0.6) * (landShot.framed ? 0.15 : 0.45));
-            camPos.lerp(to, 1 - Math.exp(-dt * (landShot.framed ? 2 : 2.6)));
+            camPos.lerp(to, 1 - Math.exp(-dt * (landShot.framed ? 2.4 : 2.6)));
           }
         }
         else {
@@ -371,7 +372,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // (down to the water when the net's down there: the shot's from beside you, not your own eyes looking down)
         // (a framed shot: what it looks at eases along with the camera, and the view is turned to it at once, so the two
         // never drift apart and leave the fish off the edge)
-        if (landing && landShot.framed) { landShot.fs = landShot.fs ? landShot.fs.lerp(landShot.focus, 1 - Math.exp(-dt * 2.4)) : camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(4)).lerp(landShot.focus, 0.2); }
+        // (on the way out from your eyes to the first shot, the view turns to it only as fast as the camera gets there, so
+        // it never looks straight down into the water from beside your head)
+        if (landing && landShot.framed) {
+          if (!landShot.fs) { landShot.fs0 = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(6)); landShot.fs = landShot.fs0.clone(); landShot.p = 0; }
+          if (mode === "first" && !landShot.up) { landShot.d0 = null; }
+          else {
+            const dNow = camPos.distanceTo(landShot.pos); landShot.d0 = Math.max(landShot.d0 || 0, dNow, 0.5);
+            landShot.p = Math.max(landShot.p, 1 - dNow / landShot.d0);
+            const want = landShot.p >= 0.97 ? landShot.focus : landShot.fs0.clone().lerp(landShot.focus, ease01(landShot.p / 0.97));
+            landShot.fs.lerp(want, 1 - Math.exp(-dt * (landShot.p >= 0.97 ? 3 : 8)));
+          }
+        }
         if (landing && (mode !== "first" || landShot.up) && performance.now() - look.touched > 1500) {
           const l = lookAt(camPos.toArray(), (landShot.framed ? landShot.fs : landShot.focus).toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch)));
           if (landShot.framed) for (let i = 0; i < 6; i++) look.step(0.5);

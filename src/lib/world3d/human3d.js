@@ -479,7 +479,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       let wantYaw = 0, wantPitch = -0.06;
       if (o.look) {
         const d = o.look.clone().sub(wFig(wp(head))); const hy = Math.atan2(d.x, -d.z), hp = Math.atan2(d.y, Math.hypot(d.x, d.z));
-        wantYaw = clamp(hy - st.twist, -1.1, 1.1); wantPitch = clamp(hp, -0.8, 0.45);
+        wantYaw = clamp(hy - st.twist, -1.1, 1.1); wantPitch = clamp(hp, (o.kneel || 0) > 0.5 ? -1.1 : -0.8, 0.45); // (kneeling over a fish on the mat the head bows right down to it)
       }
       const kh = 1 - Math.exp(-dt * 5); st.yaw += (wantYaw - st.yaw) * kh; st.pitch += (wantPitch - st.pitch) * kh;
       const on = o.look ? 1 : 0; st.lookOn = (st.lookOn || 0) + (on - (st.lookOn || 0)) * kh;
@@ -490,6 +490,18 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         const full = new THREE.Quaternion().setFromUnitVectors(faceW, want), id = new THREE.Quaternion();
         const qn = id.clone().slerp(full, 0.4 * st.lookOn), qh = id.clone().slerp(full, 0.6 * st.lookOn);
         setWQ(neck, qn.multiply(wq(neck))); setWQ(head, qh.multiply(wq(head)));
+      }
+      // the eyes go the rest of the way to what they're watching (a little: the head did most of the turn), so a
+      // look at the fish in your hands reads as looking at it, not past it
+      for (const n of ["LEye", "REye"]) {
+        const e = B(n); if (!e || !eyeRest[n]) continue;
+        e.quaternion.copy(eyeRest[n]);
+        if (o.look && st.lookOn > 0.01) {
+          e.updateMatrixWorld(true);
+          const fw = eyeFwd[n].clone().applyQuaternion(wq(e)).normalize(), want = figW(o.look).sub(wp(e)).normalize();
+          const ang = Math.acos(clamp(fw.dot(want), -1, 1)), q = new THREE.Quaternion().setFromUnitVectors(fw, want);
+          setWQ(e, new THREE.Quaternion().slerp(q, Math.min(1, 0.3 / Math.max(1e-3, ang)) * st.lookOn).multiply(wq(e)));
+        }
       }
       void fwdNow;
     }
@@ -542,9 +554,12 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       const ew = ease(hs.w);
       if (ew < 0.999) for (const n of ARM) { const b = B(s + "_" + n), ik = b.quaternion.clone(); b.quaternion.copy(save[s + n]).slerp(ik, ew); }
       // fingers: curled round a handle, a little open otherwise
-      const grip = use.axis ? (use.kind === "crank" ? 0.75 : 1) : use.kind === "wave" || use.kind === "cheer" || use.kind === "clap" ? -0.1 : 0.15;
+      // (under a fish: the fingers spread and cupped round its belly, the thumb along its side; laid on its flank: the
+      // fingers resting on it, curving over a little: it was a fist round a handle, the fish hanging off the knuckles)
+      const fishHold = use.kind === "fish", cradle = fishHold && use.palm && use.palm.y > 0.5;
+      const grip = fishHold ? (cradle ? 0.42 : 0.22) : use.axis ? (use.kind === "crank" ? 0.75 : 1) : use.kind === "wave" || use.kind === "cheer" || use.kind === "clap" ? -0.1 : 0.15;
       for (const [b, f] of FINGERS[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), grip * f * ew));
-      for (const b of THUMB[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), (use.axis ? 0.35 : 0) * ew));
+      for (const b of THUMB[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), (fishHold ? 0.12 : use.axis ? 0.35 : 0) * ew));
       B(s + "_UpperArm").updateMatrixWorld(true);
     }
 
@@ -576,6 +591,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // the figure faces -z, which is +z in the model)
   mixer.update(0); root.updateMatrixWorld(true);
   const headFwd = V(0, 0, 1).transformDirection(inner.matrixWorld).applyQuaternion(wq(B("Head")).invert()).normalize();
+  const eyeRest = {}, eyeFwd = {}; for (const n of ["LEye", "REye"]) { const e = B(n); if (e) { eyeRest[n] = e.quaternion.clone(); eyeFwd[n] = V(0, 0, 1).transformDirection(inner.matrixWorld).applyQuaternion(wq(e).invert()).normalize(); } }
 
   let fp = false;
   return {
