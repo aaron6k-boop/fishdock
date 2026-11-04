@@ -25,6 +25,24 @@ export const spotById = (id) => SPOTS.find((s) => s.id === id) || null;
 ```
 Species ids must match species.js ids.
 
+## scenes.js (the 3D place check, run ahead of time)
+```js
+export const SCENE_CHECKS = {
+  "deal-pier": {
+    result: "passed" | "failed",      // osmPlace.buildPlace + checkLayout on the saved /api/place answer
+    venue: "pier" | "beach" | "estuary" | "river" | "lake",   // as the 3D game opens it (scene.js venueOf)
+    points: [{ name: "On the pier", face: 359 }],              // the four checked positions, compass degrees; [] if failed
+    approx: false,                     // true when the 3D view used the mark's approximate listed position
+    why: "only when failed",
+    data: "2026-11-02", checked: "2026-11-04", sources: ["https://www.openstreetmap.org/"], verification: "verified",
+  },
+};
+```
+The UK spot map (src/lib/spotMap.js) reads every map spot from spots.js and this file; nothing is copied. Its
+scene states: `exact` (passed, not approximate), `representative` (failed), `reconstructed` (everything else: built
+and checked when you arrive, Beta). Positions are never stored: they come from the map data on the day, and every
+arrival is checked again on the phone (src/lib/world3d/spawn.js).
+
 ## species.js
 ```js
 export const SPECIES = [{
