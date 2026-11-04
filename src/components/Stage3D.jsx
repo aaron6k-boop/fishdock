@@ -7,6 +7,7 @@ import { WorldCtx } from "./WorldContext.js";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
 import { speciesById } from "../data/species.js";
+import { catchInfo } from "../lib/catchInfo.js";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
@@ -183,21 +184,33 @@ function Joystick({ onMove, size = "m", float = false }) {
 }
 
 // ---- having a look at your fish before you decide ----
+// A small card at first (the fish stays in view above it): what it is, its size, Keep it and Put it back. The minimum
+// size and any rule or safety point (catchInfo.js) are always shown; how to tell it and the rest of the note wait
+// under "More about this fish"
 function FishLook({ ev, demo, onKeep, onRelease, onClose }) {
-  const d = ev?.data || {}, sp = speciesById(d.species);
+  const d = ev?.data || {}, sp = speciesById(d.species), info = catchInfo(sp);
+  const [more, setMore] = useState(false);
   const len = d.lengthCm ? `${d.lengthCm} cm (${(d.lengthCm / 2.54).toFixed(1)} in)` : null, kg = d.weightKg ? `${d.weightKg >= 1 ? d.weightKg.toFixed(1) : d.weightKg.toFixed(2)} kg` : null;
+  const label = { size: "Minimum size", rule: "Rule", safety: "Take care" };
   return (
-    <div className="fish-look" role="dialog" aria-label={`Your ${sp?.name || "fish"}`}>
+    <div className={`fish-look${more ? " open" : ""}`} role="dialog" aria-label={`Your ${sp?.name || "fish"}`}>
       <button type="button" className="xbtn fish-look-x" onClick={onClose} aria-label="Put it down"><Icon name="close" /></button>
       <span className="cc-kicker">{demo ? "Demo · not logged" : "Simulated · not a real record"}</span>
       <h3>{sp?.name || "Fish"} {sp?.latin ? <i className="tiny muted">{sp.latin}</i> : null}</h3>
-      <p className="cc-facts">{[len, kg].filter(Boolean).join(" · ")}</p>
-      {sp?.idTip ? <p className="small"><b>How to tell it:</b> {sp.idTip}</p> : null}
-      {sp?.conservation ? <p className="small muted">{sp.conservation}</p> : null}
+      <p className="cc-facts">{[len, kg].filter(Boolean).join(" · ") || "Size not given"}</p>
+      {info.must.length ? <ul className="fl-must">{info.must.map((m, i) => <li key={i} className={`fl-${m.kind}`}><b>{label[m.kind]}:</b> {m.text}{m.source ? <> <a href={m.source} target="_blank" rel="noopener noreferrer">Source</a></> : null}</li>)}</ul> : null}
       <div className="row">
         <button type="button" className="btn primary" onClick={onKeep}><Icon name="check" />Keep it</button>
         <button type="button" className="btn" onClick={onRelease}>Put it back</button>
       </div>
+      {info.hasMore ? <button type="button" className="fl-more" aria-expanded={more} aria-controls="fl-more-body" onClick={() => setMore(!more)}>More about this fish<span aria-hidden="true">{more ? "▴" : "▾"}</span></button> : null}
+      {more ? (
+        <div className="fl-more-body" id="fl-more-body">
+          {info.more.idTip ? <p className="small"><b>How to tell it:</b> {info.more.idTip}</p> : null}
+          {info.more.note ? <p className="small"><b>Looking after it:</b> {info.more.note}</p> : null}
+          {info.more.lookalikes ? <p className="small"><b>Lookalikes:</b> {info.more.lookalikes}</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

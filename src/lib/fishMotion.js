@@ -53,13 +53,15 @@ export function surfaceSpine(waterY, halfDepth) {
  * net held out at the edge; then it swims out of the net, along the surface and down out of sight.
  */
 export function releasePlan(venue) {
-  if (venue === "pier") return { carry: 1.0, over: 2.0, lower: 4.6, swim: 8.0, net: true };
+  // (off a pier the empty net is then hauled back up the wall and lifted over the rail onto the deck: haul. It used to
+  // vanish at the foot of the wall and reappear on the deck)
+  if (venue === "pier") return { carry: 1.0, over: 2.0, lower: 4.6, swim: 9.0, haul: 12.6, net: true };
   if (venue === "beach") return { carry: 1.0, over: 1.0, lower: 1.6, swim: 5.0, net: false };
   return { carry: 1.0, over: 1.0, lower: 2.2, swim: 5.6, net: true };
 }
-/** Which step of the plan kt is in: carry | over | lower | swim | gone. */
+/** Which step of the plan kt is in: carry | over | lower | swim | haul (a pier's empty net coming back up) | gone. */
 export function releaseStep(kt, plan) {
-  return kt < plan.carry ? "carry" : kt < plan.over ? "over" : kt < plan.lower ? "lower" : kt < plan.swim ? "swim" : "gone";
+  return kt < plan.carry ? "carry" : kt < plan.over ? "over" : kt < plan.lower ? "lower" : kt < plan.swim ? "swim" : plan.haul && kt < plan.haul ? "haul" : "gone";
 }
 
 /**
