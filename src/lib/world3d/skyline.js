@@ -39,7 +39,7 @@ const hazed = (mesh, dist, far) => {
  * Builds the skyline for a real place into `group`. place: the built place (origin, land rings). Returns
  * { turbines, update(t) } (the rotors turn slowly), or null when nothing applies.
  */
-export function buildSkyline(group, place, { groundY = 2.2, quality = 1 } = {}) {
+export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industry = null } = {}) {
   if (!place?.origin) return null;
   const [lat0, lon0] = place.origin, P = projector(lat0, lon0), H = PLACE3D.box;
   const far = 9000, rotors = [];
@@ -94,7 +94,17 @@ export function buildSkyline(group, place, { groundY = 2.2, quality = 1 } = {}) 
       const wm = new THREE.InstancedMesh(wall, new THREE.MeshLambertMaterial({ color: 0xffffff }), n), rm = new THREE.InstancedMesh(roof, new THREE.MeshLambertMaterial({ color: 0xffffff }), n);
       const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
       const BRICK = [0xb9a48e, 0xa78e78, 0xc8b8a4, 0xd6cfc2, 0x9a8676], SLATE = [0x5d5f63, 0x6b5148, 0x7a4a3c, 0x55585c];
+      const SHED = [0xa9aeb2, 0xc9c6bf, 0xc99a88, 0x8d969c, 0xb7b2a6], SHEDROOF = [0x8e9599, 0xa3a7a9, 0x7d8489];
       out.forEach(([x, z, d], i) => {
+        // (a port or industrial estate, where the mark says so: long low sheds with shallow roofs)
+        if (industry && industry(x, z)) {
+          const w = 30 + rnd() * 45, dep = 18 + rnd() * 25, h = 7 + rnd() * 7;
+          q.setFromAxisAngle(up, Math.round(rnd() * 3) * (Math.PI / 2) + (rnd() - 0.5) * 0.15);
+          mx.compose(new THREE.Vector3(x, groundY, z), q, new THREE.Vector3(w, h, dep)); wm.setMatrixAt(i, mx);
+          mx.compose(new THREE.Vector3(x, groundY + h, z), q, new THREE.Vector3(w * 1.02, 1.2, dep * 1.02)); rm.setMatrixAt(i, mx);
+          wm.setColorAt(i, c.setHex(SHED[i % SHED.length])); rm.setColorAt(i, c.setHex(SHEDROOF[i % SHEDROOF.length]));
+          return;
+        }
         const w = 8 + rnd() * 10, dep = 7 + rnd() * 6, h = 5.5 + rnd() * (d < 1400 ? 5 : 3.5), rh = 2.2 + rnd() * 1.6;
         q.setFromAxisAngle(up, Math.round(rnd() * 3) * (Math.PI / 2) + (rnd() - 0.5) * 0.3);
         mx.compose(new THREE.Vector3(x, groundY, z), q, new THREE.Vector3(w, h, dep)); wm.setMatrixAt(i, mx);
