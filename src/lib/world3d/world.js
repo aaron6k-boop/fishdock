@@ -273,12 +273,16 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
             const k = st === "haul" ? Math.max(0, Math.min(1, (net.y - landing.water) / hgt)) : 0;
             shot = from(-3.3, landing.edge + 3.5, wl + 0.42 * hgt + 0.9 + 0.5 * k); focusAt = net.clone().lerp(rail, 0.38 + 0.2 * k);
           }
+          // (where the bank runs out further than the spot's edge, that low place is in the ground: stand there instead, at a
+          // person's height over it, looking down to the water)
+          { const fl = env.floorAt?.(shot.x, shot.z); if (fl != null && fl > landing.water + 0.25) shot.y = Math.max(shot.y, fl + 1.55); }
         } else if (st === "lower" || st === "lead" || st === "haul") {
           shot = from(-4.3, landing.edge + 0.5, 3.0); focusAt = rail.clone().lerp(landing.net || landing.fish || rail, 0.45);
         } else {
           // other ways of landing (swung in, a landing net, up the beach): behind you and a little to the side, the fish
           // and you both ahead
-          shot = from(-0.75, -2.5, 2.55); focusAt = (landing.net || landing.fish || rail).clone().lerp(you, 0.35);
+          // (off to your left and a little behind: from straight behind, your body hid the net and the fish in front of you)
+          shot = from(-2.1, -0.7, 2.3); focusAt = (landing.net || landing.fish || rail).clone().lerp(you, 0.3);
         }
         if (!landShot) landShot = { since: t };
         // (putting it back is shortened: where it cuts to the fish in the water, the camera cuts too, rather than
