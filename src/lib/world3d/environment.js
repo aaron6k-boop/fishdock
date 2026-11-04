@@ -522,7 +522,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     envSky.uniforms.uEnvGround.value.copy(wU.uWater.value).multiplyScalar(0.8 * (st.day + st.dusk * 0.5 + st.night * 0.08));
     // ---- lamps after dark: the pools by the anglers, the lanterns and windows, their streaks on the water ----
     const lampOn = look.lampOn;
-    for (const pl of pointLights) pl.intensity = lampOn * (pl.userData.cd || 60);
+    // (switched off altogether by day: an unlit light still costs every pixel it might reach)
+    for (const pl of pointLights) { pl.intensity = lampOn * (pl.userData.cd || 60); pl.visible = lampOn > 0.02; }
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     for (let i = 0; i < 4; i++) { const q = lampSpots[i]; wU.uLamps.value[i].set(q ? q[0] : 0, q ? q[1] : 0, q ? q[2] : 0, q ? lampOn : 0); }
     if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain (wetLook.js)

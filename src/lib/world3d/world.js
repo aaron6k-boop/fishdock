@@ -392,17 +392,17 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     pace(ts, dt);
   }
   // ---- the sky as light and reflection: the sky itself (its gradient, sun glow and clouds; the sea below the horizon,
-  // environment.js envSky) made into an environment map whenever the light has changed enough (at most twice a second
-  // while it eases), so glass, wet concrete, puddles, metal railings and the reel catch the sky you see, and the shaded
+  // environment.js envSky) made into an environment map whenever the light has changed enough (at most every 90 frames,
+  // about one and a half seconds, while it eases: a few milliseconds each on a phone), so glass, wet concrete, puddles, metal railings and the reel catch the sky you see, and the shaded
   // side of a building is lit by it rather than going flat grey ----
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), env.envSky));
   let envRT = null, envKey = "", envWait = 0;
   function skyLight(s, force = false) {
     if (!s) return;
-    const key = [s.day, s.dusk, s.night, s.cloud, s.rain].map((v) => Math.round(v * 12)).join(",");
+    const key = [s.day, s.dusk, s.night, s.cloud, s.rain].map((v) => Math.round(v * 6)).join(",");
     if (envWait > 0) envWait--;
-    if (key === envKey || (envWait > 0 && !force)) return; envKey = key; envWait = 30;
+    if (key === envKey || (envWait > 0 && !(force && !envRT))) return; envKey = key; envWait = 90;
     const rt = pmrem.fromScene(envScene, 0.02);
     scene.environment = rt.texture;
     envRT?.dispose(); envRT = rt;
