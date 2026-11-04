@@ -13,6 +13,7 @@ import { loadPart, weatherPierProps } from "./glbParts.js";
 import { buildSkyline } from "./skyline.js";
 import { localFor } from "./localDetail.js";
 import { LANDMARK_BUILDERS } from "./landmarks3d.js";
+import { WET_PREP, WET_DARKEN, wetRough } from "./wetLook.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -67,6 +68,7 @@ function pierConcrete(mat, quality = 1) {
       sh.vertexShader = "attribute float aDamp;\nvarying float vDamp;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvDamp = aDamp;");
       sh.fragmentShader = "uniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0;\n" + sh.fragmentShader
         .replace("#include <map_fragment>", `#include <map_fragment>
+        ${WET_PREP}
         {
           vec2 pu = vMapUv * ${PHOTO_TILE.toFixed(3)};
           vec3 a = texture2D(pDiff, pu).rgb, b = texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb;
@@ -90,10 +92,10 @@ function pierConcrete(mat, quality = 1) {
           float salt = smoothstep(0.08, 0.35, vDamp) * (1.0 - fdDamp) * smoothstep(0.45, 0.7, texture2D(pNoise, vMapUv * 3.1).r);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.86, 0.83), salt * 0.25);
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.74, 0.77, 0.72), fdDamp);
-          diffuseColor.rgb *= 1.0 - uWet * 0.32;
+          diffuseColor.rgb *= ${WET_DARKEN};
         }`)
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35) * (1.0 - uWet * 0.55);`);
+        roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`);
     };
     mat.customProgramCacheKey = () => "fdpier2" + (quality < 1 ? "p" : "");
     mat.needsUpdate = true;

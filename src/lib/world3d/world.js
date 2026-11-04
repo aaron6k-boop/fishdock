@@ -36,7 +36,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.q >= 1, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
-  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0; // (see adapt)
   renderer.shadowMap.enabled = !!Q.shadows; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 5000);
@@ -83,7 +83,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     }
   }
   const ripples = [];
-  const ripple = (at, s = 0.6) => { ripples.push([at.x, at.z, 0, s]); if (ripples.length > 8) ripples.shift(); };
+  // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
+  // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)
+  const ripple = (at, s = 0.6) => {
+    ripples.push([at.x, at.z, 0, s, 2.4 + 3.2 * Math.min(1, s)]);
+    if (ripples.length > 8) { let k = 0, lo = Infinity; ripples.forEach((r, i) => { const v = r[3] * (1 - r[2] / r[4]); if (v < lo) { lo = v; k = i; } }); ripples.splice(k, 1); }
+  };
 
   // ---- aiming a cast: a ring on the water where it will land, while you hold Cast ----
   const aimMark = new THREE.Group(); aimMark.visible = false; scene.add(aimMark);
@@ -386,32 +391,33 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     tick((ts - clock0) / 1000, nowFn(), dt);
     pace(ts, dt);
   }
-  // ---- the sky as light and reflection: a soft gradient (sky above, haze at the horizon, the ground below) made into
-  // an environment map once per change of light, so glass, wet concrete, metal railings and the reel catch the sky,
-  // and the shaded side of a building is lit by it rather than going flat grey ----
+  // ---- the sky as light and reflection: the sky itself (its gradient, sun glow and clouds; the sea below the horizon,
+  // environment.js envSky) made into an environment map whenever the light has changed enough (at most every 90 frames,
+  // about one and a half seconds, while it eases: a few milliseconds each on a phone), so glass, wet concrete, puddles, metal railings and the reel catch the sky you see, and the shaded
+  // side of a building is lit by it rather than going flat grey ----
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const envScene = new THREE.Scene(), envGeo = new THREE.SphereGeometry(50, 32, 16), envCol = new Float32Array(envGeo.attributes.position.count * 3);
-  envGeo.setAttribute("color", new THREE.BufferAttribute(envCol, 3));
-  envScene.add(new THREE.Mesh(envGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
-  let envRT = null, envKey = "";
-  function skyLight(s) {
-    const key = [s.day, s.dusk, s.night, s.cloud].map((v) => Math.round(v * 10)).join(",");
-    if (key === envKey) return; envKey = key;
-    const top = new THREE.Color(0.32, 0.5, 0.82).multiplyScalar(s.day).add(new THREE.Color(0.32, 0.3, 0.48).multiplyScalar(s.dusk)).add(new THREE.Color(0.02, 0.025, 0.05).multiplyScalar(s.night)).lerp(new THREE.Color(0.55, 0.57, 0.6).multiplyScalar(s.day + s.dusk * 0.5 + s.night * 0.05), s.cloud * 0.7);
-    const hz = new THREE.Color(0.78, 0.84, 0.9).multiplyScalar(s.day).add(new THREE.Color(0.95, 0.62, 0.42).multiplyScalar(s.dusk)).add(new THREE.Color(0.05, 0.05, 0.08).multiplyScalar(s.night));
-    const low = new THREE.Color(0.3, 0.3, 0.29).multiplyScalar(s.day + s.dusk * 0.5 + s.night * 0.05);
-    const p = envGeo.attributes.position;
-    for (let i = 0; i < p.count; i++) { const y = p.getY(i) / 50, c = y > 0 ? hz.clone().lerp(top, Math.pow(y, 0.6)) : hz.clone().lerp(low, Math.min(1, -y * 3)); envCol.set([c.r, c.g, c.b], i * 3); }
-    envGeo.attributes.color.needsUpdate = true;
+  const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), env.envSky));
+  let envRT = null, envKey = "", envWait = 0;
+  function skyLight(s, force = false) {
+    if (!s) return;
+    const key = [s.day, s.dusk, s.night, s.cloud, s.rain].map((v) => Math.round(v * 6)).join(",");
+    if (envWait > 0) envWait--;
+    if (key === envKey || (envWait > 0 && !(force && !envRT))) return; envKey = key; envWait = 90;
     const rt = pmrem.fromScene(envScene, 0.02);
-    scene.environment = rt.texture; scene.environmentIntensity = 0.55;
+    scene.environment = rt.texture;
     envRT?.dispose(); envRT = rt;
+  }
+  // tone mapping: Khronos PBR Neutral keeps colours true (a dusk sky gold rather than orange, the sea its own colour)
+  // and keeps detail in the shadows; exposure follows the light as it eases (the eye adapts: dusk and night aren't black)
+  function adapt(force = false) {
+    const L2 = env.light; if (!L2) return;
+    renderer.toneMappingExposure = L2.exposure; scene.environmentIntensity = L2.envIntensity;
+    skyLight(env.current, force);
   }
 
   function setEnvAll({ light, cond, facing = 180 } = {}) {
     const s = env.setEnv({ light, cond, facing });
-    skyLight(s);
-    renderer.toneMappingExposure = 1 + 0.3 * s.dusk + 0.45 * s.night; // eyes adapt: dusk and night aren't black
+    adapt(true);
     envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind, rain: s.rain || 0 };
     return s;
   }
@@ -504,9 +510,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     }
     dropGeo.attributes.position.needsUpdate = true;
     for (const r of ripples) r[2] += dt;
-    while (ripples.length && ripples[0][2] > 6) ripples.shift();
-    env.setRipples(ripples.map((r) => [r[0], r[1], r[2], r[3] * Math.max(0, 1 - r[2] / 6)]));
+    for (let i = ripples.length - 1; i >= 0; i--) if (ripples[i][2] > ripples[i][4]) ripples.splice(i, 1);
+    env.setRipples(ripples.map((r) => [r[0], r[1], r[2], r[3] * Math.pow(Math.max(0, 1 - r[2] / r[4]), 1.5)]));
     env.update(t, dt, camera);
+    adapt();
     if (draw) renderer.render(scene, camera);
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
