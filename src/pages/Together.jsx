@@ -79,7 +79,8 @@ export default function Together() {
         {card("code", "lock", "Join with an invite code", "Six letters and numbers from the host")}
         {panel === "code" ? (
           <section className="tg-form">
-            <label className="field"><span className="lbl">Invite code</span><input className="tg-code" value={code} onChange={(e) => setCode(cleanCode(e.target.value))} inputMode="text" autoCapitalize="characters" autoComplete="off" placeholder="ABC234" maxLength={6} /></label>
+            <label className="field"><span className="lbl">Invite code</span><input className="tg-code" value={code} onChange={(e) => { const v = e.target.value, m = v.match(/#party\/([A-Za-z0-9]{6})\/([A-Za-z0-9_-]{4,40})/); if (m) go(`#party/${m[1].toUpperCase()}/${m[2]}`); else setCode(cleanCode(v.replace(/^.*#party\//, ""))); }} inputMode="text" autoCapitalize="characters" autoComplete="off" placeholder="ABC234" maxLength={6} /></label>
+            <span className="tiny">The host sees it under Invite a friend. Pasting their whole link works too.</span>
             <button type="button" className="btn primary block" disabled={busy || code.length !== 6} onClick={byCode}>{busy ? "Checking…" : "Find the party"}</button>
           </section>
         ) : null}

@@ -40,7 +40,8 @@ export default function InviteHere({ markId, placeName, venue, open, onClose }) 
           </section>
         ) : (
           <section className="watch-sec">
-            <p className="small">Send this link. Whoever taps it joins you here. Only people with the link can come in, and you can lock the party or remove anyone.</p>
+            <p className="small">Send this link. Whoever taps it joins you here. Only people with the link or the code can come in, and you can lock the party or remove anyone.</p>
+            <div className="invite-code-box"><span className="lbl">Join code</span><b className="invite-code">{made.code.slice(0, 3)} {made.code.slice(3)}</b><span className="tiny">Or they open FishDock, tap Fish Together, then Join with an invite code.</span></div>
             <div className="row">
               {navigator.share ? <button type="button" className="btn primary" onClick={share}><Icon name="share" />Share</button> : null}
               <button type="button" className="btn" onClick={copy}><Icon name="copy" />{copied ? "Copied" : "Copy link"}</button>

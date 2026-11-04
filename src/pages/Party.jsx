@@ -15,7 +15,7 @@ import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import { phaseAt } from "../lib/liveEvents.js";
 import { isLanded } from "../lib/landed.js";
 import { standings, CHALLENGES } from "../lib/partyStats.js";
-import { createVoice, proximityOf } from "../lib/voice.js";
+import { createVoice, proximityOf, micProblem } from "../lib/voice.js";
 import { qrSvg } from "../lib/qr.js";
 import { SPECIES, speciesById } from "../data/species.js";
 import { hasArt, artUrl } from "../data/fishart.js";
@@ -99,7 +99,7 @@ function RealCatchForm({ onSave, onCancel, code, mkey }) {
 function PartyLive({ code, mkey }) {
   const [toasts, setToasts] = useState([]), [sheet, setSheet] = useState(null), [uiHidden, setUiHidden] = useState(false), [sound, setSound] = useState(false);
   const [voiceState, setVoiceState] = useState({ on: false, muted: false, ptt: false, peers: [] }), [blocked, setBlocked] = useState(blockedSet);
-  const [replay, setReplay] = useState(null), [logging, setLogging] = useState(false), [chatText, setChatText] = useState(""), [copied, setCopied] = useState(false);
+  const [replay, setReplay] = useState(null), [logging, setLogging] = useState(false), [chatText, setChatText] = useState(""), [copied, setCopied] = useState(false), [micNote, setMicNote] = useState("");
   const voice = useRef(null);
   const toast = (text, kind = "") => { const id = Math.random().toString(36).slice(2); setToasts((t) => [...t.slice(-4), { id, text, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200); };
   // walking about: others' poses go straight to the 3D view; yours are sent a few times a second while you move
@@ -117,7 +117,11 @@ function PartyLive({ code, mkey }) {
       const name = (id) => P_ref.current?.members.find((x) => x.id === id)?.name || "Someone";
       if (m.t === "pose") { poseBus.dispatchEvent(new CustomEvent("pose", { detail: { who: m.who, p: m.p } })); return; }
       if (m.t === "react" && !blocked.has(m.from)) { toast(`${name(m.from)}: ${REACT.find((r) => r[0] === m.r)?.[1] || "Nice"}`, "react"); if (m.from !== P_ref.current?.me?.id) haptics.feel("reaction"); }
-      if (m.t === "chat" && m.c.who !== P_ref.current?.me?.id && !blocked.has(m.c.who) && sheetRef.current !== "chat") toast(`${name(m.c.who)}: ${m.c.text}`, "chat");
+      // someone's joined, left or been removed: always a toast (and a light buzz for joining), whatever's open
+      if (m.t === "chat" && m.c.sys && m.c.who !== P_ref.current?.me?.id) {
+        toast(noticeText(m.c), "join");
+        if (m.c.sys === "joined" && !blocked.has(m.c.who)) haptics.feel("friendJoined", { key: `${m.c.who}|joined|${Math.floor(Date.now() / 60000)}` });
+      } else if (m.t === "chat" && !m.c.sys && m.c.who !== P_ref.current?.me?.id && !blocked.has(m.c.who) && sheetRef.current !== "chat") toast(`${name(m.c.who)}: ${m.c.text}`, "chat");
       if (m.t === "signal") voice.current?.signal(m.from, m.data);
       if (m.t === "voice" && m.voice.on && m.who !== P_ref.current?.me?.id && !blocked.has(m.who)) voice.current?.meet(m.who);
       if (m.t === "voice" && !m.voice.on) voice.current?.drop(m.who);
@@ -184,8 +188,8 @@ function PartyLive({ code, mkey }) {
   useEffect(() => () => voice.current?.leave(), []);
   async function joinVoice() {
     if (!voice.current) voice.current = createVoice({ me: me.id, send: (m) => P.send(m), onChange: setVoiceState });
-    try { await voice.current.join(P.members.filter((m) => m.id !== me.id && m.voice?.on && !blocked.has(m.id)).map((m) => m.id)); }
-    catch { toast("Voice needs the microphone. It wasn't allowed, so text chat is there instead."); }
+    try { await voice.current.join(P.members.filter((m) => m.id !== me.id && m.voice?.on && !blocked.has(m.id)).map((m) => m.id)); setMicNote(""); }
+    catch (e) { const t = micProblem(e); setMicNote(t); toast(t); }
   }
   // the mic button on the fishing screen: the first tap joins voice (the phone asks for the microphone then, not
   // before); after that it mutes and unmutes you
@@ -220,6 +224,20 @@ function PartyLive({ code, mkey }) {
   if (!party) return <div className="watch-shell"><div className="watch-msg"><span className="loading-dots" aria-label="Connecting" /><p>{P.status === "reconnecting" ? "Reconnecting…" : "Joining the party…"}</p></div></div>;
 
   const host = me?.host, link = party.secret ? partyLink(code, party.secret) : null;
+  // ---- inviting: the host shares the private link; anyone else, while the host lets the short code be used, a link
+  // with the code in it (the same as telling a friend the code). Both open straight into this party ----
+  const inviteLink = link || (party.codeOn && !party.locked ? codeLink(code) : null);
+  const inviteText = `Come and fish with me on FishDock${party.place?.label ? ` at ${party.place.label}` : ""}. Tap the link, or type the code ${code} in Fish Together.`;
+  async function invite() {
+    if (!inviteLink) { setSheet("invite"); return; }
+    if (navigator.share) {
+      try { await navigator.share({ title: "Fish with me on FishDock", text: inviteText, url: inviteLink }); return; }
+      catch (e) { if (e?.name === "AbortError") return; } // closed the share sheet: nothing more to do
+    }
+    try { await navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); toast(`Invite link copied. Or tell them the code: ${code}`, "join"); }
+    catch { toast(`Tell them the code: ${code}`, "join"); }
+    setSheet("invite");
+  }
   const tab = sheet || "people"; // on a wide screen the panel is always there, open at People
   const lastMine = myEvents.at(-1)?.type;
   // real trips: one tap for what just happened, only the steps that make sense now
@@ -243,6 +261,8 @@ function PartyLive({ code, mkey }) {
             <button type="button" className="fs-chip" onClick={() => setSheet("people")}><Icon name="users" />{P.members.filter((m) => m.spot).length}{P.members.some((m) => !m.spot) ? ` + ${P.members.filter((m) => !m.spot).length} watching` : ""}</button>
             {P.status === "reconnecting" ? <span className="fs-chip">Reconnecting…</span> : null}
             <span className="grow" />
+            <button type="button" className="fs-chip invite-btn" onClick={invite} aria-label="Invite a friend"><Icon name="share" />Invite a friend</button>
+            {party.voiceOn && voiceState.on ? <span className={`fs-chip mic-state${voiceState.muted ? "" : " live"}`} aria-live="polite">{voiceState.muted ? "Muted" : voiceState.ptt && !voiceState.talking ? "Hold to talk" : voiceState.talking && voiceState.level > 0.05 ? "Speaking" : "Mic on"}</span> : null}
             {party.voiceOn ? <button type="button" className={`fs-btn mic${voiceState.on && !voiceState.muted ? " on" : ""}${voiceState.on && voiceState.talking && voiceState.level > 0.05 ? " talking" : ""}`} onClick={micTap} aria-pressed={voiceState.on && !voiceState.muted} aria-label={!voiceState.on ? "Turn on your microphone (voice chat)" : voiceState.muted ? "Unmute your microphone" : "Mute your microphone"} title={!voiceState.on ? "Voice chat: tap to turn your mic on" : voiceState.muted ? "Muted: tap to talk" : "Mic on: tap to mute"}><Icon name={voiceState.on && !voiceState.muted ? "mic" : "micoff"} /></button> : null}
             <button type="button" className={`fs-btn${sheet ? " on" : ""}`} onClick={() => setSheet(sheet ? null : "people")} aria-label="Party: people, voice, chat, catches, invite"><Icon name="users" /></button>
           </div>
@@ -269,6 +289,7 @@ function PartyLive({ code, mkey }) {
                   <label className="check small"><input type="checkbox" checked={voiceState.ptt} onChange={(e) => voice.current?.setPushToTalk(e.target.checked)} /> Push to talk</label>
                   <label className="check small"><input type="checkbox" checked={voiceState.proximity !== false} onChange={(e) => voice.current?.setProximity(e.target.checked)} /> Proximity chat (people near you are louder, from their side; off: hear everyone)</label></>}
             </div>
+            {micNote && !voiceState.on ? <p className="notice warn small" role="alert"><Icon name="micoff" /><span>{micNote}</span></p> : null}
             <p className="tiny">Voice goes phone to phone. It asks for the microphone only when you join. On some mobile networks someone may not connect; text chat always works.</p>
             <div className="list">{P.members.map((m) => {
               const vp = voiceState.peers.find((x) => x.id === m.id), isMe = m.id === me.id;
@@ -319,7 +340,9 @@ function PartyLive({ code, mkey }) {
         {tab === "chat" ? (
           <section className="watch-sec">
             {!party.chatOn ? <p className="notice small">The host has turned chat off.</p> : null}
-            <ol className="chat">{P.chat.filter((c) => !blocked.has(c.who)).map((c) => <li key={c.seq} className={c.who === me.id ? "mine" : ""}><b>{memberById[c.who]?.name || "Someone"}</b> {c.text}<span className="tiny"> {fmtTime(c.at - P.offset)}</span></li>)}</ol>
+            <ol className="chat">{P.chat.filter((c) => c.sys || !blocked.has(c.who)).map((c) => (c.sys
+              ? <li key={c.seq} className="sys">{noticeText(c, c.who === me.id)}<span className="tiny"> {fmtTime(c.at - P.offset)}</span></li>
+              : <li key={c.seq} className={c.who === me.id ? "mine" : ""}><b>{memberById[c.who]?.name || "Someone"}</b> {c.text}<span className="tiny"> {fmtTime(c.at - P.offset)}</span></li>))}</ol>
             <form className="row" onSubmit={(e) => { e.preventDefault(); if (chatText.trim()) { P.send({ t: "chat", text: chatText.trim() }); setChatText(""); } }}>
               <input value={chatText} onChange={(e) => setChatText(e.target.value)} maxLength={200} placeholder={party.chatOn ? "Say something" : "Chat is off"} disabled={!party.chatOn} aria-label="Message" />
               <button type="submit" className="btn small primary" disabled={!party.chatOn}>Send</button>
@@ -329,17 +352,21 @@ function PartyLive({ code, mkey }) {
 
         {tab === "invite" ? (
           <section className="watch-sec">
-            {link ? (
+            {inviteLink ? (
               <>
-                <div className="qr" aria-label="QR code for the invite link" dangerouslySetInnerHTML={{ __html: qrSvg(link) || "" }} />
-                <p className="small"><b>Code: {code}</b>{party.codeOn ? "" : " (turned off: only the link works)"}</p>
-                <div className="row">
-                  {navigator.share ? <button type="button" className="btn small primary" onClick={() => navigator.share({ title: "Fish with me on FishDock", text: `Join my ${mode === "real" ? "fishing trip" : "virtual fishing party"} on FishDock`, url: link }).catch(() => {})}><Icon name="share" />Share</button> : null}
-                  <button type="button" className="btn small" onClick={async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ } }}><Icon name={copied ? "check" : "copy"} />{copied ? "Copied" : "Copy link"}</button>
+                <div className="invite-code-box">
+                  <span className="lbl">{party.codeOn && !party.locked ? "Join code" : "Party code"}</span>
+                  <b className="invite-code" aria-label={`Code ${code.split("").join(" ")}`}>{code.slice(0, 3)} {code.slice(3)}</b>
+                  <span className="tiny">{party.locked ? "The party is locked: nobody new can join until the host unlocks it." : party.codeOn ? "They can tap the link, or open FishDock, tap Fish Together, then Join with an invite code." : "The code is turned off: only the link works."}</span>
                 </div>
-                <p className="tiny">Private: only people with this link{party.codeOn ? " or the code" : ""} can join. Don't post it publicly. You can make a new link in Host if it gets passed on.</p>
+                <div className="row">
+                  <button type="button" className="btn small primary" onClick={invite}><Icon name="share" />{navigator.share ? "Invite a friend" : copied ? "Link copied" : "Copy invite link"}</button>
+                  {navigator.share ? <button type="button" className="btn small" onClick={async () => { try { await navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ } }}><Icon name={copied ? "check" : "copy"} />{copied ? "Copied" : "Copy link"}</button> : null}
+                </div>
+                <div className="qr" aria-label="QR code for the invite link" dangerouslySetInnerHTML={{ __html: qrSvg(inviteLink) || "" }} />
+                <p className="tiny">Private: only people with this link{party.codeOn ? " or the code" : ""} can join, and they arrive here, at {party.place?.label || "this place"}. Don't post it publicly.{host ? " You can make a new link in Host if it gets passed on." : ""}</p>
               </>
-            ) : <p className="small">Ask the host for the invitation. Only the host can share it.</p>}
+            ) : <p className="small">{party.locked ? "The host has locked this party, so nobody new can join just now." : "Ask the host for the invitation: they've turned the short code off, so only their link works."}</p>}
           </section>
         ) : null}
 
@@ -362,6 +389,13 @@ function PartyLive({ code, mkey }) {
   );
 }
 const confirmClose = { current: false };
+// ---- small words ----
+const codeLink = (code) => `${location.origin}/#party/${code}/code`;
+/** A chat notice in plain words: "Sam joined the party", "Sam left", "Sam was removed by the host". */
+function noticeText(c, self = false) {
+  const n = self ? "You" : c.name || "Someone";
+  return c.sys === "joined" ? `${n} joined the party` : c.sys === "left" ? `${n} left` : c.sys === "removed" ? `${n} ${self ? "were" : "was"} removed by the host` : "";
+}
 // a catch's notification waits until the fish is out of the water on screen
 function landedDelay(e, venue) { const at = e.t + 0; const now = Date.now(); for (let ms = 0; ms < 12000; ms += 250) if (isLanded(e, now + ms, venue)) return ms; return 8000 - (now - at); }
 
