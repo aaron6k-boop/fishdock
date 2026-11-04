@@ -19,9 +19,9 @@ const POS = /"(lat|lon|lng|latitude|longitude|gps|coords|position)"\s*:/i;
 // ---- one person: a browser context of their own (their own storage, as a separate phone) ----
 // (each in a browser of its own, so one phone's 3D drawing in software never starves another's page)
 const ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--autoplay-policy=no-user-gesture-required"];
-async function person(label) {
-  const browser = await chromium.launch({ args: ARGS });
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true, permissions: ["clipboard-read", "clipboard-write"] });
+async function person(label, { mic = false } = {}) {
+  const browser = await chromium.launch({ args: [...ARGS, ...(mic ? ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] : [])] });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true, permissions: ["clipboard-read", "clipboard-write", ...(mic ? ["microphone"] : [])] });
   // what the phone receives from the party, so the test can check nobody is ever sent a position
   await ctx.addInitScript(() => {
     window.__partyIn = [];
@@ -30,6 +30,10 @@ async function person(label) {
     // haptics: count the buzzes instead (no vibration motor here)
     window.__buzz = [];
     navigator.vibrate = (p) => { window.__buzz.push(p); return true; };
+    // voice connections, to say why if one doesn't connect
+    window.__pcs = [];
+    const PC = window.RTCPeerConnection;
+    if (PC) window.RTCPeerConnection = class extends PC { constructor(...a) { super(...a); const r = { states: [], cands: [] }; Object.defineProperty(r, "pc", { value: this }); window.__pcInfo = () => window.__pcs.map((x) => ({ ...x, gather: x.pc.iceGatheringState, ice: x.pc.iceConnectionState, conn: x.pc.connectionState, local: (x.pc.localDescription?.sdp || "").split("\r\n").filter((l) => /^(m=|a=candidate|a=(send|recv|inactive)|a=ice-ufrag)/.test(l)), remote: (x.pc.remoteDescription?.sdp || "").split("\r\n").filter((l) => /^(m=|a=candidate|a=(send|recv|inactive)|a=ice-ufrag)/.test(l)) })); window.__pcs.push(r); this.addEventListener("connectionstatechange", () => r.states.push(this.connectionState)); this.addEventListener("icecandidate", (e) => r.cands.push(e.candidate ? e.candidate.candidate.split(" ").slice(4, 8).join(" ") : "end")); this.addEventListener("signalingstatechange", () => r.states.push(`sig:${this.signalingState}`)); } };
     // every toast that appears (they go after a few seconds, which a slow machine could miss)
     window.__toasts = [];
     new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.classList?.contains("w3d-toast")) window.__toasts.push(n.textContent); })
@@ -55,7 +59,7 @@ const openSheet = async (page, tab) => {
 
 async function main() {
   console.log(`Fish Together in two browsers against ${base}\n`);
-  const A = await person("host"), B = await person("guest"), C = await person("code guest");
+  const A = await person("host", { mic: true }), B = await person("guest", { mic: true }), C = await person("code guest");
   try {
     // ---- the host starts a party ----
     await A.page.goto(`${base}/#together`);
@@ -137,17 +141,38 @@ async function main() {
     ok(!!(await until(() => C.page.$(".fs-top"))), "the code guest is in the fishing view");
     ok(!!(await until(() => toasted(B.page, "Cara joined the party"))), "Bob gets a toast that Cara joined too");
 
+    // ---- a guest can pass the invitation on too (a link with the short code, while the host allows the code) ----
+    await C.page.evaluate(() => navigator.clipboard.writeText(""));
+    await C.page.click("button.invite-btn");
+    const cLink = await until(async () => { const t = await C.page.evaluate(() => navigator.clipboard.readText()); return t || null; }, 8000);
+    ok(cLink === `${base}/#party/${code}/code`, "a guest's Invite a friend gives a link with the code (never the host's secret)", cLink);
+    if (await C.page.$(".party-sheet.open")) await C.page.click(".party-sheet .sheet-x");
+
+    // ---- mic: a refused microphone gets plain words ----
+    await C.page.evaluate(() => { navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error("denied"), { name: "NotAllowedError" })); });
+    await C.page.click("button.mic");
+    const refused = await until(() => C.page.evaluate(() => window.__toasts.find((t) => /microphone is blocked/i.test(t))), 10000);
+    ok(!!refused, "a refused microphone is explained in plain words", refused);
+
     // ---- leaving ----
     await openSheet(C.page, "People");
     await C.page.click("button:has-text('Leave the party')");
     ok(!!(await until(() => toasted(A.page, "Cara left"))), "the host gets a toast that Cara left");
 
-    // ---- mic: a refused microphone gets plain words ----
-    await B.page.evaluate(() => { navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error("denied"), { name: "NotAllowedError" })); });
-    if (await B.page.$(".party-sheet.open")) await B.page.click(".party-sheet .sheet-x");
+    // ---- voice between Alice and Bob (Chromium's stand-in microphone plays a beep), phone to phone ----
+    for (const p of [A, B]) { if (await p.page.$(".party-sheet.open")) await p.page.click(".party-sheet .sheet-x"); }
+    await A.page.click("button.mic");
+    ok(!!(await until(() => A.page.$(".fs-chip.mic-state"))), "after one tap, the host's screen shows the mic is on", await A.page.$eval(".fs-top", (e) => e.innerText));
     await B.page.click("button.mic");
-    const refused = await until(() => B.page.evaluate(() => (document.body.innerText.match(/microphone[^.]*(blocked|allow)[^.]*\./i) || [])[0]), 6000);
-    ok(!!refused, "a refused microphone is explained in plain words", refused);
+    await openSheet(A.page, "People"); await openSheet(B.page, "People");
+    const hear = (p, who) => p.page.$$eval(".party-person", (els, w) => els.some((e) => e.innerText.includes(w) && e.innerText.includes("you can hear each other")), who);
+    ok(!!(await until(() => hear(A, "Bob"), 40000)), "voice connects: the host's list says she and Bob can hear each other", await A.page.$$eval(".party-person .s", (e) => e.map((x) => x.textContent).join(" | ")));
+    ok(!!(await until(() => hear(B, "Alice"), 20000)), "and Bob's says the same about Alice", JSON.stringify(await Promise.all([A, B].map((p) => p.page.evaluate(() => window.__pcInfo())))));
+    const lit = await until(() => A.page.$$eval(".party-person", (els) => els.some((e) => e.innerText.includes("Bob") && e.querySelector(".speak.on"))), 20000);
+    ok(!!lit, "Bob's sound reaches Alice's phone: his speaking light comes on");
+    await B.page.click("button:has-text('Mute me')");
+    ok(!!(await until(() => A.page.$$eval(".party-person .s", (els) => els.some((e) => e.textContent.includes("voice (muted)"))))), "Bob mutes: Alice sees him as muted");
+    ok(!!(await until(() => B.page.$eval(".fs-top", (e) => e.innerText.includes("Muted")))), "and Bob's own screen says Muted");
 
     // ---- privacy: nothing either phone received holds a position ----
     const got = (await Promise.all([A, B, C].map((p) => p.page.evaluate(() => window.__partyIn)))).flat();

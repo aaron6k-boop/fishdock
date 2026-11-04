@@ -51,13 +51,15 @@ export function createVoice({ me, send, onChange }) {
   const buf = new Uint8Array(512);
   const levelOf = (a) => { if (!a) return 0; a.getByteTimeDomainData(buf); let s = 0; for (const v of buf) s += ((v - 128) / 128) ** 2; return Math.sqrt(s / buf.length); };
 
-  function peer(id) {
+  // your microphone on a connection (once; after an incoming offer is applied, so it rides on the offered audio line)
+  const addMic = (p) => { if (p.micAdded || !stream) return; p.micAdded = true; stream.getTracks().forEach((t) => p.pc.addTrack(t, stream)); };
+  function peer(id, { mic = true } = {}) {
     if (peers.has(id)) return peers.get(id);
     const pc = new RTCPeerConnection({ iceServers: ICE });
     const audio = new Audio(); audio.autoplay = true; audio.playsInline = true;
-    const p = { pc, audio, polite: me < id, making: false, ignore: false, level: 0, analyser: null, volume: 1, muted: false, near: 1, pan: 0, gain: null, panner: null };
+    const p = { pc, audio, polite: me < id, making: false, ignore: false, micAdded: false, chain: Promise.resolve(), level: 0, analyser: null, volume: 1, muted: false, near: 1, pan: 0, gain: null, panner: null };
     peers.set(id, p);
-    stream?.getTracks().forEach((t) => pc.addTrack(t, stream));
+    if (mic) addMic(p);
     pc.ontrack = (e) => {
       audio.srcObject = e.streams[0]; audio.play?.().catch(() => {});
       try {
@@ -74,19 +76,34 @@ export function createVoice({ me, send, onChange }) {
     };
     pc.onicecandidate = (e) => { if (e.candidate) send({ t: "signal", to: id, data: { ice: e.candidate.toJSON() } }); };
     pc.onnegotiationneeded = async () => { try { p.making = true; await pc.setLocalDescription(); send({ t: "signal", to: id, data: { sdp: pc.localDescription.toJSON() } }); } catch { /* retried on the next change */ } finally { p.making = false; } };
-    pc.onconnectionstatechange = changed;
+    // a connection that fails (a network change, say) is tried again by the side that started it
+    pc.onconnectionstatechange = () => { if (pc.connectionState === "failed" && !p.polite) { try { pc.restartIce(); } catch { /* old browser */ } } changed(); };
     return p;
   }
-  // "perfect negotiation": either side may start; the polite one gives way on a clash
-  async function signal(from, data) {
-    if (!on) return;
-    const p = peer(from), pc = p.pc;
+  // Who calls whom: of any two people, only the one whose id sorts later starts the call (the other answers). Both
+  // starting at once, as when two people turn voice on together, made both phones roll back and, in Chromium, left
+  // the answering side never finding a network path (seen in tests/e2e/together.mjs), so it's avoided altogether.
+  const calls = (id) => me > id;
+  const connect = (id) => { if (calls(id)) peer(id); else send({ t: "signal", to: id, data: { call: true } }); };
+  // "perfect negotiation" for anything later (either side may renegotiate; the polite one gives way on a clash).
+  // Messages for one person are handled one at a time, in order.
+  function signal(from, data) {
+    if (!on || !data) return Promise.resolve();
+    if (data.call) { if (calls(from)) peer(from); return Promise.resolve(); } // "call me": they're in voice and waiting
+    if (!peers.has(from) && data.sdp?.type !== "offer") return Promise.resolve(); // nothing to apply it to
+    const p = peer(from, { mic: false });
+    p.chain = p.chain.then(() => handle(p, from, data));
+    return p.chain;
+  }
+  async function handle(p, from, data) {
+    const pc = p.pc;
     try {
       if (data.sdp) {
         const clash = data.sdp.type === "offer" && (p.making || pc.signalingState !== "stable");
         p.ignore = !p.polite && clash;
         if (p.ignore) return;
         await pc.setRemoteDescription(data.sdp);
+        addMic(p);
         if (data.sdp.type === "offer") { await pc.setLocalDescription(); send({ t: "signal", to: from, data: { sdp: pc.localDescription.toJSON() } }); }
       } else if (data.ice) { try { await pc.addIceCandidate(data.ice); } catch (e) { if (!p.ignore) throw e; } }
     } catch { /* a bad message: ignore it */ }
@@ -109,7 +126,7 @@ export function createVoice({ me, send, onChange }) {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       try { ctx = new (window.AudioContext || window.webkitAudioContext)(); localA = analyse(ctx.createMediaStreamSource(stream)); ctx.resume?.().catch(() => {}); } catch { ctx = null; }
       on = true; applyMic();
-      for (const id of others) peer(id); // offers go out through onnegotiationneeded
+      for (const id of others) connect(id); // offers go out through onnegotiationneeded
       meter = setInterval(() => { localLevel = levelOf(localA); for (const p of peers.values()) p.level = levelOf(p.analyser); changed(); }, 250);
       return true;
     },
@@ -124,7 +141,7 @@ export function createVoice({ me, send, onChange }) {
     setProximity(v) { proximity = !!v; for (const p of peers.values()) output(p); changed(); },
     signal, drop,
     /** someone new joined voice: connect to them */
-    meet(id) { if (on && id !== me) peer(id); },
+    meet(id) { if (on && id !== me && !peers.has(id)) connect(id); },
   };
 }
 let localA = null;
