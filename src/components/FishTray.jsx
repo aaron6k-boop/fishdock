@@ -2,9 +2,9 @@
 // One large button for the step that makes sense now, and nothing else, so the rod and the water stay clear:
 //   Cast (hold to build power, look where you want it, let go) → Strike (one tap) → Reel (tap it, again and again:
 //   each tap turns the handle) → Land (once the fish is close) → Cast again.
-// The button sits in the thumb's corner on its own; everything you read sits in one small panel above it, never
-// beside it or under the thumb: while a fish is on, how far out it is, the line's tension (with where the drag will
-// slip) and one line of what's going on. Assisted reeling (an option) winds steadily after one tap. In Advanced mode
+// The button sits in the thumb's corner on its own, with one short line above it only when there's something to say.
+// While a fish is on, the button is the whole readout: a ring round it for the line's tension (with where the drag will
+// slip) and how far out the fish is under the word Reel, so nothing sits over your hands and the reel. Assisted reeling (an option) winds steadily after one tap. In Advanced mode
 // two small buttons set the drag. Nothing shows while the cast flies or a fish is being landed.
 // Each button takes one press for one thing: a second Strike or Land straight after the first is ignored, and Land
 // doesn't take a tap meant for Reel in the moment it appears under your thumb.
@@ -39,7 +39,8 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
     const near = !!fight?.near || (landOn.current && (fight?.progress ?? 0) > 0.88);
     landOn.current = near; act = near ? "land" : "reel";
     // what's happening, said only when it's true: a run only while the fish is taking line, the drag only while it slips
-    status = near ? "It's close: tap Land" : fight?.running ? "It's running: line going out" : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : "Keep tapping Reel";
+    // (the how-to only for the first few taps: after that the button, its ring and the reel turning say it)
+    status = near ? "It's close: tap Land" : fight?.running ? "It's running: line going out" : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : (fight?.taps ?? 0) < 4 ? "Tap Reel again and again" : "";
     dist = fight && !near ? `${Math.round(fight.dist)}\u00a0m` : null; label = status;
   }
   else if (phase === "landing") { busy = true; label = "Landing it"; }
@@ -83,17 +84,21 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   const land = (e) => { e?.preventDefault?.(); if (ok("land")) onLand?.(); };
   const key = (f) => (e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); f(); } };
   const fighting = act === "reel" || act === "land";
+  // the line's tension as a ring round the button you're pressing (green, amber, then red; the white mark where the
+  // drag slips), so the one thing you watch and the one thing you press are in the same place
+  const dragDeg = (dragAt / 1.2) * 360;
+  const tenRing = fighting ? (
+    <svg className={`ft-ringsvg ft-tension ${tenCls}`} viewBox="0 0 64 64" role="meter" aria-label="Line tension" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((ten / 1.2) * 100)}>
+      <circle cx="32" cy="32" r={R} className="ft-ring-bg" />
+      <circle cx="32" cy="32" r={R} className="ft-ring ft-ten-fill" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - ten / 1.2) }} />
+      <line x1={32 + 25.5 * Math.cos((dragDeg * Math.PI) / 180)} y1={32 + 25.5 * Math.sin((dragDeg * Math.PI) / 180)} x2={32 + 32.5 * Math.cos((dragDeg * Math.PI) / 180)} y2={32 + 32.5 * Math.sin((dragDeg * Math.PI) / 180)} className="ft-ten-drag" />
+    </svg>
+  ) : null;
   return (
     <div className={`fish-tray${hide ? " is-busy" : ""}${urgent ? " is-urgent" : ""}`} data-act={act || (busy ? "busy" : "none")} role="group" aria-label="Fishing controls">
-      {/* what you read: one panel above the button, clear of your thumb */}
+      {/* what you read: one short line above the button, only when it says something (clear of your hands and your
+          thumb); while a fish is on, the tension and the distance are on the Reel button itself */}
       <div className={`ft-readout${fighting ? " fight" : ""}`}>
-        {fighting && dist ? <b className="ft-dist" aria-label={`About ${dist.replace("\u00a0", " ")} out`}>{dist}</b> : null}
-        {fighting ? (
-          <div className={`ft-tension ${tenCls}`} role="meter" aria-label="Line tension" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((ten / 1.2) * 100)}>
-            <span className="ft-ten-name" aria-hidden="true">Tension</span>
-            <span className="ft-ten-bar"><i className="ft-ten-fill" style={{ width: `${(ten / 1.2) * 100}%` }} /><i className="ft-ten-drag" style={{ left: `${(dragAt / 1.2) * 100}%` }} /></span>
-          </div>
-        ) : null}
         {label ? <span className="ft-label" aria-live="polite">{label}</span> : null}
       </div>
       <div className="ft-row">
@@ -114,14 +119,15 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
           </button>
         ) : null}
         {act === "strike" ? <button type="button" className="ft-main ft-strike" onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}><Icon name="hook" /><span>Strike</span></button> : null}
-        {act === "land" ? <button type="button" className="ft-main ft-land" onPointerDown={land} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(land)}><Icon name="fish" /><span>Land</span></button> : null}
+        {act === "land" ? <button type="button" className="ft-main ft-land" onPointerDown={land} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(land)}>{tenRing}<Icon name="fish" /><span>Land</span></button> : null}
         {act === "reel" ? (
           <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
             onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onTap?.(); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => setPressed(false)} onPointerCancel={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onContextMenu={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
-            <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - reel) }} /></svg>
+            {tenRing}
             {tapFx ? <span key={tapFx} className="ft-tapfx" aria-hidden="true" /> : null}
-            <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span>Reel</span>
+            <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span className="ft-word">Reel</span>
+            {dist ? <b className="ft-dist" aria-label={`About ${dist.replace("\u00a0", " ")} out`}>{dist}</b> : null}
           </button>
         ) : null}
       </div>

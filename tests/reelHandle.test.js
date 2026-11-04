@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { stepHandle, handleState } from "../src/lib/reelHandle.js";
+import { stepHandle, handleState, halfTurnsPassed } from "../src/lib/reelHandle.js";
 
 const run = (taps, seconds, fps, s = handleState()) => {
   // taps: times (s) of accepted taps; each is half a turn
@@ -41,4 +41,17 @@ test("a new fight carries on from where the handle is", () => {
   s = stepHandle(s, 0, 1 / 60); // the next fight: no turns yet
   assert.ok(s.angle >= at - 1e-9 && s.angle - at < 0.02);
   s = stepHandle(s, 0.5, 1); assert.ok(s.angle > at);
+});
+
+test("the reel clicks once for each half turn the handle actually makes, the same at 20 or 60 frames a second", () => {
+  const taps = Array.from({ length: 10 }, (_, i) => 0.1 + i * 0.15);
+  for (const fps of [20, 60]) {
+    let s = handleState(), t = 0, turns = 0, k = 0, clicks = 0;
+    while (t < 4) { while (k < taps.length && taps[k] <= t) { turns += 0.5; k++; } const a0 = s.angle; s = stepHandle(s, turns, 1 / fps); clicks += halfTurnsPassed(a0, s.angle); t += 1 / fps; }
+    // ten taps, five turns: ten half turns, all made by the time it has run down
+    assert.equal(clicks, 10, `at ${fps} fps`);
+  }
+  assert.equal(halfTurnsPassed(0.1, 0.2), 0);
+  assert.equal(halfTurnsPassed(3.1, 3.2), 1);
+  assert.equal(halfTurnsPassed(3.2, 3.1), 0);
 });

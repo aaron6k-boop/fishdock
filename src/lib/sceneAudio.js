@@ -255,7 +255,7 @@ function step(d = {}) {
 
 /** Plays a named effect if sound is on: bell (the bite: a bell at sea, an alarm on fresh water), plop, splash,
  *  bigsplash, whoosh, net (a net going into the water), drip (water pouring out of a lifted net), reelOn, reelOff,
- *  reelTap (one tap of the reel), drag (the drag slipping), swish, rope, mat, flap, step and stepRun (data: surface,
+ *  reelTap (half a turn of the handle; data: speed 0..1), strain (the line under a pull; data: tension), drag (the drag slipping), swish, rope, mat, flap, step and stepRun (data: surface,
  *  hard 0..1, wet, land). */
 export function play(name, data = null) {
   if (!ac || !on || ac.state !== "running") return;
@@ -274,6 +274,18 @@ export function play(name, data = null) {
   else if (name === "mat") { burst(0.12, 240 + R() * 50, 0.26 * v(), 0.9); burst(0.08, 1800, 0.05, 1, true); } // the fish laid on the wet mat
   else if (name === "flap") { const n = 1 + Math.floor(R() * 3); for (let i = 0; i < n; i++) { const at = i * (0.08 + R() * 0.07), g = 0.11 * (1 - i * 0.25) * v(); burst(0.06, 850 + R() * 400, g, 1.3, false, evG, at); burst(0.03, 2600, g * 0.25, 1.5, true, evG, at); } } // a flick or two of its tail on the wet mat
   else if (name === "reelOff") { clearInterval(reelTimer); reelTimer = null; }
-  else if (name === "reelTap") { click(0); click(0.04 + R() * 0.012); if (R() < 0.7) click(0.085 + R() * 0.02, 0.07); burst(0.1, 520 + R() * 120, 0.025, 1.4, false, gearG); } // half a turn of the handle: the gears' clicks over a soft whirr
+  else if (name === "reelTap") {
+    // half a turn of the handle as it actually goes round: the pawl's click over a soft whirr of the gears; turning
+    // faster, the clicks run together into the whirr (quieter, one of them) rather than rattling, and each is a little
+    // different
+    const sp = Math.max(0, Math.min(1, data?.speed || 0));
+    click(0, 0.1 * (1 - 0.4 * sp)); if (R() < 0.75 - 0.5 * sp) click(0.035 + R() * 0.015, 0.06);
+    burst(0.08 + 0.07 * sp, 470 + R() * 140 + 220 * sp, 0.02 + 0.016 * sp, 1.4, false, gearG);
+  }
+  else if (name === "strain") {
+    // the line under a fish's pull: a low hum through the taut line, as loud as it's pulling (once a surge, never a loop)
+    const k = Math.max(0, Math.min(1.4, data?.tension || 0.5));
+    burst(0.35 + 0.25 * k, 190 + R() * 60 + 90 * k, 0.03 + 0.05 * k, 6, false, gearG); burst(0.2, 2400 + R() * 600, 0.008 * k, 3, true, gearG, 0.05);
+  }
   else if (name === "drag") { const n = 5 + Math.floor(R() * 4); for (let i = 0; i < n; i++) burst(0.016, 4000 + R() * 800, 0.085 * v(), 5, false, gearG, (i * (24 + R() * 8)) / 1000); burst(0.22, 6500, 0.012, 2, true, gearG); } // the drag giving line: a fast ratchet, and the line hissing off the spool
 }

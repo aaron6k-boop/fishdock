@@ -35,7 +35,9 @@ const THUMB = { at: V(0.026, 0.03, 0.012), len: [0.028, 0.024, 0.02], r: 0.0102 
 const GRIPS = {
   rest: { f: [[0.35, 0.45, 0.3], [0.4, 0.5, 0.32], [0.45, 0.55, 0.35], [0.5, 0.6, 0.38]], t: [0.25, 0.2, 0.15], spread: 0.06 },
   seat: { f: [[1.25, 1.3, 0.8], [1.25, 1.35, 0.85], [1.35, 1.4, 0.9], [1.4, 1.4, 0.95]], t: [0.85, 0.35, 0.25], spread: 0.0 },
-  crank: { f: [[1.3, 1.35, 0.95], [1.4, 1.4, 1.0], [1.45, 1.4, 1.0], [1.5, 1.4, 1.0]], t: [0.75, 0.55, 0.45], spread: 0.0 }, // (a closed hand round the knob)
+  // (over the knob, the fingers wrapped down round it and the thumb on top: was a tight fist with the knob lying
+  // against the backs of the fingers and the thumb stuck out, the curled look in Aaron's recording)
+  crank: { f: [[1.0, 1.1, 0.7], [1.1, 1.2, 0.8], [1.25, 1.3, 0.85], [1.35, 1.35, 0.9]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fish: { f: [[0.25, 0.3, 0.2], [0.3, 0.35, 0.22], [0.35, 0.38, 0.25], [0.4, 0.4, 0.28]], t: [0.1, 0.15, 0.1], spread: 0.05 },
 };
@@ -43,8 +45,14 @@ let BETA = 1.0; export const _tune = (o) => { if (o.beta != null) BETA = o.beta;
 const gripOf = (kind) => (kind === "seat" ? GRIPS.seat : kind === "crank" ? GRIPS.crank : kind === "fish" ? GRIPS.fish : kind ? GRIPS.fist : GRIPS.rest);
 // where what's held runs through the hand (hand frame): in the curl of the fingers, in front of the palm; for the reel's
 // handle, between the thumb and the curled index finger
-const CHANNEL = { seat: V(0.004, 0.102, 0.03), crank: V(0.012, 0.105, 0.032), fish: V(0, 0.06, -0.02), fist: V(0, 0.1, 0.03) };
+const CHANNEL = { seat: V(0.004, 0.102, 0.03), crank: V(0.012, 0.12, 0.025), fish: V(0, 0.06, -0.02), fist: V(0, 0.1, 0.03) };
 const channelOf = (kind) => CHANNEL[kind] || CHANNEL.fist;
+// ---- winding the reel ----
+// roll: the hand turned about the knob (radians) from square to the forearm; follow: how much of the knob's circle the
+// elbow and forearm follow (a real arm winds from the elbow, the wrist taking the rest); ease: how far the fingers
+// loosen a little once the handle's been still a moment
+const CRANK = { roll: -1.1, follow: 0.55, ease: 0.16 };
+if (typeof window !== "undefined" && window.__fdFilm) window.__fdHands = { GRIPS, CHANNEL, CRANK };
 
 // ---- geometry ----
 // a part of the hand: its geometry placed in the hand's rest frame, every vertex on one bone, one colour
@@ -304,6 +312,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       // the palm towards you rather than away (settled by the input alone)
       const Y = reach.clone().addScaledVector(ax, -reach.dot(ax)).normalize();
       const Z = ax.clone().cross(Y).normalize(); if (Z.dot(spec.palm || V(0, 0, 1)) < 0) Z.negate();
+      if (CRANK.roll) { Y.applyAxisAngle(ax, CRANK.roll * h.s); Z.applyAxisAngle(ax, CRANK.roll * h.s); }
       const X = Y.clone().cross(Z).normalize();
       return new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(X, Y, Z));
     }
@@ -341,6 +350,9 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // the elbow: fixed in the view, below and out to the side, out of sight
         const elbow = eye.clone().addScaledVector(vr, h.s * (o.elbowX ?? 0.2)).addScaledVector(vu, o.elbowY ?? -0.6).addScaledVector(vf, o.elbowZ ?? 0.35);
         // (holding the rod at the reel, the forearm lies back along the rod's butt, just under it)
+        // (winding: the elbow and forearm go a little way round with the knob, the wrist turning for the rest, rather
+        // than the hand going round on the end of a still arm)
+        if (spec?.kind === "crank" && spec.hub) elbow.addScaledVector(tmpV.copy(spec.at).sub(spec.hub), CRANK.follow);
         if (spec?.kind === "seat" && spec.axis) elbow.copy(spec.at).addScaledVector(spec.axis.clone().normalize(), -0.3).addScaledVector(vu, -0.1).addScaledVector(vr, 0.13 * h.s);
         let want;
         if (spec) {
@@ -365,6 +377,15 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // the fingers and thumb, curled for the grip
         const from = h.from?.curl || h.curlTo, to = h.curlTo;
         const curl = { f: to.f.map((row, a) => row.map((v, b) => from.f[a][b] + (v - from.f[a][b]) * e)), t: to.t.map((v, b) => from.t[b] + (v - from.t[b]) * e), spread: from.spread + (to.spread - from.spread) * e };
+        // (winding, the grip's firm; the handle still a moment, the fingers ease a little on the knob, and firm again as
+        // it turns: never a jump, as it follows the handle's own speed)
+        if (want.kind === "crank" && spec?.spin != null) {
+          const turning = h.spinWas != null && Math.abs(spec.spin - h.spinWas) > dt * 0.8 ? 1 : 0;
+          h.firm = (h.firm ?? 1) + (turning - (h.firm ?? 1)) * Math.min(1, dt * (turning ? 12 : 2.5));
+          const k = 1 - CRANK.ease * (1 - h.firm);
+          curl.f = curl.f.map((row) => row.map((v) => v * k)); curl.t = curl.t.map((v) => v * (0.5 + 0.5 * k));
+        }
+        h.spinWas = spec?.spin ?? null;
         h.curlNow = curl;
         h.joints.forEach((chain, a) => chain.forEach((bn, b) => {
           if (a < 4) bn.rotation.set(curl.f[a][b], 0, (b === 0 ? (a - 1.5) * -curl.spread : 0) * h.s);

@@ -288,19 +288,16 @@ html:not([data-hand="left"]) .ft-row { flex-direction: row; }
 html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right; }
 .ft-readout:empty { display: none; }
 .ft-label { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.25; min-width: 0; text-wrap: balance; padding: 5px 10px; border-radius: 11px; background: #0a141b8c; text-shadow: 0 1px 2px #0008; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-.ft-readout.fight { padding: 8px 12px 9px; border-radius: 14px; background: #0a141bc4; border: 1px solid #ffffff1f; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); min-width: 176px; }
-.ft-readout.fight .ft-label { padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; font-size: 13.5px; }
-.ft-dist { display: block; color: #fff; font-size: 26px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-/* the tension: a level that fills left to right (green, then amber, then red), the white mark where the drag slips */
-.ft-tension { display: flex; align-items: center; gap: 8px; width: 100%; }
-.ft-ten-name { font-size: 10.5px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: #cfe0e8; }
-.ft-ten-bar { position: relative; flex: 1; min-width: 96px; height: 9px; border-radius: 6px; background: #ffffff1f; overflow: visible; }
-.ft-ten-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: #5fd38d; transition: width .1s linear, background-color .2s; }
-.ft-tension.mid .ft-ten-fill { background: #e9c74b; }
-.ft-tension.high .ft-ten-fill, .ft-tension.slip .ft-ten-fill { background: #f07a52; }
-.ft-tension.slip .ft-ten-bar { animation: ft-shiver .18s linear infinite; }
-.ft-ten-drag { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 3px #000; border-radius: 1px; }
+.ft-readout.fight .ft-label { font-size: 13.5px; max-width: 190px; }
+/* while a fish is on: the tension as the ring round the button (green, amber, then red; the white mark where the
+   drag slips), the distance under the word */
+.ft-main > svg.ft-tension .ft-ring { transition: stroke-dashoffset .12s linear, stroke .2s; stroke-width: 5; stroke: #5fd38d; }
+.ft-tension.mid .ft-ring { stroke: #e9c74b; }
+.ft-tension.high .ft-ring, .ft-tension.slip .ft-ring { stroke: #f07a52; }
+.ft-main > svg.ft-tension.slip { animation: ft-shiver .18s linear infinite; }
+.ft-ten-drag { stroke: #fff; stroke-width: 2.2; stroke-linecap: round; filter: drop-shadow(0 0 1px #000); }
 @keyframes ft-shiver { 50% { translate: 1px 0; } }
+.ft-dist { display: block; color: #04201d; font-size: 13px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
 /* the buttons: one size for Cast, a little bigger for Strike and Land, biggest for Reel (pressed most); each with a
    touch area larger still, so a thumb mid-fight never misses */
 .ft-main { position: relative; width: 80px; height: 80px; flex: none; border-radius: 50%; border: 3px solid #fff; display: grid; place-content: center; justify-items: center; gap: 2px;
@@ -312,8 +309,9 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .ft-cast.holding { transform: scale(1.05); }
 .ft-strike { width: 88px; height: 88px; background: var(--sun, #f2b84b); color: #2b1a00; animation: ft-pulse 0.9s ease-in-out infinite; }
 .ft-land { width: 88px; height: 88px; background: var(--action); animation: ft-pulse 0.9s ease-in-out infinite; }
-.ft-reel { width: 96px; height: 96px; }
-.ft-reel span:not(.ft-handle) { font-size: 15px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.ft-reel { width: 100px; height: 100px; gap: 1px; }
+.ft-land > svg.ft-tension { opacity: .8; }
+.ft-reel .ft-word { font-size: 15px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
 .ft-reel .ft-handle svg { width: 28px; height: 28px; }
 .ft-reel.pressed { transform: scale(.93); transition: transform .05s; }
 .ft-reel.assisted { box-shadow: 0 0 0 4px color-mix(in srgb, var(--action) 55%, transparent), 0 6px 20px #0008; }
@@ -328,10 +326,14 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .ft-pill svg { width: 15px; height: 15px; }
 .ft-drag { display: grid; gap: 6px; }
 .ft-drag .ft-pill { min-height: 34px; padding: 0 12px; font-size: 12px; }
+/* while a bite, the fight or the landing is on, the chips that set things up (the time and wind, the fish) step back,
+   so the view is the water, your hands and the one button; the Demo label and the place's attribution stay */
+.immersive .fs-top .fs-chip { transition: opacity .3s; }
+.immersive:has(.fish-tray.is-urgent) .fs-top .fs-chip { opacity: 0; pointer-events: none; }
 /* a stray tap that hides the controls never hides a bite, the fight or the landing: those stay until they're done */
 .immersive.ui-hidden .fs-overlay > .fs-bottom:has(.fish-tray.is-urgent) { opacity: 1; }
 .immersive.ui-hidden .fs-overlay > .fs-bottom .fish-tray.is-urgent .ft-row > *, .immersive.ui-hidden .fs-overlay > .fs-bottom .fish-tray.is-urgent .ft-row button { pointer-events: auto; }
-@media (prefers-reduced-motion: reduce) { .ft-tapfx { animation: none; display: none; } .ft-strike, .ft-land, .ft-tension.slip .ft-ten-bar { animation: none; } .fish-tray { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ft-tapfx { animation: none; display: none; } .ft-strike, .ft-land, .ft-main > svg.ft-tension.slip { animation: none; } .fish-tray { transition: none; } }
 
 /* the viewer's slim tray: no box, just a soft shadow behind the words */
 .view-tray { pointer-events: auto; display: flex; flex-direction: column; gap: 6px; max-width: min(78vw, 420px); transition: opacity .25s, transform .25s; }
