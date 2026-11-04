@@ -21,6 +21,17 @@ export function proximityOf(me, them, yaw = 0) {
   return { near, pan: Math.round(pan * 100) / 100 };
 }
 
+// ---- when the microphone can't be used ----
+/** Why the microphone couldn't be used, in plain words, and what to do about it (from the browser's error name). */
+export function micProblem(e) {
+  const n = e?.name || "";
+  if (n === "NotAllowedError" || n === "SecurityError" || n === "PermissionDeniedError") return "Your microphone is blocked for FishDock. To talk, allow the microphone for this site in your browser or phone settings, then tap the mic again. Text chat still works.";
+  if (n === "NotFoundError" || n === "DevicesNotFoundError" || n === "OverconstrainedError") return "No microphone was found on this device. Text chat still works.";
+  if (n === "NotReadableError" || n === "AbortError") return "Your microphone is busy (another app may be using it). Close that app, then tap the mic again.";
+  if (n === "unsupported") return "This browser can't do voice chat. Text chat still works.";
+  return "Voice couldn't start just now. Tap the mic to try again. Text chat still works.";
+}
+
 const ICE = [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }];
 
 export function createVoice({ me, send, onChange }) {
@@ -94,8 +105,9 @@ export function createVoice({ me, send, onChange }) {
     /** join: asks for the microphone now, then connects to everyone else in voice */
     async join(others) {
       if (on) return true;
+      if (!globalThis.navigator?.mediaDevices?.getUserMedia || typeof RTCPeerConnection === "undefined") throw Object.assign(new Error("no voice here"), { name: "unsupported" });
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); localA = analyse(ctx.createMediaStreamSource(stream)); } catch { ctx = null; }
+      try { ctx = new (window.AudioContext || window.webkitAudioContext)(); localA = analyse(ctx.createMediaStreamSource(stream)); ctx.resume?.().catch(() => {}); } catch { ctx = null; }
       on = true; applyMic();
       for (const id of others) peer(id); // offers go out through onnegotiationneeded
       meter = setInterval(() => { localLevel = levelOf(localA); for (const p of peers.values()) p.level = levelOf(p.analyser); changed(); }, 250);

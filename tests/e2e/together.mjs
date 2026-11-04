@@ -12,8 +12,8 @@ let chromium;
 try { ({ chromium } = require("playwright")); } catch { console.log("SKIP  Playwright isn't installed here (set NODE_PATH to a folder that has it)"); process.exit(0); }
 
 let fails = 0;
-const ok = (cond, what, extra) => { console.log(`${cond ? "PASS" : "FAIL"}  ${what}${!cond && extra !== undefined ? `  -> ${String(extra).slice(0, 300)}` : ""}`); if (!cond) fails++; };
-const until = async (fn, ms = 15000) => { const end = Date.now() + ms; for (;;) { try { const v = await fn(); if (v) return v; } catch { /* not yet */ } if (Date.now() > end) return null; await new Promise((r) => setTimeout(r, 200)); } };
+const ok = (cond, what, extra) => { console.log(`${cond ? "PASS" : "FAIL"}  ${what}${!cond && extra !== undefined ? `  -> ${String(extra).slice(0, 1200)}` : ""}`); if (!cond) fails++; };
+const until = async (fn, ms = 30000) => { const end = Date.now() + ms; for (;;) { try { const v = await fn(); if (v) return v; } catch { /* not yet */ } if (Date.now() > end) return null; await new Promise((r) => setTimeout(r, 200)); } };
 const POS = /"(lat|lon|lng|latitude|longitude|gps|coords|position)"\s*:/i;
 
 // ---- one person: a browser context of their own (their own storage, as a separate phone) ----
@@ -30,17 +30,23 @@ async function person(label) {
     // haptics: count the buzzes instead (no vibration motor here)
     window.__buzz = [];
     navigator.vibrate = (p) => { window.__buzz.push(p); return true; };
+    // every toast that appears (they go after a few seconds, which a slow machine could miss)
+    window.__toasts = [];
+    new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.classList?.contains("w3d-toast")) window.__toasts.push(n.textContent); })
+      .observe(document, { childList: true, subtree: true });
   });
   // only this site: map tiles and photos from elsewhere aren't needed (and may not be reachable)
   const own = new URL(base).host;
   await ctx.route("**/*", (r) => (new URL(r.request().url()).host === own ? r.continue() : r.abort()));
-  ctx.setDefaultTimeout(12000);
+  // (generous: three phones drawing 3D in software on one machine are slow)
+  ctx.setDefaultTimeout(30000);
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   return { browser, ctx, page, label, errors };
 }
+const toasted = (page, text) => page.evaluate((t) => window.__toasts.some((x) => x.includes(t)), text);
 const names = (page) => page.$$eval(".party-person .t", (els) => els.map((e) => e.textContent));
 const openSheet = async (page, tab) => {
   if (!(await page.$(".party-sheet.open"))) await page.click("button[aria-label^='Party: people']");
@@ -88,8 +94,8 @@ async function main() {
     ok(bHash === `#party/${code}`, "the guest is in the same party (and the secret left the address bar)", bHash);
 
     // ---- both see each other ----
-    const joinToast = await until(() => A.page.$eval(".toasts, .fs-toasts, [class*='toast']", () => document.body.innerText.includes("Bob joined")), 8000);
-    ok(!!joinToast, "the host is told \"Bob joined\"");
+    const joinToast = await until(() => toasted(A.page, "Bob joined the party"));
+    ok(!!joinToast, "the host gets a toast: \"Bob joined the party\"", JSON.stringify(await A.page.evaluate(() => window.__toasts)));
     const buzzed = await A.page.evaluate(() => window.__buzz.length);
     ok(buzzed > 0, "the host's phone gives a light buzz when Bob joins", buzzed);
     await openSheet(A.page, "People"); await openSheet(B.page, "People");
@@ -129,15 +135,16 @@ async function main() {
     await C.page.fill("input[placeholder='Shown to the others']", "Cara");
     await C.page.click("button:has-text('Join the party')");
     ok(!!(await until(() => C.page.$(".fs-top"))), "the code guest is in the fishing view");
-    ok(!!(await until(() => B.page.evaluate(() => document.body.innerText.includes("Cara joined")))), "Bob is told Cara joined too");
+    ok(!!(await until(() => toasted(B.page, "Cara joined the party"))), "Bob gets a toast that Cara joined too");
 
     // ---- leaving ----
     await openSheet(C.page, "People");
     await C.page.click("button:has-text('Leave the party')");
-    ok(!!(await until(() => A.page.evaluate(() => document.body.innerText.includes("Cara left")))), "the host is told Cara left");
+    ok(!!(await until(() => toasted(A.page, "Cara left"))), "the host gets a toast that Cara left");
 
     // ---- mic: a refused microphone gets plain words ----
     await B.page.evaluate(() => { navigator.mediaDevices.getUserMedia = () => Promise.reject(Object.assign(new Error("denied"), { name: "NotAllowedError" })); });
+    if (await B.page.$(".party-sheet.open")) await B.page.click(".party-sheet .sheet-x");
     await B.page.click("button.mic");
     const refused = await until(() => B.page.evaluate(() => (document.body.innerText.match(/microphone[^.]*(blocked|allow)[^.]*\./i) || [])[0]), 6000);
     ok(!!refused, "a refused microphone is explained in plain words", refused);
