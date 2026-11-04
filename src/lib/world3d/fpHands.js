@@ -37,7 +37,7 @@ const GRIPS = {
   seat: { f: [[1.25, 1.3, 0.8], [1.25, 1.35, 0.85], [1.35, 1.4, 0.9], [1.4, 1.4, 0.95]], t: [0.85, 0.35, 0.25], spread: 0.0 },
   // (over the knob, the fingers wrapped down round it and the thumb on top: was a tight fist with the knob lying
   // against the backs of the fingers and the thumb stuck out, the curled look in Aaron's recording)
-  crank: { f: [[1.0, 1.1, 0.7], [1.1, 1.2, 0.8], [1.25, 1.3, 0.85], [1.35, 1.35, 0.9]], t: [1.3, 0.75, 0.5], spread: 0.0 },
+  crank: { f: [[1.0, 1.1, 0.7], [1.1, 1.2, 0.8], [1.25, 1.3, 0.85], [1.35, 1.35, 0.9]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fish: { f: [[0.25, 0.3, 0.2], [0.3, 0.35, 0.22], [0.35, 0.38, 0.25], [0.4, 0.4, 0.28]], t: [0.1, 0.15, 0.1], spread: 0.05 },
 };
