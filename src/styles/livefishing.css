@@ -273,62 +273,65 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 .mini-tl i.t-catch { top: 3px; width: 9px; height: 16px; border-radius: 5px; background: var(--sun, #f2b84b); box-shadow: 0 0 0 2px #0a141bc4; }
 .mini-tl b { position: absolute; top: 2px; width: 2px; height: 18px; transform: translateX(-50%); background: #fff; border-radius: 2px; }
 
-/* ---- the fishing tray: one round button for the step that makes sense now, a line of small text, and nothing
-   while the cast flies or a fish is landed ---- */
-.fish-tray { pointer-events: auto; display: flex; align-items: center; gap: 10px; transition: opacity .25s, transform .25s; }
-.fish-tray.is-busy { opacity: 0; transform: translateY(12px); pointer-events: none; }
-.ft-main { position: relative; width: 64px; height: 64px; flex: none; border-radius: 50%; border: 1px solid #ffffff3a; display: grid; place-content: center; justify-items: center; gap: 1px;
-  background: color-mix(in srgb, var(--action) 88%, #000); color: var(--action-ink, #052421); font: 750 12px/1 var(--font-ui, inherit); box-shadow: 0 8px 22px #0007; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-.ft-main svg { width: 22px; height: 22px; }
-.ft-strike { background: var(--sun, #f2b84b); color: #2b1a00; animation: ft-pulse 0.9s ease-in-out infinite; }
-.ft-reel { background: #0a141bd0; color: #fff; }
-.ft-reel > svg.ft-ringsvg { position: absolute; inset: -1px; width: 72px; height: 72px; transform: rotate(-90deg); }
-.ft-reel:active { transform: scale(.96); }
-.ft-ring-bg { fill: none; stroke: #ffffff26; stroke-width: 4; }
-.ft-ring { fill: none; stroke: var(--action); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
-.ft-label { font-size: 14.5px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px #000, 0 0 10px #0009; max-width: 52vw; line-height: 1.25; min-width: 0; text-wrap: balance; }
-.ft-label .ft-dist { display: block; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-html:not([data-hand="left"]) .ft-label { text-align: right; }
-/* the Reel button: the thing you press most, so the biggest and clearest; it answers every tap */
-.ft-reel { width: 92px !important; height: 92px !important; background: color-mix(in srgb, var(--action) 88%, #000) !important; color: #04201d !important; border: 3px solid #fff !important; box-shadow: 0 6px 20px #0008; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
-.ft-reel span:not(.ft-handle) { font-size: 15px; font-weight: 900; letter-spacing: .06em; }
-.ft-reel .ft-handle svg { width: 28px; height: 28px; }
-.ft-reel.pressed { transform: scale(.92); transition: transform .05s; }
-.ft-tapfx { position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #fff; animation: ft-tap .32s ease-out forwards; pointer-events: none; }
-@keyframes ft-tap { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.28); } }
-.ft-main { touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
-.ft-strike { width: 92px !important; height: 92px !important; border: 3px solid #fff !important; }
-@media (prefers-reduced-motion: reduce) { .ft-tapfx { animation: none; display: none; } }
-.ft-pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid #ffffff2a; background: #0a141bb3; color: #fff; font-size: 13px; font-weight: 650; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.ft-pill svg { width: 15px; height: 15px; }
-/* hold to cast, tap to reel, the tension gauge, land */
-.ft-main { width: 70px; height: 70px; }
-/* the actions you have to hit quickly are bigger, with a touch area larger still (an iPhone thumb, mid-fight) */
-.ft-strike, .ft-reel, .ft-land { width: 84px; height: 84px; }
-.ft-strike::after, .ft-reel::after, .ft-land::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; }
-.ft-reel > svg.ft-ringsvg, .ft-land > svg.ft-ringsvg { inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); }
-.ft-strike svg, .ft-reel svg, .ft-land svg { width: 26px; height: 26px; }
-.ft-strike span, .ft-reel span, .ft-land span { font-size: 14px; font-weight: 800; }
-.ft-main > svg.ft-ringsvg { position: absolute; inset: -1px; width: 72px; height: 72px; transform: rotate(-90deg); }
-.ft-cast.holding { transform: scale(1.05); }
-.ft-ring.power { stroke: #fff; transition: none; }
-.ft-reel.assisted { box-shadow: 0 0 0 3px color-mix(in srgb, var(--action) 55%, transparent), 0 8px 22px #0007; }
-.ft-handle { display: grid; place-items: center; transition: transform .12s ease-out; }
-.ft-land { background: var(--action); animation: ft-pulse 0.9s ease-in-out infinite; }
-.ft-fight { display: flex; align-items: center; gap: 8px; }
-.ft-tension { position: relative; width: 9px; height: 78px; border-radius: 6px; background: #0a141bb8; border: 1px solid #ffffff30; overflow: hidden; }
-.ft-ten-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 6px; background: #5fd38d; transition: height .1s linear, background-color .2s; }
+/* ---- the fishing tray: one round button in the thumb's corner for the step that makes sense now, and above it one
+   small panel to read (how far out, the tension, what's going on), never beside the button or under the thumb.
+   Nothing shows while the cast flies or a fish is landed ---- */
+.fish-tray { pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; transition: opacity .25s, transform .25s; touch-action: manipulation; }
+.fish-tray.is-busy { opacity: 0; transform: translateY(12px); }
+.fish-tray.is-busy * { pointer-events: none !important; }
+.ft-row { display: flex; align-items: center; gap: 12px; flex-direction: row-reverse; }
+.ft-row > * { pointer-events: auto; }
+html:not([data-hand="left"]) .fish-tray { align-items: flex-end; }
+html:not([data-hand="left"]) .ft-row { flex-direction: row; }
+/* the readout: words with a soft dark backing so they read against a bright sky; a firmer panel while a fish is on */
+.ft-readout { pointer-events: none; display: grid; justify-items: start; gap: 5px; max-width: min(66vw, 270px); }
+html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right; }
+.ft-readout:empty { display: none; }
+.ft-label { font-size: 14px; font-weight: 700; color: #fff; line-height: 1.25; min-width: 0; text-wrap: balance; padding: 5px 10px; border-radius: 11px; background: #0a141b8c; text-shadow: 0 1px 2px #0008; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.ft-readout.fight { padding: 8px 12px 9px; border-radius: 14px; background: #0a141bc4; border: 1px solid #ffffff1f; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); min-width: 176px; }
+.ft-readout.fight .ft-label { padding: 0; background: none; -webkit-backdrop-filter: none; backdrop-filter: none; font-size: 13.5px; }
+.ft-dist { display: block; color: #fff; font-size: 26px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+/* the tension: a level that fills left to right (green, then amber, then red), the white mark where the drag slips */
+.ft-tension { display: flex; align-items: center; gap: 8px; width: 100%; }
+.ft-ten-name { font-size: 10.5px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: #cfe0e8; }
+.ft-ten-bar { position: relative; flex: 1; min-width: 96px; height: 9px; border-radius: 6px; background: #ffffff1f; overflow: visible; }
+.ft-ten-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: #5fd38d; transition: width .1s linear, background-color .2s; }
 .ft-tension.mid .ft-ten-fill { background: #e9c74b; }
 .ft-tension.high .ft-ten-fill, .ft-tension.slip .ft-ten-fill { background: #f07a52; }
-.ft-tension.slip { animation: ft-shiver .18s linear infinite; }
-.ft-ten-drag { position: absolute; left: -2px; right: -2px; height: 2px; background: #fff; box-shadow: 0 0 3px #000; }
+.ft-tension.slip .ft-ten-bar { animation: ft-shiver .18s linear infinite; }
+.ft-ten-drag { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 3px #000; border-radius: 1px; }
+@keyframes ft-shiver { 50% { translate: 1px 0; } }
+/* the buttons: one size for Cast, a little bigger for Strike and Land, biggest for Reel (pressed most); each with a
+   touch area larger still, so a thumb mid-fight never misses */
+.ft-main { position: relative; width: 80px; height: 80px; flex: none; border-radius: 50%; border: 3px solid #fff; display: grid; place-content: center; justify-items: center; gap: 2px;
+  background: color-mix(in srgb, var(--action) 88%, #000); color: #04201d; font: 800 14px/1 var(--font-ui, inherit); box-shadow: 0 6px 20px #0008;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.ft-main::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; }
+.ft-main svg { width: 26px; height: 26px; }
+.ft-main > svg.ft-ringsvg { position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); transform: rotate(-90deg); }
+.ft-cast.holding { transform: scale(1.05); }
+.ft-strike { width: 88px; height: 88px; background: var(--sun, #f2b84b); color: #2b1a00; animation: ft-pulse 0.9s ease-in-out infinite; }
+.ft-land { width: 88px; height: 88px; background: var(--action); animation: ft-pulse 0.9s ease-in-out infinite; }
+.ft-reel { width: 96px; height: 96px; }
+.ft-reel span:not(.ft-handle) { font-size: 15px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.ft-reel .ft-handle svg { width: 28px; height: 28px; }
+.ft-reel.pressed { transform: scale(.93); transition: transform .05s; }
+.ft-reel.assisted { box-shadow: 0 0 0 4px color-mix(in srgb, var(--action) 55%, transparent), 0 6px 20px #0008; }
+.ft-ring-bg { fill: none; stroke: #ffffff26; stroke-width: 4; }
+.ft-ring { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .1s linear; }
+.ft-ring.power { stroke: #fff; transition: none; }
+.ft-handle { display: grid; place-items: center; transition: transform .12s ease-out; }
+.ft-tapfx { position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #fff; animation: ft-tap .32s ease-out forwards; pointer-events: none; }
+@keyframes ft-tap { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.28); } }
+@keyframes ft-pulse { 50% { transform: scale(1.05); box-shadow: 0 0 0 8px #f2b84b33, 0 6px 20px #0008; } }
+.ft-pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #ffffff2a; background: #0a141bb3; color: #fff; font-size: 13px; font-weight: 650; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); touch-action: manipulation; }
+.ft-pill svg { width: 15px; height: 15px; }
 .ft-drag { display: grid; gap: 6px; }
-.ft-drag .ft-pill { min-height: 30px; padding: 0 10px; font-size: 12px; }
-@keyframes ft-shiver { 50% { transform: translateX(1px); } }
-html:not([data-hand="left"]) .ft-fight { flex-direction: row-reverse; }
-@media (prefers-reduced-motion: reduce) { .ft-land, .ft-tension.slip { animation: none; } }
-@keyframes ft-pulse { 50% { transform: scale(1.06); box-shadow: 0 0 0 8px #f2b84b33, 0 8px 22px #0007; } }
-@media (prefers-reduced-motion: reduce) { .ft-strike { animation: none; } .fish-tray { transition: none; } }
+.ft-drag .ft-pill { min-height: 34px; padding: 0 12px; font-size: 12px; }
+/* a stray tap that hides the controls never hides a bite, the fight or the landing: those stay until they're done */
+.immersive.ui-hidden .fs-overlay > .fs-bottom:has(.fish-tray.is-urgent) { opacity: 1; }
+.immersive.ui-hidden .fs-overlay > .fs-bottom .fish-tray.is-urgent .ft-row > *, .immersive.ui-hidden .fs-overlay > .fs-bottom .fish-tray.is-urgent .ft-row button { pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .ft-tapfx { animation: none; display: none; } .ft-strike, .ft-land, .ft-tension.slip .ft-ten-bar { animation: none; } .fish-tray { transition: none; } }
 
 /* the viewer's slim tray: no box, just a soft shadow behind the words */
 .view-tray { pointer-events: auto; display: flex; flex-direction: column; gap: 6px; max-width: min(78vw, 420px); transition: opacity .25s, transform .25s; }
@@ -381,7 +384,6 @@ html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(saf
 .cam-menu button { text-align: left; }
 /* controls on the right (for a right thumb): Cast, Strike and Reel bottom right, the camera tools bottom left */
 html:not([data-hand="left"]) .fs-bottom { align-self: flex-end; align-items: flex-end; }
-html:not([data-hand="left"]) .fish-tray { flex-direction: row-reverse; }
 html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
 .cam-sep { width: 100%; margin: 2px 0; border: 0; border-top: 1px solid #ffffff26; }
 /* the catch card sits under the top bar: the landed fish (in the hands, or the net) is in the lower part of the view */
@@ -461,6 +463,7 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .joystick-zone.floating { width: 46vw; height: 42vh; touch-action: none; }
 .joystick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); width: var(--js, 128px); height: var(--js, 128px); border-radius: 50%; background: radial-gradient(circle, #ffffff1f, #ffffff0d 70%); border: 2px solid #ffffff40; touch-action: none; display: grid; place-items: center; opacity: .45; transition: opacity .25s; }
 .joystick-zone.active .joystick { opacity: 1; }
+.joystick::before { content: ""; position: absolute; inset: -22px; border-radius: 50%; } /* (a thumb landing just outside the ring still takes the stick, rather than walking you to where it touched) */
 .joystick-zone.floating .joystick.placed { left: calc(var(--jx) - var(--js, 128px) / 2); bottom: auto; top: calc(var(--jy) - var(--js, 128px) / 2); }
 .joystick-zone.floating .joystick { pointer-events: none; }
 .stick-s { --js: 104px; } .stick-m { --js: 128px; } .stick-l { --js: 156px; }
@@ -480,7 +483,13 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .walk-prompt { display: flex; align-items: center; gap: 10px; padding: 10px 18px 10px 10px; border-radius: 14px; border: 0; background: #0a141be6; color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 6px 20px #0008; animation: prompt-in .25s ease both; }
 .walk-prompt .key { background: #fff; color: #0a141b; border-radius: 8px; padding: 4px 8px; font-size: 12px; }
 @keyframes prompt-in { from { transform: scale(.85); opacity: 0; } }
-.walk-msg { position: absolute; z-index: 7; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 104px); max-width: 86%; text-align: center; padding: 8px 14px; border-radius: 12px; background: #0a141be6; color: #fff; font-size: 13px; }
+/* messages while walking about join the toasts' one column under the top bar, so they stack rather than overlap */
+.w3d-toast.msg { white-space: normal; max-width: min(86vw, 360px); text-align: center; border-radius: 14px; line-height: 1.35; }
+/* the menu open: a tap anywhere else closes it, and the toasts, label and compass step back so nothing stacks under it */
+.w3d-menuscrim { position: absolute; inset: 0; z-index: 5; background: #05090c33; pointer-events: auto; touch-action: none; }
+.stage3d.menu-open .w3d-toasts, .stage3d.menu-open .w3d-label, .stage3d.menu-open .w3d-compass, .stage3d.menu-open .w3d-src { opacity: 0; pointer-events: none; transition: opacity .15s; }
+.w3d-menu { max-height: min(560px, calc(100vh - 230px)); max-height: min(560px, calc(100dvh - 230px - env(safe-area-inset-bottom, 0px))); } /* (clear of the fishing buttons) */
+.fish-tray.real-tray { flex-direction: row; flex-wrap: wrap; align-items: center; pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .walk-prompt, .walk-fish { animation: none; } }
 
 /* ---- having a look at your landed fish (Stage3D): a compact panel low down, the fish held up above it ---- */
