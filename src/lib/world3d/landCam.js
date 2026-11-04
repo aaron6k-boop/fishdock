@@ -17,6 +17,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
  * The shot for each stage: from: the direction from the subject out to the camera, in the angler's frame
  * ([right, up, forward]); must: what has to be in the picture; want: also in it if that doesn't take the camera too far
  * back; near / far: how close it may come and how far it may go (metres); wide: a wider lens.
+ * (ahead: where a swimming fish will be in a moment.)
  * Drop net stages (angler.js): up (fish at the surface) | rod (rod on the rail) | pick (the net off the deck) | lower |
  * lead (fish over the net) | haul | in (over the rail) | done | deck. Putting it back: carry | over | rlower | swim |
  * rhaul (the empty net hauled back up).
@@ -47,7 +48,7 @@ export const SHOTS = {
   // swimming free: close on the fish and the net at the foot of the wall, the fish big enough to see
   // (from higher, looking down onto the water so the wall doesn't fill the picture, and with room round the fish, which
   // moves off quickly: it was framed tight and swam out of the side of the picture)
-  swim: { from: [-0.45, 0.68, 0.58], must: ["fish", "net"], want: [], near: 3, far: 7.5, margin: 0.6 },
+  swim: { from: [-0.45, 0.68, 0.58], must: ["fish", "ahead", "net"], want: [], near: 3, far: 8, margin: 0.6 },
   // the empty net hauled back up to the rail, then onto the deck
   rhaul: { from: [-0.66, 0.3, 0.7], must: ["net", "head"], want: ["feet"], near: 3.4, far: 12, wide: true },
 };

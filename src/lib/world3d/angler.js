@@ -803,6 +803,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           if (crossed2(kt, plan.lower + 0.2)) { const sp = start.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.35 + 0.2 * prof.splashy); rippleCb?.(sp, 0.6); onSound?.("splash", sp); }
           if (sw.depth === 0 && Math.floor(kt / 0.35) !== Math.floor(prevKt / 0.35)) { const w2 = c.clone(); w2.y = wh(c.x, c.z); rippleCb?.(w2, 0.22); } // (its wake while it's on top)
           rel.fish = c.clone();
+          // (and where it'll be in a moment, so the camera frames the way it's going rather than trailing behind it)
+          { const u2 = Math.min(1, u + 0.15), s2 = swimAway(u2, fishLen), b2 = Math.atan2(away.z, away.x) + s2.bear * P.side * 0.5; rel.ahead = start.clone().add(new THREE.Vector3(Math.cos(b2), 0, Math.sin(b2)).multiplyScalar(s2.dist)); rel.ahead.y = c.y; rel.ahead.addScaledVector(new THREE.Vector3(Math.cos(base), 0, Math.sin(base)), fishLen * 0.5); }
           // (once it's gone down out of sight the shot goes back up to you and the net: it stared at empty water)
           if (sw.depth > 0.35) rel.stage = "swum";
         } else if (step === "haul" && G) {

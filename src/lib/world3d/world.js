@@ -299,7 +299,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         const dropStage = venue === "pier" && (out.tech === "dropnet" || !out.land) ? (out.release ? { deck: "carry", in: "over", lower: "rlower", swim: "swim", swum: "rhaul", haul: "rhaul" }[st] : st) : null;
         const shotFov = (dropStage === "lower" || dropStage === "haul" || dropStage === "rlower" || dropStage === "rhaul" ? 60 : 52) * (camera.aspect < 0.8 ? 1.12 : 1), tanV = Math.tan((shotFov * Math.PI) / 360);
         const arr = (v) => (v ? v.toArray() : null);
-        const framed = dropStage ? shotFor(dropStage, { fish: arr(landing.fish), net: arr(landing.net), head: arr(out.at.clone().add(new THREE.Vector3(0, 1.72, 0))), feet: arr(out.at.clone().add(new THREE.Vector3(0, 0.05, 0))) }, out.face, { tanV, tanH: tanV * camera.aspect, margin: 0.8 }) : null;
+        const framed = dropStage ? shotFor(dropStage, { fish: arr(landing.fish), ahead: arr(out.release?.ahead), net: arr(landing.net), head: arr(out.at.clone().add(new THREE.Vector3(0, 1.72, 0))), feet: arr(out.at.clone().add(new THREE.Vector3(0, 0.05, 0))) }, out.face, { tanV, tanH: tanV * camera.aspect, margin: 0.8 }) : null;
         if (framed) { shot = new THREE.Vector3(...framed.pos); focusAt = new THREE.Vector3(...framed.at); }
         else if (st === "up" || st === "rod") {
           // over your right shoulder, down to the fish held at the surface beside the pier
@@ -384,7 +384,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
             const dNow = camPos.distanceTo(landShot.pos); landShot.d0 = Math.max(landShot.d0 || 0, dNow, 0.5);
             landShot.p = Math.max(landShot.p, 1 - dNow / landShot.d0);
             const want = landShot.p >= 0.97 ? landShot.focus : landShot.fs0.clone().lerp(landShot.focus, ease01(landShot.p / 0.97));
-            landShot.fs.lerp(want, 1 - Math.exp(-dt * (landShot.p >= 0.97 ? 3 : 8)));
+            landShot.fs.lerp(want, 1 - Math.exp(-dt * (landShot.p >= 0.97 ? 4 : 8)));
           }
         }
         if (landing && (mode !== "first" || landShot.up || landShot.framed) && performance.now() - look.touched > 1500) {
