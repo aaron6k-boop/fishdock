@@ -14,6 +14,7 @@ import { buildSkyline } from "./skyline.js";
 import { localFor } from "./localDetail.js";
 import { LANDMARK_BUILDERS } from "./landmarks3d.js";
 import { WET_PREP, WET_DARKEN, wetRough } from "./wetLook.js";
+import { contactShadows } from "./contactShadow.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -118,6 +119,12 @@ function placeProps(group, stand, props, glowGlass, wet) {
         const im = new THREE.InstancedMesh(geo, mats.length > 1 ? mats : mats[0], list.length);
         list.forEach(([x, y, z, ry], k) => { mx.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, ry), one); im.setMatrixAt(k, mx); });
         im.castShadow = true; im.receiveShadow = true; group.add(im);
+      }
+      // ---- contact shadows: the dark on the deck right under each one, the size of its footprint ----
+      const bb = new THREE.Box3(); for (const m of meshes) { const g = m.geometry.clone().applyMatrix4(new THREE.Matrix4().copy(src.matrixWorld).invert().multiply(m.matrixWorld)); g.computeBoundingBox(); bb.union(g.boundingBox); g.dispose(); }
+      if (!bb.isEmpty()) {
+        const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2, w = (bb.max.x - bb.min.x) * 1.25 + 0.15, d = (bb.max.z - bb.min.z) * 1.25 + 0.15;
+        group.add(contactShadows(list.map(([x, y, z, ry]) => [x + cx * Math.cos(ry) + cz * Math.sin(ry), y, z - cx * Math.sin(ry) + cz * Math.cos(ry), ry, w, d]), name === "bench" ? 0.5 : 0.4));
       }
     }
     group.remove(stand);

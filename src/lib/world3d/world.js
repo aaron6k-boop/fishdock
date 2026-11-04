@@ -12,6 +12,7 @@ import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist } f
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
 import { planCast } from "./castAim.js";
+import { addRipple, stepRipples } from "./waterFx.js";
 
 export const QUALITY3D = { performance: { dpr: 1.25, shadows: 0, q: 0.5 }, balanced: { dpr: 2, shadows: 1, q: 1 }, high: { dpr: 2, shadows: 1, q: 2 } };
 export function autoQuality3d() {
@@ -85,10 +86,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const ripples = [];
   // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
   // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)
-  const ripple = (at, s = 0.6) => {
-    ripples.push([at.x, at.z, 0, s, 2.4 + 3.2 * Math.min(1, s)]);
-    if (ripples.length > 8) { let k = 0, lo = Infinity; ripples.forEach((r, i) => { const v = r[3] * (1 - r[2] / r[4]); if (v < lo) { lo = v; k = i; } }); ripples.splice(k, 1); }
-  };
+  // (waterFx.js: small, short-lived rings, so a fight's swirls don't pile up into wide pale loops round the net)
+  const ripple = (at, s = 0.6) => { addRipple(ripples, at.x, at.z, s); };
 
   // ---- aiming a cast: a ring on the water where it will land, while you hold Cast ----
   const aimMark = new THREE.Group(); aimMark.visible = false; scene.add(aimMark);
@@ -487,6 +486,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       get walker() { return W ? { x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed } : null; },
       walkInput(x, y, sprint = false) { walkIn = { x, y, sprint }; },
       get fight() { return lastFight; },
+      // for visual checks: a ring on the water, as a fish or the net makes one
+      ripple(x, z, s) { ripple({ x, z }, s); },
       get stats() { const r = renderer.info.render, m = renderer.info.memory; return { dpr: dprNow, late: +late.toFixed(2), calls: r.calls, triangles: r.triangles, geometries: m.geometries, textures: m.textures, programs: renderer.info.programs?.length }; },
       get yaw() { return look.yaw; },
       get lag() { return film ? nowFn() - film.now : 0; },
@@ -563,9 +564,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (dropPos[k * 3 + 1] < -0.05) dropLife[k] = 0;
     }
     dropGeo.attributes.position.needsUpdate = true;
-    for (const r of ripples) r[2] += dt;
-    for (let i = ripples.length - 1; i >= 0; i--) if (ripples[i][2] > ripples[i][4]) ripples.splice(i, 1);
-    env.setRipples(ripples.map((r) => [r[0], r[1], r[2], r[3] * Math.pow(Math.max(0, 1 - r[2] / r[4]), 1.5)]));
+    env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera);
     adapt();
     if (draw) renderer.render(scene, camera);

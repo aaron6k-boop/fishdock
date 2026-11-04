@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
-import { SHORE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
+import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
 import { lightingFor, lampPools, poolLight, lookQuality } from "./skyLook.js";
 
 // ---- shared shader pieces: noise and the sky's colour in any direction ----
@@ -151,6 +151,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uRip: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 0, 0)) }, uFogC: { value: new THREE.Color(0xb8c8d4) }, uFogD: { value: 0.0006 },
     uLamps: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
     uShore: { value: null }, uShoreOn: { value: 0 }, uShoreHalf: { value: SHORE.half },
+    uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
   };
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
   wU.uKind.value = kind;
@@ -198,9 +199,14 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       }`,
     fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
-      uniform sampler2D uShore;
-      // metres to the nearest land (from the shore map), or far when off the map
-      float shoreDist(vec2 p){ vec2 uv = p/(2.*uShoreHalf) + .5; if (uShoreOn < .5 || uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return 99.; return texture2D(uShore, uv).r*40.; }
+      uniform sampler2D uShore, uShoreF; uniform float uShoreFHalf;
+      // metres to the nearest land (from the shore maps: the fine one close round the anglers, the coarse one further
+      // out), or far when off the map
+      float shoreDist(vec2 p){ vec2 uv = p/(2.*uShoreHalf) + .5; if (uShoreOn < .5 || uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return 99.;
+        float far = texture2D(uShore, uv).r*40.;
+        vec2 fv = p/(2.*uShoreFHalf) + .5;
+        if (fv.x > 0. && fv.y > 0. && fv.x < 1. && fv.y < 1.) { float f = texture2D(uShoreF, fv).r*8.; return f < 7.8 ? f : max(far, f); }
+        return far; }
       varying vec3 vW;
       #if WQ > 0
         #define RAIN_LAYERS 2
@@ -243,15 +249,21 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // heavy rain roughens the whole surface close by
         n.xz += (vec2(noise(p*9. + uTime*3.), noise(p*9.7 - uTime*3.1)) - .5)*uRain*.18*(1. - smoothstep(8., 50., dist));
         // ---- rings where a rig lands or a fish breaks the surface ----
-        // the ring runs out fast and then slows, its wavelets lengthen and weaken as it spreads, with a few smaller
-        // rings following inside it; white churned water at the middle at first
+        // small rings, as a fish, a net or a rig really makes them: a short train of wavelets running out at a walking
+        // pace and slowing (waterFx.js: about a metre and a half at most before they're gone), broken up by the chop so
+        // they're never perfect circles, and only a slight tilt of the surface (a strong one mirrored a patch of bright
+        // sky into every ring: the big pale loops). A little churned water at the middle, in ragged bits, for a moment
         float churn = 0.;
         for (int i = 0; i < 8; i++) { vec4 r = uRip[i]; if (r.w <= 0.) continue;
           vec2 o = p - r.xy; float d = length(o), age = r.z;
-          float R = 1.6*age/(1. + age*.3), k = 8./(1. + age*.6), fr = (d - R)*k;
-          float env = fr > 0. ? exp(-fr*fr*.5) : exp(fr*.2);
-          n.xz += normalize(o + .001)*sin(fr)*env*r.w*.55/(1. + R*.8);
-          churn += r.w*smoothstep(1.8, 0., age)*(1. - smoothstep(.25 + age*.9, .55 + age*1.3, d))*smoothstep(.25, .75, noise(p*2.4 + uTime*1.5)); }
+          if (d > 2.4) continue;
+          float R = .55*age/(1. + age*.35), k = 22./(1. + age*.9);
+          float dn = d + (noise(p*1.7 + r.xy*3.1) - .5)*(.12 + .25*R);
+          float fr = (dn - R)*k;
+          float env = fr > 0. ? exp(-fr*fr*.35) : exp(fr*.55);
+          n.xz += (o/(d + .05))*sin(fr)*env*r.w*.3/(1. + R*1.4)*(1. - smoothstep(1.6, 2.4, d));
+          float bits = smoothstep(.5, .8, noise(p*6.3 + r.xy + uTime*.7)*.65 + noise(p*15.1 - uTime*.9)*.35);
+          churn += min(1., r.w*1.6)*smoothstep(1.6, .05, age)*(1. - smoothstep(.2 + age*.35, .45 + age*.6, dn))*bits; }
         n = normalize(n);
         // ---- colour: the sky mirrored, the water's own colour seen through it ----
         vec3 rd = reflect(-v, n); rd.y = abs(rd.y);
@@ -292,22 +304,28 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float cap = smoothstep(.22, .55, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .8, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
         float streak = 0.;
         #if WQ > 0
-          // old foam lying in long streaks along the wind
-          streak = smoothstep(.74, .92, noise(pf*vec2(.07, 1.1) + vec2(-uTime*.15, 0.)))*smoothstep(.55, 1., uWind)*sea*.3*(1. - smoothstep(40., 260., dist));
+          // old foam lying in streaks along the wind, broken into short lengths and thin patches (unbroken, they read as
+          // long pale lines drawn across the sea)
+          streak = smoothstep(.74, .92, noise(pf*vec2(.07, 1.1) + vec2(-uTime*.15, 0.)))*smoothstep(.45, .75, noise(p*.45 + 5.)*.6 + noise(p*1.7 - uTime*.1)*.4)*smoothstep(.55, 1., uWind)*sea*.22*(1. - smoothstep(40., 200., dist));
         #endif
         float shore = uShoreZ > -1e3 ? smoothstep(-26., 0., p.y - uShoreZ) : 0.;
         float band = smoothstep(.5, .9, sin((p.y - uShoreZ)*.45 + uTime*1.3 + noise(vec2(p.x*.05, uTime*.1))*3.))*shore;
         float wash = smoothstep(-3., .5, p.y - uShoreZ + noise(vec2(p.x*.2, uTime*.4))*2.)*(uShoreZ > -1e3 ? 1. : 0.);
         // foam washing against walls, piers and banks, pulsing as each wave arrives
         float pulse = sin(uTime*1.1 + dot(p, uWindDir)*.25 + noise(p*.08)*4.)*(.5 + .7*uSwell + .4*uWind);
-        // (thin, lacy streaks drawn out along the wall and broken up, thickest right against it, never pale blobs: a ridge
-        // of one noise, thinned by a second finer one; a third, coarse one opens holes in it)
-        float en1 = noise(p*vec2(3.1, 2.3) - uTime*.35), en2 = noise(p*7.3 + vec2(uTime*.2, -uTime*.3));
-        float lace = smoothstep(.8, .97, 1. - abs(en1*2. - 1.))*(.45 + .55*en2)*smoothstep(.2, .55, noise(p*.7 + uTime*.05));
-        float eband = 1. - smoothstep(.15, 1.6 + pulse*.6, sd + (en2 - .5)*.7);
-        float edge = eband*lace + eband*eband*.16*smoothstep(.45, .85, en2);
-        float foam = clamp(cap*.75 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.6*uShoreOn + churn*.8, 0., .92);
-        col = mix(col, vec3(.9, .93, .95)*(lit*dim + uNight*.05), foam);
+        // small ragged patches of bubbles in a narrow band hard against the wall, thickest right at it, the band
+        // breathing in and out as each wave arrives and drains (two noises at small scales thresholded into clumps,
+        // a third opening gaps between them). The band is cut off within about a metre and a half of the wall, as the
+        // shore map is only good to a couple of metres, and fades with distance so it never shimmers far off
+        float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
+        float clump = smoothstep(.45, .72, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
+        float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
+        float edge = eband*(clump*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
+        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.9*uShoreOn + churn*.7;
+        // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
+        foam = clamp(foam, 0., .8);
+        vec3 foamC = mix(uWater*2.2 + vec3(.3, .33, .34), vec3(.8, .83, .84), smoothstep(.2, .7, foam));
+        col = mix(col, foamC*(lit*dim + uNight*.05), foam*(.75 + .2*smoothstep(.2, .7, foam)));
         // ---- haze: the same as the land's close in (three's exponential fog), the sky's own horizon far out ----
         float fogK = 1. - exp(-uFogD*uFogD*dist*dist);
         vec3 hz = mix(uFogC, skyBase(normalize(vec3(-v.x, .02, -v.z))), smoothstep(.5, 1., fogK));
@@ -479,7 +497,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     if (isLand) {
       const tex = new THREE.DataTexture(shoreBytes(shoreDistances(isLand)), SHORE.n, SHORE.n, THREE.RedFormat, THREE.UnsignedByteType);
       tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
-      wU.uShore.value = tex; wU.uShoreOn.value = 1;
+      const fine = new THREE.DataTexture(shoreBytes(shoreDistances(isLand, SHORE_FINE), SHORE_FINE.cap), SHORE_FINE.n, SHORE_FINE.n, THREE.RedFormat, THREE.UnsignedByteType);
+      fine.magFilter = fine.minFilter = THREE.LinearFilter; fine.needsUpdate = true;
+      wU.uShore.value = tex; wU.uShoreF.value = fine; wU.uShoreOn.value = 1;
     }
   }
 

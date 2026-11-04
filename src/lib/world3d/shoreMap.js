@@ -5,6 +5,9 @@
 // walls, piers and banks, lighter water in the shallows, the dark of a wall reflected close to it.
 
 export const SHORE = { half: 240, n: 192, cap: 40 };
+// and a fine one round the anglers (half a metre a cell): the coarse map's 2.5 m cells drew a diagonal wall as a
+// staircase, so its foam lay in blocks a couple of metres off the wall or under the deck
+export const SHORE_FINE = { half: 48, n: 192, cap: 8 };
 
 /** Distances (metres, Float32Array n×n, row by row from -half to +half in z, x across) from `isLand(x, z)`. */
 export function shoreDistances(isLand, { half = SHORE.half, n = SHORE.n, cap = SHORE.cap } = {}) {

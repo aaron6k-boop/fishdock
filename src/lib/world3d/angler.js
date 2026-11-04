@@ -17,6 +17,7 @@ import { createFpHands } from "./fpHands.js";
 import { loadPart, fitNet } from "./glbParts.js";
 import { fitRodReel, buildRod } from "./rodKit.js";
 import { stepHandle, handleState } from "../reelHandle.js";
+import { contactShadow } from "./contactShadow.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -138,6 +139,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the person (human3d.js: a realistic person, with the simple figure3d.js figure standing in while it loads): their
   // own look if they chose one, otherwise a steady one from their id
   const fig = createPerson({ id, look: lookFor(id, look), outfit: O, venue }); root.add(fig.group);
+  // the soft dark round your feet where you stand (contactShadow.js; hidden in a jump)
+  const feetShadow = contactShadow(0.85, 0.7, 0.5); root.add(feetShadow);
   // your forearms and hands in first person (only ever your own angler's are needed: made the first time they're shown)
   let fpv = null;
   const part = (geo, mat, x, y, z, parent = root) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
@@ -255,6 +258,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const lidB = new THREE.Mesh(new THREE.CylinderGeometry(0.136, 0.136, 0.018, 24), mBlue); lidB.position.y = 0.29; bk.add(lidB);
     const wire = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.003, 4, 20, Math.PI), mSteel); wire.position.y = 0.27; wire.rotation.y = 0.5; bk.add(wire);
     for (const o of [box, bk]) o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+    // ---- contact shadows: the dark just under the box and the bucket (contactShadow.js) ----
+    box.add(contactShadow(0.62, 0.46, 0.55)); bk.add(contactShadow(0.36, 0.36, 0.5));
   }
   // a landing net (rivers, lakes, estuaries) or a drop net with ropes (piers)
   // the net: knotted mesh you can see through (a drawn diamond pattern), hanging as a soft bag under a metal hoop
@@ -272,7 +277,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   { const top = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.46), new THREE.MeshStandardMaterial({ color: 0x2f5a3c, roughness: 0.75 })); top.position.y = 0.022;
     const edgeM = new THREE.MeshStandardMaterial({ color: 0x1f2c24, roughness: 0.8 });
     for (const [w, d, x, z] of [[0.9, 0.05, 0, 0.235], [0.9, 0.05, 0, -0.235], [0.05, 0.5, 0.43, 0], [0.05, 0.5, -0.43, 0]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), edgeM); e.position.set(x, 0.025, z); mat.add(e); }
-    mat.add(top); mat.traverse((m) => { if (m.isMesh) { m.receiveShadow = true; m.castShadow = true; } }); }
+    mat.add(top); mat.traverse((m) => { if (m.isMesh) { m.receiveShadow = true; m.castShadow = true; } });
+    mat.add(contactShadow(1.0, 0.6, 0.35)); }
   // the drop net's rope: thin braided polypropylene (a muted blue), and its three bridles to the hoop
   const mRope = new THREE.MeshStandardMaterial({ color: 0x3f5874, roughness: 0.9 });
   const ropes = [0, 1, 2, 3, 4, 5].map(() => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 1, 5), mRope); world.add(r); r.visible = false; return r; });
@@ -1161,8 +1167,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     place,
     /** Walking about (walker.js state, world coordinates), or null to stand at the spot again. */
     setWalk(w) {
-      if (w) { walking = w; root.position.set(w.x, w.y, w.z); root.rotation.y = -w.face; }
-      else if (walking) { walking = null; place(curSpot); }
+      if (w) { walking = w; root.position.set(w.x, w.y, w.z); root.rotation.y = -w.face; feetShadow.visible = !w.air; }
+      else if (walking) { walking = null; place(curSpot); feetShadow.visible = true; }
     },
     setSpeaking(on) { speaking = !!on; },
     /** Wave, cheer or clap (Fish Together). Only free hands join in: not while fighting a fish. */
