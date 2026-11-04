@@ -110,9 +110,13 @@ const PARTY = new Set(["friendJoined", "friendHooked", "reaction", "invite"]);
 // taps, surges or reeling the animation fills in between)
 export const RECORDED = new Set(["bite", "hooked", "landed", "lost", "missed", "alert", "button"]);
 // the shortest time between two of the same kind, so nothing becomes a buzz
-const GAP = { tap: 140, pull: 1200, run: 900, reel: 1600, reelTap: 170, friendJoined: 8000, friendHooked: 15000, reaction: 6000, invite: 6000, release: 400, splashdown: 400 };
+const GAP = { tap: 140, pull: 1200, run: 900, reel: 1600, reelTap: 110, friendJoined: 8000, friendHooked: 15000, reaction: 6000, invite: 6000, release: 400, splashdown: 400 };
 const SAVER_SKIP = new Set(["release", "splashdown", "tap", "reel", "reelTap", "reaction", "friendJoined"]);
 export const BUDGET_MS = { normal: 4000, saver: 1500 }; // most vibration in any minute
+// the small ticks (each reel tap, reeling, the cast's release and splashdown) only use the budget down to this much,
+// so a minute of fast tapping never leaves nothing for the pulls, the runs and the landing that matter more
+export const MINOR = new Set(["reelTap", "reel", "tap", "release", "splashdown"]);
+export const RESERVE_MS = { normal: 1600, saver: 600 };
 
 /** The Vibration API's on/off list for a pattern at a strength (the API can't set motor strength, so the presets
  *  lengthen or shorten pulses, and Subtle leaves out the faintest). Pure (tested). */
@@ -185,6 +189,7 @@ export function createHaptics({ nav = globalThis.navigator, win = globalThis.win
       if (cap.kind === "vibration") {
         const v = toVibration(pulses, S.strength), ms = v.filter((_, i) => i % 2 === (v[0] === 0 ? 1 : 0)).reduce((a, b) => a + b, 0);
         if (budgetLeft(t) < ms && name !== "test" && name !== "landed" && name !== "lost") return { done: false, why: "minute's budget used" };
+        if (MINOR.has(name) && budgetLeft(t) - ms < (S.saver ? RESERVE_MS.saver : RESERVE_MS.normal)) return { done: false, why: "kept for the fight" };
         try { nav.vibrate(v); spent.push([t, ms]); return { done: true, how: "vibration", pattern: v }; } catch { return { done: false, why: "vibration refused" }; }
       }
       // no vibration on this phone: a soft pulse at the edge of the screen for the moments that matter

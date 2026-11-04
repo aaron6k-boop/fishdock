@@ -26,7 +26,8 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   };
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
-  const [sprint, setSprint] = useState(false);
+  const [sprint, setSprint] = useState(false), [myPhase, setMyPhase] = useState("idle");
+  const busyFishing = !!fight || myPhase === "bite" || myPhase === "hooked" || myPhase === "cast";
   // (the stick's last position, so Sprint takes effect at once, without having to move your thumb)
   const stick = useRef([0, 0]);
   useEffect(() => { if (walk) w.current?.setWalkInput({ x: stick.current[0], y: stick.current[1], sprint }); }, [sprint]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -72,8 +73,9 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
       <World3D ref={w} fight={fight} startMode="first" feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} sound={sound} now={now} quality={view.gfx && view.gfx !== "auto" ? view.gfx : quality}
         onPhase={(id, phase, info) => {
           onPhase?.(id, phase, info);
-          // your own bite or fish on: the menu gets out of the way of the Strike and Reel buttons
-          if ((phase === "bite" || phase === "hooked") && anglers.find((x) => x.id === id)?.local) setMenu(false);
+          // your own bite or fish on: the menu gets out of the way of the Strike and Reel buttons, and Walk about
+          // stays hidden until it's over (it can't be used then anyway)
+          if (anglers.find((x) => x.id === id)?.local) { setMyPhase(phase); if (phase === "bite" || phase === "hooked") setMenu(false); }
           if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); return; }
           const a = anglers.find((x) => x.id === id);
           if (a && !a.local && phase === "hooked" && !watching) setAlert({ id, name: a.name || "Someone" });
@@ -144,7 +146,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
           ) : null}
         </div>
         {/* walking about: its own button, bottom right (while walking, the walking controls take its place) */}
-        {!walk ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
+        {!walk && !busyFishing ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
         {card ? <div className="w3d-card"><CatchCard ev={card.ev} demo={demo} compact photoUrl={catchPhoto?.(card.ev)} onClose={() => setCard(null)} who={card.who} /></div> : null}
       </World3D>
     </div>

@@ -535,7 +535,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     }
     const view = updateCamera(t, dt || 0.016);
     // (gliding into first person: your body shows until the camera is nearly at your eyes, so no floating hands)
-    if (camBlend && applyBlend() < 0.8 && !W) anglers.get(localId)?.a.setFirstPerson(false);
+    if (camBlend) { applyBlend(); const me = anglers.get(localId); if (!W && me?.out?.eye && (mode === "first" || mode === "free") && camera.position.distanceTo(me.out.eye) > 0.7) me.a.setFirstPerson(false); }
     if (aimPower != null) { const pl = castPlanFor(aimPower); aimMark.visible = !!pl; if (pl) { aimMark.position.set(pl.point[0], 0.03, pl.point[1]); const k = (1.2 + pl.dist / 40) * (1 + 0.08 * Math.sin(t * 6)); aimMark.scale.set(k, 1, k); } } else aimMark.visible = false;
     // droplets fall back, rings spread
     for (let k = 0; k < DROPS; k++) {

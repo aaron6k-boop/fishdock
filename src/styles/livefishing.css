@@ -463,6 +463,7 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .joystick-zone.floating { width: 46vw; height: 42vh; touch-action: none; }
 .joystick { position: absolute; left: max(18px, env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); width: var(--js, 128px); height: var(--js, 128px); border-radius: 50%; background: radial-gradient(circle, #ffffff1f, #ffffff0d 70%); border: 2px solid #ffffff40; touch-action: none; display: grid; place-items: center; opacity: .45; transition: opacity .25s; }
 .joystick-zone.active .joystick { opacity: 1; }
+.joystick::before { content: ""; position: absolute; inset: -22px; border-radius: 50%; } /* (a thumb landing just outside the ring still takes the stick, rather than walking you to where it touched) */
 .joystick-zone.floating .joystick.placed { left: calc(var(--jx) - var(--js, 128px) / 2); bottom: auto; top: calc(var(--jy) - var(--js, 128px) / 2); }
 .joystick-zone.floating .joystick { pointer-events: none; }
 .stick-s { --js: 104px; } .stick-m { --js: 128px; } .stick-l { --js: 156px; }
