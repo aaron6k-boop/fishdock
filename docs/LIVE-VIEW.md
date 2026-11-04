@@ -205,7 +205,18 @@ photographer (CC BY-SA 4.0) and labelled as not a live camera. A switch goes bac
   hashed; network addresses only as the usual daily keyed hashes for rate limits.
 - Reconnecting: the phone reconnects by itself (and when the screen comes back on), gets everything it missed, and
   sends events queued while offline once each (the server drops repeats by their ids). Spots are kept ten minutes.
-- Voice: opt-in WebRTC between phones (perfect negotiation), public STUN only; mute, push to talk, per-person
+- Inviting: an Invite a friend button on the fishing screen opens the phone's share sheet (or copies the link) and
+  shows the six-character code big enough to read out. The host shares the private link; anyone else, while the host
+  allows the code, shares `#party/<code>/code`, which is the same as telling a friend the code. Both open the join
+  screen of that party, at its place. The code box on Fish Together also takes a pasted link.
+- Joining and leaving: the server adds a line to the chat when someone joins, leaves or is removed (`sys`: joined,
+  left, removed, with their name only), sent to everyone and kept for anyone who connects later (even with chat
+  off). Phones show it as a toast and a light buzz for joining. Losing signal isn't announced: that person shows as
+  away. Chat has its own limit on top of the general one: 6 lines in 10 seconds and 20 a minute, 200 characters.
+- Voice: opt-in WebRTC between phones, public STUN only. Of any two people only the one whose member id sorts later
+  starts the call (the other asks to be called and answers); both offering at once left Chromium's answering side
+  with no network path. Later renegotiation uses perfect negotiation. Someone whose phone drops out of the party is
+  out of voice too. A refused or missing microphone is explained in plain words; mute, push to talk, per-person
   volume and mute, a speaking light, and text chat as the fallback. Without a TURN relay some mobile networks won't
   connect; adding Cloudflare's TURN key would fix that. Block hides someone's chat and voice on your phone; Report
   is kept with the party for review.
@@ -231,7 +242,13 @@ catches up the moment FishDock is open again, and viewers are told the phone has
   look-around (full turns, pitch limits, inertia, double tap, aiming the short way round, compass points).
 - `tests/party.test.js`: starting and joining, wrong and old secrets, code joining off, locking, four anglers at most,
   the virtual rules and simulated catches, duplicates, real trips and photos, host controls, chat, voice relay,
-  reports, reconnecting, leaving, ending on time, leaderboards, the socket's origin check.
+  reports, reconnecting, leaving, ending on time, leaderboards, the socket's origin check, join, leave and removal
+  notices, chat limits, voice off when a phone drops out.
+- `tests/voice.test.js`: proximity chat, who starts a call, plain words for microphone problems.
+- `tests/e2e/together.mjs` (Playwright, three browsers against `tests/e2e/server.mjs --dist`): a friend follows the
+  host's invite link and another types the code, all in the same party; join and leave toasts and chat lines, chat
+  both ways and its length limit, a guest's invite, a refused microphone, voice connecting with Chromium's stand-in
+  microphone, muting, and nothing received holding a position.
 - `tests/qr.test.js`: the invite QR code.
 - `tests/viewpoint.test.js`: where a photo was taken from; which viewpoints suit each place; real photos'
   measurements judged (a level open view passes; a town seen from above, a view looking down and a tilted field
