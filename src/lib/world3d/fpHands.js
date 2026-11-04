@@ -35,7 +35,7 @@ const THUMB = { at: V(0.026, 0.03, 0.012), len: [0.028, 0.024, 0.02], r: 0.0102 
 const GRIPS = {
   rest: { f: [[0.35, 0.45, 0.3], [0.4, 0.5, 0.32], [0.45, 0.55, 0.35], [0.5, 0.6, 0.38]], t: [0.25, 0.2, 0.15], spread: 0.06 },
   seat: { f: [[1.25, 1.3, 0.8], [1.25, 1.35, 0.85], [1.35, 1.4, 0.9], [1.4, 1.4, 0.95]], t: [0.85, 0.35, 0.25], spread: 0.0 },
-  crank: { f: [[0.95, 1.15, 0.85], [1.25, 1.3, 0.9], [1.4, 1.35, 0.9], [1.5, 1.35, 0.95]], t: [0.7, 0.5, 0.45], spread: 0.0 },
+  crank: { f: [[1.3, 1.35, 0.95], [1.4, 1.4, 1.0], [1.45, 1.4, 1.0], [1.5, 1.4, 1.0]], t: [0.75, 0.55, 0.45], spread: 0.0 }, // (a closed hand round the knob)
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fish: { f: [[0.25, 0.3, 0.2], [0.3, 0.35, 0.22], [0.35, 0.38, 0.25], [0.4, 0.4, 0.28]], t: [0.1, 0.15, 0.1], spread: 0.05 },
 };
@@ -43,7 +43,7 @@ let BETA = 1.0; export const _tune = (o) => { if (o.beta != null) BETA = o.beta;
 const gripOf = (kind) => (kind === "seat" ? GRIPS.seat : kind === "crank" ? GRIPS.crank : kind === "fish" ? GRIPS.fish : kind ? GRIPS.fist : GRIPS.rest);
 // where what's held runs through the hand (hand frame): in the curl of the fingers, in front of the palm; for the reel's
 // handle, between the thumb and the curled index finger
-const CHANNEL = { seat: V(0.004, 0.102, 0.03), crank: V(0.03, 0.098, 0.026), fish: V(0, 0.06, -0.02), fist: V(0, 0.1, 0.03) };
+const CHANNEL = { seat: V(0.004, 0.102, 0.03), crank: V(0.012, 0.105, 0.032), fish: V(0, 0.06, -0.02), fist: V(0, 0.1, 0.03) };
 const channelOf = (kind) => CHANNEL[kind] || CHANNEL.fist;
 
 // ---- geometry ----
@@ -186,7 +186,7 @@ function realArms(scene, { gloves, skinHex }) {
     const up0 = Z.clone().addScaledVector(dir0, -Z.dot(dir0)).normalize(), fr0 = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(dir0.clone().cross(up0), dir0, up0));
     // each finger's bones, with the axis it curls about (towards the palm) in its own frame
     const chain = (name, axisW) => [1, 2, 3].map((k) => { const b = bone(`${name}_0${k}_${sfx}`); return { b, rest: b.quaternion.clone(), axis: axisW.clone().applyQuaternion(wq(b).invert()).normalize() }; });
-    const fingers = DIG.map((d) => chain(d, s > 0 ? X : X.clone().negate())); // (the left hand is the right's mirror: its fingers curl the other way about its own across axis)
+    const fingers = DIG.map((d) => chain(d, X));
     const tDir = wp(bone("thumb_02_" + sfx)).sub(wp(bone("thumb_01_" + sfx))).normalize(), tAxis = tDir.clone().cross(Z).normalize().multiplyScalar(s); // (towards the palm, as the fingers: the other way stood it straight up)
     const thumb = chain("thumb", tAxis);
     return { hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone() };

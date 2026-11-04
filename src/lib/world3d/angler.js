@@ -766,7 +766,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const e = fpE - 0.2, sw = fpYaw - 0.3;
       dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
       fpView = { vr, vu, vf };
-      const reelAt = fpEye().addScaledVector(vr, 0.035).addScaledVector(vu, -0.135).addScaledVector(vf, 0.4); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
+      const reelAt = fpEye().addScaledVector(vr, 0.06).addScaledVector(vu, -0.115).addScaledVector(vf, 0.4); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
       butt = reelAt.addScaledVector(dir, -R.seat);
     }
     // from one way of holding the rod to the next (onto the rail, into your hands, walking off with it) the rod moves
@@ -785,7 +785,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // but never takes the tip past the line's own direction (under a heavy fish the tip points down the line). The tip's
     // spring adds a quick flick of the last part (a sudden pull, the drag slipping) that dies away
     const toLine = Math.acos(clamp(toT.dot(dir), -1, 1));
-    const turn = Math.sign(k) * Math.min(Math.abs(k) * 2.3, Math.max(0.15, toLine * 0.98));
+    const turn = Math.sign(k) * Math.min(Math.abs(k) * 3.0, Math.max(0.15, toLine * 0.98));
     pts[0].copy(butt);
     for (let i = 0; i < NSEG; i++) {
       const s = (i + 0.5) / NSEG, th = turn * (BEND[i] + BEND[i + 1]) / 2 + spr.tip * 2.2 * Math.pow(s, 5);
