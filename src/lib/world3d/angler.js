@@ -429,6 +429,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let dropRig = null, ropePull = null, releaseInfo = null, releaseRope = null, matOn = false, releasePole = false, prevKt = -1; // the drop net's rope: over the rail where, hanging or not; which hand is pulling and how far through the pull
   const rodS = { butt: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0), key: "", until: 0, ok: false }; // the rod eased from one way of holding it to the next
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
+  const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0 }; // carrying it as you walk: its sway with your steps
+  const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
   let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0; // first person: the rod held where you can see it; leaning over the rail to land a fish
   const toWorld = (v) => v.clone().applyMatrix4(root.matrixWorld);
   const toLocal = (v) => root.worldToLocal(v.clone());
@@ -857,12 +859,27 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     } else { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     if (!held || (ph !== "cast" && ph !== "hooked" && ph !== "landing" && ph !== "lost")) { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); held = false; }
     // walking about: the rod carried in the right hand at the reel, low by your side, its tip leading forwards and up
-    // (clear of your legs, the rail and anyone behind you), bobbing a little with your stride; the line wound in
+    // (clear of your legs, the rail and anyone behind you); the line wound in. It moves with you: rising and falling and
+    // swaying with your shoulders at each step, the tip trailing a little as you turn and dipping as you stop, and held
+    // more upright when something's close ahead (a wall, the lighthouse) so it never pokes through it
     if (walking) {
-      const bob = Math.sin((walking.phase || 0) * 2) * 0.025 * Math.min(1, (walking.speed || 0) / 2);
-      dir = new THREE.Vector3(0.07, 0.58 + bob, -0.81).normalize();
-      butt = new THREE.Vector3(0.25, 0.86 + bob * 0.5, -0.05).addScaledVector(dir, -R.seat * 0.7); held = true; showLine = false; showFish = false;
-    }
+      const ch = fig.chest;
+      if (ch) {
+        if (!carry.base) carry.base = ch.p.clone(), carry.yaw = ch.yaw;
+        const kb = 1 - Math.exp(-dt * 1.8); carry.base.lerp(ch.p, kb); carry.yaw += wrapR(ch.yaw - carry.yaw) * kb;
+        carry.d.copy(ch.p).sub(carry.base).clampLength(0, 0.06); carry.sway = clamp(wrapR(ch.yaw - carry.yaw), -0.2, 0.2);
+      } else { const bob = Math.sin((walking.phase || 0) * 2) * 0.025 * Math.min(1, (walking.speed || 0) / 2); carry.d.set(0, bob * 0.5, 0); carry.sway = 0; }
+      const kt = 1 - Math.exp(-dt * 5);
+      carry.trail += (clamp((walking.turnRate || 0) * 0.05, -0.1, 0.1) - carry.trail) * kt;
+      carry.tilt += (clamp((walking.acc || 0) * 0.012, -0.06, 0.05) - carry.tilt) * kt;
+      // (upright as far as needed to clear what's ahead: the tip's reach forward no more than the space there is)
+      const reachOk = walking.ahead == null ? 9 : Math.max(0.4, walking.ahead - 0.25);
+      const along = R.len * (1 - 0.7 * R.seat / R.len), fwd0 = 0.81 * along, up = fwd0 > reachOk ? Math.acos(clamp(reachOk / along, 0.2, 0.81)) - Math.acos(0.81) : 0;
+      carry.up += (up - carry.up) * (1 - Math.exp(-dt * (up > carry.up ? 9 : 3)));
+      const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + carry.d.y * 0.6, az = -0.086 + carry.trail + carry.sway * 0.35;
+      dir = new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
+      butt = new THREE.Vector3(0.25, 0.86, -0.05).addScaledVector(carry.d, 0.8).addScaledVector(dir, -R.seat * 0.7); held = true; showLine = false; showFish = false;
+    } else carry.base = null;
     // first person: whenever the line is out the rod is in your hands, low and to the right with the reel in view and
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
@@ -1084,7 +1101,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       fpv.pose({ hands: walking ? [null, null] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt });
     }
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFigP(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
-    fig.pose({ t, dt, act: actNow, emote, kneel, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5 } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFigP(toLocal(lookAtW)) : null, speaking, hood: fig.look?.hat === 4, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
+    fig.pose({ t, dt, act: actNow, emote, kneel, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5, off: walking.off || 0, floor: walking.floor || null } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFigP(toLocal(lookAtW)) : null, speaking, hood: fig.look?.hat === 4, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
     tag.position.y = fig.top + 0.3; talk.position.y = tag.position.y + 0.31;
     if (!fp && !walking && (ph === "waiting" || ph === "idle" || ph === "ended" || ph === "paused")) { const ey = fig.eyeAt?.y; if (ey > 1.2 && ey < 2) eyeH += (ey - eyeH) * (1 - Math.exp(-dt * 0.5)); }
 

@@ -7,9 +7,11 @@ export const FOV = { min: 28, max: 78, base: 62 };
 const TAU = Math.PI * 2;
 export const wrap = (a) => ((a % TAU) + TAU + Math.PI) % TAU - Math.PI; // -π..π
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+/** How far the view can tip down and up (radians); walking about narrows it (WALK_PITCH) */
+export const PITCH = { min: -1.25, max: 1.1 };
 
 export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { yaw: 0, pitch: -0.08 } } = {}) {
-  const s = { yaw, pitch, fov, vyaw: 0, vpitch: 0, aim: null, home: { ...home }, dragging: false, moved: 0, lastTap: 0, touched: -1e9, sens: 1, smooth: true, dragFov: null };
+  const s = { yaw, pitch, fov, vyaw: 0, vpitch: 0, aim: null, home: { ...home }, dragging: false, moved: 0, lastTap: 0, touched: -1e9, sens: 1, smooth: true, dragFov: null, pmin: PITCH.min, pmax: PITCH.max, flickPitch: true, baseFov: null, fv: 0 };
   const api = {
     get yaw() { return s.yaw; }, get pitch() { return s.pitch; }, get fov() { return s.fov; }, get dragging() { return s.dragging; },
     /** when the person last turned or zoomed the view themselves (performance.now() ms): the camera doesn't steer itself for a while after */
@@ -19,7 +21,7 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
      *  (walking about, the zoom sets how far behind you the camera is, so the camera's own fov is used: dragFov) */
     drag(dx, dy, viewH = 800) {
       const k = ((((s.dragFov ?? s.fov) * Math.PI) / 180) / Math.max(200, viewH)) * s.sens;
-      s.yaw = wrap(s.yaw - dx * k); s.pitch = clamp(s.pitch + dy * k, -1.25, 1.1);
+      s.yaw = wrap(s.yaw - dx * k); s.pitch = clamp(s.pitch + dy * k, s.pmin, s.pmax);
       // the flick's speed: a blend of this move and the last, so one uneven touch event doesn't set a jerky spin
       const now = performance.now(), gap = Math.max(8, Math.min(60, now - (s.dragAt || now - 16))) / 1000; s.dragAt = now;
       s.vyaw = s.vyaw * 0.4 + ((-dx * k) / gap) * 0.6; s.vpitch = s.vpitch * 0.4 + ((dy * k) / gap) * 0.6;
@@ -29,19 +31,35 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     setDragFov(f) { s.dragFov = Number.isFinite(f) ? f : null; },
     start() { s.dragging = true; s.moved = 0; s.vyaw = 0; s.vpitch = 0; s.aim = null; s.dragAt = 0; },
     // (a finger held still before letting go is no flick: the view stops where it is)
-    end() { s.dragging = false; if (!s.smooth || performance.now() - (s.dragAt || 0) > 90) { s.vyaw = 0; s.vpitch = 0; } s.vyaw = clamp(s.vyaw, -6, 6); s.vpitch = clamp(s.vpitch, -3, 3); },
+    end() { s.dragging = false; if (!s.smooth || performance.now() - (s.dragAt || 0) > 90) { s.vyaw = 0; s.vpitch = 0; } s.vyaw = clamp(s.vyaw, -6, 6); s.vpitch = s.flickPitch ? clamp(s.vpitch, -3, 3) : 0; },
+    /** the range the view may tip through, and whether a flick carries on up or down (walking about: a narrower range,
+     *  and no vertical flick, so a thumb lifting off the screen never throws the view up into the sky). No args: as normal */
+    setPitchRange(min = PITCH.min, max = PITCH.max, flick = true) { s.pmin = min; s.pmax = max; s.flickPitch = !!flick; s.pitch = clamp(s.pitch, min, max); if (!flick) s.vpitch = 0; },
+    /** the zoom a recentre goes back to (null: the usual) */
+    setBaseFov(f) { s.baseFov = Number.isFinite(f) ? f : null; },
     /** how the view feels: sensitivity (0.5..2, 1 normal) and smoothing (the turn carries on a little after a flick) */
     setFeel({ sens, smooth } = {}) { if (Number.isFinite(sens)) s.sens = clamp(sens, 0.4, 2.5); if (smooth != null) s.smooth = !!smooth; },
     zoom(factor) { s.fov = clamp(s.fov / factor, FOV.min, FOV.max); s.touched = performance.now(); },
     setFov(f) { s.fov = clamp(f, FOV.min, FOV.max); },
     /** turn smoothly to look at a heading (and pitch) */
-    aim(yaw, pitch = s.pitch) { s.aim = { yaw: wrap(yaw), pitch: clamp(pitch, -1.25, 1.1) }; s.vyaw = 0; s.vpitch = 0; },
-    recenter() { api.aim(s.home.yaw, s.home.pitch); s.fov = FOV.base; s.touched = -1e9; },
+    aim(yaw, pitch = s.pitch) { s.aim = { yaw: wrap(yaw), pitch: clamp(pitch, s.pmin, s.pmax) }; s.vyaw = 0; s.vpitch = 0; },
+    recenter() { api.aim(s.home.yaw, s.home.pitch); s.fov = s.baseFov ?? FOV.base; s.touched = -1e9; },
     setHome(yaw, pitch = s.home.pitch) { s.home = { yaw: wrap(yaw), pitch }; },
     /** a tap: returns true for a double tap (two taps within 320 ms that didn't move), which recentres */
     tap(now) { const dbl = now - s.lastTap < 320 && s.moved < 8; s.lastTap = dbl ? 0 : now; if (dbl) api.recenter(); return dbl; },
     /** follow a heading (walking: the camera coming round behind you): k is how far to go this frame (0..1) */
-    follow(yaw, pitch, k) { if (s.dragging || s.aim || !(k > 0)) return; s.yaw = wrap(s.yaw + wrap(yaw - s.yaw) * k); if (pitch != null) s.pitch += (pitch - s.pitch) * k * 0.6; },
+    follow(yaw, pitch, k, dt) {
+      if (s.dragging || s.aim) { s.fv = 0; return; }
+      if (!(dt > 0)) { if (!(k > 0)) return; s.yaw = wrap(s.yaw + wrap(yaw - s.yaw) * k); if (pitch != null) s.pitch += (pitch - s.pitch) * k * 0.6; return; }
+      // (with dt: the turn's own speed eases up and down, so the camera never starts or stops swinging round with a jolt,
+      // and never carries on past where you face)
+      const off = wrap(yaw - s.yaw), want = k > 0 ? (off * k) / dt : 0;
+      s.fv += (want - s.fv) * (1 - Math.exp(-dt * 7));
+      let step = s.fv * dt; if (step * off <= 0 && k > 0) step = 0; else if (Math.abs(step) > Math.abs(off) && k > 0) step = off;
+      s.yaw = wrap(s.yaw + step); if (pitch != null && k > 0) s.pitch += (pitch - s.pitch) * k * 0.6;
+    },
+    /** ease the pitch towards `to` by k (0..1), unless the person is turning the view or it's being aimed */
+    easePitch(to, k) { if (s.dragging || s.aim || !(k > 0)) return; s.pitch = clamp(s.pitch + (to - s.pitch) * Math.min(1, k), s.pmin, s.pmax); },
     /** advance by dt seconds: inertia after a flick, or easing towards an aim */
     step(dt) {
       if (s.dragging) return api;
@@ -52,7 +70,7 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
         return api;
       }
       const damp = Math.exp(-dt * 4.5);
-      s.yaw = wrap(s.yaw + s.vyaw * dt); s.pitch = clamp(s.pitch + s.vpitch * dt, -1.25, 1.1);
+      s.yaw = wrap(s.yaw + s.vyaw * dt); s.pitch = clamp(s.pitch + s.vpitch * dt, s.pmin, s.pmax);
       s.vyaw *= damp; s.vpitch *= damp;
       if (Math.abs(s.vyaw) < 1e-3) s.vyaw = 0; if (Math.abs(s.vpitch) < 1e-3) s.vpitch = 0;
       return api;
@@ -79,6 +97,17 @@ export function walkFollow({ dragging = false, sinceTouch = 1e9, speed = 0, off 
   const far = a > 1.6 ? Math.max(0, (FOLLOW.maxOff - a) / (FOLLOW.maxOff - 1.6)) : 1;
   const k = 1 - Math.exp(-dt * FOLLOW.rate * sp * ramp * far);
   return a > 1e-6 ? Math.min(k, (FOLLOW.maxRate * dt) / a) : k;
+}
+
+// ---- the walking camera's pitch: a comfortable range, and back to the usual gently after a look up or down ----
+// (WALK_PITCH: how far you can tip the view while walking about; level: where it settles. With the follow camera's
+// height that keeps the deck ahead of you in view and never lets the sky fill the screen)
+export const WALK_PITCH = { min: -0.75, max: 0.1, level: -0.2, wait: 1600, rate: 1.4 };
+/** How far (0..1) the walking camera's pitch eases back towards its level this frame, whether or not you're moving. */
+export function walkPitchBack({ dragging = false, sinceTouch = 1e9, dt = 0.016 } = {}) {
+  if (dragging || sinceTouch < WALK_PITCH.wait) return 0;
+  const ramp = Math.min(1, (sinceTouch - WALK_PITCH.wait) / 900);
+  return 1 - Math.exp(-dt * WALK_PITCH.rate * ramp);
 }
 
 // ---- easing between camera views: walking about and back, so the switch is a glide and never a cut ----
