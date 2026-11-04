@@ -447,7 +447,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const dropGeo = (ns) => {
       const railZ = -Math.max(0.3, edge - 0.22), railY = 1.12, col = toWorld(new THREE.Vector3(-0.32, 0, -(edge + 0.25))), waterY = wh(col.x, col.z);
       const bridle = 0.72 * ns, top = railY - 0.05, sink = 0.02 * ns; // (the hoop right at the surface, breaking it: you see the net and the fish go over it)
-      return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(0.8 + 0.4 * ns), 0.05 + 0.18 * ns, -0.08)), railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
+      return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(1.2 + 0.45 * ns), 0.05 + 0.18 * ns, -0.22)), /* (on the deck clear of the tackle box: it lay half on it) */ railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
     };
 
     // ---- what the rod is doing ----

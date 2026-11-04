@@ -272,10 +272,12 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const brow = hd.eye + 0.045; // where a hat's front edge sits, just above the eyebrows
   if (L.hat === 0) {
     // a beanie: snug over the head and hair, pulled down at the back and over the ears, with a turned-up cuff
-    const cy = brow - 0.022, ry = hd.top + 0.016 - cy;
-    const dome = new THREE.Group(); dome.position.set(hd.cx, cy, hd.cz); dome.rotation.x = 0.26; hats.add(dome);
-    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), knitMat); m.scale.set(hd.rx + 0.014, ry, hd.rz + 0.014); dome.add(m);
-    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 26, 1, true), knitMat); cuff.scale.set(hd.rx + 0.02, 0.05, hd.rz + 0.02); cuff.position.y = 0.022; dome.add(cuff);
+    // (pulled well down: the cuff's lower edge at the brow in front and over the tops of the ears behind, the crown close
+    // over the head, not perched on top of it)
+    const cy = brow - 0.04, ry = hd.top + 0.026 - cy;
+    const dome = new THREE.Group(); dome.position.set(hd.cx, cy, hd.cz + 0.006); dome.rotation.x = 0.14; hats.add(dome);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), knitMat); m.scale.set(hd.rx + 0.008, ry, hd.rz + 0.01); dome.add(m);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(1.02, 1, 1, 26, 1, true), knitMat); cuff.scale.set(hd.rx + 0.01, 0.05, hd.rz + 0.012); cuff.position.y = 0.022; dome.add(cuff);
   } else if (L.hat === 1) {
     // a cap: a crown over the head and a peak over the eyes
     const cy = brow, ry = Math.max(0.05, hd.top + 0.012 - cy);
