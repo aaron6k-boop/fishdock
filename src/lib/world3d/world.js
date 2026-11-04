@@ -5,10 +5,10 @@
 // chosen by Auto from the phone, and stepped down if frames run slow. Nothing is drawn while hidden.
 import * as THREE from "three";
 import { checkScene } from "./sceneCheck.js";
-import { walker, stepWalker, keepApart, roomToFish } from "./walker.js";
+import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor } from "./walker.js";
 import { createEnvironment } from "./environment.js";
 import { createAngler } from "./angler.js";
-import { createLook, lookAt, wrap, walkFollow, FOLLOW } from "./look.js";
+import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist } from "./look.js";
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
 import { planCast } from "./castAim.js";
@@ -36,7 +36,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.q >= 1, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
-  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0; // (see adapt)
   renderer.shadowMap.enabled = !!Q.shadows; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 5000);
@@ -83,7 +83,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     }
   }
   const ripples = [];
-  const ripple = (at, s = 0.6) => { ripples.push([at.x, at.z, 0, s]); if (ripples.length > 8) ripples.shift(); };
+  // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
+  // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)
+  const ripple = (at, s = 0.6) => {
+    ripples.push([at.x, at.z, 0, s, 2.4 + 3.2 * Math.min(1, s)]);
+    if (ripples.length > 8) { let k = 0, lo = Infinity; ripples.forEach((r, i) => { const v = r[3] * (1 - r[2] / r[4]); if (v < lo) { lo = v; k = i; } }); ripples.splice(k, 1); }
+  };
 
   // ---- aiming a cast: a ring on the water where it will land, while you hold Cast ----
   const aimMark = new THREE.Group(); aimMark.visible = false; scene.add(aimMark);
@@ -144,6 +149,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     return out;
   }
   let camOverride = null, lookOverride = null, inspectFrom = null;
+  // where your fish sits on screen while you look at it (normalised: 0 the middle, 1 the top), above the card that
+  // tells you about it along the bottom (Stage3D FishLook, its height capped in livefishing.css)
+  const FISH_NDC_Y = 0.32;
   // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
   // auto-walk (keeps walking where you look until you touch the stick) and tap-to-move (walks to a point you tapped)
   let autoWalk = false, walkTarget = null, walkStuck = 0, modeSince = -10, lastMode = "first";
@@ -151,6 +159,22 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // where everyone else is standing (their spot, or where they've walked to)
   const othersAt = () => { const o = []; for (const [id, x] of anglers) if (id !== localId && x.out?.at) o.push([x.out.at.x, x.out.at.z]); return o; };
   let W = null, walkIn = { x: 0, y: 0, sprint: false }, walkJump = false, canFish = false, fishTest = 0, modeBeforeWalk = "first", fovBeforeWalk = null, onPose = null;
+  // ---- the walking camera's own easing: how far behind you it is (in at once for a wall, out slowly), the height it
+  // looks from (eased, so a step up or a jump doesn't jolt it), the footsteps' stride, and a glide between views ----
+  let followAt = 0, pivotY = null, pivotXZ = null, gait = { d: 0 }, camBlend = null, clockT = 0; // (clockT: the scene's clock, so a filmed glide is exact)
+  const WALK_FOV = 62;
+  /** Glide the camera from where it is now to wherever the next frames put it, over `sec` seconds. */
+  function blendCamera(sec = 0.7) { camBlend = reduceMotion ? null : { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, t0: clockT, sec }; }
+  // (a long way round takes a little longer: the glide back to your spot turns at most about 150° a second)
+  const blendFor = (yawTo, far = 0) => blendCamera(0.65 + Math.min(0.6, Math.abs(wrap(yawTo - look.yaw)) / 2.6) + Math.min(0.45, far / 20));
+  function applyBlend() {
+    if (!camBlend) return 1;
+    const u = (clockT - camBlend.t0) / camBlend.sec; if (u >= 1) { camBlend = null; return 1; }
+    const k = easeBlend(u), q = camera.quaternion.clone();
+    camera.position.lerpVectors(camBlend.pos, camera.position.clone(), k); camera.quaternion.copy(camBlend.quat).slerp(q, k);
+    camera.fov = camBlend.fov + (camera.fov - camBlend.fov) * k; camera.updateProjectionMatrix();
+    return k;
+  }
   // other people walking (Fish Together): their latest pose, eased towards
   const remote = new Map();
   function applyRemote(id, x, dt) {
@@ -201,20 +225,33 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // a little below it, so it sits in the top half of the picture, clear of the card along the bottom)
       // (from beside you on the bank or the deck, never out over the water: a bank's edge between hid the mat. Off to
       // your right, looking down across the mat at the fish)
-      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(sx * 1.5 - fx * 0.4, 1.3, sz * 1.5 - fz * 0.4)); // (a little back from it, so the railing is behind the fish, not across it)
+      // (off to your left: the rod lies on its rest on your right and crossed the picture. At a steady height over the
+      // deck or the bank, so it doesn't bob as the fish goes from the net to your hands to the mat)
+      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * 1.75 - fx * 0.45, 0, -sz * 1.75 - fz * 0.45)); at0.y = mk.at.y + 1.45; // (a little back from it, so the railing is behind the fish, not across it)
       { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
       camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
-      camera.fov = 52; camera.updateProjectionMatrix(); camera.lookAt(c.clone().add(new THREE.Vector3(0, -0.34, 0)));
+      // (the fish a little above the middle, at the height of the clear band between the top bar and the card about it
+      // along the bottom: the card never covers it)
+      camera.fov = 52; camera.updateProjectionMatrix(); camera.lookAt(c); camera.rotateX(-Math.atan(Math.tan((camera.fov * Math.PI) / 360) * FISH_NDC_Y));
       return { yaw, pitch };
     } else { if (inspectFrom) modeSince = t; inspectFrom = null; } // (and back from it with a glide, not a cut)
     if (W) {
       // behind and a little above you, coming round smoothly as you turn (not while you drag to look round, and not for a
       // moment after: then it eases back behind you as you walk on); closer or further as you pinch; very close is first
       // person. The horizon stays level (the camera never rolls)
-      look.follow(W.face, FOLLOW.pitch, walkFollow({ dragging: look.dragging, sinceTouch: performance.now() - look.touched, speed: W.speed || 0, off: W.face - look.yaw, dt }));
+      // (the speed it follows at is the walker's eased speed, not a frame's, so it doesn't twitch with uneven frames)
+      W.camSpeed = (W.camSpeed || 0) + ((W.speed || 0) - (W.camSpeed || 0)) * (1 - Math.exp(-dt * 6));
+      look.follow(W.face, FOLLOW.pitch, walkFollow({ dragging: look.dragging, sinceTouch: performance.now() - look.touched, speed: W.camSpeed, off: W.face - look.yaw, dt }));
       yaw = look.yaw; pitch = look.pitch;
-      const dist = Math.max(0, ((look.fov - 28) / 50) * 9 + 0.4), tgt = new THREE.Vector3(W.x, W.y + 1.55, W.z);
+      // the height it looks from eases after you (a step up, a jump, a ramp onto the pier), never jolting
+      pivotY = pivotY == null || Math.abs(W.y - pivotY) > 3 ? W.y : pivotY + (W.y - pivotY) * (1 - Math.exp(-dt * (W.air ? 4 : 9)));
+      // and where it looks from follows you a touch behind (a few centimetres at a walk), so a stride that comes up
+      // short against a railing doesn't shake the whole view; first person stays exactly at your eyes
+      const dist = Math.max(0, ((look.fov - 28) / 50) * 9 + 0.4);
+      if (!pivotXZ || dist < 1.1 || Math.hypot(W.x - pivotXZ[0], W.z - pivotXZ[1]) > 3) pivotXZ = [W.x, W.z];
+      else { const kp = 1 - Math.exp(-dt * 14); pivotXZ = [pivotXZ[0] + (W.x - pivotXZ[0]) * kp, pivotXZ[1] + (W.z - pivotXZ[1]) * kp]; }
+      const tgt = new THREE.Vector3(pivotXZ[0], pivotY + 1.55, pivotXZ[1]);
       const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
       if (dist < 1.1) {
         // first person: a subtle bob and sway with your steps (none with reduced motion)
@@ -223,8 +260,17 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         if (!reduceMotion) { const sx = Math.cos(yaw), sz = Math.sin(yaw), w = Math.sin(ph * 0.5) * 0.02 * sp; pos.x += sx * w; pos.z += sz * w; }
         anglers.get(localId)?.a.setFirstPerson(true);
       }
-      else { pos.copy(tgt).addScaledVector(d, -dist).add(new THREE.Vector3(0, 0.3, 0)); pivot.copy(tgt); pos = unblocked(pivot, pos); anglers.get(localId)?.a.setFirstPerson(false); } // (a little higher: you sit lower in the view, with the way ahead above you)
-      camPos.copy(pos); camera.position.copy(camPos); camera.fov = 62 * (camera.aspect < 0.8 ? 1.1 : 1); camera.updateProjectionMatrix();
+      else {
+        // (a little higher: you sit lower in the view, with the way ahead above you). Something in the way brings the
+        // camera in at once; when it clears, the camera eases back out rather than popping
+        const want = tgt.clone().addScaledVector(d, -dist).add(new THREE.Vector3(0, 0.3, 0)); pivot.copy(tgt);
+        const free = unblocked(pivot, want), wantD = free.distanceTo(pivot);
+        followAt = followDist(followAt, wantD, dt);
+        pos.copy(pivot).addScaledVector(want.clone().sub(pivot).normalize(), followAt);
+        { const fl = env.floorAt ? env.floorAt(pos.x, pos.z) : null; if (fl != null) pos.y = Math.max(pos.y, fl + 0.6); }
+        anglers.get(localId)?.a.setFirstPerson(false);
+      }
+      camPos.copy(pos); camera.position.copy(camPos); camera.fov = WALK_FOV * (camera.aspect < 0.8 ? 1.1 : 1); camera.updateProjectionMatrix();
       camera.lookAt(camera.position.clone().add(d));
       if (camOverride) { camera.position.copy(camOverride); camera.lookAt(tgt.clone().add(new THREE.Vector3(0, -0.6, 0))); } // test hook only
       return { yaw, pitch };
@@ -236,7 +282,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // than going back to the open water with the fish behind you)
     const ownView = landShotOn && out && focus?.a.local && (mode === "first" || mode === "third");
     const landing = ownView && out.land ? out.land : ownView && out.kept === "deck" && out.keptAt ? { stage: "deck", net: out.keptAt, fish: out.keptAt, edge: out.edge }
-      : ownView && out.release ? { stage: out.release.stage, net: out.release.net, fish: out.release.fish || out.keptAt, edge: out.edge } : null; // (putting it back: the same shots)
+      : ownView && out.release ? { stage: out.release.stage, net: out.release.net, fish: out.release.fish || out.keptAt, edge: out.edge, water: out.release.water ?? null } : null; // (putting it back: the same shots)
     if (landShot && !out) landShot = null;
     if (landing || landShot) {
       if (landing) {
@@ -251,34 +297,40 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         } else if (st === "pick" || st === "in" || st === "done" || st === "deck") {
           // back a little and to the side: you and the net, on the deck or coming over the rail
           shot = from(0.85, -2.2, 2.35); focusAt = (landing.net || rail).clone().lerp(you, 0.45);
-        } else if ((st === "lower" || st === "lead" || st === "haul") && landing.water != null) {
-          // the drop net, shot by shot: down near the water, a little way out from the pier, as the net comes down its side
-          // and the fish is led over it and in; then rising with the net as it's hauled up, back to the rail. Never a long
-          // look down at empty water
-          const wl = landing.water - out.at.y, net = landing.net || landing.fish || rail;
-          {
-            // (letting it down too: from low by the water you see the net come down the pier's side towards you)
-            const k = st === "lead" || st === "lower" ? 0 : Math.max(0, Math.min(1, (net.y - landing.water) / Math.max(0.5, out.at.y + 1.1 - landing.water)));
-            shot = from(-1.9, landing.edge + 2.3 - 0.6 * k, Math.max(wl + 1.25, wl + 1.25 + (2.3 - wl - 1.25) * k));
-            // the moment it goes in (as fishing games frame it): in close and low over the hoop, the fish filling the shot
-            if (st === "lead") shot = from(-1.15, landing.edge + 1.45, wl + 0.85);
-            focusAt = net.clone().lerp(rail, st === "lead" ? 0 : st === "lower" ? 0.15 : 0.1); focusAt.y += st === "lead" ? 0.15 : 0;
+        } else if ((st === "lower" || st === "lead" || st === "haul" || st === "swim") && landing.water != null) {
+          // the drop net, from out over the water and off to the side, a three-quarter view: the pier's face runs away at
+          // an angle instead of filling the picture, and the rail (you, the rope) and the water (the net, the fish) are in
+          // the one shot. (It was low and close, looking straight back at the wall: the wall filled the screen and the
+          // net was a giant blur in front of it.) Letting it down and hauling it up: wide, rising with the net; the fish
+          // led in: nearer, on the hoop; putting it back: on the fish as it swims off
+          const wl = landing.water - out.at.y, hgt = Math.max(0.6, 1.1 - wl), net = landing.net || landing.fish || rail;
+          if (st === "lead") { shot = from(-2.6, landing.edge + 2.3, wl + 1.35); focusAt = net.clone().lerp(landing.fish || net, 0.4); focusAt.y += 0.08; }
+          // (putting it back: from just out over the rail, looking down, as you'd watch it go: the net at the foot of the
+          // wall and the fish swimming off below you, out and down)
+          else if (st === "swim") { shot = from(-1.6, landing.edge - 0.3, 2.5); focusAt = (landing.fish || net).clone().lerp(net, 0.3); focusAt.y = Math.max(focusAt.y, landing.water - 0.25); } // (from over the rail, watching it go: the focus held near the surface, so the view never stares straight down into the dark)
+          else {
+            const k = st === "haul" ? Math.max(0, Math.min(1, (net.y - landing.water) / hgt)) : 0;
+            shot = from(-3.3, landing.edge + 3.5, wl + 0.42 * hgt + 0.9 + 0.5 * k); focusAt = net.clone().lerp(rail, 0.38 + 0.2 * k);
           }
+          // (where the bank runs out further than the spot's edge, that low place is in the ground: stand there instead, at a
+          // person's height over it, looking down to the water)
+          { const fl = env.floorAt?.(shot.x, shot.z); if (fl != null && fl > landing.water + 0.25) shot.y = Math.max(shot.y, fl + 1.55); }
         } else if (st === "lower" || st === "lead" || st === "haul") {
           shot = from(-4.3, landing.edge + 0.5, 3.0); focusAt = rail.clone().lerp(landing.net || landing.fish || rail, 0.45);
         } else {
           // other ways of landing (swung in, a landing net, up the beach): behind you and a little to the side, the fish
           // and you both ahead
-          shot = from(-0.75, -2.5, 2.55); focusAt = (landing.net || landing.fish || rail).clone().lerp(you, 0.35);
+          // (off to your left and a little behind: from straight behind, your body hid the net and the fish in front of you)
+          shot = from(-2.1, -0.7, 2.3); focusAt = (landing.net || landing.fish || rail).clone().lerp(you, 0.3);
         }
         if (!landShot) landShot = { since: t };
         // (putting it back is shortened: where it cuts to the fish in the water, the camera cuts too, rather than
         // gliding there across empty sea)
-        const low = (x) => (x === "lower" || x === "lead" || x === "haul") && landing.water != null;
+        const low = (x) => (x === "lower" || x === "lead" || x === "haul" || x === "swim") && landing.water != null;
         // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
         const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage)); // (and back up from it: climbing the wall it passed close over the deck)
         landShot.stage = st;
-        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "haul";
+        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); if (landing.water != null) landShot.pos.y = Math.max(landShot.pos.y, landing.water + 0.45); /* (never under the surface as the fish swims off) */ landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "haul" || st === "swim";
         anglers.get(localId)?.a.showTag(false);
         if (cutTo) { camPos.copy(landShot.pos); landShot.up = true; landShot.clear = true; const l = lookAt(camPos.toArray(), focusAt.toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch))); for (let i = 0; i < 40; i++) look.step(0.1); }
         // out of your own head by going up first (never back through it), then round to the shot; your head shows once
@@ -386,32 +438,33 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     tick((ts - clock0) / 1000, nowFn(), dt);
     pace(ts, dt);
   }
-  // ---- the sky as light and reflection: a soft gradient (sky above, haze at the horizon, the ground below) made into
-  // an environment map once per change of light, so glass, wet concrete, metal railings and the reel catch the sky,
-  // and the shaded side of a building is lit by it rather than going flat grey ----
+  // ---- the sky as light and reflection: the sky itself (its gradient, sun glow and clouds; the sea below the horizon,
+  // environment.js envSky) made into an environment map whenever the light has changed enough (at most every 90 frames,
+  // about one and a half seconds, while it eases: a few milliseconds each on a phone), so glass, wet concrete, puddles, metal railings and the reel catch the sky you see, and the shaded
+  // side of a building is lit by it rather than going flat grey ----
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const envScene = new THREE.Scene(), envGeo = new THREE.SphereGeometry(50, 32, 16), envCol = new Float32Array(envGeo.attributes.position.count * 3);
-  envGeo.setAttribute("color", new THREE.BufferAttribute(envCol, 3));
-  envScene.add(new THREE.Mesh(envGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
-  let envRT = null, envKey = "";
-  function skyLight(s) {
-    const key = [s.day, s.dusk, s.night, s.cloud].map((v) => Math.round(v * 10)).join(",");
-    if (key === envKey) return; envKey = key;
-    const top = new THREE.Color(0.32, 0.5, 0.82).multiplyScalar(s.day).add(new THREE.Color(0.32, 0.3, 0.48).multiplyScalar(s.dusk)).add(new THREE.Color(0.02, 0.025, 0.05).multiplyScalar(s.night)).lerp(new THREE.Color(0.55, 0.57, 0.6).multiplyScalar(s.day + s.dusk * 0.5 + s.night * 0.05), s.cloud * 0.7);
-    const hz = new THREE.Color(0.78, 0.84, 0.9).multiplyScalar(s.day).add(new THREE.Color(0.95, 0.62, 0.42).multiplyScalar(s.dusk)).add(new THREE.Color(0.05, 0.05, 0.08).multiplyScalar(s.night));
-    const low = new THREE.Color(0.3, 0.3, 0.29).multiplyScalar(s.day + s.dusk * 0.5 + s.night * 0.05);
-    const p = envGeo.attributes.position;
-    for (let i = 0; i < p.count; i++) { const y = p.getY(i) / 50, c = y > 0 ? hz.clone().lerp(top, Math.pow(y, 0.6)) : hz.clone().lerp(low, Math.min(1, -y * 3)); envCol.set([c.r, c.g, c.b], i * 3); }
-    envGeo.attributes.color.needsUpdate = true;
+  const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), env.envSky));
+  let envRT = null, envKey = "", envWait = 0;
+  function skyLight(s, force = false) {
+    if (!s) return;
+    const key = [s.day, s.dusk, s.night, s.cloud, s.rain].map((v) => Math.round(v * 6)).join(",");
+    if (envWait > 0) envWait--;
+    if (key === envKey || (envWait > 0 && !(force && !envRT))) return; envKey = key; envWait = 90;
     const rt = pmrem.fromScene(envScene, 0.02);
-    scene.environment = rt.texture; scene.environmentIntensity = 0.55;
+    scene.environment = rt.texture;
     envRT?.dispose(); envRT = rt;
+  }
+  // tone mapping: Khronos PBR Neutral keeps colours true (a dusk sky gold rather than orange, the sea its own colour)
+  // and keeps detail in the shadows; exposure follows the light as it eases (the eye adapts: dusk and night aren't black)
+  function adapt(force = false) {
+    const L2 = env.light; if (!L2) return;
+    renderer.toneMappingExposure = L2.exposure; scene.environmentIntensity = L2.envIntensity;
+    skyLight(env.current, force);
   }
 
   function setEnvAll({ light, cond, facing = 180 } = {}) {
     const s = env.setEnv({ light, cond, facing });
-    skyLight(s);
-    renderer.toneMappingExposure = 1 + 0.3 * s.dusk + 0.45 * s.night; // eyes adapt: dusk and night aren't black
+    adapt(true);
     envState = { swell: env.waterUniforms.uSwell.value, wind: s.wind, windDir: [env.waterUniforms.uWindDir.value.x, env.waterUniforms.uWindDir.value.y], kind, rain: s.rain || 0 };
     return s;
   }
@@ -444,7 +497,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     };
   }
   function tick(t, now, dt, draw = true) {
-    const t0 = performance.now();
+    const t0 = performance.now(); clockT = t;
     const outs = {};
     if (env.waveState) envState = { ...envState, ...env.waveState() }; // the sea as the water shows it (conditions ease in)
     // walking about: the stick moves the walker, the angler follows it
@@ -465,11 +518,16 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
           if (d < 0.45) walkTarget = null;
           else { camYaw = Math.atan2(dx, -dz); input = { x: 0, y: Math.min(1, 0.45 + d * 0.25), sprint: false }; }
         }
-        const x0 = W.x, z0 = W.z;
+        const x0 = W.x, z0 = W.z, wasAir = W.air;
         const ph0 = W.phase;
         while (rem > 1e-4) { const h = Math.min(0.05, rem); W = stepWalker(W, { ...input, camYaw, jump: walkJump }, h, env.ground); walkJump = false; rem -= h; }
-        // a footstep each time a foot comes down (twice a stride), quieter at a stroll
-        if (!W.air && W.speed > 0.3 && Math.floor(W.phase / Math.PI) !== Math.floor(ph0 / Math.PI)) onSound?.(W.speed > 5 ? "stepRun" : "step", new THREE.Vector3(W.x, W.y, W.z), localId);
+        // a footstep each time a foot comes down (quicker as you speed up, softer at a stroll), on this ground; and the
+        // landing from a jump
+        void ph0;
+        const moved = Math.hypot(W.x - x0, W.z - z0); gait = stepGait(gait, moved, W.speed || 0, W.air);
+        const under = surfaceFor(venue, env.ground.surfaceAt?.(W.x, W.z), envState.rain || 0);
+        if (gait.fall) onSound?.(gait.fall.run ? "stepRun" : "step", new THREE.Vector3(W.x, W.y, W.z), localId, { hard: gait.fall.hard, surface: under.kind, wet: under.wet });
+        if (wasAir && !W.air) onSound?.("stepRun", new THREE.Vector3(W.x, W.y, W.z), localId, { hard: 1, surface: under.kind, wet: under.wet, land: true });
         // never through someone else (Fish Together): pushed round them, as long as that's somewhere you can stand
         const near = othersAt();
         if (near.length) { const p = keepApart(W.x, W.z, near); if ((p.x !== W.x || p.z !== W.z) && env.ground.walkable(p.x, p.z)) W = { ...W, x: p.x, z: p.z }; }
@@ -495,6 +553,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (meK.out.kept && meK.out.kept !== "gone") kept = { state: meK.out.kept };
     }
     const view = updateCamera(t, dt || 0.016);
+    // (gliding into first person: your body shows until the camera is nearly at your eyes, so no floating hands)
+    if (camBlend) { applyBlend(); const me = anglers.get(localId); if (!W && me?.out?.eye && (mode === "first" || mode === "free") && camera.position.distanceTo(me.out.eye) > 0.7) me.a.setFirstPerson(false); }
     if (aimPower != null) { const pl = castPlanFor(aimPower); aimMark.visible = !!pl; if (pl) { aimMark.position.set(pl.point[0], 0.03, pl.point[1]); const k = (1.2 + pl.dist / 40) * (1 + 0.08 * Math.sin(t * 6)); aimMark.scale.set(k, 1, k); } } else aimMark.visible = false;
     // droplets fall back, rings spread
     for (let k = 0; k < DROPS; k++) {
@@ -504,9 +564,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     }
     dropGeo.attributes.position.needsUpdate = true;
     for (const r of ripples) r[2] += dt;
-    while (ripples.length && ripples[0][2] > 6) ripples.shift();
-    env.setRipples(ripples.map((r) => [r[0], r[1], r[2], r[3] * Math.max(0, 1 - r[2] / 6)]));
+    for (let i = ripples.length - 1; i >= 0; i--) if (ripples[i][2] > ripples[i][4]) ripples.splice(i, 1);
+    env.setRipples(ripples.map((r) => [r[0], r[1], r[2], r[3] * Math.pow(Math.max(0, 1 - r[2] / r[4]), 1.5)]));
     env.update(t, dt, camera);
+    adapt();
     if (draw) renderer.render(scene, camera);
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
@@ -547,9 +608,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         const p = me.a.root.position;
         W = walker(p.x, p.z, me.out?.face ?? 0, p.y); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
         fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56 }[dist] || 47); look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);
+        // (from your eyes out to behind you as a glide; a drag turns the view by what the walking camera shows)
+        followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8);
         return null;
       }
       if (!W) return null;
+      { const s0 = me?.a.spot, at = s0?.at; blendFor(s0?.face ?? look.yaw, at ? Math.hypot(at[0] - W.x, at[2] - W.z) : 0); } look.setDragFov(null);
       W = null; autoWalk = false; walkTarget = null; me?.a.setWalk(null); onPose?.(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       const s2 = me?.a.spot; if (s2) { look.setHome(s2.face, HOME_PITCH); look.aim(s2.face, HOME_PITCH); }
       return null;
@@ -597,6 +661,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const me = anglers.get(localId); if (!W || !me) return null;
       const sp = env.ground.fishHere(W.x, W.z); if (!sp || !roomToFish(W.x, W.z, othersAt())) return null;
       const spot = { ...me.a.spot, ...sp, id: me.a.spot?.id ?? 1, name: "Where you chose" };
+      blendFor(spot.face); look.setDragFov(null);
       me.a.place(spot); W = null; autoWalk = false; walkTarget = null; me.a.setWalk(null); onPose?.({ ...spot, spotAt: true }); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       look.setHome(spot.face, HOME_PITCH); look.aim(spot.face, HOME_PITCH);
       return spot;

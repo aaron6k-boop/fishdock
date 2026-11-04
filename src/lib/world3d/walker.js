@@ -5,7 +5,9 @@
 // (so a railing guides you along the edge instead of stopping you dead). Steps up onto a pier or quay are taken
 // smoothly; anything higher than a step needs a jump.
 
-export const WALK = { speed: 1.8, sprint: 4.2, turn: 10, jump: 5.2, gravity: 16, step: 0.45, accel: 14, stop: 18, dead: 0.12 };
+// (accel and stop: how quickly you get up to speed and come to a halt, per second. A step and a half to set off and
+// about one to stop, so starts and stops read as a person and not a cursor; turn eases you round to the way you go)
+export const WALK = { speed: 1.8, sprint: 4.2, turn: 9, jump: 5.2, gravity: 16, step: 0.45, accel: 7.5, stop: 10, air: 4.9, dead: 0.12 };
 
 /** A fresh walker standing at (x, z), facing `face` (radians, 0 = -z). */
 export function walker(x, z, face, y = 0) { return { x, z, y, vy: 0, vx: 0, vz: 0, face, speed: 0, air: false, phase: 0 }; }
@@ -27,14 +29,15 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
   const dx = (fx * iy + rx * ix) * mag, dz = (fz * iy + rz * ix) * mag;
   const v = (input.sprint ? W.sprint : W.speed) * mag;
   // turn to face the way you're going
-  if (mag > 0.05) { const want = Math.atan2(dx, -dz); n.face = wrap(s.face + wrap(want - s.face) * Math.min(1, dt * W.turn)); }
+  // (a little slower for a big turn, so turning back the way you came is a turn, not a flip)
+  if (mag > 0.05) { const want = Math.atan2(dx, -dz), off = wrap(want - s.face); n.face = wrap(s.face + off * Math.min(1, dt * W.turn * (Math.abs(off) > 2 ? 0.7 : 1))); }
   const floor = (x, z) => ground.heightAt(x, z);
   // somewhere you can stand, and no higher above your feet than a step (jump to get up higher)
   const can = (x, z) => ground.walkable(x, z) && (floor(x, z) - n.y <= W.step || !!ground.ramp?.(n.x, n.z, x, z));
   let moved = 0;
   // speed up and slow down smoothly (quicker to stop than to start), in the air too but less
   const tvx = mag > 0 ? (dx / (mag || 1)) * v : 0, tvz = mag > 0 ? (dz / (mag || 1)) * v : 0;
-  const k = Math.min(1, dt * (mag > 0 ? W.accel : W.stop) * (s.air ? 0.35 : 1));
+  const k = Math.min(1, dt * (s.air ? W.air : mag > 0 ? W.accel : W.stop));
   n.vx = (s.vx || 0) + (tvx - (s.vx || 0)) * k; n.vz = (s.vz || 0) + (tvz - (s.vz || 0)) * k;
   if (Math.hypot(n.vx, n.vz) < 0.02) { n.vx = 0; n.vz = 0; }
   if (n.vx || n.vz) {
@@ -61,6 +64,24 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
   } else if (n.y < g) { n.y = Math.min(g, n.y + Math.max(1.5, (g - n.y) * 6) * dt); } // up a step, or a ramp onto a pier
   else n.y = g;
   return n;
+}
+
+// ---- footsteps: when a foot comes down, from the ground covered (pure; tests) ----
+// A person's step lengthens as they speed up (about 0.7 m strolling, 0.8 m walking, 1.3 m running), so the footfalls
+// come quicker with speed: about 1.8 a second at a walk, nearer 3 at a run. `stepGait` carries the distance since
+// the last footfall; it says when the next one lands and how hard (0..1: a stroll is soft, a run firm).
+export function stepLength(speed) { return Math.max(0.6, Math.min(1.35, 0.55 + speed * 0.17)); }
+export function stepGait(g = { d: 0 }, moved = 0, speed = 0, air = false) {
+  if (air || speed < 0.25) return { d: Math.min(g.d || 0, stepLength(speed) * 0.5), fall: null };
+  const len = stepLength(speed), d = (g.d || 0) + moved;
+  if (d < len) return { d, fall: null };
+  return { d: d - len, fall: { hard: Math.max(0.25, Math.min(1, (speed - 0.25) / 4)), run: speed > 3 } };
+}
+/** The sound of the ground underfoot for a venue: a pier's or quay's concrete, a beach's shingle, a river or lake
+ *  bank's grass and gravel; a deck can say its own (ground.surfaceAt). Wet in the rain. */
+export function surfaceFor(venue, own = null, rain = 0) {
+  const kind = own || (venue === "beach" ? "shingle" : venue === "river" || venue === "lake" ? "gravel" : "concrete");
+  return { kind, wet: rain > 0.15 };
 }
 
 // ---- room for everyone (Fish Together): nobody walks through anyone else or fishes on top of them ----

@@ -22,11 +22,15 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
     const why = w.current?.walk(true, { dist: view.camDist });
     // your line's still in the water: wind it in, then walk (one step, never "reel in first" with nothing to reel)
     if (why === "line") { if (!retry && onWindIn?.()) setTimeout(() => startWalk(true), 250); else say("Wind your line in first."); return; }
-    if (why) say(why); else { setMenu(false); say(retry ? "Line wound in. Walk with the stick; at the water's edge, tap Start fishing." : "Walk with the stick and drag to look round. At the water's edge, tap Start fishing."); }
+    if (why) say(why); else { setMenu(false); say(retry ? "Line wound in. Use the stick to walk; Start fishing shows at the water's edge." : "Use the stick to walk and drag to look round. Start fishing shows at the water's edge."); }
   };
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
-  const [sprint, setSprint] = useState(false);
+  const [sprint, setSprint] = useState(false), [myPhase, setMyPhase] = useState("idle");
+  const busyFishing = !!fight || myPhase === "bite" || myPhase === "hooked" || myPhase === "cast";
+  // (the stick's last position, so Sprint takes effect at once, without having to move your thumb)
+  const stick = useRef([0, 0]);
+  useEffect(() => { if (walk) w.current?.setWalkInput({ x: stick.current[0], y: stick.current[1], sprint }); }, [sprint]); // eslint-disable-line react-hooks/exhaustive-deps
   // emotes: wave, cheer or clap (the others in a Fish Together party see it too)
   const emote = (k) => { w.current?.emote(k); onEmote?.(k); };
   const hasMe = anglers.some((a) => a.local);
@@ -39,10 +43,11 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   const [kept, setKept] = useState(null), [landed, setLanded] = useState(null), [looking, setLooking] = useState(false);
   const openInspect = () => { if (!landed) return; w.current?.inspectFish(true); setLooking(true); };
   const keepIt = () => { w.current?.keepFish(); setLooking(false); if (landed) { setCard({ ev: landed.ev, key: landed.key, who: null }); setTimeout(() => setCard((c) => (c?.ev === landed.ev ? null : c)), 8000); } setLanded(null); };
-  // (how it goes back depends on the place: never dropped off a high pier. The scene shortens it, and says so)
+  // (how it goes back depends on the place: never dropped off a high pier, but lowered in the drop net. Only the walk
+  // down a beach to the water is shortened, and the page says so)
   const putBack = () => {
     w.current?.releaseFish(); setLooking(false); const sp = speciesById(landed?.ev?.data?.species), off = sp ? `: the ${sp.name.toLowerCase()} swims off` : "";
-    say(venue === "pier" ? `Let back down to the water in the drop net (shortened)${off}.` : venue === "beach" ? `Back into the shallows (shortened)${off}.` : `Back in the landing net at the edge (shortened)${off}.`); setLanded(null);
+    say(venue === "pier" ? `Lowered back to the water in the drop net${off}.` : venue === "beach" ? `Back into the shallows (shortened)${off}.` : `Back in the landing net at the water's edge${off}.`); setLanded(null);
   };
   useEffect(() => { if (!kept) { setLooking(false); } }, [kept]);
   useEffect(() => { if (kept === null && landed && !looking) setLanded(null); }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,11 +69,14 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   const [alert, setAlert] = useState(null);
   useEffect(() => { if (!alert) return undefined; const t = setTimeout(() => setAlert(null), 14000); return () => clearTimeout(t); }, [alert]);
   return (
-    <div className={`stage3d${walk ? " walking" : ""}`}>
+    <div className={`stage3d${walk ? " walking" : ""}${menu ? " menu-open" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
       <World3D ref={w} fight={fight} startMode="first" feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} sound={sound} now={now} quality={view.gfx && view.gfx !== "auto" ? view.gfx : quality}
         onPhase={(id, phase, info) => {
           onPhase?.(id, phase, info);
+          // your own bite or fish on: the menu gets out of the way of the Strike and Reel buttons, and Walk about
+          // stays hidden until it's over (it can't be used then anyway)
+          if (anglers.find((x) => x.id === id)?.local) { setMyPhase(phase); if (phase === "bite" || phase === "hooked") setMenu(false); }
           if (watching && mode === "spectator" && (phase === "bite" || phase === "hooked")) { setWatch(id); w.current?.focus(id); return; }
           const a = anglers.find((x) => x.id === id);
           if (a && !a.local && phase === "hooked" && !watching) setAlert({ id, name: a.name || "Someone" });
@@ -79,25 +87,27 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
         <div className="w3d-toasts" aria-live="polite">
           {toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
           {alert ? <button type="button" className="w3d-toast w3d-watch" onClick={() => watchOne(alert.id)}>{alert.name} has a fish on · <b>Watch</b></button> : null}
+          {walkMsg ? <div className="w3d-toast msg" role="status">{walkMsg}</div> : null}
         </div>
         {walk ? (
           <>
-            <Joystick size={view.stick} float={view.stickFloat} onMove={(x, y) => w.current?.setWalkInput({ x, y, sprint })} />
+            <Joystick size={view.stick} float={view.stickFloat} onMove={(x, y) => { stick.current = [x, y]; w.current?.setWalkInput({ x, y, sprint }); }} />
             <div className="walk-actions">
               {walk.canFish ? <button type="button" className="walk-fish" onClick={fishHere}><Icon name="target" />Start fishing</button> : walk.crowded ? <span className="walk-note">Too close to someone to fish: move along a little</span> : null}
               <div className="walk-small">
                 {view.autoBtn ? <button type="button" className={`walk-pill${walk.auto ? " on" : ""}`} aria-pressed={!!walk.auto} onClick={() => w.current?.autoWalk(!walk.auto)} title="Keep walking where you look; touch the stick to stop">Auto</button> : null}
                 <button type="button" className={`walk-pill${sprint ? " on" : ""}`} aria-pressed={sprint} onClick={() => setSprint(!sprint)}>Sprint</button>
-                <button type="button" className="walk-pill" onClick={stopWalk} aria-label="Stop walking" title="Stop walking and go back to where you were fishing">Stop</button>
+                <button type="button" className="walk-pill" onClick={stopWalk} aria-label="Stop walking" title="Stop walking and go back to where you were fishing">Back to my spot</button>
               </div>
             </div>
           </>
         ) : null}
-        {walkMsg ? <div className="walk-msg" role="status">{walkMsg}</div> : null}
-        {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is in the net: have a look</button></div> : null}
+        {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is landed: have a look</button></div> : null}
         {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
         {/* one menu for everything that isn't fishing or walking (top right): the page's own items (your angler, sound,
             settings, inviting a friend), the camera, emotes, watching a friend, and the view's settings */}
+        {/* the menu closes with a tap anywhere else (and by itself when a fish bites: see onPhase) */}
+        {menu ? <div className="w3d-menuscrim" aria-hidden="true" onPointerDown={(e) => { e.preventDefault(); setMenu(false); }} /> : null}
         <div className="w3d-menuwrap">
           <button type="button" className={`fs-btn w3d-menubtn${menu ? " on" : ""}`} onClick={() => setMenu(!menu)} aria-label="Menu" aria-expanded={menu} title="Menu: camera, sound, settings, Fish Together"><Icon name="more" /></button>
           {menu ? (
@@ -137,7 +147,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
           ) : null}
         </div>
         {/* walking about: its own button, bottom right (while walking, the walking controls take its place) */}
-        {!walk ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
+        {!walk && !busyFishing ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
         {card ? <div className="w3d-card"><CatchCard ev={card.ev} demo={demo} compact photoUrl={catchPhoto?.(card.ev)} onClose={() => setCard(null)} who={card.who} /></div> : null}
       </World3D>
     </div>

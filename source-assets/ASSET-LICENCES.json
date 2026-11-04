@@ -74,7 +74,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "2k",
-   "use": "pier walls near the water",
+   "use": "weed on the harbour wall round the waterline (public/textures/wall_moss_diff.jpg, 512 px)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -118,7 +118,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "2k",
-   "use": "railings and fittings",
+   "use": "rust runs and pitting on the harbour wall's steel piling (public/textures/wall_rust_*.jpg, 1024 px colour and normal, 256 px roughness)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -449,7 +449,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "1k",
-   "use": "pier deck (worn concrete)",
+   "use": "worn patches on the pier deck (public/textures/deck_worn_diff.jpg, 512 px)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -537,7 +537,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "1k",
-   "use": "pier wall caps",
+   "use": "the harbour wall's concrete cap (public/textures/cap_concrete_*.jpg, 512 px colour and normal, 256 px roughness)",
    "downloaded": "2026-11-03",
    "files": [
     {

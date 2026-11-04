@@ -3,7 +3,7 @@
 // OpenStreetMap. Sizes are estimates from photographs.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { bricks } from "./textures3d.js";
+import { bricks, weather } from "./textures3d.js";
 
 // ---- a few shapes merged by material: one mesh (one draw call) per material ----
 function kit() {
@@ -179,6 +179,21 @@ function gorlestonLighthouse(group, ring, base) {
     lamp: new THREE.MeshStandardMaterial({ color: 0xf4efe0, emissive: 0xffe2b0, emissiveIntensity: 0, roughness: 0.4 }),
     sign: new THREE.MeshStandardMaterial({ map: sign, color: sign ? 0xffffff : 0x1d2a5c, roughness: 0.75, side: THREE.DoubleSide }),
   };
+  // ---- weathering: seventy years by the sea ----
+  // The painted brick dirtier towards the deck (splashback and salt) and streaked below the slab's edge where the rain
+  // runs off it; the white slabs and fascia with grey runs from their drips; the red railings faded and rust-spotted;
+  // the iron stair and the galvanised masts dull, rusting at the joints.
+  const age = {
+    paint: { scale: 0.8, mottle: 0.12, grime: [base, base + 0.8, 0.22], streaks: [y1, 2.4, 0.13], rough: [0.9, 1.1] },
+    panel: { scale: 0.8, mottle: 0.12, grime: [base, base + 0.6, 0.2], streaks: [y1, 2.4, 0.1] },
+    white: { scale: 1.2, mottle: 0.1, streaks: [yR + S2, 1.2, 0.12], rough: [0.9, 1.1] },
+    brick: { scale: 0.8, mottle: 0.15, streaks: [yU + sill, 1.0, 0.12] },
+    red: { scale: 0.4, mottle: 0.3, bump: 0.3, rust: [0.25, 0.15, 0.06, 0.025], rough: [0.85, 1.25] },
+    redbox: { scale: 0.4, mottle: 0.25, rust: [0.15, 0.15, 0.06, 0.025] },
+    iron: { scale: 0.3, mottle: 0.3, bump: 0.3, rust: [0.35, 0.14, 0.055, 0.024], grime: [base, base + 0.5, 0.2] },
+    galv: { scale: 0.5, mottle: 0.35, rust: [0.2, 0.16, 0.065, 0.028] },
+  };
+  for (const [k, o] of Object.entries(age)) weather(M[k], o);
   brk.map.wrapS = brk.map.wrapT = THREE.RepeatWrapping; brk.normalMap.wrapS = brk.normalMap.wrapT = THREE.RepeatWrapping;
   // brick uvs: the brick texture's tile is about 0.86 m across and 0.6 m high (box uvs would run 0..1 a face)
   const turn = Math.atan2(-ax[1], ax[0]), meshes = [];

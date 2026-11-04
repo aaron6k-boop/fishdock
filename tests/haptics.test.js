@@ -91,3 +91,12 @@ test("no repeats after reconnecting, no buzzing: gaps between the same moment, a
   // other anglers' activity is spaced out too
   const p = phone(); p.h.feel("friendHooked"); p.tick(2000); assert.equal(p.h.feel("friendHooked").why, "too soon");
 });
+
+test("a minute of fast reel tapping leaves room in the budget for the pulls and the landing", async () => {
+  const { RESERVE_MS } = await import("../src/lib/haptics.js");
+  const { h, tick } = phone();
+  let taps = 0; for (let i = 0; i < 360; i++) { tick(170); if (h.feel("reelTap", { load: 0.9 }).done) taps++; }
+  assert.ok(taps > 50, `the taps are felt for a good while (${taps})`);
+  tick(10); assert.equal(h.feel("pull", { tension: 1.2 }).done, true, "a surge late in the minute is still felt");
+  assert.ok(RESERVE_MS.normal < BUDGET_MS.normal);
+});

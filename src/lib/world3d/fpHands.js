@@ -287,7 +287,12 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   // can't drift or flip any more than the simple hands could), the forearm laid from the elbow to the wrist and turned
   // with the hand (no twisting), each finger curled about its own joint. Until they've loaded, the simple hands show
   let real = null;
-  loadPart("fp_arms").then((sc) => { try { real = realArms(sc, { gloves, skinHex }); } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } }).catch(() => {});
+  // the modelled arms (fp_arms.glb): the simple drawn hands stay hidden while they load (they looked like stiff blocks
+  // for the first moments), and only show if the model can't load or takes too long
+  for (const h of hands) h.mesh.visible = false;
+  const fallback = () => { if (!real) for (const h of hands) h.mesh.visible = true; };
+  const slow = setTimeout(fallback, 8000);
+  loadPart("fp_arms").then((sc) => { try { real = realArms(sc, { gloves, skinHex }); } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
 
   const m4 = new THREE.Matrix4();
   // the hand's frame from what it holds: the thumb along the handle (towards the rod's tip, or out along the reel's

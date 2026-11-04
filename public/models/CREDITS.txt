@@ -14,6 +14,15 @@ modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and 
 (https://polyhaven.com), CC0 1.0. The pier deck's concrete (public/textures/pier_concrete_*.jpg) is Poly Haven's
 "Concrete Floor 02", CC0 1.0. Credited with thanks to Poly Haven and its artists.
 
+The pier's other photographed surfaces (public/textures/, cut down to 512 or 1024 px by
+source-assets/prepare_textures.py) are also from Poly Haven (https://polyhaven.com), CC0 1.0:
+  deck_worn_diff.jpg: "Concrete Floor Worn 001" by Dimitrios Savva and Rico Cilliers (worn patches on the deck);
+  wall_rust_*.jpg: "Rusty Painted Metal" by Amal Kumar (rust runs and pitting on the harbour wall's steel piling);
+  wall_moss_diff.jpg: "Concrete Moss" by Rob Tuytel (the weed on the wall round the waterline);
+  cap_concrete_*.jpg: "Concrete Wall 004" by Dario Barresi and Charlotte Baglioni (the wall's concrete cap).
+The weathering on the railings, lamp columns, furniture, timber, drains and stains is drawn on the phone
+(src/lib/world3d/textures3d.js); no third-party assets.
+
 fish.glb (cod, bass, whiting, mackerel, plaice and pollack bodies, fins and eyes) was modelled in Blender for FishDock
 from the outlines of FishDock's own species pictures (source-assets/blender/build_fish.py); the pictures are laid
 over it in the app.
