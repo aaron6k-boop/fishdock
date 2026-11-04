@@ -106,6 +106,8 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
         W.current = w;
         w.setNow(() => props.current.now());
         w.setAnglers(props.current.anglers);
+        // where you arrived, after the arrival check (spawn.js): for the tests and for anyone looking into a report
+        if (canvas.current && w.spawn) { canvas.current.dataset.spawn = JSON.stringify({ safe: w.spawn.spots.length, report: w.spawn.report.filter((r) => r.problem) }); canvas.current.dataset.me = JSON.stringify(w.mySpot); }
         if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
         let keptWas = null, heardAt = 0;
         w.onFrame(({ outs, view, walk: wk, kept, localId }) => {

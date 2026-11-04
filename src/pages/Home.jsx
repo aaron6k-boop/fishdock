@@ -141,6 +141,11 @@ export default function Home() {
             <span className="grow"><b>{app.session ? "Return to your session" : "Start fishing"}</b><span>Live Fishing Mode: timer, bites, catches, marks</span></span>
             <Icon name="chevron" className="go" />
           </button>
+          <button type="button" className="quick-main play" onClick={() => go("map")}>
+            <span className="qm-ico"><Icon name="explore" /></span>
+            <span className="grow"><b>Virtual fishing: choose a spot</b><span>Pick a place on the UK map and fish it in 3D. Simulated, never logged as a real catch.</span></span>
+            <Beta />
+          </button>
           <div className="quick-grid">
             <button type="button" onClick={() => go("cast")}><Icon name="scan" /><b>Cast Advisor</b><Beta /></button>
             <button type="button" onClick={() => go("tackle", { species: target?.id })}><Icon name="hook" /><b>Bait & rig for {target?.name || "a species"}</b></button>

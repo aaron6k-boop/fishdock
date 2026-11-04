@@ -482,6 +482,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   };
   place.ground = {
     heightAt, walkable,
+    // the benches, lamps, bollards and lifebuoy stations, as [x, z], so nobody arrives inside one (spawn.js)
+    props: Object.values(props).flat().map(([x, , z]) => [x, z]),
     ramp: (x0, z0, x1, z1) => walkable(x1, z1) && Math.abs(heightAt(x1, z1) - heightAt(x0, z0)) < 2.6,
     /** Fishing from here: the water's edge within reach, which way it faces and how far in front it is. */
     fishHere(x, z) {
