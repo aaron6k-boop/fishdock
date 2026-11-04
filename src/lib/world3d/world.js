@@ -206,7 +206,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // your right, looking down across the mat at the fish)
       // (off to your left: the rod lies on its rest on your right and crossed the picture. At a steady height over the
       // deck or the bank, so it doesn't bob as the fish goes from the net to your hands to the mat)
-      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * 1.5 - fx * 0.4, 0, -sz * 1.5 - fz * 0.4)); at0.y = mk.at.y + 1.45; // (a little back from it, so the railing is behind the fish, not across it)
+      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * 1.75 - fx * 0.45, 0, -sz * 1.75 - fz * 0.45)); at0.y = mk.at.y + 1.45; // (a little back from it, so the railing is behind the fish, not across it)
       { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
       camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
@@ -266,7 +266,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
           // led in: nearer, on the hoop; putting it back: on the fish as it swims off
           const wl = landing.water - out.at.y, hgt = Math.max(0.6, 1.1 - wl), net = landing.net || landing.fish || rail;
           if (st === "lead") { shot = from(-2.6, landing.edge + 2.3, wl + 1.35); focusAt = net.clone().lerp(landing.fish || net, 0.4); focusAt.y += 0.08; }
-          else if (st === "swim") { shot = from(-3.1, landing.edge + 2.2, wl + Math.min(2.3, 0.4 * hgt + 1.0)); focusAt = (landing.fish || net).clone().lerp(net, 0.3); }
+          // (putting it back: from just out over the rail, looking down, as you'd watch it go: the net at the foot of the
+          // wall and the fish swimming off below you, out and down)
+          else if (st === "swim") { shot = from(-1.2, landing.edge + 0.6, 1.7); focusAt = (landing.fish || net).clone().lerp(net, 0.3); }
           else {
             const k = st === "haul" ? Math.max(0, Math.min(1, (net.y - landing.water) / hgt)) : 0;
             shot = from(-3.3, landing.edge + 3.5, wl + 0.42 * hgt + 0.9 + 0.5 * k); focusAt = net.clone().lerp(rail, 0.38 + 0.2 * k);
