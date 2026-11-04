@@ -136,7 +136,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     out.y = Math.max(out.y, (env.floorAt ? env.floorAt(out.x, out.z) : 0) + 0.6);
     return out;
   }
-  let camOverride = null, inspectFrom = null;
+  let camOverride = null, lookOverride = null, inspectFrom = null;
   // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
   // auto-walk (keeps walking where you look until you touch the stick) and tap-to-move (walks to a point you tapped)
   let autoWalk = false, walkTarget = null, walkStuck = 0, modeSince = -10, lastMode = "first";
@@ -352,7 +352,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
     camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1) * jumpZoom; camera.updateProjectionMatrix();
     const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
-    camera.lookAt(camera.position.clone().add(d));
+    camera.lookAt(camOverride && lookOverride ? lookOverride : camera.position.clone().add(d));
     for (const [id, x] of anglers) x.a.setFirstPerson((mode === "first" || mode === "free") && id === (focus?.a.id));
     return { yaw, pitch };
   }
@@ -423,7 +423,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       view(yawDeg, pitch = -0.08) { const s = look.state(); look.aim((yawDeg * Math.PI) / 180, pitch); for (let i = 0; i < 40; i++) look.step(0.1); look.drag(0, 0); look.end(); return { yaw: look.yaw, pitch: look.pitch, was: s.yaw }; },
       get camera() { return camera; },
       buildMs,
-      at(x, y, z) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); },
+      at(x, y, z, look) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); lookOverride = look ? new THREE.Vector3(...look) : null; },
       get walker() { return W ? { x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed } : null; },
       walkInput(x, y, sprint = false) { walkIn = { x, y, sprint }; },
       get fight() { return lastFight; },

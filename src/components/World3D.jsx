@@ -9,6 +9,7 @@ import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
 import { landCamOn } from "../lib/viewPrefs.js";
 import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
+import { localFor } from "../lib/world3d/localDetail.js";
 import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/sceneAudio.js";
 
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
@@ -74,7 +75,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
         // (only when the server used that listed position: some marks have a checked position kept on the server)
         const listed = spotById(spotId);
         const approx = listed?.coordsVerified === false && Math.abs(listed.lat - lat) < 1e-4 && Math.abs(listed.lon - lon) < 1e-4;
-        const place = buildPlace(osm, lat, lon, venue, { approx });
+        const place = buildPlace(osm, lat, lon, venue, { approx }); place.id = spotId;
         // only a layout that passes the check (anglers at the mark, water in front); otherwise the labelled drawing
         if (!gone) setReal(place.grid && place.spots.length === 4 && place.check?.ok ? place : null);
       } catch { if (!gone) setReal(null); }
@@ -204,7 +205,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
       {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
       <div className={`w3d-label${about ? " open" : ""}`}>
         <button type="button" className="w3d-about" onClick={() => setAbout(!about)} aria-expanded={about} aria-label="About this view and its sources"><Icon name="info" /></button>
-        {about ? <span className="w3d-full">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""}. {SKYLINE_NOTE} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</span>
+        {about ? <span className="w3d-full">{panoOn ? <>360° <a href={pano.page} target="_blank" rel="noopener noreferrer">photo near here</a> by {pano.profile ? <a href={pano.profile} target="_blank" rel="noopener noreferrer">{pano.author}</a> : pano.author}, Mapillary, {pano.licence}{pano.capturedAt ? `, ${new Date(pano.capturedAt).getFullYear()}` : ""}. Not a live camera; the rod and fish are drawn · <b>Beta</b></> : real ? <>{placeName || "This place"}: its shape and where buildings stand from OpenStreetMap; how they look is a reconstruction{real.approx ? "; the mark's position is approximate, so you're on the nearest bank" : ""}. {SKYLINE_NOTE}{localFor(spotId)?.note ? ` ${localFor(spotId).note}` : ""} · © OpenStreetMap contributors · <b>Beta</b></> : <>{layoutFor(venue).label}: a 3D drawing, not the real place · <b>Beta</b></>}</span>
           : <span className="w3d-short">{panoOn ? "360° photo, Mapillary" : real ? `${placeName || "This place"} · reconstruction · © OpenStreetMap contributors` : "A 3D drawing, not the real place"} · <b>Beta</b></span>}
       </div>
       {children}
