@@ -15,6 +15,8 @@
 //   app, or none). It's how their character looks in the simulation, nothing more.
 // - Voice: the server only relays the connection set-up (WebRTC signalling) between members; audio goes phone to
 //   phone and never through FishDock.
+// - Notices: a line in the chat when someone joins, leaves or is removed ({ sys: "joined" | "left" | "removed" }),
+//   kept with the chat so someone who connects later sees it too. A name only, nothing else about them.
 
 import { json, err, guard, toResponse, sameOrigin, readJson, routePath, cleanLine, randomId, sha256Hex } from "./http.js";
 import { needDb, enforce } from "./db.js";
@@ -55,7 +57,7 @@ export function cleanPlace(place, mode) {
 }
 
 export const PARTY = {
-  maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, hours: [2, 6, 12, 24], defaultHours: 12,
+  maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, chatPer10s: 6, chatPerMinute: 20, hours: [2, 6, 12, 24], defaultHours: 12,
   spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, maxSpeed: 12, signalBytes: 16000, photoBytes: 400e3,
 };
 export const VENUES = ["pier", "beach", "estuary", "river", "lake"];
@@ -75,7 +77,7 @@ const nameOf = (v, d) => cleanLine(v, 24) || d;
 
 // ---- the party itself: pure state and rules (tested without Cloudflare) ----
 export class PartyRoom {
-  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); this.poseRate = new Map(); this.lastPose = new Map(); }
+  constructor(state = null) { this.s = state; this.online = new Map(); this.rate = new Map(); this.poseRate = new Map(); this.lastPose = new Map(); this.chatRate = new Map(); }
   get ready() { return !!this.s; }
 
   async init({ code, mode, venue, place, name, outfit, look, hours }, now) {
@@ -144,7 +146,22 @@ export class PartyRoom {
     if (Object.keys(S.members).length >= PARTY.maxEverMembers) return { error: "full" };
     const wants = role === "angler" && S.anglersOn && this.anglerCount() < PARTY.maxAnglers ? "angler" : "spectator";
     const m = await this.addMember({ name, role: wants, outfit, look }, now);
-    return { member: m, role: S.members[m.id].role };
+    return { member: m, role: S.members[m.id].role, notice: this.notice("joined", m.id, now) };
+  }
+  /** A line in the chat saying someone joined, left or was removed; returns the message for everyone. */
+  notice(sys, mid, now) {
+    const S = this.s, c = { seq: ++S.seq, at: now, who: mid, sys, name: S.members[mid]?.name || "Someone" };
+    S.chat.push(c); if (S.chat.length > PARTY.maxChat) S.chat.shift();
+    return { t: "chat", c };
+  }
+  /** Chat's own limit, on top of the general one: a few lines at a time, and not too many a minute. */
+  chatLimited(mid, now) {
+    const r = this.chatRate.get(mid) || { at: [] };
+    r.at = r.at.filter((t) => now - t < 60e3);
+    const recent = r.at.filter((t) => now - t < 10e3).length;
+    if (recent >= PARTY.chatPer10s || r.at.length >= PARTY.chatPerMinute) { this.chatRate.set(mid, r); return true; }
+    r.at.push(now); this.chatRate.set(mid, r);
+    return false;
   }
 
   // ---- what each member sees ----
@@ -155,7 +172,7 @@ export class PartyRoom {
     return {
       t: "hello", now, you: { id: mid, role: me.role, host: me.role === "host" },
       party: { code: S.code, mode: S.mode, venue: S.venue, place: S.place, light: S.light || "now", expiresAt: S.expiresAt, closed: S.closed, locked: S.locked, codeOn: S.codeOn, chatOn: S.chatOn, voiceOn: S.voiceOn, anglersOn: S.anglersOn, challenge: S.challenge, ...(me.role === "host" ? { secret: S.secret } : {}) },
-      members: this.members(), events: S.events.slice(-600), chat: S.chatOn ? S.chat.slice(-50) : [],
+      members: this.members(), events: S.events.slice(-600), chat: (S.chatOn ? S.chat : S.chat.filter((c) => c.sys)).slice(-50),
     };
   }
   settingsOut(forHost = false) { const S = this.s; return { t: "settings", light: S.light || "now", locked: S.locked, codeOn: S.codeOn, chatOn: S.chatOn, voiceOn: S.voiceOn, anglersOn: S.anglersOn, challenge: S.challenge, closed: S.closed, ...(forHost ? { secret: S.secret } : {}) }; }
@@ -253,6 +270,7 @@ export class PartyRoom {
         if (!S.chatOn) { out.push({ to: mid, msg: { t: "error", code: "chat_off", message: "The host has turned chat off." } }); return res(); }
         const text = cleanLine(msg.text, PARTY.chatChars);
         if (!text) return res();
+        if (this.chatLimited(mid, now)) { out.push({ to: mid, msg: { t: "error", code: "chat_slow", message: "Slow down a little: you can send another message in a moment." } }); return res(); }
         const c = { seq: ++S.seq, at: now, who: mid, text };
         S.chat.push(c); if (S.chat.length > PARTY.maxChat) S.chat.shift();
         out.push({ to: "*", msg: { t: "chat", c } });
@@ -285,6 +303,7 @@ export class PartyRoom {
       }
       case "leave": {
         me.left = true; me.spot = null; me.voice = { on: false, muted: true };
+        out.push({ to: "others", msg: this.notice("left", mid, now) });
         bcastMembers();
         return res({ save: true, close: [mid] });
       }
@@ -305,6 +324,7 @@ export class PartyRoom {
         if (!who || who.id === mid) return res();
         who.kicked = true; who.spot = null;
         out.push({ to: who.id, msg: { t: "kicked" } });
+        out.push({ to: "*", msg: this.notice("removed", who.id, now) });
         bcastMembers();
         return res({ save: true, close: [who.id] });
       }
@@ -344,7 +364,9 @@ export class PartyRoom {
     return res();
   }
   connected(mid, now) { this.online.set(mid, (this.online.get(mid) || 0) + 1); const m = this.s.members[mid]; if (m) m.seenAt = now; }
-  disconnected(mid, now) { const n = (this.online.get(mid) || 1) - 1; if (n <= 0) this.online.delete(mid); else this.online.set(mid, n); const m = this.s?.members[mid]; if (m) m.seenAt = now; }
+  // someone whose last connection closes is out of voice too (their phone dropped the call), so nobody else keeps
+  // waiting to hear them; they turn it back on when they're back
+  disconnected(mid, now) { const n = (this.online.get(mid) || 1) - 1; if (n <= 0) this.online.delete(mid); else this.online.set(mid, n); const m = this.s?.members[mid]; if (m) { m.seenAt = now; if (n <= 0) m.voice = { on: false, muted: true }; } }
 }
 
 export { standings } from "../src/lib/partyStats.js";
@@ -375,7 +397,8 @@ export class PartyHost {
       if (r.error) return json({ error: r.error }, r.error === "not_found" ? 404 : r.error === "ended" ? 410 : 403);
       await this.save();
       this.broadcast({ t: "members", members: room.members() });
-      return json(r);
+      if (r.notice) this.broadcast(r.notice);
+      return json({ member: r.member, role: r.role });
     }
     if (op === "auth") { const m = await room.auth(url.searchParams.get("m"), now); if (!m || room.ended(now)) return json({ error: room.ended(now) ? "ended" : "not_member" }, room.ended(now) ? 410 : 403); await this.save(); return json({ member: m.id }); }
     if (op === "photo" && request.method === "POST") {
@@ -421,8 +444,11 @@ export class PartyHost {
   async onClose(ws, now = Date.now()) {
     const room = await this.load(), mid = this.sockets.memberOf(ws);
     if (!mid || !room.ready) return;
+    const wasOn = !!room.s.members[mid]?.voice?.on;
     room.disconnected(mid, now);
     this.broadcast({ t: "members", members: room.members() }, ws);
+    const m = room.s.members[mid];
+    if (wasOn && m && !m.voice.on) this.broadcast({ t: "voice", who: mid, voice: m.voice }, ws);
     await this.save();
   }
   broadcast(msg, except = null) { const text = JSON.stringify(msg); for (const s of this.sockets.all()) if (s !== except) this.sockets.send(s, text); }

@@ -329,3 +329,90 @@ test("virtual party: you can wind your line in between bites (and only then)", (
   mine("reelin"); assert.equal(room.allowed("a", "bite"), false, "no bite once it's wound in"); assert.equal(room.allowed("a", "cast"), true);
   mine("cast"); mine("bite"); mine("hooked"); assert.equal(room.allowed("a", "reelin"), false, "not with a fish on");
 });
+
+test("someone's joined: everyone already there gets a chat line with the newcomer's name, and so does anyone who connects later", async (t) => {
+  const h = harness(t);
+  const { code, member, secret } = (await start(h.c)).body;
+  const host = await h.sock(code, member.key);
+  const j = await h.c("POST", `/${code}/join`, { body: { secret, name: "James", role: "angler" } });
+  assert.equal(j.status, 200);
+  assert.equal(j.body.notice, undefined, "the join answer carries only the new member's own details");
+  const line = host.last("chat").c;
+  assert.equal(line.sys, "joined"); assert.equal(line.name, "James"); assert.equal(line.who, j.body.member.id);
+  assert.equal(line.text, undefined, "a notice, not something James typed");
+  assert.deepEqual(Object.keys(line).sort(), ["at", "name", "seq", "sys", "who"], "a name and a time, nothing else about them");
+  // whoever joins by the short code is announced too
+  await h.c("POST", `/${code}/join`, { body: { viaCode: true, name: "Sam", role: "spectator" } });
+  assert.equal(host.last("chat").c.name, "Sam");
+  // James connects afterwards: the lines are there in his catch-up
+  const james = await h.sock(code, j.body.member.key);
+  assert.deepEqual(james.last("hello").chat.filter((c) => c.sys).map((c) => `${c.name} ${c.sys}`), ["James joined", "Sam joined"]);
+  // even with chat turned off, the notices still arrive (who's here matters more than chat)
+  await host.send({ t: "settings", chatOn: false });
+  const again = await h.sock(code, j.body.member.key);
+  assert.equal(again.last("hello").chat.length, 2);
+});
+
+test("someone's left: leaving and being removed are announced to the others; losing signal isn't", async (t) => {
+  const h = harness(t);
+  const { code, member, secret } = (await start(h.c)).body;
+  const host = await h.sock(code, member.key);
+  const a = (await h.c("POST", `/${code}/join`, { body: { secret, name: "James", role: "angler" } })).body.member;
+  const b = (await h.c("POST", `/${code}/join`, { body: { secret, name: "Ruth", role: "angler" } })).body.member;
+  const james = await h.sock(code, a.key), ruth = await h.sock(code, b.key);
+  await james.send({ t: "leave" });
+  assert.equal(host.last("chat").c.sys, "left"); assert.equal(host.last("chat").c.name, "James");
+  assert.equal(ruth.last("chat").c.sys, "left");
+  await host.send({ t: "kick", who: ruth.member });
+  assert.equal(host.last("chat").c.sys, "removed"); assert.equal(host.last("chat").c.name, "Ruth");
+  // a member simply losing signal is not announced as leaving (they're shown as away instead)
+  const n = host.got.filter((m) => m.t === "chat").length;
+  const k = (await h.c("POST", `/${code}/join`, { body: { secret, name: "Pat", role: "angler" } })).body.member;
+  const pat = await h.sock(code, k.key);
+  await pat.close();
+  assert.equal(host.got.filter((m) => m.t === "chat").length, n + 1, "only Pat's joining");
+  assert.equal(host.last("members").members.find((m) => m.id === pat.member).online, false);
+});
+
+test("chat limits: 200 characters at most, cleaned, a few lines at a time and not too many a minute", async (t) => {
+  const h = harness(t);
+  const { code, member, secret } = (await start(h.c)).body;
+  const host = await h.sock(code, member.key);
+  const j = (await h.c("POST", `/${code}/join`, { body: { secret, name: "James", role: "angler" } })).body.member;
+  const james = await h.sock(code, j.key);
+  const said = () => host.got.filter((m) => m.t === "chat" && m.c.who === james.member && !m.c.sys);
+  await james.send({ t: "chat", text: "x".repeat(500) });
+  assert.equal(said()[0].c.text.length, PARTY.chatChars);
+  await james.send({ t: "chat", text: "<b>hi</b>\n\nthere" });
+  assert.equal(said()[1].c.text, "b hi /b there", "no markup or line breaks");
+  await james.send({ t: "chat", text: "   " }); await james.send({ t: "chat", text: 42 });
+  assert.equal(said().length, 2, "nothing empty or odd");
+  for (let i = 0; i < 10; i++) await james.send({ t: "chat", text: `line ${i}` });
+  assert.equal(said().length, PARTY.chatPer10s, "a burst is cut off");
+  assert.equal(james.last("error").code, "chat_slow");
+  assert.match(james.last("error").message, /^Slow down/);
+  // others' chat isn't held up by James's
+  await host.send({ t: "chat", text: "from the host" });
+  assert.equal(james.last("chat").c.text, "from the host");
+  // over a minute, no more than the minute's allowance
+  for (let i = 0; i < 6; i++) { h.tick(11e3); for (let k = 0; k < 6; k++) await james.send({ t: "chat", text: `m${i}.${k}` }); }
+  const inAMinute = said().filter((m) => m.c.at > h.now() - 60e3).length;
+  assert.ok(inAMinute <= PARTY.chatPerMinute, `${inAMinute} in the last minute`);
+  h.tick(61e3);
+  await james.send({ t: "chat", text: "later" });
+  assert.equal(said().at(-1).c.text, "later", "and chat comes back after a pause");
+});
+
+test("voice: someone whose phone drops out of the party is out of voice too, so nobody waits to hear them", async (t) => {
+  const h = harness(t);
+  const { code, member, secret } = (await start(h.c)).body;
+  const host = await h.sock(code, member.key);
+  const j = (await h.c("POST", `/${code}/join`, { body: { secret, name: "James", role: "angler" } })).body.member;
+  let james = await h.sock(code, j.key);
+  await james.send({ t: "voice", on: true, muted: false });
+  assert.deepEqual(host.last("voice"), { t: "voice", who: james.member, voice: { on: true, muted: false }, speaking: false });
+  await james.close();
+  assert.deepEqual(host.last("voice").voice, { on: false, muted: true });
+  james = await h.sock(code, j.key);
+  assert.equal(james.last("hello").members.find((m) => m.id === james.member).voice.on, false);
+});
