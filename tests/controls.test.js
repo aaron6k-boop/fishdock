@@ -95,7 +95,7 @@ test("gulls by the sea in daylight only, slaps under a pier or quay only, halyar
 test("the beds stay quiet and the sparse sounds never come on a beat", () => {
   const p = ambiencePlan({ kind: "sea", venue: "pier", wind: 1, rain: 1 });
   for (const k of ["wash", "wind", "whistle", "rain", "rumble"]) assert.ok(p[k] <= 0.15, `${k} ${p[k]}`);
-  let r = 0.13; const rnd = () => (r = (r * 9301 + 49297) % 233280 / 233280);
+  let r = 7; const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
   const gull = ambiencePlan({ kind: "sea", venue: "pier", wind: 0.4 }).gull, gaps = Array.from({ length: 12 }, () => waitIn(gull, rnd));
   assert.ok(gaps.every((g) => g >= gull[0] && g <= gull[1]));
   assert.ok(new Set(gaps.map((g) => g.toFixed(1))).size > 8, "varied waits");
