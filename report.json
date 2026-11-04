@@ -1,0 +1,753 @@
+{
+  "base": "https://fishdock.aaron6k.workers.dev",
+  "at": "2026-11-04T01:27:06.015Z",
+  "pages": [
+    {
+      "name": "photo-pixel7",
+      "path": "/#try/gorleston-south-pier/cod",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [
+        "Strike button covered by fs-water",
+        "stopped: locator.waitFor: Timeout 15000ms exceeded."
+      ],
+      "frames": [
+        {
+          "f": "bite",
+          "tray": [
+            188,
+            733,
+            212,
+            92
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            78
+          ]
+        }
+      ],
+      "loadMs": 569,
+      "fps": 4
+    },
+    {
+      "name": "photo-se",
+      "path": "/#try/whitby-piers/cod",
+      "device": "iPhone SE",
+      "errors": [],
+      "notes": [
+        "Strike button covered by fs-water",
+        "stopped: locator.waitFor: Timeout 15000ms exceeded."
+      ],
+      "frames": [
+        {
+          "f": "bite",
+          "tray": [
+            96,
+            462,
+            212,
+            92
+          ],
+          "topbar": [
+            12,
+            10,
+            296,
+            112
+          ]
+        }
+      ],
+      "loadMs": 274
+    },
+    {
+      "name": "3d-gorleston",
+      "path": "/#try/gorleston-south-pier/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [
+        {
+          "f": "bite",
+          "tray": [
+            188,
+            733,
+            212,
+            92
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 0.0s",
+          "tray": [
+            186,
+            789,
+            214,
+            36
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 2.4s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 5.4s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 8.0s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 10.4s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 12.6s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 15.4s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 17.9s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 20.5s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 23.1s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 25.4s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 27.8s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 30.4s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 32.5s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 34.7s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 36.8s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 38.8s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 41.0s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 43.3s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 45.6s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 48.0s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 50.3s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 53.0s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 55.5s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 58.0s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        },
+        {
+          "f": "land 60.5s",
+          "tray": [
+            195,
+            755,
+            205,
+            70
+          ],
+          "topbar": [
+            12,
+            10,
+            388,
+            28
+          ],
+          "label": [
+            10,
+            50,
+            342,
+            24
+          ]
+        }
+      ],
+      "loadMs": 255,
+      "fps": 8,
+      "label": "Gorleston South Pier · reconstruction · © OpenStreetMap contributors · Beta",
+      "sceneCheck": "ok",
+      "uiAfterDrag": true,
+      "reelSeconds": 69.1,
+      "requests": 97,
+      "kb": 5557,
+      "heapMb": 61
+    },
+    {
+      "name": "3d-whitby",
+      "path": "/#try/whitby-piers/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 325,
+      "fps": 6,
+      "label": "Whitby Piers · reconstruction · © OpenStreetMap contributors · Beta",
+      "sceneCheck": "ok",
+      "requests": 95,
+      "kb": 5641,
+      "heapMb": 54
+    },
+    {
+      "name": "3d-cromer",
+      "path": "/#try/cromer-pier/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 246,
+      "fps": 8,
+      "label": "Cromer Pier · reconstruction · © OpenStreetMap contributors · Beta",
+      "sceneCheck": "ok",
+      "requests": 77,
+      "kb": 4950,
+      "heapMb": 54
+    },
+    {
+      "name": "3d-mumbles",
+      "path": "/#try/mumbles-head/bass/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 246,
+      "fps": 10,
+      "label": "Mumbles Head · reconstruction · © OpenStreetMap contributors · Beta",
+      "sceneCheck": "ok",
+      "requests": 94,
+      "kb": 4802,
+      "heapMb": 45
+    },
+    {
+      "name": "3d-deal",
+      "path": "/#try/deal-pier/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 239,
+      "fps": 9,
+      "label": "Deal Pier · reconstruction · © OpenStreetMap contributors · Beta",
+      "sceneCheck": "ok",
+      "requests": 77,
+      "kb": 4851,
+      "heapMb": 45
+    },
+    {
+      "name": "3d-wye",
+      "path": "/#try/river-wye-ross/barbel/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 357,
+      "fps": 6,
+      "label": "River Wye at Ross-on-Wye · reconstruction · © OpenStreetMap contributors · Beta",
+      "sceneCheck": "ok",
+      "requests": 66,
+      "kb": 5190,
+      "heapMb": 78
+    },
+    {
+      "name": "3d-rutland",
+      "path": "/#try/rutland-water/pike/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 354,
+      "fps": 8,
+      "label": "Rutland Water · reconstruction · © OpenStreetMap contributors · Beta",
+      "sceneCheck": "ok",
+      "requests": 57,
+      "kb": 4347,
+      "heapMb": 38
+    },
+    {
+      "name": "3d-chesil",
+      "path": "/#try/chesil-beach-ferry-bridge/cod/3d",
+      "device": "Pixel 7",
+      "errors": [],
+      "notes": [],
+      "frames": [],
+      "loadMs": 448,
+      "fps": 8,
+      "label": "A 3D drawing, not the real place · Beta",
+      "sceneCheck": "drawn",
+      "requests": 74,
+      "kb": 1177,
+      "heapMb": 36
+    }
+  ]
+}
