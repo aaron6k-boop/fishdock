@@ -288,8 +288,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // whitecaps once the wind is up (about force 4): on the higher crests, in patches that come and go, drawn
         // out down wind
         vec2 pf = vec2(dot(p, wd), dot(p, wx));
-        float capPatch = smoothstep(.45, .8, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
-        float cap = smoothstep(.3, .6, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .85, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
+        float capPatch = smoothstep(.36, .7, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
+        float cap = smoothstep(.22, .55, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .8, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
         float streak = 0.;
         #if WQ > 0
           // old foam lying in long streaks along the wind
