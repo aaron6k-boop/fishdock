@@ -5,8 +5,10 @@
 // chose the same person; until one has loaded, or if it can't, the simple drawn figure (figure3d.js) stands in.
 //
 // It takes the same inputs as figure3d's pose(), so angler.js doesn't care which it's driving:
-//  - walking: the walk clips are blended by speed and their phase is driven by the distance actually walked, so the
-//    feet stay planted (no sliding); turning on the spot takes small steps; starting and stopping ease through the blend
+//  - walking: the walk clips are blended by speed and their phase is driven by the distance actually walked; a foot
+//    that has come down is held there by leg IK until it lifts (no sliding), on the ground's own height; turning on
+//    the spot is a pivot on the turning steps; the body leans into setting off, stopping and turning, with a moment's
+//    weight shift first and a settle at the end, the chest and head leading a turn; a slow breath standing
 //  - standing: the idle (breathing, shifting weight), now and then a look round; crouching and bracing lower the hips
 //    and bend the knees with the feet kept where they stand (leg IK), the left foot forward against a fish
 //  - the chest leans and turns (spine), the head turns to watch the rod tip, the float, the fish (neck and head)
@@ -490,6 +492,9 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     let yc = 0;
     inner.rotation.set(0, Math.PI, 0);
     if (st.pw > 0.002) { root.updateMatrixWorld(true); yc = -wrapA(latAt() - latRef) * clamp(st.pw * 4, 0, 1); }
+    // (where the moves put the feet before the body leans: the lean is over the feet, which stay flat on the ground)
+    const pre = {};
+    if (walking && !fp) { inner.rotation.set(0, Math.PI + yc, 0); root.updateMatrixWorld(true); for (const sd of ["L", "R"]) pre[sd] = { a: wp(B(sd + "_Foot")), t: wp(B(sd + "_Toe0")), q: wq(B(sd + "_Foot")) }; }
     const fwdT = walking ? clamp(-st.acc * 0.028, -0.07, 0.05) : 0;
     const rollT = walking ? clamp(0.55 * Math.atan((st.v * st.yr) / 9.8), -0.16, 0.16) : 0;
     const kb = 1 - Math.exp(-dt * 7);
@@ -534,20 +539,33 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     const footOn = (w.idle < 0.98 || st.pw > 0.02) && walking && !fp;
     if (footOn) {
       const floor = o.walk?.floor, gy = gp.y;
-      let ref = 0, rw = 0; for (const key of ["idle", ...LOCO]) { const ww = w[key] || 0; if (ww > 0 && ankRef[key] != null) { ref += ww * ankRef[key]; rw += ww; } }
-      ref = rw > 0 ? ref / rw : ankRef.idle || 0.09;
+      // (the planted heights for the blend of moves playing: the heel's and the toe's)
+      const wts = { ...w }; if (st.piv) { for (const kk of Object.keys(wts)) wts[kk] *= 1 - st.pw; wts[st.piv.dir > 0 ? "turn_r" : "turn_l"] = st.pw; }
+      let refA = 0, refT = 0, rw = 0;
+      for (const [key, ww] of Object.entries(wts)) if (ww > 0 && footRef[key]) { refA += ww * footRef[key].a; refT += ww * footRef[key].t; rw += ww; }
+      if (rw > 0) { refA /= rw; refT /= rw; } else { refA = footRef.idle?.a ?? 0.09; refT = footRef.idle?.t ?? 0.02; }
       const lw = clamp((1 - w.idle) * 3 + st.pw * 2, 0, 1), aims = [];
       for (const sd of ["L", "R"]) {
-        const fs = st.foot[sd] || (st.foot[sd] = { lock: null, off: V() });
-        const fb = B(sd + "_Foot"), ank = wp(fb), hA = wFig(ank).y - ref;
-        const c = 1 - clamp((hA - 0.012) / 0.03, 0, 1);
-        const tgt = ank.clone();
-        if (!fs.lock && c > 0.6) fs.lock = ank.clone();
-        if (fs.lock && (c < 0.15 || Math.hypot(fs.lock.x - ank.x, fs.lock.z - ank.z) > 0.3)) { fs.off.set(fs.lock.x - ank.x, 0, fs.lock.z - ank.z).multiplyScalar(c * lw); fs.lock = null; }
-        if (fs.lock) { tgt.x += (fs.lock.x - ank.x) * c * lw; tgt.z += (fs.lock.z - ank.z) * c * lw; }
-        else { tgt.add(fs.off); fs.off.multiplyScalar(Math.exp(-dt * 14)); }
+        // the planted point: the heel from when it strikes, then the ball of the foot as the heel lifts, until the toe
+        // leaves the ground, and the way the foot points while it's down (a pivot turns on the planted foot, not by
+        // skidding it round); the corrections that hold it fade out over the swing
+        const fs = st.foot[sd] || (st.foot[sd] = { mode: null, lock: V(), corr: V(), yaw: 0, dyaw: 0 });
+        const P = pre[sd], ank = P.a, toe0 = P.t;
+        const yaw0 = Math.atan2(toe0.x - ank.x, toe0.z - ank.z);
+        const hA = wFig(ank).y - refA, hT = wFig(toe0).y - refT;
+        const mode = hA < 0.022 ? "heel" : hT < 0.018 ? "toe" : null;
+        if (mode && !fs.mode) fs.yaw = yaw0 + fs.dyaw;
+        fs.dyaw = mode ? clamp(wrapA(fs.yaw - yaw0), -0.9, 0.9) : fs.dyaw * Math.exp(-dt * 10);
+        const cy = Math.cos(fs.dyaw * lw), sy = Math.sin(fs.dyaw * lw), rx = toe0.x - ank.x, rz = toe0.z - ank.z;
+        const toe = V(ank.x + rx * cy + rz * sy, toe0.y, ank.z - rx * sy + rz * cy), at = mode === "toe" ? toe : ank;
+        if (mode && mode !== fs.mode) fs.lock.set(at.x + fs.corr.x, 0, at.z + fs.corr.z);
+        fs.mode = mode;
+        if (mode) { fs.corr.set(fs.lock.x - at.x, 0, fs.lock.z - at.z); if (fs.corr.length() > 0.3) { fs.mode = null; fs.corr.setLength(0.3); } }
+        else fs.corr.multiplyScalar(Math.exp(-dt * 12));
+        const tgt = ank.clone().addScaledVector(fs.corr, lw);
         if (floor) { const fy = floor(tgt.x, tgt.z); if (Number.isFinite(fy)) tgt.y += clamp(fy - gy, -0.25, 0.25); }
-        aims.push([sd, tgt, wq(fb)]);
+        const fq = new THREE.Quaternion().setFromAxisAngle(up, fs.dyaw * lw).multiply(P.q);
+        aims.push([sd, tgt, fq]);
       }
       // (a leg stretched past its length: the hips come down to it)
       let need = 0;
@@ -674,15 +692,15 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const latRef = latAt();
   const legL = {}; for (const sd of ["L", "R"]) legL[sd] = wp(B(sd + "_Thigh")).distanceTo(wp(B(sd + "_Calf"))) + wp(B(sd + "_Calf")).distanceTo(wp(B(sd + "_Foot")));
   const legLen = (sd) => legL[sd];
-  const ankRef = {};
+  const footRef = {};
   {
     const save = Object.entries(act).map(([kk, a]) => [kk, a.getEffectiveWeight(), a.time]);
-    for (const key of ["idle", ...LOCO]) {
+    for (const key of ["idle", ...LOCO, "turn_l", "turn_r"]) {
       const a = act[key]; if (!a) continue;
       for (const [k2, a2] of Object.entries(act)) a2.setEffectiveWeight(k2 === key ? 1 : 0);
-      let lo = Infinity; const N = key === "idle" ? 1 : 24;
-      for (let i = 0; i < N; i++) { a.time = (i / N) * a.getClip().duration; mixer.update(0); root.updateMatrixWorld(true); for (const sd of ["L", "R"]) lo = Math.min(lo, wp(B(sd + "_Foot")).y); }
-      ankRef[key] = lo;
+      let lo = Infinity, lt = Infinity; const N = key === "idle" ? 1 : 24;
+      for (let i = 0; i < N; i++) { a.time = (i / N) * a.getClip().duration; mixer.update(0); root.updateMatrixWorld(true); for (const sd of ["L", "R"]) { lo = Math.min(lo, wp(B(sd + "_Foot")).y); lt = Math.min(lt, wp(B(sd + "_Toe0")).y); } }
+      footRef[key] = { a: lo, t: lt };
     }
     for (const [kk, wt, tm] of save) { act[kk].setEffectiveWeight(wt); act[kk].time = tm; }
     mixer.update(0); root.updateMatrixWorld(true);
