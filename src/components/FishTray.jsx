@@ -2,15 +2,27 @@
 // One large button for the step that makes sense now, and nothing else, so the rod and the water stay clear:
 //   Cast (hold to build power, look where you want it, let go) → Strike (one tap) → Reel (tap it, again and again:
 //   each tap turns the handle) → Land (once the fish is close) → Cast again.
-// While a fish is on, a slim gauge beside the button shows the line's tension and where the drag will slip. Assisted
-// reeling (an option) winds steadily after one tap. In Advanced mode two small buttons set the drag. Nothing shows
-// while the cast flies or a fish is being landed. A line of small text says what's going on.
+// The button sits in the thumb's corner on its own; everything you read sits in one small panel above it, never
+// beside it or under the thumb: while a fish is on, how far out it is, the line's tension (with where the drag will
+// slip) and one line of what's going on. Assisted reeling (an option) winds steadily after one tap. In Advanced mode
+// two small buttons set the drag. Nothing shows while the cast flies or a fish is being landed.
+// Each button takes one press for one thing: a second Strike or Land straight after the first is ignored, and Land
+// doesn't take a tap meant for Reel in the moment it appears under your thumb.
 import { useContext, useEffect, useRef, useState } from "react";
 import { Icon } from "./ui.jsx";
 import { WorldCtx } from "./WorldContext.js";
 
 const R = 29, C = 2 * Math.PI * R;
 const HOLD_CYCLE = 1150; // ms from no power to full (then back down: let go at the top)
+// ---- one press for one thing (pure; tested) ----
+// how long a button ignores presses after it has just appeared (a tap meant for the button it replaced), and after it
+// has been pressed (a double tap, or a second press before the scene has caught up)
+export const GUARD = { appear: { land: 450, strike: 120, cast: 250 }, again: { strike: 900, land: 1200, cast: 900 } };
+export function pressOk(act, now, { shownAt = -1e9, pressedAt = -1e9 } = {}) {
+  if (now - shownAt < (GUARD.appear[act] || 0)) return false;
+  if (now - pressedAt < (GUARD.again[act] || 0)) return false;
+  return true;
+}
 
 /**
  * phase: the scene phase; last: the last event type; reel: 0..1; fight: the fight's state while a fish is on
@@ -20,7 +32,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   const world = useContext(WorldCtx);
   // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
   const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
-  const castAt = useRef(0);
+  const castAt = useRef(-1e9), shown = useRef({ act: null, at: -1e9 }), pressed1 = useRef({});
   const [power, setPower] = useState(null), [tapFx, setTapFx] = useState(0), [pressed, setPressed] = useState(false);
   const hold = useRef(null);
   let act = null, label = hint || "", busy = false, status = "", dist = null;
@@ -39,6 +51,10 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   else if (phase === "lost") { label = "Lost it"; }
   if (note) label = note;
   const hide = busy && !autoplay;
+  // when this button appeared, and when each was last pressed (one press for one thing, above)
+  if (shown.current.act !== act) shown.current = { act, at: performance.now() };
+  const ok = (a) => { const t = performance.now(); if (!pressOk(a, t, { shownAt: shown.current.at, pressedAt: pressed1.current[a] })) return false; pressed1.current[a] = t; return true; };
+  const urgent = act === "strike" || act === "reel" || act === "land";
 
   // ---- hold to cast: the power rises and falls while you hold; the 3D view shows where it would land ----
   useEffect(() => {
@@ -55,7 +71,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   }, [power != null]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => world?.current?.aimCast?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
   // (one cast at a time: a second press straight after a cast, before the scene has caught up, is ignored)
-  const castDown = (e) => { e.preventDefault(); if (performance.now() - castAt.current < 900) return; e.currentTarget.setPointerCapture?.(e.pointerId); hold.current = { t0: performance.now(), p: 0 }; setPower(0); };
+  const castDown = (e) => { e.preventDefault(); if (performance.now() - castAt.current < GUARD.again.cast || performance.now() - shown.current.at < GUARD.appear.cast) return; e.currentTarget.setPointerCapture?.(e.pointerId); hold.current = { t0: performance.now(), p: 0 }; setPower(0); };
   const castUp = () => {
     const h = hold.current; if (!h) return; hold.current = null;
     // a quick tap is a gentle cast; holding sets the power
@@ -68,45 +84,52 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
 
   const ten = fight ? Math.max(0, Math.min(1.2, fight.tension)) : 0, dragAt = fight ? Math.min(1.2, fight.drag) : 0.78;
   const tenCls = fight?.slipping ? "slip" : ten > dragAt * 0.85 ? "high" : ten > 0.45 ? "mid" : "low";
+  const strike = (e) => { e?.preventDefault?.(); if (ok("strike")) onStrike?.(); };
+  const land = (e) => { e?.preventDefault?.(); if (ok("land")) onLand?.(); };
+  const key = (f) => (e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); f(); } };
+  const fighting = act === "reel" || act === "land";
   return (
-    <div className={`fish-tray${hide ? " is-busy" : ""}`} role="group" aria-label="Fishing controls">
-      {act === "cast" ? (
-        <button type="button" className={`ft-main ft-cast${power != null ? " holding" : ""}`} aria-label="Cast: hold to build power, let go to cast"
-          onPointerDown={castDown} onPointerUp={castUp} onPointerCancel={castCancel} onContextMenu={(e) => e.preventDefault()}
-          onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); onCast?.(world?.current?.castParams?.(0.6) || { power: 0.6 }); } }}>
-          {power != null ? <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring power" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - power) }} /></svg> : null}
-          <Icon name="target" /><span>{power != null ? `${Math.round(power * 100)}%` : "Cast"}</span>
-        </button>
-      ) : null}
-      {act === "strike" ? <button type="button" className="ft-main ft-strike" onPointerDown={(e) => { e.preventDefault(); onStrike?.(); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onStrike?.(); } }}><Icon name="hook" /><span>Strike</span></button> : null}
-      {act === "reel" || act === "land" ? (
-        <div className="ft-fight">
+    <div className={`fish-tray${hide ? " is-busy" : ""}${urgent ? " is-urgent" : ""}`} data-act={act || (busy ? "busy" : "none")} role="group" aria-label="Fishing controls">
+      {/* what you read: one panel above the button, clear of your thumb */}
+      <div className={`ft-readout${fighting ? " fight" : ""}`}>
+        {fighting && dist ? <b className="ft-dist" aria-label={`About ${dist.replace("\u00a0", " ")} out`}>{dist}</b> : null}
+        {fighting ? (
           <div className={`ft-tension ${tenCls}`} role="meter" aria-label="Line tension" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((ten / 1.2) * 100)}>
-            <i className="ft-ten-fill" style={{ height: `${(ten / 1.2) * 100}%` }} />
-            <i className="ft-ten-drag" style={{ bottom: `${(dragAt / 1.2) * 100}%` }} />
+            <span className="ft-ten-name" aria-hidden="true">Tension</span>
+            <span className="ft-ten-bar"><i className="ft-ten-fill" style={{ width: `${(ten / 1.2) * 100}%` }} /><i className="ft-ten-drag" style={{ left: `${(dragAt / 1.2) * 100}%` }} /></span>
           </div>
-          {act === "land" ? (
-            <button type="button" className="ft-main ft-land" onPointerDown={(e) => { e.preventDefault(); onLand?.(); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onLand?.(); } }}><Icon name="fish" /><span>Land</span></button>
-          ) : (
-            <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
-              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onTap?.(); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => setPressed(false)} onPointerCancel={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onContextMenu={(e) => e.preventDefault()}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
-              <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - reel) }} /></svg>
-              {tapFx ? <span key={tapFx} className="ft-tapfx" aria-hidden="true" /> : null}
-              <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span>REEL</span>
-            </button>
-          )}
-          {opts.advanced && act === "reel" ? (
-            <div className="ft-drag" role="group" aria-label="Drag">
-              <button type="button" className="ft-pill" onClick={() => onDrag?.(+1)} aria-label="Tighten the drag">Drag +</button>
-              <button type="button" className="ft-pill" onClick={() => onDrag?.(-1)} aria-label="Loosen the drag">Drag −</button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-      {act === "wait" ? <button type="button" className="ft-pill ft-windin" onClick={() => onWindIn?.()} title="Wind your line in: then cast again, or walk about">Wind in</button> : null}
-      {autoplay ? <button type="button" className="ft-pill" onClick={onStop}><Icon name="stop" />Stop</button> : null}
-      <span className="ft-label" aria-live="polite">{dist ? <b className="ft-dist">{dist}</b> : null}{label}</span>
+        ) : null}
+        {label ? <span className="ft-label" aria-live="polite">{label}</span> : null}
+      </div>
+      <div className="ft-row">
+        {act === "wait" ? <button type="button" className="ft-pill ft-windin" onClick={() => onWindIn?.()} title="Wind your line in: then cast again, or walk about">Wind in</button> : null}
+        {autoplay ? <button type="button" className="ft-pill" onClick={onStop}><Icon name="stop" />Stop</button> : null}
+        {opts.advanced && act === "reel" ? (
+          <div className="ft-drag" role="group" aria-label="Drag">
+            <button type="button" className="ft-pill" onClick={() => onDrag?.(+1)} aria-label="Tighten the drag">Drag +</button>
+            <button type="button" className="ft-pill" onClick={() => onDrag?.(-1)} aria-label="Loosen the drag">Drag −</button>
+          </div>
+        ) : null}
+        {act === "cast" ? (
+          <button type="button" className={`ft-main ft-cast${power != null ? " holding" : ""}`} aria-label="Cast: hold to build power, let go to cast"
+            onPointerDown={castDown} onPointerUp={castUp} onPointerCancel={castCancel} onContextMenu={(e) => e.preventDefault()}
+            onKeyDown={key(() => { if (ok("cast")) onCast?.(world?.current?.castParams?.(0.6) || { power: 0.6 }); })}>
+            {power != null ? <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring power" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - power) }} /></svg> : null}
+            <Icon name="target" /><span>{power != null ? `${Math.round(power * 100)}%` : "Cast"}</span>
+          </button>
+        ) : null}
+        {act === "strike" ? <button type="button" className="ft-main ft-strike" onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}><Icon name="hook" /><span>Strike</span></button> : null}
+        {act === "land" ? <button type="button" className="ft-main ft-land" onPointerDown={land} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(land)}><Icon name="fish" /><span>Land</span></button> : null}
+        {act === "reel" ? (
+          <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onTap?.(); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => setPressed(false)} onPointerCancel={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onContextMenu={(e) => e.preventDefault()}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
+            <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - reel) }} /></svg>
+            {tapFx ? <span key={tapFx} className="ft-tapfx" aria-hidden="true" /> : null}
+            <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span>Reel</span>
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
