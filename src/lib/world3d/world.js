@@ -149,6 +149,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     return out;
   }
   let camOverride = null, lookOverride = null, inspectFrom = null;
+  // where your fish sits on screen while you look at it (normalised: 0 the middle, 1 the top), above the card that
+  // tells you about it along the bottom (Stage3D FishLook, its height capped in livefishing.css)
+  const FISH_NDC_Y = 0.32;
   // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
   // auto-walk (keeps walking where you look until you touch the stick) and tap-to-move (walks to a point you tapped)
   let autoWalk = false, walkTarget = null, walkStuck = 0, modeSince = -10, lastMode = "first";
@@ -206,11 +209,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // a little below it, so it sits in the top half of the picture, clear of the card along the bottom)
       // (from beside you on the bank or the deck, never out over the water: a bank's edge between hid the mat. Off to
       // your right, looking down across the mat at the fish)
-      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(sx * 1.5 - fx * 0.4, 1.3, sz * 1.5 - fz * 0.4)); // (a little back from it, so the railing is behind the fish, not across it)
+      // (off to your left: the rod lies on its rest on your right and crossed the picture. At a steady height over the
+      // deck or the bank, so it doesn't bob as the fish goes from the net to your hands to the mat)
+      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * 1.75 - fx * 0.45, 0, -sz * 1.75 - fz * 0.45)); at0.y = mk.at.y + 1.45; // (a little back from it, so the railing is behind the fish, not across it)
       { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
       camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
-      camera.fov = 52; camera.updateProjectionMatrix(); camera.lookAt(c.clone().add(new THREE.Vector3(0, -0.34, 0)));
+      // (the fish a little above the middle, at the height of the clear band between the top bar and the card about it
+      // along the bottom: the card never covers it)
+      camera.fov = 52; camera.updateProjectionMatrix(); camera.lookAt(c); camera.rotateX(-Math.atan(Math.tan((camera.fov * Math.PI) / 360) * FISH_NDC_Y));
       return { yaw, pitch };
     } else { if (inspectFrom) modeSince = t; inspectFrom = null; } // (and back from it with a glide, not a cut)
     if (W) {
@@ -241,7 +248,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // than going back to the open water with the fish behind you)
     const ownView = landShotOn && out && focus?.a.local && (mode === "first" || mode === "third");
     const landing = ownView && out.land ? out.land : ownView && out.kept === "deck" && out.keptAt ? { stage: "deck", net: out.keptAt, fish: out.keptAt, edge: out.edge }
-      : ownView && out.release ? { stage: out.release.stage, net: out.release.net, fish: out.release.fish || out.keptAt, edge: out.edge } : null; // (putting it back: the same shots)
+      : ownView && out.release ? { stage: out.release.stage, net: out.release.net, fish: out.release.fish || out.keptAt, edge: out.edge, water: out.release.water ?? null } : null; // (putting it back: the same shots)
     if (landShot && !out) landShot = null;
     if (landing || landShot) {
       if (landing) {
@@ -256,34 +263,40 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         } else if (st === "pick" || st === "in" || st === "done" || st === "deck") {
           // back a little and to the side: you and the net, on the deck or coming over the rail
           shot = from(0.85, -2.2, 2.35); focusAt = (landing.net || rail).clone().lerp(you, 0.45);
-        } else if ((st === "lower" || st === "lead" || st === "haul") && landing.water != null) {
-          // the drop net, shot by shot: down near the water, a little way out from the pier, as the net comes down its side
-          // and the fish is led over it and in; then rising with the net as it's hauled up, back to the rail. Never a long
-          // look down at empty water
-          const wl = landing.water - out.at.y, net = landing.net || landing.fish || rail;
-          {
-            // (letting it down too: from low by the water you see the net come down the pier's side towards you)
-            const k = st === "lead" || st === "lower" ? 0 : Math.max(0, Math.min(1, (net.y - landing.water) / Math.max(0.5, out.at.y + 1.1 - landing.water)));
-            shot = from(-1.9, landing.edge + 2.3 - 0.6 * k, Math.max(wl + 1.25, wl + 1.25 + (2.3 - wl - 1.25) * k));
-            // the moment it goes in (as fishing games frame it): in close and low over the hoop, the fish filling the shot
-            if (st === "lead") shot = from(-1.15, landing.edge + 1.45, wl + 0.85);
-            focusAt = net.clone().lerp(rail, st === "lead" ? 0 : st === "lower" ? 0.15 : 0.1); focusAt.y += st === "lead" ? 0.15 : 0;
+        } else if ((st === "lower" || st === "lead" || st === "haul" || st === "swim") && landing.water != null) {
+          // the drop net, from out over the water and off to the side, a three-quarter view: the pier's face runs away at
+          // an angle instead of filling the picture, and the rail (you, the rope) and the water (the net, the fish) are in
+          // the one shot. (It was low and close, looking straight back at the wall: the wall filled the screen and the
+          // net was a giant blur in front of it.) Letting it down and hauling it up: wide, rising with the net; the fish
+          // led in: nearer, on the hoop; putting it back: on the fish as it swims off
+          const wl = landing.water - out.at.y, hgt = Math.max(0.6, 1.1 - wl), net = landing.net || landing.fish || rail;
+          if (st === "lead") { shot = from(-2.6, landing.edge + 2.3, wl + 1.35); focusAt = net.clone().lerp(landing.fish || net, 0.4); focusAt.y += 0.08; }
+          // (putting it back: from just out over the rail, looking down, as you'd watch it go: the net at the foot of the
+          // wall and the fish swimming off below you, out and down)
+          else if (st === "swim") { shot = from(-1.2, landing.edge + 0.6, 1.7); focusAt = (landing.fish || net).clone().lerp(net, 0.3); }
+          else {
+            const k = st === "haul" ? Math.max(0, Math.min(1, (net.y - landing.water) / hgt)) : 0;
+            shot = from(-3.3, landing.edge + 3.5, wl + 0.42 * hgt + 0.9 + 0.5 * k); focusAt = net.clone().lerp(rail, 0.38 + 0.2 * k);
           }
+          // (where the bank runs out further than the spot's edge, that low place is in the ground: stand there instead, at a
+          // person's height over it, looking down to the water)
+          { const fl = env.floorAt?.(shot.x, shot.z); if (fl != null && fl > landing.water + 0.25) shot.y = Math.max(shot.y, fl + 1.55); }
         } else if (st === "lower" || st === "lead" || st === "haul") {
           shot = from(-4.3, landing.edge + 0.5, 3.0); focusAt = rail.clone().lerp(landing.net || landing.fish || rail, 0.45);
         } else {
           // other ways of landing (swung in, a landing net, up the beach): behind you and a little to the side, the fish
           // and you both ahead
-          shot = from(-0.75, -2.5, 2.55); focusAt = (landing.net || landing.fish || rail).clone().lerp(you, 0.35);
+          // (off to your left and a little behind: from straight behind, your body hid the net and the fish in front of you)
+          shot = from(-2.1, -0.7, 2.3); focusAt = (landing.net || landing.fish || rail).clone().lerp(you, 0.3);
         }
         if (!landShot) landShot = { since: t };
         // (putting it back is shortened: where it cuts to the fish in the water, the camera cuts too, rather than
         // gliding there across empty sea)
-        const low = (x) => (x === "lower" || x === "lead" || x === "haul") && landing.water != null;
+        const low = (x) => (x === "lower" || x === "lead" || x === "haul" || x === "swim") && landing.water != null;
         // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
         const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage)); // (and back up from it: climbing the wall it passed close over the deck)
         landShot.stage = st;
-        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "haul";
+        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "haul" || st === "swim";
         anglers.get(localId)?.a.showTag(false);
         if (cutTo) { camPos.copy(landShot.pos); landShot.up = true; landShot.clear = true; const l = lookAt(camPos.toArray(), focusAt.toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch))); for (let i = 0; i < 40; i++) look.step(0.1); }
         // out of your own head by going up first (never back through it), then round to the shot; your head shows once

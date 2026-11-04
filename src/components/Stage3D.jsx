@@ -39,10 +39,11 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   const [kept, setKept] = useState(null), [landed, setLanded] = useState(null), [looking, setLooking] = useState(false);
   const openInspect = () => { if (!landed) return; w.current?.inspectFish(true); setLooking(true); };
   const keepIt = () => { w.current?.keepFish(); setLooking(false); if (landed) { setCard({ ev: landed.ev, key: landed.key, who: null }); setTimeout(() => setCard((c) => (c?.ev === landed.ev ? null : c)), 8000); } setLanded(null); };
-  // (how it goes back depends on the place: never dropped off a high pier. The scene shortens it, and says so)
+  // (how it goes back depends on the place: never dropped off a high pier, but lowered in the drop net. Only the walk
+  // down a beach to the water is shortened, and the page says so)
   const putBack = () => {
     w.current?.releaseFish(); setLooking(false); const sp = speciesById(landed?.ev?.data?.species), off = sp ? `: the ${sp.name.toLowerCase()} swims off` : "";
-    say(venue === "pier" ? `Let back down to the water in the drop net (shortened)${off}.` : venue === "beach" ? `Back into the shallows (shortened)${off}.` : `Back in the landing net at the edge (shortened)${off}.`); setLanded(null);
+    say(venue === "pier" ? `Lowered back to the water in the drop net${off}.` : venue === "beach" ? `Back into the shallows (shortened)${off}.` : `Back in the landing net at the water's edge${off}.`); setLanded(null);
   };
   useEffect(() => { if (!kept) { setLooking(false); } }, [kept]);
   useEffect(() => { if (kept === null && landed && !looking) setLanded(null); }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -94,7 +95,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
           </>
         ) : null}
         {walkMsg ? <div className="walk-msg" role="status">{walkMsg}</div> : null}
-        {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is in the net: have a look</button></div> : null}
+        {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is landed: have a look</button></div> : null}
         {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
         {/* one menu for everything that isn't fishing or walking (top right): the page's own items (your angler, sound,
             settings, inviting a friend), the camera, emotes, watching a friend, and the view's settings */}
