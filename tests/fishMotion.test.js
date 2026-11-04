@@ -38,11 +38,19 @@ test("putting it back: carried, lowered, then it swims, in that order, at every 
     assert.ok(p.carry <= p.over && p.over <= p.lower && p.lower < p.swim, v);
     assert.equal(releaseStep(0.2, p), "carry");
     assert.equal(releaseStep((p.lower + p.swim) / 2, p), "swim");
-    assert.equal(releaseStep(p.swim + 0.1, p), "gone");
+    const end = p.haul || p.swim;
+    assert.equal(releaseStep(end + 0.1, p), "gone");
+    if (p.haul) assert.equal(releaseStep((p.swim + p.haul) / 2, p), "haul");
   }
   // off a pier the net is let down the wall: it takes a moment, not a cut
   const pier = releasePlan("pier");
   assert.ok(pier.lower - pier.over >= 2);
+  // and the empty net comes back up the wall afterwards (it never just reappears on the deck), taking a few pulls
+  assert.ok(pier.haul - pier.swim >= 2.5);
+  // the swim-away lasts long enough to watch
+  assert.ok(pier.swim - pier.lower >= 4);
+  // nowhere else is there a net to haul up
+  for (const v of ["river", "lake", "estuary", "beach"]) assert.equal(releasePlan(v).haul, undefined, v);
 });
 
 test("swimming off: away and then down, never backwards or up", () => {

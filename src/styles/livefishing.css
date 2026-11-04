@@ -499,6 +499,19 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .fish-look p { margin: 0; }
 .fish-look .row { margin-top: 6px; gap: 10px; }
 .fish-look-x { position: absolute; top: 8px; right: 8px; }
+/* compact at first (the fish stays in clear view above it); the rules and the minimum size always show, the rest opens below */
+.fish-look { gap: 4px; padding: 12px 14px; }
+.fish-look h3 { font-size: 20px; }
+.fish-look .cc-facts { font-size: 15px; }
+.fish-look .fl-must { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; line-height: 1.35; }
+.fish-look .fl-must li { padding: 4px 8px; border-radius: 8px; background: #ffffff0d; }
+.fish-look .fl-must li.fl-size, .fish-look .fl-must li.fl-rule { background: #f2b13a1f; border-left: 3px solid #f2b13a; }
+.fish-look .fl-must li.fl-safety { background: #ff6b5a1f; border-left: 3px solid #ff6b5a; }
+.fish-look .fl-must a { color: inherit; text-decoration: underline; }
+.fish-look .row .btn { flex: 1; min-height: 44px; }
+.fish-look .fl-more { align-self: flex-start; margin-top: 2px; padding: 8px 2px; min-height: 40px; background: none; border: 0; color: var(--accent, #7ee8de); font: inherit; font-size: 14px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.fish-look .fl-more-body { display: flex; flex-direction: column; gap: 6px; padding-top: 2px; }
+.fish-look.open { max-height: 58%; }
 .stage3d .fish-look ~ .w3d-tools { display: none; }
 
 /* ---- the mic button (Fish Together): off, on (teal) and a ring while you're talking ---- */
