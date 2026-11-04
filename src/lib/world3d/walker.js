@@ -5,14 +5,31 @@
 // (so a railing guides you along the edge instead of stopping you dead). Steps up onto a pier or quay are taken
 // smoothly; anything higher than a step needs a jump.
 
-// (accel and stop: how quickly you get up to speed and come to a halt, per second. A step and a half to set off and
-// about one to stop, so starts and stops read as a person and not a cursor; turn eases you round to the way you go)
-export const WALK = { speed: 1.8, sprint: 4.2, turn: 9, jump: 5.2, gravity: 16, step: 0.45, accel: 7.5, stop: 10, air: 4.9, dead: 0.12 };
+// (go and halt: how briskly you get up to speed and come to a halt. Speed follows a critically damped spring, so it
+// builds from nothing (a moment's weight shift, then the first step) and settles without a jolt: about half a second to
+// walking pace, a little less to stop. turnMax: the quickest you turn, in radians a second, standing (a pivot), at a
+// walk and flat out, so a turn is a turn and never an instant flip; turn eases you into the last part of it)
+export const WALK = { speed: 1.8, sprint: 4.2, turn: 9, turnMax: [5.5, 4.6, 3.2], jump: 5.2, gravity: 16, step: 0.45, go: 9, halt: 13, air: 4.9, dead: 0.12 };
 
 /** A fresh walker standing at (x, z), facing `face` (radians, 0 = -z). */
-export function walker(x, z, face, y = 0) { return { x, z, y, vy: 0, vx: 0, vz: 0, face, speed: 0, air: false, phase: 0 }; }
+export function walker(x, z, face, y = 0) { return { x, z, y, vy: 0, vx: 0, vz: 0, ax: 0, az: 0, face, speed: 0, air: false, phase: 0, turnRate: 0, acc: 0, off: 0 }; }
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+// ---- the body's own limits: how fast you can turn at a speed, and how much of the stick's speed you make while you're
+// still turning towards where it points (you turn first and then go, rather than sliding off sideways or backwards) ----
+/** The quickest turn (rad/s) at a speed (m/s). */
+export function turnLimit(speed, W = WALK) {
+  const [a, b, c] = W.turnMax, s = Math.max(0, speed);
+  return s <= W.speed ? a + (b - a) * (s / W.speed) : b + (c - b) * Math.min(1, (s - W.speed) / Math.max(0.01, W.sprint - W.speed));
+}
+/** How much of the wanted speed to make when facing `off` radians away from where you're going (1 straight on). */
+export function alignSpeed(off) { return Math.max(0.12, Math.min(1, (Math.cos(off) + 0.35) / 1.35)); }
+/** One exact step of a critically damped spring (value x heading for `to`, its rate v), dt seconds at stiffness w. */
+export function spring(x, v, to, w, dt) {
+  const e = Math.exp(-w * dt), d = x - to, c = v + w * d;
+  return [to + (d + c * dt) * e, (v - w * c * dt) * e];
+}
 
 /**
  * One step of `dt` seconds. input: { x, y } from the stick (-1..1 each, y up = forwards), camYaw (where the camera
@@ -28,18 +45,34 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
   const fx = Math.sin(input.camYaw || 0), fz = -Math.cos(input.camYaw || 0), rx = -fz, rz = fx;
   const dx = (fx * iy + rx * ix) * mag, dz = (fz * iy + rz * ix) * mag;
   const v = (input.sprint ? W.sprint : W.speed) * mag;
-  // turn to face the way you're going
-  // (a little slower for a big turn, so turning back the way you came is a turn, not a flip)
-  if (mag > 0.05) { const want = Math.atan2(dx, -dz), off = wrap(want - s.face); n.face = wrap(s.face + off * Math.min(1, dt * W.turn * (Math.abs(off) > 2 ? 0.7 : 1))); }
+  // turn to face the way you're going: eased in at the end, never quicker than a body turns (a pivot standing, a wider
+  // arc at speed), so turning back the way you came is a turn, not a flip
+  const sp0 = Math.hypot(s.vx || 0, s.vz || 0);
+  let off = 0;
+  if (mag > 0.05) {
+    off = wrap(Math.atan2(dx, -dz) - s.face);
+    const lim = turnLimit(sp0, W) * dt, step = off * (1 - Math.exp(-dt * W.turn));
+    n.face = wrap(s.face + Math.max(-lim, Math.min(lim, step)));
+  }
+  n.off = wrap(off - wrap(n.face - s.face));
+  n.turnRate = dt > 0 ? wrap(n.face - s.face) / dt : 0;
   const floor = (x, z) => ground.heightAt(x, z);
   // somewhere you can stand, and no higher above your feet than a step (jump to get up higher)
   const can = (x, z) => ground.walkable(x, z) && (floor(x, z) - n.y <= W.step || !!ground.ramp?.(n.x, n.z, x, z));
   let moved = 0;
-  // speed up and slow down smoothly (quicker to stop than to start), in the air too but less
-  const tvx = mag > 0 ? (dx / (mag || 1)) * v : 0, tvz = mag > 0 ? (dz / (mag || 1)) * v : 0;
-  const k = Math.min(1, dt * (s.air ? W.air : mag > 0 ? W.accel : W.stop));
-  n.vx = (s.vx || 0) + (tvx - (s.vx || 0)) * k; n.vz = (s.vz || 0) + (tvz - (s.vz || 0)) * k;
-  if (Math.hypot(n.vx, n.vz) < 0.02) { n.vx = 0; n.vz = 0; }
+  // speed up and slow down smoothly (a little quicker to stop than to start), in the air too but less; while you're
+  // still turning towards where the stick points, only part of the speed (you come round, then stride out)
+  const al = mag > 0 ? alignSpeed(n.off) : 0;
+  const tvx = mag > 0 ? (dx / (mag || 1)) * v * al : 0, tvz = mag > 0 ? (dz / (mag || 1)) * v * al : 0;
+  if (s.air) {
+    const k = 1 - Math.exp(-dt * W.air);
+    n.vx = (s.vx || 0) + (tvx - (s.vx || 0)) * k; n.vz = (s.vz || 0) + (tvz - (s.vz || 0)) * k; n.ax = 0; n.az = 0;
+  } else {
+    const w = Math.hypot(tvx, tvz) >= sp0 - 1e-6 && mag > 0 ? W.go : W.halt;
+    [n.vx, n.ax] = spring(s.vx || 0, s.ax || 0, tvx, w, dt); [n.vz, n.az] = spring(s.vz || 0, s.az || 0, tvz, w, dt);
+  }
+  // (settled: a halt ends at rest rather than creeping on)
+  if (!(mag > 0) && Math.hypot(n.vx, n.vz) < 0.06) { n.vx = 0; n.vz = 0; n.ax = 0; n.az = 0; }
   if (n.vx || n.vz) {
     const sx = n.vx * dt, sz = n.vz * dt;
     // straight on, or slide along whatever's in the way: turned a little either way first (round a curved railing),
@@ -50,9 +83,10 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
       if (can(n.x + mx, n.z + mz)) { n.x += mx; n.z += mz; moved = Math.hypot(mx, mz); break; }
     }
     // blocked: carry only the speed actually made (no building up against a wall)
-    if (moved < Math.hypot(sx, sz) * 0.5 && dt > 0) { const f = moved / Math.max(1e-6, Math.hypot(sx, sz)); n.vx *= f; n.vz *= f; }
+    if (moved < Math.hypot(sx, sz) * 0.5 && dt > 0) { const f = moved / Math.max(1e-6, Math.hypot(sx, sz)); n.vx *= f; n.vz *= f; n.ax *= f; n.az *= f; }
   }
   n.speed = dt > 0 ? moved / dt : 0;
+  n.acc = dt > 0 ? (n.speed - (s.speed || 0)) / dt : 0;
   n.phase = (s.phase + moved * 2.2) % (Math.PI * 2); // the stride: about one step every 1.4 m
   // up and down: jumping, falling, and stepping onto higher ground smoothly
   const g = floor(n.x, n.z);
