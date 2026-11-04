@@ -273,7 +273,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
           if (st === "lead") { shot = from(-2.6, landing.edge + 2.3, wl + 1.35); focusAt = net.clone().lerp(landing.fish || net, 0.4); focusAt.y += 0.08; }
           // (putting it back: from just out over the rail, looking down, as you'd watch it go: the net at the foot of the
           // wall and the fish swimming off below you, out and down)
-          else if (st === "swim") { shot = from(-1.2, landing.edge + 0.6, 1.7); focusAt = (landing.fish || net).clone().lerp(net, 0.3); }
+          else if (st === "swim") { shot = from(-1.6, landing.edge - 0.3, 2.5); focusAt = (landing.fish || net).clone().lerp(net, 0.3); focusAt.y = Math.max(focusAt.y, landing.water - 0.25); } // (from over the rail, watching it go: the focus held near the surface, so the view never stares straight down into the dark)
           else {
             const k = st === "haul" ? Math.max(0, Math.min(1, (net.y - landing.water) / hgt)) : 0;
             shot = from(-3.3, landing.edge + 3.5, wl + 0.42 * hgt + 0.9 + 0.5 * k); focusAt = net.clone().lerp(rail, 0.38 + 0.2 * k);
@@ -296,7 +296,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
         const cutTo = (out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage)); // (and back up from it: climbing the wall it passed close over the deck)
         landShot.stage = st;
-        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "haul" || st === "swim";
+        landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); if (landing.water != null) landShot.pos.y = Math.max(landShot.pos.y, landing.water + 0.45); /* (never under the surface as the fish swims off) */ landShot.focus = focusAt; landShot.until = t; landShot.wide = st === "lower" || st === "haul" || st === "swim";
         anglers.get(localId)?.a.showTag(false);
         if (cutTo) { camPos.copy(landShot.pos); landShot.up = true; landShot.clear = true; const l = lookAt(camPos.toArray(), focusAt.toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch))); for (let i = 0; i < 40; i++) look.step(0.1); }
         // out of your own head by going up first (never back through it), then round to the shot; your head shows once
