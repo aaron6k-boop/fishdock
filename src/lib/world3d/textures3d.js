@@ -167,3 +167,162 @@ export function bricks(seed = 17, base = [150, 70, 52]) {
   g.putImageData(img, 0, 0);
   return { map: toTex(c), normalMap: normalFrom(hf, n, n, 1.5) };
 }
+
+// ---- photographed surfaces (public/textures/, Poly Haven CC0, cut down by source-assets/prepare_textures.py) ----
+// Loaded once each and shared; a material that uses one shows its drawn look until it has arrived (or if it can't).
+export const TEX_BASE = "/textures/";
+const photos = new Map();
+export function photoTex(name, { srgb = true } = {}) {
+  if (typeof document === "undefined") return null;
+  if (!photos.has(name)) {
+    const t = new THREE.TextureLoader().load(TEX_BASE + name + ".jpg");
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    photos.set(name, t);
+  }
+  return photos.get(name);
+}
+
+// ---- weathering noise: one small tiling texture every weathered material shares ----
+// r: fine mottle (zinc spangle, grain in paint), g: soft blotches (patina, dirt, damp), b: streaks running down
+// (stretched tall: rain and rust runs)
+let weatherNoise = null;
+export function weatherTex() {
+  if (weatherNoise || typeof document === "undefined") return weatherNoise;
+  const n = 256, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const u = x / n, v = y / n;
+    const r = fbm(u * 32, v * 32, 32, 41, 3) * 0.75 + hash(x, y, 43) * 0.25;
+    const gg = fbm(u * 5, v * 5, 5, 45, 4);
+    const b = fbm(u * 48, v * 3, 48, 47, 3) * 0.7 + fbm(u * 96, v * 6, 96, 49, 2) * 0.3;
+    img.data.set([r * 255, gg * 255, b * 255, 255], (y * n + x) * 4);
+  }
+  g.putImageData(img, 0, 0);
+  return (weatherNoise = toTex(c, { srgb: false }));
+}
+
+// ---- weathered timber: silvered grain with dark open cracks along it, one tile = 1 m along the grain by 0.25 m ----
+// grey-brown, multiplied over the material's colour; a = 1 (the grain's height comes from its brightness)
+let woodTexC = null;
+export function woodTex() {
+  if (woodTexC || typeof document === "undefined") return woodTexC;
+  const w = 256, h = 128, c = canvas(w, h), g = c.getContext("2d"), img = g.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = x / w, v = y / h;
+    const warp = fbm(u * 2, v * 4, 2, 51, 3) * 2.2 + noise2(u * 8, v * 2, 8, 52) * 0.25;
+    const ring = 0.5 + 0.5 * Math.sin((v * 26 + warp * 3) * Math.PI); // the growth rings, seen as lines along the board
+    const fine = hash(x >> 1, y, 53) * 0.5 + fbm(u * 64, v * 2, 64, 54, 2) * 0.5; // fibres
+    const crack = Math.abs(fbm(u * 3, v * 9, 3, 55, 3) - 0.5) < 0.012 && noise2(u * 4, v * 2, 4, 56) > 0.5 ? 1 : 0;
+    const silver = fbm(u * 3, v * 3, 3, 57, 3); // weathered silver-grey patches, browner where the boards keep damp
+    let L = 0.78 + ring * 0.14 + (fine - 0.5) * 0.16 - crack * 0.45;
+    const warm = (0.5 - silver) * 26;
+    img.data.set([Math.min(255, 196 * L + warm), Math.min(255, 188 * L + warm * 0.5), Math.min(255, 176 * L - warm * 0.2), 255], (y * w + x) * 4);
+  }
+  g.putImageData(img, 0, 0);
+  return (woodTexC = toTex(c));
+}
+
+// ---- weather(material, options): age a material in its own shader, without a uv map ----
+// The surface is sampled by position (world space, or for wood the object's own axes times its instance scale, so a
+// stretched rail keeps its grain the right size) and blended across the three axes, so nothing stretches.
+//   scale: metres a tile; mottle: colour variation; bump: relief from the texture's brightness (light catches it);
+//   rust: [amount, r, g, b] chips and runs, more where grime is; grime: [y0, y1, amount] darker towards the foot
+//   (splashes, damp, dirt), world heights; streaks: [yTop, length, amount] runs down from a top edge;
+//   rough: [lo, hi] roughness range over the blotches; wood: "x" or "y" (the grain's axis) for the timber map;
+//   wet: a { value } uniform (0 dry to 1 in rain: darker and shinier).
+export function weather(mat, o = {}) {
+  const noise = weatherTex(); if (!noise) return mat;
+  const wood = o.wood ? woodTex() : null, local = !!o.wood;
+  const f = (v) => (+v).toFixed(4), S = o.scale || 1;
+  const rust = o.rust || [0, 0.36, 0.17, 0.07], grime = o.grime || [0, 0, 0], streaks = o.streaks || [0, 1, 0], rough = o.rough || [1, 1];
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, r) => {
+    prev?.(sh, r);
+    sh.uniforms.fdNoise = { value: noise }; sh.uniforms.fdWet = o.wet || { value: 0 };
+    if (wood) sh.uniforms.fdWood = { value: wood };
+    sh.vertexShader = "varying vec3 vFdW;\nvarying vec3 vFdP;\nvarying vec3 vFdN;\n" + sh.vertexShader.replace("#include <project_vertex>", `#include <project_vertex>
+      {
+        vec4 fw = vec4(transformed, 1.0); vec3 fn = objectNormal;
+        #ifdef USE_INSTANCING
+          fw = instanceMatrix * fw; fn = mat3(instanceMatrix) * fn;
+        #endif
+        fw = modelMatrix * fw; vFdW = fw.xyz;
+        ${local ? `vec3 sc = vec3(1.0);
+        #ifdef USE_INSTANCING
+          sc = vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
+        #endif
+        vFdP = transformed * sc; vFdN = objectNormal;${o.wood === "y" ? " vFdP = vFdP.yxz; vFdN = vFdN.yxz;" : ""}` : "vFdP = fw.xyz; vFdN = normalize(mat3(modelMatrix) * fn);"}
+      }`);
+    sh.fragmentShader = `uniform sampler2D fdNoise;\nuniform float fdWet;\n${wood ? "uniform sampler2D fdWood;\n" : ""}varying vec3 vFdW;\nvarying vec3 vFdP;\nvarying vec3 vFdN;
+      vec4 fdTri(sampler2D t, vec3 p, vec3 n, vec2 k) { vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z + 1e-5); return texture2D(t, p.zy * k) * w.x + texture2D(t, p.xz * k) * w.y + texture2D(t, p.xy * k) * w.z; }
+      vec3 fdPerturb(vec3 sp, vec3 sn, vec2 dh, float fd) { vec3 sx = normalize(dFdx(sp)), sy = normalize(dFdy(sp)); vec3 r1 = cross(sy, sn), r2 = cross(sn, sx); float det = dot(sx, r1) * fd; return normalize(abs(det) * sn - sign(det) * (dh.x * r1 + dh.y * r2)); }
+      ` + sh.fragmentShader
+      .replace("#include <map_fragment>", `#include <map_fragment>
+        vec3 fdN = normalize(vFdN); vec3 fdP = vFdP / ${f(S)};
+        vec4 fdT = fdTri(fdNoise, fdP, fdN, vec2(1.0));
+        float fdH = fdT.r;
+        diffuseColor.rgb *= 1.0 + (fdT.r - 0.5) * ${f(o.mottle ?? 0.3)} + (fdT.g - 0.5) * ${f((o.mottle ?? 0.3) * 1.4)};
+        ${wood ? `{ vec4 wd = fdTri(fdWood, fdP, fdN, vec2(1.0, 4.0)); diffuseColor.rgb *= wd.rgb * 1.25; fdH = dot(wd.rgb, vec3(0.33)) * 1.6; }` : ""}
+        float fdG = ${f(grime[2])} * (1.0 - smoothstep(${f(grime[0])}, ${f(grime[1])}, vFdW.y)) * (0.55 + fdT.g * 0.9);
+        float fdS = 0.0;
+        ${streaks[2] ? `{ float run = clamp((${f(streaks[0])} - vFdW.y) / ${f(streaks[1])}, 0.0, 1.0); float st = texture2D(fdNoise, vec2((vFdW.x + vFdW.z) * 0.9, vFdW.y * 0.06)).b; fdS = ${f(streaks[2])} * smoothstep(0.5, 0.75, st) * (1.0 - run) * step(0.0, ${f(streaks[0])} - vFdW.y); }` : ""}
+        float fdR = 0.0;
+        ${rust[0] ? `{ vec4 q = fdTri(fdNoise, fdP * 2.7 + 0.31, fdN, vec2(1.0)); fdR = smoothstep(0.62, 0.7, q.g + fdG * 0.6 + fdS * 0.5 + (fdT.r - 0.5) * 0.2) * ${f(rust[0])}; }` : ""}
+        diffuseColor.rgb *= (1.0 - fdG) * (1.0 - fdS);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${f(rust[1])}, ${f(rust[2])}, ${f(rust[3])}) * (0.7 + fdT.r * 0.6), fdR);
+        diffuseColor.rgb *= 1.0 - fdWet * 0.28;`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        roughnessFactor = clamp(roughnessFactor * mix(${f(rough[0])}, ${f(rough[1])}, fdT.g) + fdR * 0.35 + fdG * 0.1, 0.05, 1.0) * (1.0 - fdWet * 0.45);`)
+      .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\n        metalnessFactor *= 1.0 - fdR;")
+      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+        ${o.bump ? `normal = fdPerturb(-vViewPosition, normal, vec2(dFdx(fdH), dFdy(fdH)) * ${f(o.bump)} + vec2(dFdx(fdR), dFdy(fdR)) * ${f(o.bump * 0.5)}, faceDirection);` : ""}`);
+  };
+  const key = "fdw1:" + JSON.stringify(o, (k, v) => (k === "wet" ? !!v : v));
+  const prevKey = mat.customProgramCacheKey?.bind(mat);
+  mat.customProgramCacheKey = () => (prevKey ? prevKey() : "") + key;
+  mat.needsUpdate = true;
+  return mat;
+}
+
+// ---- decals: stains laid over the deck and the wall cap, four to a texture (2 x 2) ----
+// [0] a rust ring round a post's foot, [1] a rust run down from a fitting, [2] an old dark stain (bait, oil, fish),
+// [3] a soft damp patch (round a drain, under a bench). Transparent: colour over the concrete, faded at the edges.
+export const DECAL = { rustRing: 0, rustRun: 1, stain: 2, damp: 3 };
+let decalC = null;
+export function decalTex() {
+  if (decalC || typeof document === "undefined") return decalC;
+  const T = 128, c = canvas(T * 2), g = c.getContext("2d"), img = g.createImageData(T * 2, T * 2);
+  for (let y = 0; y < T * 2; y++) for (let x = 0; x < T * 2; x++) {
+    const cell = (y < T ? 0 : 2) + (x < T ? 0 : 1), u = (x % T) / T - 0.5, v = (y % T) / T - 0.5, r = Math.hypot(u, v) * 2;
+    const nz = fbm(x / 18, y / 18, 256 / 18, 61, 3), fine = hash(x, y, 62);
+    let col = [0, 0, 0], a = 0;
+    if (cell === 0) { // rust ring: strongest just round the post, ragged outer edge
+      a = Math.max(0, 1 - r / (0.55 + nz * 0.5)) ** 1.4 * (0.4 + fine * 0.2); col = [92 + nz * 26, 54 + nz * 14, 32];
+    } else if (cell === 1) { // a run: narrow at the top, spreading and fading downwards (v = -0.5 is the top)
+      const t = v + 0.5, w = 0.05 + t * 0.22 + (nz - 0.5) * 0.06, s = Math.max(0, 1 - Math.abs(u + (nz - 0.5) * 0.08) / Math.max(0.02, w));
+      a = s ** 1.2 * (1 - t) ** 0.8 * (0.6 + fbm(x / 6, y / 40, 256 / 6, 63, 2) * 0.6); col = [104 + nz * 30, 54 + nz * 14, 26];
+    } else if (cell === 2) { // a dark stain, blotchy
+      a = Math.max(0, 1 - r / (0.45 + nz * 0.6)) ** 0.8 * (0.35 + fbm(x / 9, y / 9, 256 / 9, 64, 3) * 0.45); col = [52, 47, 40];
+    } else { // damp: a soft dark patch
+      a = Math.max(0, 1 - r / (0.6 + nz * 0.4)) ** 1.6 * 0.55; col = [70, 72, 66];
+    }
+    img.data.set([col[0], col[1], col[2], Math.min(255, a * 255)], (y * T * 2 + x) * 4);
+  }
+  g.putImageData(img, 0, 0);
+  return (decalC = toTex(c, { repeat: false }));
+}
+
+// ---- a cast-iron drain grate in its frame: slots across, a raised rim, rust in the slots (opaque, 0.5 x 0.35 m) ----
+let grateC = null;
+export function grateTex() {
+  if (grateC || typeof document === "undefined") return grateC;
+  const w = 128, h = 96, c = canvas(w, h), g = c.getContext("2d"), img = g.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const rim = x < 7 || x >= w - 7 || y < 7 || y >= h - 7, slot = !rim && (x - 7) % 10 > 5 && y > 12 && y < h - 12;
+    const nz = fbm(x / 12, y / 12, 128 / 12, 71, 3), rust = fbm(x / 6, y / 6, 128 / 6, 72, 2) > 0.62;
+    let L = slot ? 0.12 : rim ? 0.42 + nz * 0.12 : 0.32 + nz * 0.14;
+    const col = slot ? [24, 22, 20] : rust ? [96 * (0.6 + nz), 54 * (0.6 + nz), 30] : [140 * L, 136 * L, 130 * L];
+    img.data.set([col[0], col[1], col[2], 255], (y * w + x) * 4);
+  }
+  g.putImageData(img, 0, 0);
+  return (grateC = toTex(c, { repeat: false }));
+}
