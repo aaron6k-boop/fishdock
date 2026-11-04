@@ -293,11 +293,9 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .ft-dist { display: block; color: #fff; font-size: 26px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 /* the tension: a level that fills left to right (green, then amber, then red), the white mark where the drag slips */
 .ft-tension { display: flex; align-items: center; gap: 8px; width: 100%; }
-html:not([data-hand="left"]) .ft-tension { flex-direction: row-reverse; }
 .ft-ten-name { font-size: 10.5px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; color: #cfe0e8; }
 .ft-ten-bar { position: relative; flex: 1; min-width: 96px; height: 9px; border-radius: 6px; background: #ffffff1f; overflow: visible; }
 .ft-ten-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: #5fd38d; transition: width .1s linear, background-color .2s; }
-html:not([data-hand="left"]) .ft-ten-bar { transform: scaleX(-1); } /* (it fills towards the button) */
 .ft-tension.mid .ft-ten-fill { background: #e9c74b; }
 .ft-tension.high .ft-ten-fill, .ft-tension.slip .ft-ten-fill { background: #f07a52; }
 .ft-tension.slip .ft-ten-bar { animation: ft-shiver .18s linear infinite; }

@@ -153,10 +153,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   let W = null, walkIn = { x: 0, y: 0, sprint: false }, walkJump = false, canFish = false, fishTest = 0, modeBeforeWalk = "first", fovBeforeWalk = null, onPose = null;
   // ---- the walking camera's own easing: how far behind you it is (in at once for a wall, out slowly), the height it
   // looks from (eased, so a step up or a jump doesn't jolt it), the footsteps' stride, and a glide between views ----
-  let followAt = 0, pivotY = null, gait = { d: 0 }, camBlend = null, clockT = 0; // (clockT: the scene's clock, so a filmed glide is exact)
+  let followAt = 0, pivotY = null, pivotXZ = null, gait = { d: 0 }, camBlend = null, clockT = 0; // (clockT: the scene's clock, so a filmed glide is exact)
   const WALK_FOV = 62;
   /** Glide the camera from where it is now to wherever the next frames put it, over `sec` seconds. */
   function blendCamera(sec = 0.7) { camBlend = reduceMotion ? null : { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, t0: clockT, sec }; }
+  // (a long way round takes a little longer: the glide back to your spot turns at most about 150° a second)
+  const blendFor = (yawTo, far = 0) => blendCamera(0.65 + Math.min(0.6, Math.abs(wrap(yawTo - look.yaw)) / 2.6) + Math.min(0.45, far / 20));
   function applyBlend() {
     if (!camBlend) return 1;
     const u = (clockT - camBlend.t0) / camBlend.sec; if (u >= 1) { camBlend = null; return 1; }
@@ -232,7 +234,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       yaw = look.yaw; pitch = look.pitch;
       // the height it looks from eases after you (a step up, a jump, a ramp onto the pier), never jolting
       pivotY = pivotY == null || Math.abs(W.y - pivotY) > 3 ? W.y : pivotY + (W.y - pivotY) * (1 - Math.exp(-dt * (W.air ? 4 : 9)));
-      const dist = Math.max(0, ((look.fov - 28) / 50) * 9 + 0.4), tgt = new THREE.Vector3(W.x, pivotY + 1.55, W.z);
+      // and where it looks from follows you a touch behind (a few centimetres at a walk), so a stride that comes up
+      // short against a railing doesn't shake the whole view; first person stays exactly at your eyes
+      const dist = Math.max(0, ((look.fov - 28) / 50) * 9 + 0.4);
+      if (!pivotXZ || dist < 1.1 || Math.hypot(W.x - pivotXZ[0], W.z - pivotXZ[1]) > 3) pivotXZ = [W.x, W.z];
+      else { const kp = 1 - Math.exp(-dt * 14); pivotXZ = [pivotXZ[0] + (W.x - pivotXZ[0]) * kp, pivotXZ[1] + (W.z - pivotXZ[1]) * kp]; }
+      const tgt = new THREE.Vector3(pivotXZ[0], pivotY + 1.55, pivotXZ[1]);
       const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
       if (dist < 1.1) {
         // first person: a subtle bob and sway with your steps (none with reduced motion)
@@ -582,11 +589,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         W = walker(p.x, p.z, me.out?.face ?? 0, p.y); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
         fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56 }[dist] || 47); look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);
         // (from your eyes out to behind you as a glide; a drag turns the view by what the walking camera shows)
-        followAt = 0; pivotY = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8);
+        followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8);
         return null;
       }
       if (!W) return null;
-      blendCamera(0.75); look.setDragFov(null);
+      { const s0 = me?.a.spot, at = s0?.at; blendFor(s0?.face ?? look.yaw, at ? Math.hypot(at[0] - W.x, at[2] - W.z) : 0); } look.setDragFov(null);
       W = null; autoWalk = false; walkTarget = null; me?.a.setWalk(null); onPose?.(null); mode = modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       const s2 = me?.a.spot; if (s2) { look.setHome(s2.face, HOME_PITCH); look.aim(s2.face, HOME_PITCH); }
       return null;
@@ -634,7 +641,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const me = anglers.get(localId); if (!W || !me) return null;
       const sp = env.ground.fishHere(W.x, W.z); if (!sp || !roomToFish(W.x, W.z, othersAt())) return null;
       const spot = { ...me.a.spot, ...sp, id: me.a.spot?.id ?? 1, name: "Where you chose" };
-      blendCamera(0.75); look.setDragFov(null);
+      blendFor(spot.face); look.setDragFov(null);
       me.a.place(spot); W = null; autoWalk = false; walkTarget = null; me.a.setWalk(null); onPose?.({ ...spot, spotAt: true }); mode = modeBeforeWalk === "walk" ? "first" : modeBeforeWalk; if (fovBeforeWalk) look.setFov?.(fovBeforeWalk);
       look.setHome(spot.face, HOME_PITCH); look.aim(spot.face, HOME_PITCH);
       return spot;

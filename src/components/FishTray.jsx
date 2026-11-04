@@ -11,18 +11,10 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Icon } from "./ui.jsx";
 import { WorldCtx } from "./WorldContext.js";
+import { GUARD, pressOk } from "../lib/trayGuard.js";
 
 const R = 29, C = 2 * Math.PI * R;
 const HOLD_CYCLE = 1150; // ms from no power to full (then back down: let go at the top)
-// ---- one press for one thing (pure; tested) ----
-// how long a button ignores presses after it has just appeared (a tap meant for the button it replaced), and after it
-// has been pressed (a double tap, or a second press before the scene has caught up)
-export const GUARD = { appear: { land: 450, strike: 120, cast: 250 }, again: { strike: 900, land: 1200, cast: 900 } };
-export function pressOk(act, now, { shownAt = -1e9, pressedAt = -1e9 } = {}) {
-  if (now - shownAt < (GUARD.appear[act] || 0)) return false;
-  if (now - pressedAt < (GUARD.again[act] || 0)) return false;
-  return true;
-}
 
 /**
  * phase: the scene phase; last: the last event type; reel: 0..1; fight: the fight's state while a fish is on
@@ -32,9 +24,10 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   const world = useContext(WorldCtx);
   // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
   const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
-  const castAt = useRef(-1e9), shown = useRef({ act: null, at: -1e9 }), pressed1 = useRef({});
+  const landOn = useRef(false), castAt = useRef(-1e9), shown = useRef({ act: null, at: -1e9 }), pressed1 = useRef({});
   const [power, setPower] = useState(null), [tapFx, setTapFx] = useState(0), [pressed, setPressed] = useState(false);
   const hold = useRef(null);
+  if (phase !== "hooked") landOn.current = false;
   let act = null, label = hint || "", busy = false, status = "", dist = null;
   if (autoplay) { label = "Playing it through"; }
   else if (phase === "idle" || phase === "ended" || (phase === "waiting" && !lineOut)) { act = "cast"; label = label || (power != null ? "Let go to cast" : last ? "Hold to cast again" : "Hold Cast, aim, let go"); }
@@ -42,10 +35,12 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   else if (phase === "waiting" || phase === "missed") { act = onWindIn && !autoplay ? "wait" : null; label = phase === "missed" ? "Missed it. The bait's still out" : "Waiting for a bite"; }
   else if (phase === "bite") { act = "strike"; label = "Bite! Strike now"; }
   else if (phase === "hooked") {
-    act = fight?.near ? "land" : "reel";
+    // (Land stays once it's shown unless the fish really pulls away, so it doesn't flicker with Reel at the edge)
+    const near = !!fight?.near || (landOn.current && (fight?.progress ?? 0) > 0.88);
+    landOn.current = near; act = near ? "land" : "reel";
     // what's happening, said only when it's true: a run only while the fish is taking line, the drag only while it slips
-    status = fight?.near ? "It's close: land it" : fight?.running ? "It's running: line going out" : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : "Keep tapping Reel";
-    dist = fight && !fight.near ? `${Math.round(fight.dist)}\u00a0m` : null; label = status;
+    status = near ? "It's close: tap Land" : fight?.running ? "It's running: line going out" : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : "Keep tapping Reel";
+    dist = fight && !near ? `${Math.round(fight.dist)}\u00a0m` : null; label = status;
   }
   else if (phase === "landing") { busy = true; label = "Landing it"; }
   else if (phase === "lost") { label = "Lost it"; }
