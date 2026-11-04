@@ -375,8 +375,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // (on the way out from your eyes to the first shot, the view turns to it only as fast as the camera gets there, so
         // it never looks straight down into the water from beside your head)
         if (landing && landShot.framed) {
-          if (!landShot.fs) { landShot.fs0 = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(6)); landShot.fs = landShot.fs0.clone(); landShot.p = 0; }
-          if (mode === "first" && !landShot.up) { landShot.d0 = null; }
+          // (starting from the fish itself, so it stays in the middle of the picture as the camera rises out of your head
+          // and swings out over the water: it started from a point 6 m along your view, under the surface, and the
+          // camera stared into the dark water on its way out)
+          if (!landShot.fs) { landShot.fs0 = landing.fish ? landing.fish.clone() : landShot.focus.clone(); landShot.fs = landShot.fs0.clone(); landShot.p = 0; }
+          if (mode === "first" && !landShot.up) { landShot.d0 = null; if (landing.fish) landShot.fs.copy(landing.fish); landShot.fs0.copy(landShot.fs); }
           else {
             const dNow = camPos.distanceTo(landShot.pos); landShot.d0 = Math.max(landShot.d0 || 0, dNow, 0.5);
             landShot.p = Math.max(landShot.p, 1 - dNow / landShot.d0);
@@ -384,7 +387,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
             landShot.fs.lerp(want, 1 - Math.exp(-dt * (landShot.p >= 0.97 ? 3 : 8)));
           }
         }
-        if (landing && (mode !== "first" || landShot.up) && performance.now() - look.touched > 1500) {
+        if (landing && (mode !== "first" || landShot.up || landShot.framed) && performance.now() - look.touched > 1500) {
           const l = lookAt(camPos.toArray(), (landShot.framed ? landShot.fs : landShot.focus).toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch)));
           if (landShot.framed) for (let i = 0; i < 6; i++) look.step(0.5);
         }
