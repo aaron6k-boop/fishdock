@@ -5,6 +5,7 @@
 import * as THREE from "three";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
+import { concrete } from "./textures3d.js";
 import { createWildlife } from "./wildlife.js";
 import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
 import { lightingFor, lampPools, poolLight, lookQuality } from "./skyLook.js";
@@ -270,12 +271,20 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 rd = reflect(-v, n); rd.y = abs(rd.y);
         float F = .02 + .98*pow(1. - max(dot(n, v), 0.), 5.);
         vec3 refl = skyReflect(normalize(rd));
+        // Unresolved wavelets scatter the reflected sky rather than leaving an oily mirror.
+        // Reuse the cheap sky gradient; no reflection render target or extra texture fetch.
+        float roughWater = (.06 + .22*uWind)*smoothstep(.015, .3, footprint);
+        refl = mix(refl, skyBase(normalize(vec3(rd.x, max(rd.y, .16), rd.z))), roughWater);
         float lit = uDay + uDusk*.55 + uNight*.12, dim = 1. - .25*smoothstep(.5, 1., uCloud) - .15*uRain;
         float sd = shoreDist(p), shallow = 1. - smoothstep(0., 16., sd);
         // looking down into it you see the deep colour; at a low angle more of the light scattered back out; the
         // shallows by the land are lighter and greener
         vec3 body = mix(uWater*1.25 + vec3(0., .012, .01), uWater*.72, pow(clamp(v.y, 0., 1.), .6));
         body = mix(body, uWater*1.55 + vec3(.012, .03, .018), shallow*.7)*lit*dim;
+        // Broad, restrained variations of depth/current colour, not a repeating surface tile.
+        float waterMass = noise(p*.018 + flow*.025);
+        body *= .9 + .2*waterMass;
+        body += vec3(.003, .018, .014)*shallow*(1. - F)*lit*dim;
         // light through the thin water at the crests, more so looking towards the sun
         float crest = smoothstep(-.05, .4, h)*(1. - uNight);
         float toward = pow(max(dot(-v, normalize(vec3(uSunDir.x, 0., uSunDir.z))), 0.), 3.);
@@ -291,7 +300,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // the sun's glitter (a gold path at dusk, never a red one) and the moon's
         float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud));
         float sp = max(dot(rd, uSunDir), 0.);
-        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 600.)*5. + pow(sp, 60.)*.16)*sunVis;
+        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, mix(600., 100., smoothstep(.015, .22, footprint)))*mix(5., .84, smoothstep(.015, .22, footprint)) + pow(sp, 60.)*.16)*sunVis;
         float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
         // lamps on piers and promenades after dark: warm streaks broken up by the waves
         for (int i = 0; i < 4; i++) { vec4 L = uLamps[i]; if (L.w <= 0.) continue; vec3 ld = normalize(L.xyz - vW); float s2 = max(dot(rd, ld), 0.); vec2 o = L.xz - vW.xz; float fall = 1./(1. + dot(o, o)*.003);
@@ -302,7 +311,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // out down wind
         vec2 pf = vec2(dot(p, wd), dot(p, wx));
         float capPatch = smoothstep(.36, .7, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
-        float cap = smoothstep(.22, .55, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .8, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
+        // Break only the exposed crests, not every bright contour of the swell.
+        float crestHeight = h/(.12 + .5*uSwell + .2*uWind);
+        float capGrain = noise(pf*vec2(.8, 2.8) - vec2(uTime*.65, 0.));
+        float cap = smoothstep(.38, .78, crestHeight)*smoothstep(.35, .8, uWind)*sea*capPatch;
+        cap *= smoothstep(.26, .66, capGrain)*(.45 + .55*smoothstep(.02, .18, length(s.yz)));
+        cap *= 1. - smoothstep(120., 430., dist);
         float streak = 0.;
         #if WQ > 0
           // old foam lying in streaks along the wind, broken into short lengths and thin patches (unbroken, they read as
@@ -318,7 +332,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // breathing in and out as each wave arrives and drains (two noises at small scales thresholded into clumps,
         // a third opening gaps between them, the clumps sparser away from the wall). The band reaches a metre or two
         // out (further as bigger waves arrive), on the fine shore map, and fades with distance so it never shimmers
-        float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
+        // Foam drifts along the wind instead of boiling in place; subpixel bubbles blend out.
+        vec2 foamFlow = -wd*uTime*.12 + wx*sin(uTime*.35)*.08;
+        float en1 = noise(p*vec2(4.3, 3.7) + foamFlow), en2 = mix(noise(p*9.1 + foamFlow*1.7), .5, smoothstep(.025, .12, footprint));
         float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
         float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
         float edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
@@ -337,11 +353,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   const water = new THREE.Mesh(wGeo, waterMat); water.frustumCulled = false; water.renderOrder = -5; group.add(water);
 
   // ---- materials ----
-  const stoneTex = canvasTex(256, 256, (g, w, h) => { speckle(g, w, h, "#8e8b84", 0.18, 3000); g.strokeStyle = "rgba(40,36,30,.35)"; g.lineWidth = 2; for (let y = 0; y <= h; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); for (let x = (y / 64) % 2 ? 0 : 64; x < w; x += 128) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 64); g.stroke(); } } }, [4, 30]);
+  const stoneMaps = concrete({ size: 256, seed: 3, tint: [160, 155, 145] });
   const sandTex = canvasTex(256, 256, (g, w, h) => speckle(g, w, h, "#c9b48a", 0.22, 5000, 1.5), [60, 30]);
   const grassTex = canvasTex(256, 256, (g, w, h) => { speckle(g, w, h, "#4d6b33", 0.25, 6000, 2); }, [80, 40]);
   const M = {
-    stone: new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.92 }),
+    stone: new THREE.MeshStandardMaterial({ ...stoneMaps, normalScale: new THREE.Vector2(.45, .45), roughness: 1 }),
     wall: new THREE.MeshStandardMaterial({ color: 0x6f6b63, roughness: 0.95 }),
     weed: new THREE.MeshStandardMaterial({ color: 0x2f3a24, roughness: 1 }),
     rail: new THREE.MeshStandardMaterial({ color: 0x2a5a7a, roughness: 0.5, metalness: 0.4 }),
@@ -361,7 +377,17 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // left out); the camera also keeps above floorAt()
   const solids = [];
   let floorAt = () => 0;
-  const box = (w, h, d, mat, x, y, z, parent = group) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); if (Math.min(w, h, d) >= 0.3) solids.push(m); return m; };
+  const box = (w, h, d, mat, x, y, z, parent = group) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z);
+    if (mat === M.stone) {
+      // Metres, not one tile stretched over an entire slab. Project each box face onto its own plane.
+      const p = m.geometry.attributes.position, n = m.geometry.attributes.normal, uv = m.geometry.attributes.uv;
+      for (let i = 0; i < p.count; i++) {
+        const a = Math.abs(n.getY(i)) > .5 ? p.getX(i) + x : Math.abs(n.getX(i)) > .5 ? p.getZ(i) + z : p.getX(i) + x;
+        const b = Math.abs(n.getY(i)) > .5 ? p.getZ(i) + z : p.getY(i) + y;
+        uv.setXY(i, a / 8, b / 8);
+      }
+    }
+    m.castShadow = m.receiveShadow = true; parent.add(m); if (Math.min(w, h, d) >= 0.3) solids.push(m); return m; };
   const lamps = [], pointLights = [], lampSpots = []; // (lampSpots: where lamps hang, for their reflections on the water)
   const buildings = (x0, x1, z0, z1, n, seed = 1) => {
     // a town's worth of simple houses and flats, roofs and lit windows at night
@@ -547,6 +573,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     for (const pl of pointLights) { pl.intensity = lampOn * (pl.userData.cd || 60); pl.visible = lampOn > 0.02; }
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     for (let i = 0; i < 4; i++) { const q = lampSpots[i]; wU.uLamps.value[i].set(q ? q[0] : 0, q ? q[1] : 0, q ? q[2] : 0, q ? lampOn : 0); }
+    M.stone.color.setScalar(1 - st.rain*.25);
+    M.stone.roughness = 1 - st.rain*.35;
     if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain (wetLook.js)
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
@@ -601,6 +629,6 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         p.needsUpdate = true; rain.position.set(cam.position.x, cam.position.y - 8, cam.position.z);
       }
     },
-    dispose() { envSky.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
+    dispose() { envSky.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.normalMap?.dispose?.(); m.roughnessMap?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
   };
 }
