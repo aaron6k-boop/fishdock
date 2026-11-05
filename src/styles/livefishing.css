@@ -307,8 +307,8 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .ft-main svg { width: 26px; height: 26px; }
 .ft-main > svg.ft-ringsvg { position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px); transform: rotate(-90deg); }
 .ft-cast.holding { transform: scale(1.05); }
-.ft-strike { width: 88px; height: 88px; background: var(--sun, #f2b84b); color: #2b1a00; animation: ft-pulse 0.9s ease-in-out infinite; }
-.ft-land { width: 88px; height: 88px; background: var(--action); animation: ft-pulse 0.9s ease-in-out infinite; }
+.ft-strike { width: 88px; height: 88px; background: var(--sun, #f2b84b); color: #2b1a00; }
+.ft-land { width: 88px; height: 88px; background: var(--action); }
 .ft-reel { width: 100px; height: 100px; gap: 1px; }
 .ft-land > svg.ft-tension { opacity: .8; }
 .ft-reel .ft-word { font-size: 15px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
@@ -321,7 +321,10 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .ft-handle { display: grid; place-items: center; transition: transform .12s ease-out; }
 .ft-tapfx { position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #fff; animation: ft-tap .32s ease-out forwards; pointer-events: none; }
 @keyframes ft-tap { from { opacity: .9; transform: scale(1); } to { opacity: 0; transform: scale(1.28); } }
-@keyframes ft-pulse { 50% { transform: scale(1.05); box-shadow: 0 0 0 8px #f2b84b33, 0 6px 20px #0008; } }
+/* Pulse the halo, keeping the button and its touch target steady. */
+.ft-strike::before, .ft-land::before { content: ""; position: absolute; inset: -8px; border: 3px solid currentColor; border-radius: 50%; color: #f2b84b; pointer-events: none; animation: ft-alert 1.2s ease-out infinite; }
+.ft-land::before { color: var(--action); }
+@keyframes ft-alert { from { opacity: .65; transform: scale(.96); } to { opacity: 0; transform: scale(1.12); } }
 .ft-pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #ffffff2a; background: #0a141bb3; color: #fff; font-size: 13px; font-weight: 650; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); touch-action: manipulation; }
 .ft-pill svg { width: 15px; height: 15px; }
 .ft-drag { display: grid; gap: 6px; }
@@ -333,7 +336,7 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 /* a stray tap that hides the controls never hides a bite, the fight or the landing: those stay until they're done */
 .immersive.ui-hidden .fs-overlay > .fs-bottom:has(.fish-tray.is-urgent) { opacity: 1; }
 .immersive.ui-hidden .fs-overlay > .fs-bottom .fish-tray.is-urgent .ft-row > *, .immersive.ui-hidden .fs-overlay > .fs-bottom .fish-tray.is-urgent .ft-row button { pointer-events: auto; }
-@media (prefers-reduced-motion: reduce) { .ft-tapfx { animation: none; display: none; } .ft-strike, .ft-land, .ft-main > svg.ft-tension.slip { animation: none; } .fish-tray { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ft-tapfx { animation: none; display: none; } .ft-strike::before, .ft-land::before { animation: none; display: none; } .ft-main > svg.ft-tension.slip { animation: none; } .fish-tray { transition: none; } }
 
 /* the viewer's slim tray: no box, just a soft shadow behind the words */
 .view-tray { pointer-events: auto; display: flex; flex-direction: column; gap: 6px; max-width: min(78vw, 420px); transition: opacity .25s, transform .25s; }

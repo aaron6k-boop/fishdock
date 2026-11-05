@@ -112,7 +112,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
         ) : null}
         {act === "cast" ? (
           <button type="button" className={`ft-main ft-cast${power != null ? " holding" : ""}`} aria-label="Cast: hold to build power, let go to cast"
-            onPointerDown={castDown} onPointerUp={castUp} onPointerCancel={castCancel} onContextMenu={(e) => e.preventDefault()}
+            onPointerDown={castDown} onPointerUp={castUp} onPointerCancel={castCancel} onLostPointerCapture={castCancel} onBlur={castCancel} onContextMenu={(e) => e.preventDefault()}
             onKeyDown={key(() => { if (ok("cast")) onCast?.(world?.current?.castParams?.(0.6) || { power: 0.6 }); })}>
             {power != null ? <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring power" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - power) }} /></svg> : null}
             <Icon name="target" /><span>{power != null ? `${Math.round(power * 100)}%` : "Cast"}</span>
@@ -123,10 +123,10 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
         {act === "reel" ? (
           <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
             onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onTap?.(); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => setPressed(false)} onPointerCancel={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onContextMenu={(e) => e.preventDefault()}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!e.repeat) (onTap || onNudge)?.(); } }}>
             {tenRing}
             {tapFx ? <span key={tapFx} className="ft-tapfx" aria-hidden="true" /> : null}
-            <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span className="ft-word">Reel</span>
+            <span className="ft-handle" style={{ transform: `rotate(${(fight?.turns || 0) * 360}deg)` }}><Icon name="refresh" /></span><span className="ft-word">Reel</span>
             {dist ? <b className="ft-dist" aria-label={`About ${dist.replace("\u00a0", " ")} out`}>{dist}</b> : null}
           </button>
         ) : null}

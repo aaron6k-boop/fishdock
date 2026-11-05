@@ -5,6 +5,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { spotById } from "../data/spots.js";
 import { Icon } from "./ui.jsx";
+import { bindSceneInput } from "../lib/world3d/sceneInput.js";
 import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
 import { landCamOn } from "../lib/viewPrefs.js";
@@ -138,48 +139,10 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   useEffect(() => { soundEnv(heard); }, [JSON.stringify(heard)]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!ready) return undefined; const ro = new ResizeObserver(() => W.current?.resize()); ro.observe(wrap.current); return () => ro.disconnect(); }, [ready]);
 
-  // ---- touch and mouse: drag to look, pinch or wheel to zoom, double tap to recentre ----
+  // ---- touch and keyboard input, including cancellation on focus loss ----
   useEffect(() => {
     const el = canvas.current; if (!el) return undefined;
-    const pts = new Map(); let pinch = 0, stopping = false;
-    // a touch while the view is still turning (after a flick, or steering itself) just stops it: it isn't a tap, so it
-    // doesn't show or hide the controls by accident
-    const down = (e) => { el.setPointerCapture?.(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) { const st = W.current?.look.state(); stopping = !!st && (Math.abs(st.vyaw) > 0.05 || Math.abs(st.vpitch) > 0.05 || !!st.aim); W.current?.look.start(); } if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
-    const move = (e) => {
-      if (!pts.has(e.pointerId)) return;
-      const p = pts.get(e.pointerId), dx = e.clientX - p[0], dy = e.clientY - p[1]; pts.set(e.pointerId, [e.clientX, e.clientY]);
-      if (pts.size === 1) W.current?.look.drag(dx, dy, el.clientHeight);
-      else if (pts.size === 2) { const [a, b] = [...pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) W.current?.look.zoom(d / pinch); pinch = d; }
-    };
-    // a tap (no drag) shows or hides the controls, unless a second tap follows (that recentres instead)
-    let tapTimer = 0;
-    const up = (e) => {
-      if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId);
-      if (pts.size === 0) {
-        const L = W.current?.look; L?.end();
-        // a tap on your landed fish: have a look at it
-        if (L && L.state().moved < 8 && props.current.onFishTap) { const r = el.getBoundingClientRect(); if (W.current?.tapFish(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1))) { props.current.onFishTap(); pinch = 0; return; } }
-        if (L && L.state().moved < 8 && !stopping) {
-          clearTimeout(tapTimer);
-          // walking about: a tap on the ground walks you there (a double tap still recentres the view)
-          if (W.current?.walking) { const r = el.getBoundingClientRect(), nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1); if (!L.tap(performance.now())) tapTimer = setTimeout(() => { if (!W.current?.walkTo(nx, ny)) props.current.onTap?.(); }, 260); }
-          // (while a fish is on, a tap that misses the Reel button does nothing: no recentring, no hiding the controls)
-          else if (props.current.fight) { /* fighting a fish */ }
-          else if (!L.tap(performance.now())) tapTimer = setTimeout(() => props.current.onTap?.(), 330);
-        }
-      }
-      pinch = 0;
-    };
-    const wheel = (e) => { e.preventDefault(); W.current?.look.zoom(e.deltaY < 0 ? 1.08 : 1 / 1.08); };
-    // walking with the keyboard: WASD (or the arrow keys) to move, Space to jump, Shift to sprint
-    const held = new Set();
-    const walkKeys = () => { const w = W.current; if (!w?.walking) return; const has = (...k) => k.some((x) => held.has(x)); w.setWalkInput({ x: (has("d", "D") ? 1 : 0) - (has("a", "A") ? 1 : 0), y: (has("w", "W") ? 1 : 0) - (has("s", "S") ? 1 : 0), sprint: has("Shift") }); };
-    const keyUp = (e) => { held.delete(e.key); walkKeys(); };
-    const key = (e) => {
-      if (W.current?.walking) { if (e.key === " ") { e.preventDefault(); W.current.jump(); return; } if (/^[wasdWASD]$|^Shift$/.test(e.key)) { held.add(e.key); walkKeys(); return; } }
-      const L = W.current?.look; if (!L) return; const k = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -30], ArrowDown: [0, 30] }[e.key]; if (k) { e.preventDefault(); L.start(); L.drag(-k[0], -k[1], el.clientHeight); L.end(); } if (e.key === "Home") L.recenter(); };
-    el.addEventListener("pointerdown", down); el.addEventListener("pointermove", move); el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); el.addEventListener("wheel", wheel, { passive: false }); el.addEventListener("keydown", key); el.addEventListener("keyup", keyUp);
-    return () => { el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", key); el.removeEventListener("keyup", keyUp); };
+    return bindSceneInput(el, () => W.current, () => props.current);
   }, []);
 
   useImperativeHandle(ref, () => ({

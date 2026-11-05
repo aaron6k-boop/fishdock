@@ -24,10 +24,12 @@ export function addRipple(list, x, z, s = 0.6) {
 }
 
 /** Ages the rings by `dt` seconds, drops the finished ones, and gives the shader's rows [x, z, age, strength now]. */
-export function stepRipples(list, dt) {
+export function stepRipples(list, dt, out = []) {
   for (const r of list) r[2] += dt;
   for (let i = list.length - 1; i >= 0; i--) if (list[i][2] > list[i][4]) list.splice(i, 1);
-  return list.map((r) => [r[0], r[1], r[2], rippleNow(r[3], r[2], r[4])]);
+  for (let i = 0; i < list.length; i++) { const r = list[i], row = out[i] || (out[i] = [0, 0, 0, 0]); row[0] = r[0]; row[1] = r[1]; row[2] = r[2]; row[3] = rippleNow(r[3], r[2], r[4]); }
+  out.length = list.length;
+  return out;
 }
 
 /** A contact shadow's darkness from its middle (r = 0) to its edge (r = 1): even close under, a long soft tail. */

@@ -17,7 +17,7 @@ export const handleState = (at = 0) => ({ angle: at, v: 0, base: null, last: nul
 export function stepHandle(s, turns, dt, w = HANDLE_W) {
   let { angle: x, v, base, last } = s;
   if (last == null) base = x; // (a fight's turns start from nought)
-  else if (turns < last - 1e-6) base = x - turns * Math.PI * 2;
+  else if (turns < last - 1e-6) { base = x - turns * Math.PI * 2; v = 0; } // no leftover momentum into a new fight
   last = turns;
   const target = turns * Math.PI * 2 + base;
   if (target - x > Math.PI * 6) { x = target - Math.PI; v = 0; }
