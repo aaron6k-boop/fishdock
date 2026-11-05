@@ -23,5 +23,15 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FishParty"] }],
   "d1_databases": [
     { "binding": "DB", "database_name": "fishdock", "database_id": "d6a8e717-4f54-460f-b5c4-6e6c55f206ba" }
-  ]
+  ],
+  // Branch reviews use an empty test database, never live catches or account data.
+  // The Firebase project only verifies identity; app data stays in the preview DB.
+  // A local class binding gives each Preview its own Fish Together namespace.
+  "previews": {
+    "vars": { "FIREBASE_PROJECT_ID": "fishdock" },
+    "d1_databases": [
+      { "binding": "DB", "database_name": "fishdock-preview", "database_id": "f81d39ed-0a38-4bd3-95b3-fb66a895efad" }
+    ],
+    "durable_objects": { "bindings": [{ "name": "PARTY", "class_name": "FishParty" }] }
+  }
 }
