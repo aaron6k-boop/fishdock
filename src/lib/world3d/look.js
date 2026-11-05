@@ -32,6 +32,8 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     start() { s.dragging = true; s.moved = 0; s.vyaw = 0; s.vpitch = 0; s.aim = null; s.dragAt = 0; },
     // (a finger held still before letting go is no flick: the view stops where it is)
     end() { s.dragging = false; if (!s.smooth || performance.now() - (s.dragAt || 0) > 90) { s.vyaw = 0; s.vpitch = 0; } s.vyaw = clamp(s.vyaw, -6, 6); s.vpitch = s.flickPitch ? clamp(s.vpitch, -3, 3) : 0; },
+    /** Aborted input must never become a flick, tap or delayed follow turn. */
+    cancel() { s.dragging = false; s.vyaw = 0; s.vpitch = 0; s.fv = 0; s.aim = null; s.lastTap = 0; s.touched = performance.now(); },
     /** the range the view may tip through, and whether a flick carries on up or down (walking about: a narrower range,
      *  and no vertical flick, so a thumb lifting off the screen never throws the view up into the sky). No args: as normal */
     setPitchRange(min = PITCH.min, max = PITCH.max, flick = true) { s.pmin = min; s.pmax = max; s.flickPitch = !!flick; s.pitch = clamp(s.pitch, min, max); if (!flick) s.vpitch = 0; },
@@ -62,7 +64,7 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     easePitch(to, k) { if (s.dragging || s.aim || !(k > 0)) return; s.pitch = clamp(s.pitch + (to - s.pitch) * Math.min(1, k), s.pmin, s.pmax); },
     /** advance by dt seconds: inertia after a flick, or easing towards an aim */
     step(dt) {
-      if (s.dragging) return api;
+      if (s.dragging || !(dt > 0) || !Number.isFinite(dt)) return api;
       if (s.aim) {
         const k = 1 - Math.exp(-dt * 5);
         s.yaw = wrap(s.yaw + wrap(s.aim.yaw - s.yaw) * k); s.pitch += (s.aim.pitch - s.pitch) * k;
@@ -70,7 +72,9 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
         return api;
       }
       const damp = Math.exp(-dt * 4.5);
-      s.yaw = wrap(s.yaw + s.vyaw * dt); s.pitch = clamp(s.pitch + s.vpitch * dt, s.pmin, s.pmax);
+      // Integrate the decaying velocity exactly: identical travel at 20, 60 and 120 fps.
+      const travel = (1 - damp) / 4.5;
+      s.yaw = wrap(s.yaw + s.vyaw * travel); s.pitch = clamp(s.pitch + s.vpitch * travel, s.pmin, s.pmax);
       s.vyaw *= damp; s.vpitch *= damp;
       if (Math.abs(s.vyaw) < 1e-3) s.vyaw = 0; if (Math.abs(s.vpitch) < 1e-3) s.vpitch = 0;
       return api;

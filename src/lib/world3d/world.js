@@ -84,7 +84,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       dropPos.set([at.x, Math.max(at.y, 0) + 0.02, at.z], k * 3); dropV.set([Math.cos(a) * sp * 0.6, 1.5 + Math.random() * 3 * size, Math.sin(a) * sp * 0.6], k * 3); dropLife[k] = 1;
     }
   }
-  const ripples = [];
+  const ripples = [], rippleRows = [];
   // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
   // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)
   // (waterFx.js: small, short-lived rings, so a fight's swirls don't pile up into wide pale loops round the net)
@@ -242,7 +242,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * 1.75 - fx * 0.45, 0, -sz * 1.75 - fz * 0.45)); at0.y = mk.at.y + 1.45; // (a little back from it, so the railing is behind the fish, not across it)
       { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
-      camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
+      // Coming from the net outside a high pier: rise clear of the railing before crossing it.
+      // Moving horizontally and vertically together could spend a second inside a post.
+      if (far > 1 && camPos.y < mk.at.y + 1.75) camPos.y += (mk.at.y + 1.8 - camPos.y) * (1 - Math.exp(-dt * 6));
+      else camPos.lerp(to, 1 - Math.exp(-dt * 4));
+      camera.position.copy(camPos);
       // (the fish a little above the middle, at the height of the clear band between the top bar and the card about it
       // along the bottom: the card never covers it)
       camera.fov = 52; camera.updateProjectionMatrix(); camera.lookAt(c); camera.rotateX(-Math.atan(Math.tan((camera.fov * Math.PI) / 360) * FISH_NDC_Y));
@@ -464,7 +468,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
 
   // ---- the loop ----
   let raf = 0, last = 0, visible = true, slow = 0, onFrame = null, clock0 = performance.now(), nowFn = Date.now;
-  const vis = () => { visible = document.visibilityState !== "hidden"; };
+  const vis = () => { visible = document.visibilityState !== "hidden"; last = 0; };
   document.addEventListener("visibilitychange", vis);
   // steady frame pacing on a phone: if frames keep coming late (the GPU can't keep up at this sharpness), draw at a
   // slightly lower resolution, a step at a time, and back up again once there's room. Better an even 60 (or 30) than
@@ -610,13 +614,16 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (camBlend) { applyBlend(); const me = anglers.get(localId); if (!W && me?.out?.eye && (mode === "first" || mode === "free") && camera.position.distanceTo(me.out.eye) > 0.7) me.a.setFirstPerson(false); }
     if (aimPower != null) { const pl = castPlanFor(aimPower); aimMark.visible = !!pl; if (pl) { aimMark.position.set(pl.point[0], 0.03, pl.point[1]); const k = (1.2 + pl.dist / 40) * (1 + 0.08 * Math.sin(t * 6)); aimMark.scale.set(k, 1, k); } } else aimMark.visible = false;
     // droplets fall back, rings spread
+    let dropsChanged = false, activeDrops = 0;
     for (let k = 0; k < DROPS; k++) {
-      if (dropLife[k] <= 0) { dropPos[k * 3 + 1] = -50; continue; }
+      if (dropLife[k] <= 0) { if (dropPos[k * 3 + 1] !== -50) { dropPos[k * 3 + 1] = -50; dropsChanged = true; } continue; }
+      dropsChanged = true; activeDrops++;
       dropV[k * 3 + 1] -= 9.8 * dt; dropPos[k * 3] += dropV[k * 3] * dt; dropPos[k * 3 + 1] += dropV[k * 3 + 1] * dt; dropPos[k * 3 + 2] += dropV[k * 3 + 2] * dt;
       if (dropPos[k * 3 + 1] < -0.05) dropLife[k] = 0;
     }
-    dropGeo.attributes.position.needsUpdate = true;
-    env.setRipples(stepRipples(ripples, dt));
+    drops.visible = activeDrops > 0;
+    if (dropsChanged) dropGeo.attributes.position.needsUpdate = true;
+    env.setRipples(stepRipples(ripples, dt, rippleRows));
     env.update(t, dt, camera);
     adapt();
     if (draw) renderer.render(scene, camera);

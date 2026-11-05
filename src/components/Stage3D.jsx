@@ -173,7 +173,7 @@ function Joystick({ onMove, size = "m", float = false }) {
     if (float) { const r = zone.current.getBoundingClientRect(); zone.current.style.setProperty("--jx", `${e.clientX - r.left}px`); zone.current.style.setProperty("--jy", `${e.clientY - r.top}px`); setAt([e.clientX, e.clientY]); move(e, [e.clientX, e.clientY]); }
     else move(e);
   };
-  const handlers = { onPointerDown: down, onPointerMove: (e) => { if (id.current === e.pointerId) move(e); }, onPointerUp: end, onPointerCancel: end };
+  const handlers = { onPointerDown: down, onPointerMove: (e) => { if (id.current === e.pointerId) move(e); }, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end };
   return (
     <div ref={zone} className={`joystick-zone stick-${size}${float ? " floating" : ""}${busy ? " active" : ""}`} {...(float ? handlers : {})}>
       <div className={`joystick${float && at ? " placed" : ""}`} role="application" aria-label="Walk: drag the stick" {...(float ? {} : handlers)}>

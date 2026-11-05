@@ -223,17 +223,18 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // ---- fine ripples, carried by the wind (a river's by its current) ----
         // in patches: a gust ruffles one stretch and leaves the next calm, so no one pattern shows across the water.
         // Further out they're smaller than a pixel and are left out rather than shimmer
+        float footprint = max(length(dFdx(p)), length(dFdy(p)));
         vec2 flow = uKind > 1.5 && uKind < 2.5 ? vec2(-uTime*.6, 0.) : -wd*uTime*.35;
         float gust = .45 + 1.1*noise(p*.021 - flow*.12 + 7.);
         vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
-        g += r1.yz*vec2(1.9, 2.6)*(.024 + .05*uWind)*gust*(1. - smoothstep(30., 220., dist));
+        g += (mat2(.8, .6, -.6, .8)*(r1.yz*vec2(1.9, 2.6)))*(.5 + .5*(1. - smoothstep(.12, .5, footprint)))*(.024 + .05*uWind)*gust*(1. - smoothstep(30., 220., dist));
         #if WQ > 0
           vec3 r2 = noised(mat2(.47, .88, -.88, .47)*p*6.1 + flow*1.6);
-          g += r2.yz*6.1*(.004 + .011*uWind)*gust*(1. - smoothstep(14., 90., dist));
+          g += (mat2(.47, -.88, .88, .47)*r2.yz)*6.1*(1. - smoothstep(.04, .16, footprint))*(.004 + .011*uWind)*gust*(1. - smoothstep(14., 90., dist));
         #endif
         #if WQ > 1
           vec3 r3 = noised(p*13.7 - flow*2.1 + 3.);
-          g += r3.yz*13.7*(.0016 + .004*uWind)*(1. - smoothstep(8., 45., dist));
+          g += r3.yz*13.7*(1. - smoothstep(.018, .075, footprint))*(.0016 + .004*uWind)*(1. - smoothstep(8., 45., dist));
         #endif
         vec3 n = normalize(vec3(-g.x, 1., -g.y));
         // rain: a scatter of drop rings, each kept inside its own cell (cut off at the cell's edge they showed as
@@ -263,7 +264,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           float env = fr > 0. ? exp(-fr*fr*.35) : exp(fr*.55);
           n.xz += (o/(d + .05))*sin(fr)*env*r.w*.3/(1. + R*1.4)*(1. - smoothstep(1.6, 2.4, d));
           float bits = smoothstep(.5, .8, noise(p*6.3 + r.xy + uTime*.7)*.65 + noise(p*15.1 - uTime*.9)*.35);
-          churn += min(1., r.w*1.6)*smoothstep(1.6, .05, age)*(1. - smoothstep(.2 + age*.35, .45 + age*.6, dn))*bits; }
+          churn += min(1., r.w*1.6)*(1. - smoothstep(.05, 1.6, age))*(1. - smoothstep(.2 + age*.35, .45 + age*.6, dn))*bits; }
         n = normalize(n);
         // ---- colour: the sky mirrored, the water's own colour seen through it ----
         vec3 rd = reflect(-v, n); rd.y = abs(rd.y);
