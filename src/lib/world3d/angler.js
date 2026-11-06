@@ -41,15 +41,15 @@ export const OUTFITS = [
 // as [from, to, radius, part] along the rod (seat: metal; grip: EVA foam; cork), where the reel sits, the rings
 // (where, and the first ring's size: bigger on a beachcaster), the reel's size, and a quiver tip on a feeder rod
 const ROD = {
-  beach: { name: "Beachcaster", len: 4.2, col: 0xd6a63c, flex: 0.78, r0: 0.0125, r1: 0.0026, seat: 0.68, g0: 0.028, reel: 1.3,
+  beach: { name: "Beachcaster", len: 4.2, col: 0xd6a63c, flex: 0.78, r0: 0.0125, r1: 0.0026, seat: 0.68, g0: 0.018, reel: 1.3,
     handle: [[0, 0.03, 0.018, "seat"], [0.03, 0.62, 0.0165, "grip"], [0.62, 0.74, 0.014, "seat"], [0.74, 0.92, 0.0155, "grip"], [0.92, 0.95, 0.013, "seat"]], guides: [0.36, 0.5, 0.62, 0.72, 0.81, 0.88, 0.94, 0.98] },
-  pier: { name: "Pier rod", len: 3.6, col: 0x2870ec, flex: 1, r0: 0.0108, r1: 0.0022, seat: 0.45, g0: 0.021, reel: 1,
+  pier: { name: "Pier rod", len: 3.6, col: 0x2870ec, flex: 1, r0: 0.0108, r1: 0.0022, seat: 0.45, g0: 0.0135, reel: 1,
     handle: [[0, 0.02, 0.016, "seat"], [0.02, 0.4, 0.0152, "grip"], [0.4, 0.5, 0.0128, "seat"], [0.5, 0.66, 0.0142, "grip"], [0.66, 0.69, 0.0122, "seat"]], guides: [0.25, 0.37, 0.49, 0.6, 0.7, 0.8, 0.89, 0.96] },
-  estuary: { name: "Spinning rod", len: 3.0, col: 0x2870ec, flex: 1.05, r0: 0.0098, r1: 0.002, seat: 0.35, g0: 0.02, reel: 0.9,
+  estuary: { name: "Spinning rod", len: 3.0, col: 0x2870ec, flex: 1.05, r0: 0.0098, r1: 0.002, seat: 0.35, g0: 0.012, reel: 0.9,
     handle: [[0, 0.02, 0.015, "seat"], [0.02, 0.3, 0.0145, "cork"], [0.3, 0.4, 0.0125, "seat"], [0.4, 0.52, 0.0138, "cork"], [0.52, 0.55, 0.012, "seat"]], guides: [0.2, 0.33, 0.45, 0.57, 0.68, 0.78, 0.87, 0.95] },
-  river: { name: "Float rod", len: 3.9, col: 0xd63434, flex: 1.35, r0: 0.0085, r1: 0.0015, seat: 0.29, g0: 0.012, reel: 0.8,
+  river: { name: "Float rod", len: 3.9, col: 0xd63434, flex: 1.35, r0: 0.0085, r1: 0.0015, seat: 0.29, g0: 0.008, reel: 0.8,
     handle: [[0, 0.02, 0.014, "seat"], [0.02, 0.25, 0.0135, "cork"], [0.25, 0.33, 0.012, "seat"], [0.33, 0.55, 0.013, "cork"], [0.55, 0.57, 0.0115, "seat"]], guides: [0.17, 0.24, 0.31, 0.38, 0.45, 0.52, 0.59, 0.66, 0.73, 0.8, 0.87, 0.93, 0.98] },
-  lake: { name: "Feeder rod", len: 3.6, col: 0x2ea060, flex: 1.15, r0: 0.0095, r1: 0.0018, seat: 0.4, g0: 0.018, reel: 1, tip: { from: 0.86, col: 0xff4a2a },
+  lake: { name: "Feeder rod", len: 3.6, col: 0x2ea060, flex: 1.15, r0: 0.0095, r1: 0.0018, seat: 0.4, g0: 0.011, reel: 1, tip: { from: 0.86, col: 0xff4a2a },
     handle: [[0, 0.02, 0.015, "seat"], [0.02, 0.35, 0.0142, "grip"], [0.35, 0.45, 0.0125, "seat"], [0.45, 0.58, 0.0135, "grip"], [0.58, 0.61, 0.012, "seat"]], guides: [0.22, 0.34, 0.46, 0.57, 0.67, 0.76, 0.84, 0.9, 0.95, 0.985] },
 };
 export const rodFor = (venue) => ROD[venue] || ROD.pier;
@@ -195,7 +195,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const handleParts = R.handle.map(([a, b, r, part]) => { const m = new THREE.Mesh(unitCyl, PART[part]); m.castShadow = true; root.add(m); return { m, a, b, r }; });
   const GUIDES = R.guides;
   const guides = GUIDES.map((s, i) => {
-    const r = lerp(R.g0, Math.min(R.g0, 0.0045), i / (GUIDES.length - 1)), g = new THREE.Group(); root.add(g);
+    const r = R.g0 * (Math.min(R.g0, 0.003) / R.g0) ** (i / (GUIDES.length - 1)) ** 0.8, /* (as rodKit.js: shrinking fastest near the butt) */ g = new THREE.Group(); root.add(g);
     const ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.0013, r * 0.15), 6, 18), mRing); ring.position.y = -(r * 1.35 + 0.006); g.add(ring);
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.0013, 0.0013, r * 0.4 + 0.008, 4), mRing); leg.position.y = -(r * 0.2 + 0.004); g.add(leg);
     const wrap = new THREE.Mesh(unitCyl, mWhip); wrap.rotation.x = Math.PI / 2; wrap.scale.set(0.0001, 0.026, 0.0001); g.add(wrap);
@@ -693,7 +693,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // (beaten, it lies over on its side on top: TIRED_ROLL, so its flank shows)
         const spineY = surfaceSpine(surf.y, restHeight(halfDepth(), halfThick(), TIRED_ROLL));
         if (age >= T1 && age < T3) { rigAt = fishWait.clone(); rigAt.y = spineY; }
-        else if (age >= T3 && age < T4) { const f = ease(seg(age, T3, T4)); rigAt = fishWait.clone().lerp(under, f); rigAt.y = lerp(spineY, Math.max(spineY, netAt ? netAt.y - 0.04 : under.y + 0.1), f); }
+        else if (age >= T3 && age < T4) {
+          // led over the net and into it: towards where the net actually is now (it sways on its rope), arriving at the very
+          // place it sits in the mesh once the net comes up, so there's no jump when it's caught. It stays at the surface
+          // until it's over the hoop, then drops into the bag
+          const f = ease(seg(age, T3, T4)), inBag = netAt ? netAt.clone().add(new THREE.Vector3(0, -0.12 * ns, 0)) : under;
+          rigAt = fishWait.clone().lerp(inBag, f); rigAt.y = f < 0.7 ? Math.max(spineY, lerp(spineY, inBag.y, f / 0.7 * 0.3)) : lerp(Math.max(spineY, lerp(spineY, inBag.y, 0.3)), inBag.y, (f - 0.7) / 0.3);
+        }
         else if (age >= T4) { rigAt = netAt.clone().add(new THREE.Vector3(0, -0.12 * ns, 0)); inNet = true; pitch = 0.7; bendT = 0.06; }
         if (age >= T1 && age < T4) { bendT = 0.18 * load; }
         // the net going into the water, and coming out with the fish

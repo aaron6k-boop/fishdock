@@ -409,9 +409,11 @@ function realArms(scene, { gloves, skinHex }) {
     // changes a lot, which it doesn't while you fish: the elbow's fixed in the view)
     // (on the knob the grip is found once and kept: the knob goes round, so the way to the elbow from it changes all
     // the time, and solving again each time it crossed a step put the hand in a different grip every quarter turn)
-    const Fq = Fin && kind !== "crank" ? [Math.round(Fin.x * 4), Math.round(Fin.y * 4), Math.round(Fin.z * 4)].join(",") : "";
+    const Fq = Fin && kind !== "crank" && kind !== "ropeg" ? [Math.round(Fin.x * 4), Math.round(Fin.y * 4), Math.round(Fin.z * 4)].join(",") : "";
     const key = kind + side + Fq; if (solved.has(key)) return solved.get(key);
     const T = V(0, 0, 1), U = V(0, 1, 0), X = V(1, 0, 0), M = S.M;
+    // (the knob, or for "ropeg" the drop net's rope or the hoop's rim: thinner and longer, so the fingers close further)
+    const KR = kind === "ropeg" ? 0.0055 : GRIP.knobR, KLn = kind === "ropeg" ? 0.12 : GRIP.knobLen;
     const yl = M.y.clone().normalize(), nl = M.n.clone().addScaledVector(yl, -M.n.dot(yl)).normalize(), xl = yl.clone().cross(nl);
     const Rl = basis(xl, yl, nl).invert();
     // where the forearm comes from (the reel's frame): behind, below, out on the elbow's side
@@ -428,7 +430,7 @@ function realArms(scene, { gloves, skinHex }) {
         const gap = Ph.clone().add(M.gap.clone().applyQuaternion(Qh)); Ph.addScaledVector(T, -gap.z);
       } else {
         // the knob in the hook of the index and middle fingers, the fingers over its middle
-        const hook = M.hook.clone().applyQuaternion(Qh); Ph = Nt.clone().multiplyScalar(-(GRIP.knobR + KD)).sub(hook); Ph.x = -hook.x;
+        const hook = M.hook.clone().applyQuaternion(Qh); Ph = Nt.clone().multiplyScalar(-(KR + KD)).sub(hook); Ph.x = -hook.x;
       }
       const r = trySet(S, Qh, Ph, kind);
       const wristBend = yl.clone().applyQuaternion(Qh).negate().angleTo(F);
@@ -478,7 +480,7 @@ function realArms(scene, { gloves, skinHex }) {
         const col = (k) => Mx.map((row, ri) => row.map((v, ci) => (ci === k ? bv[ri] : v)));
         const Dc = det(col(0)) / d0, Ec = det(col(1)) / d0, Fc = det(col(2)) / d0;
         const cx = -Dc / 2, cy = -Ec / 2, rad = Math.sqrt(Math.max(0, cx * cx + cy * cy - Fc));
-        const err = Math.abs(rad - (GRIP.knobR + 0.0085));
+        const err = Math.abs(rad - (KR + 0.0085));
         if (!bestC || err < bestC.err) { const along = pts.reduce((a2, p2) => a2 + p2.dot(xl), 0) / pts.length; bestC = { err, c, Cl: u.clone().multiplyScalar(cx).addScaledVector(w, cy).addScaledVector(xl, along), rad }; }
       }
       S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
@@ -492,7 +494,7 @@ function realArms(scene, { gloves, skinHex }) {
         place2(S, Ph, Ph.clone().addScaledVector(yl.clone().applyQuaternion(Qh), -S.len), Qh);
         S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, a < 2 ? fk[k] : [[1.5, 1.6, 1.0], [1.6, 1.6, 1.05]][a - 2][k]))));
         root.updateMatrixWorld(true);
-        const t = wrap(S.thumb, V(0, 0, 0), X, GRIP.knobR, 0.0095, null, true, [0.5, 0.4, 0.3], GRIP.knobLen);
+        const t = wrap(S.thumb, V(0, 0, 0), X, KR, 0.0095, null, true, [0.5, 0.4, 0.3], KLn);
         if (!(t.hits > 0)) {
           // (no contact found by bending it the usual way: the thumb set by trying, its pad on the far side of the knob from
           // the fingers, opposing them; whichever way its joints turn on this model)
@@ -500,7 +502,7 @@ function realArms(scene, { gloves, skinHex }) {
           for (let a0 = -1.0; a0 <= 1.01; a0 += 0.25) for (let a1 = -0.8; a1 <= 1.01; a1 += 0.3) {
             const ang = [a0, a1, a1 * 0.7]; S.thumb.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, ang[k]))); S.thumb[0].b.updateMatrixWorld(true);
             const tip = wp(S.thumb[2].b).add(V(0, 1, 0).applyQuaternion(wq(S.thumb[2].b)).multiplyScalar(S.thumb[2].len)), mid = wp(S.thumb[2].b);
-            const e = Math.abs(segSeg(tip, tip.clone().add(V(0, 1e-5, 0)), V(0, 0, 0), X, GRIP.knobLen) - GRIP.knobR - 0.007) + Math.max(0, GRIP.knobR + 0.006 - segSeg(mid, tip, V(0, 0, 0), X, GRIP.knobLen)) * 4 + Math.abs(a0) * 0.004;
+            const e = Math.abs(segSeg(tip, tip.clone().add(V(0, 1e-5, 0)), V(0, 0, 0), X, KLn) - KR - 0.007) + Math.max(0, KR + 0.006 - segSeg(mid, tip, V(0, 0, 0), X, KLn)) * 4 + Math.abs(a0) * 0.004;
             if (!tb || e < tb.e) tb = { e, ang };
           }
           t[0] = tb.ang[0]; t[1] = tb.ang[1]; t[2] = tb.ang[2]; t.hits = tb.e < 0.006 ? 1 : 0;
@@ -526,7 +528,7 @@ function realArms(scene, { gloves, skinHex }) {
           const Qh = basis(Xt, Yt, Nt).multiply(Rl);
           // the hollow of the hand (between the palm and the fingers' roots) just past the knob's end
           const cup = M.palm.clone().lerp(M.hook, TUNE.capCup ?? 0.55).applyQuaternion(Qh);
-          const Ph = X.clone().multiplyScalar(GRIP.knobLen / 2 + capOff).sub(cup);
+          const Ph = X.clone().multiplyScalar(KLn / 2 + capOff).sub(cup);
           const r = trySet(S, Qh, Ph, "cap");
           const wristBend = yl.clone().applyQuaternion(Qh).negate().angleTo(F);
           const miss = r.hit.reduce((a2, h) => a2 + (h >= 1 ? 0 : 1), 0) + (r.thit > 0 ? 0 : 0.6);
@@ -551,7 +553,7 @@ function realArms(scene, { gloves, skinHex }) {
       // (solved once, with the hand alone at the origin; the arms put back where they were)
       const Fin = elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).normalize();
       const G = solveGrip(S, kind, sideSign, Fin);
-      if (kind === "crank" || free) {
+      if (kind === "crank" || kind === "ropeg" || free) {
         // the knob turns freely in the fingers, so the hand is free to turn round it: each frame it's turned about the
         // knob's axis so the back of the hand lines up with the forearm (where the elbow is now). That is what keeps the
         // wrist straight all the way round, rather than the one grip carried round the circle at a fixed angle
@@ -819,7 +821,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // held by a grip on the equipment itself (realArms.poseSocket): on the knob, the wrist rolls a little as the handle
           // goes round (the knob turns in the fingers; the hand doesn't go round with it), and the forearm follows
           const roll = spec.kind === "crank" ? 0.32 * Math.sin((spec.spin || 0) + 0.6) : 0;
-          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "crank" : spec.kind, roll: spec.kind === "rope" ? 0 : roll, elbow, dt }); // (a rope is held as the knob is: across the fingers) // (a rope is held as the rod's handle is: round it)
+          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "ropeg" : spec.kind, roll: spec.kind === "rope" ? 0 : roll, elbow, dt }); // (a rope is held as the knob is: across the fingers, closed further round it)
           wr = r.wrist; el = r.elbow; h.cur = { pos: wr.clone(), quat };
         } else if (real) {
           real.pose(i, group, pos, quat, curl, elbow, spec && spec.kind === "butt" && spec.axis ? { at: spec.at, axis: spec.axis, kind: spec.kind, R: 0.0145, w: e } : null);

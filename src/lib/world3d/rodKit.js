@@ -144,7 +144,10 @@ export function buildRod(scene, R) {
   // whippings: one either side of each guide's feet, and trim bands on the blank above the fore grip and at the joint
   const bands = [R.handle[R.handle.length - 1][1] + 0.012, R.handle[R.handle.length - 1][1] + 0.03, R.len * 0.48];
   const wraps = inst(W, nG * 2 + bands.length);
-  const ringSize = R.guides.map((s, i) => R.g0 + (Math.min(R.g0, 0.0045) - R.g0) * (i / Math.max(1, nG - 1)));
+  // (the rings' radii: the butt guide's (g0: a 25 to 40 mm ring as on real rods) down to about 6 mm at the top guide,
+  // shrinking fastest near the butt, as a real guide train does (each ring a set fraction of the one before). They were
+  // half as big again, and the first rings looked like hoops in first person)
+  const gMin = Math.min(R.g0, 0.003), ringSize = R.guides.map((s, i) => R.g0 * (gMin / R.g0) ** (i / Math.max(1, nG - 1)) ** 0.8);
   const ringCentres = R.guides.map(() => new THREE.Vector3()), tipRing = new THREE.Vector3();
   const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), Y = new THREE.Vector3(), Xv = new THREE.Vector3();
   const n = pts0 => pts0.length - 1;
