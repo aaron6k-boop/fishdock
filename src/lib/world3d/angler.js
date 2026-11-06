@@ -1056,7 +1056,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope" };
           // (in first person each hand closes round the rope itself, found the same way as the grip on the rod: the rope
           // up through the fist, the fingers round its far side, the knuckles towards you)
-          if (fp) { const rq = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V3(-1, 0, 0), V3(0, 0, 1), V3(0, 1, 0)));
+          if (fp) { const rq = new THREE.Quaternion().setFromRotationMatrix((typeof window !== "undefined" && window.__fdRopeY === -1 ? new THREE.Matrix4().makeBasis(V3(1, 0, 0), V3(0, 0, -1), V3(0, 1, 0)) : new THREE.Matrix4().makeBasis(V3(-1, 0, 0), V3(0, 0, 1), V3(0, 1, 0))));
             for (const hh of hands) hh.sock = { pos: hh.at.clone(), quat: rq.clone() }; }
           lean = fp ? 0.1 : 0.22; crouch = 0.06; brace = landStage === "haul" ? 0.25 : 0; lookAtW = netAt ? netAt.clone() : lookAtW;
         } else if (landStage === "done") { lookAtW = netAt ? netAt.clone() : lookAtW; lean = 0.05; brace = 0;

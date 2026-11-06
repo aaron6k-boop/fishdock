@@ -366,7 +366,7 @@ function realArms(scene, { gloves, skinHex }) {
   // Each frame the hand is set from the grip and where the equipment is now: it can't drift, and the fingers stay as they
   // are through every turn of the handle (the knob turns in them; the wrist rolls a little with the handle's angle).
   const basis = (x, y, z) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
-  const GRIP = { rodR: 0.0145, knobR: 0.0095, knobLen: 0.032 };
+  const GRIP = { rodR: 0.0145, knobR: 0.01, knobLen: 0.026 }; // (the knob as modelled: 2 cm across, 2.6 cm long, rodkit.glb crank_knob)
   // palmTilt: the palm's facing, up (+) or down (-) from level; diag: how far forward the fingers lean (the handle's
   // diagonal across the palm); wristLim: how far the forearm may turn from straight behind the hand
   const TUNE = (typeof window !== "undefined" && window.__fdGripTune) || { wristLim: 0.6, wristW: 1.6 };
@@ -435,9 +435,13 @@ function realArms(scene, { gloves, skinHex }) {
       const ix = M.x.clone().applyQuaternion(Qh), wrongWay = kind === "seat" ? Math.max(0, 0.35 - ix.z) * 3 : Math.max(0, ix.x + 0.5) * 3;
       // (a finger that meets it straight from its root lies across it rather than round it: each should bend at its root)
       const flatF = r.f.reduce((a, x, k) => a + (kind !== "seat" && k >= 2 ? 0 : Math.max(0, 0.75 - x[0])), 0) * 1.5;
-      const score = (kind === "seat" && wristBend > (TUNE.wristMax ?? 1.0) ? 10 + wristBend : 0) + miss * 0.3 + wristBend * (TUNE.wristW ?? 1.6) + wrongWay + flatF + r.gap * 25 + r.over * 60 + r.thumbLow * 40 + (extra || 0);
+      // (how a real angler holds a spinning rod: the hand along the right side of the handle, palm towards it, the
+      // fingers running down that side and curling under it round the reel's stem, the thumb along the top. Not the
+      // hand on top with the fingers hooked over and down the far side, which is what reads as a claw)
+      const side = kind === "seat" ? Math.max(0, (TUNE.palmX ?? 0.7) - Nt.x * (TUNE.palmSign ?? 1)) * (TUNE.sideW ?? 4) + Math.max(0, Yt.y + (TUNE.fingDown ?? 0.45)) * (TUNE.downW ?? 2) : 0;
+      const score = side + (kind === "seat" && wristBend > (TUNE.wristMax ?? 1.0) ? 10 + wristBend : 0) + miss * 0.3 + wristBend * (TUNE.wristW ?? 1.6) + wrongWay + flatF + r.gap * 25 + r.over * 60 + r.thumbLow * 40 + (extra || 0);
       if (typeof window !== "undefined" && window.__fdFilm && kind === "seat") (window.__fdCand ||= []).push({ th: +CTH.toFixed(2), ps: +CPS.toFixed(2), sy: SY, se: SE, score: +score.toFixed(2), wrist: +wristBend.toFixed(2), over: +r.over.toFixed(3), tl: +r.thumbLow.toFixed(3), gap: +r.gap.toFixed(3), miss: +miss.toFixed(2), ww: +wrongWay.toFixed(2), flat: +flatF.toFixed(2) });
-      if (!best || score < best.score) best = { score, Qh, Ph, f: r.f.map((x) => [x[0], x[1], x[2]]), t: [r.t[0], r.t[1], r.t[2]], gap: r.gap, hit: r.hit, thit: r.thit, wristBend };
+      if (!best || score < best.score) best = { score, Qh, Ph, f: r.f.map((x) => [x[0], x[1], x[2]]), t: [r.t[0], r.t[1], r.t[2]], gap: r.gap, hit: r.hit, thit: r.thit, wristBend, ny: Nt.x, al: Yt.y };
     };
     if (kind === "seat") {
       // every way round the handle the palm could face it, and every lean of the hand along it
@@ -585,12 +589,12 @@ function realArms(scene, { gloves, skinHex }) {
       rest(); place(S, Pw, Ew, Qw);
       const w = A ? clamp(hold.w ?? 1, 0, 1) : 0, wrapF = hold?.kind === "crank" ? [1, 1, 0, 0] : [1, 1, 1, 1];
       S.fingers.forEach((ch, a) => {
-        const got = w > 0 && wrapF[a] ? wrap(ch, A, D, hold.R, 0.0085, null, false, fs[a], hold.kind === "crank" ? 0.032 : 0) : null;
+        const got = w > 0 && wrapF[a] ? wrap(ch, A, D, hold.R, 0.0085, null, false, fs[a], hold.kind === "crank" ? GRIP.knobLen : 0) : null;
         ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, got ? fs[a][k] + (got[k] - fs[a][k]) * w : fs[a][k])));
       });
       root.updateMatrixWorld(true);
       // the thumb: along the top of the handle (or round the knob), resting on it
-      const tg = w > 0 ? wrap(S.thumb, A, D, hold.R, 0.0095, null, hold.kind === "crank", null, hold.kind === "crank" ? 0.032 : 0) : null;
+      const tg = w > 0 ? wrap(S.thumb, A, D, hold.R, 0.0095, null, hold.kind === "crank", null, hold.kind === "crank" ? GRIP.knobLen : 0) : null;
       S.thumb.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, tg ? ts[k] * 0.8 + (tg[k] - ts[k] * 0.8) * w : ts[k] * 0.8)));
       root.updateMatrixWorld(true);
     },
