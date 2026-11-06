@@ -48,17 +48,18 @@ function rodMaterials() {
   const braid = doc ? normalTex(32, (x, y) => 0.5 + 0.5 * Math.sin(((x + y * 2) % 8) / 8 * Math.PI * 2), 1.5) : null;
   const std = (o) => new THREE.MeshStandardMaterial(o);
   MATS = {
-    rod_carbon: std({ color: 0x161a20, metalness: 0.35, roughness: 0.24, normalMap: scrim, normalScale: new THREE.Vector2(0.18, 0.18) }), // (a gloss finish: a standard material, no clearcoat pass, for phones)
+    // (carbon and epoxy are not metals: a satin finish over the weave, not a mirror; the blue accents held back)
+    rod_carbon: std({ color: 0x171a1f, metalness: 0.05, roughness: 0.34, normalMap: scrim, normalScale: new THREE.Vector2(0.18, 0.18) }), // (a gloss finish: a standard material, no clearcoat pass, for phones)
     rod_eva: std({ color: 0x1a1a1b, roughness: 0.94, metalness: 0, normalMap: foam, normalScale: new THREE.Vector2(0.7, 0.7) }),
     gunmetal: std({ color: 0x4a4f56, metalness: 0.9, roughness: 0.34, roughnessMap: brushed }),
-    chrome: std({ color: 0xd2d5d9, metalness: 1, roughness: 0.16 }),
-    blue_anodised: std({ color: 0x2457c4, metalness: 0.85, roughness: 0.3 }),
-    ceramic: std({ color: 0x2b2d31, metalness: 0.5, roughness: 0.1 }),
-    reel_graphite: std({ color: 0x1c1e22, metalness: 0.3, roughness: 0.46 }),
+    chrome: std({ color: 0xc9ccd0, metalness: 1, roughness: 0.22 }),
+    blue_anodised: std({ color: 0x2b4f96, metalness: 0.8, roughness: 0.36 }),
+    ceramic: std({ color: 0x2b2d31, metalness: 0.1, roughness: 0.18 }),
+    reel_graphite: std({ color: 0x1e2024, metalness: 0.05, roughness: 0.55 }),
     reel_brushed: std({ color: 0x9a9fa6, metalness: 1, roughness: 0.3, roughnessMap: brushed }),
     rubber: std({ color: 0x18181a, metalness: 0, roughness: 0.82, normalMap: foam, normalScale: new THREE.Vector2(0.3, 0.3) }),
-    braid_blue: std({ color: 0x2f62c8, metalness: 0.35, roughness: 0.45, normalMap: braid, normalScale: new THREE.Vector2(0.6, 0.6) }),
-    thread_blue: std({ color: 0x1f52c4, metalness: 0.55, roughness: 0.22 }),
+    braid_blue: std({ color: 0x31589f, metalness: 0, roughness: 0.62, normalMap: braid, normalScale: new THREE.Vector2(0.6, 0.6) }),
+    thread_blue: std({ color: 0x24499a, metalness: 0.1, roughness: 0.28 }),
   };
   if (scrim) { MATS.rod_carbon.normalMap.repeat.set(2, 1); }
   return MATS;

@@ -545,21 +545,23 @@ function realArms(scene, { gloves, skinHex }) {
     /** hand i held by a grip on the equipment: sock: { pos, quat } (the grip's frame, the group's space), kind "seat" |
      *  "crank", roll (radians, the wrist's roll about the knob), elbow (the group's space: where the arm comes from),
      *  dt. Returns { wrist, elbow } (the group's space). */
-    poseSocket(i, group, { pos, quat, kind, roll = 0, elbow, dt = 0.016 }) {
+    poseSocket(i, group, { pos, quat, kind, roll = 0, elbow, dt = 0.016, free = null }) {
       const S = sides[i]; group.updateWorldMatrix(true, false); group.getWorldQuaternion(gq);
       const sideSign = kind === "seat" ? (elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).x >= 0 ? 1 : -1) : 1;
       // (solved once, with the hand alone at the origin; the arms put back where they were)
       const Fin = elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).normalize();
       const G = solveGrip(S, kind, sideSign, Fin);
-      if (kind === "crank") {
+      if (kind === "crank" || free) {
         // the knob turns freely in the fingers, so the hand is free to turn round it: each frame it's turned about the
         // knob's axis so the back of the hand lines up with the forearm (where the elbow is now). That is what keeps the
         // wrist straight all the way round, rather than the one grip carried round the circle at a fixed angle
-        const bk = S.M.y.clone().normalize().applyQuaternion(G.Qh).negate(); bk.x = 0; const fe = Fin.clone(); fe.x = 0;
-        if (bk.lengthSq() > 1e-6 && fe.lengthSq() > 1e-6) { bk.normalize(); fe.normalize(); const want = Math.atan2(bk.clone().cross(fe).x, bk.dot(fe)) * (TUNE.crankFollow ?? 0.85);
+        // (a rope through the fist turns the same way, about its own length)
+        const ax = free === "z" ? "z" : "x";
+        const bk = S.M.y.clone().normalize().applyQuaternion(G.Qh).negate(); bk[ax] = 0; const fe = Fin.clone(); fe[ax] = 0;
+        if (bk.lengthSq() > 1e-6 && fe.lengthSq() > 1e-6) { bk.normalize(); fe.normalize(); const want = Math.atan2(bk.clone().cross(fe)[ax], bk.dot(fe)) * (TUNE.crankFollow ?? 0.85);
           const R0 = S.crankRoll ?? want; let d = want - R0; d = Math.atan2(Math.sin(d), Math.cos(d)); S.crankRoll = R0 + d * Math.min(1, dt * 14); roll = S.crankRoll + roll * (TUNE.crankRollExtra ?? 0); }
       }
-      const sq = gq.clone().multiply(quat); if (roll) sq.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), roll));
+      const sq = gq.clone().multiply(quat); if (roll) sq.multiply(new THREE.Quaternion().setFromAxisAngle(free === "z" ? V(0, 0, 1) : V(1, 0, 0), roll));
       const sp = group.localToWorld(pos.clone());
       let Pw = sp.clone().add(G.Ph.clone().applyQuaternion(sq)), Qw = sq.clone().multiply(G.Qh);
       let f = G.f, t = G.t;
@@ -817,7 +819,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // held by a grip on the equipment itself (realArms.poseSocket): on the knob, the wrist rolls a little as the handle
           // goes round (the knob turns in the fingers; the hand doesn't go round with it), and the forearm follows
           const roll = spec.kind === "crank" ? 0.32 * Math.sin((spec.spin || 0) + 0.6) : 0;
-          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "seat" : spec.kind, roll, elbow, dt }); // (a rope is held as the rod's handle is: round it)
+          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "seat" : spec.kind, roll, elbow, dt, free: spec.kind === "rope" ? "z" : null }); // (a rope is held as the rod's handle is: round it)
           wr = r.wrist; el = r.elbow; h.cur = { pos: wr.clone(), quat };
         } else if (real) {
           real.pose(i, group, pos, quat, curl, elbow, spec && spec.kind === "butt" && spec.axis ? { at: spec.at, axis: spec.axis, kind: spec.kind, R: 0.0145, w: e } : null);
