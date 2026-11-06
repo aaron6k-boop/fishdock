@@ -69,6 +69,11 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   }
   // (only the brightest light glows: the sun's glitter on the sea, lamps after dark, the sun low in the sky)
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.18, 0.35, 1.0);
+  // (a pixel that comes out as not-a-number, from any surface's shading, would be spread by the blur into a white
+  // blaze across the screen: the glow only takes light that's a real, finite number, capped)
+  const hp = bloom.materialHighPassFilter;
+  hp.fragmentShader = hp.fragmentShader.replace("vec4 texel = texture2D( tDiffuse, vUv );", "vec4 texel = texture2D( tDiffuse, vUv ); if (any(isnan(texel)) || any(isinf(texel))) texel = vec4(0.0); texel = min(texel, vec4(16.0));");
+  hp.needsUpdate = true;
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
   const grade = new ShaderPass(GradeShader);

@@ -976,7 +976,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const knob = toLocal(handle.localToWorld(kn.clone())), knobAx = toLocal(handle.localToWorld(kn.clone().add(V3(-0.026, 0, 0)))).sub(knob);
     if (walking) hands[1] = rodGrip(R.seat * 0.7, V3(-1, 0, 0.2), "carry");
     else if (held) {
-      hands[1] = rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"); // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below
+      hands[1] = { ...rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"), stem: along(R.seat).p }; // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below
       // the other hand: on the butt to cast, on the reel's handle to wind (while a fish is on and landing it); free
       // while you wait
       // (in first person, holding the rod while you wait, the left hand rests lightly on the knob, ready: it hung in the
@@ -1006,7 +1006,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         if (landStage === "up") { lookAtW = rigAt ? rigAt.clone() : lookAtW; lean = 0.1; }
         else if (landStage === "rod") {
           // laying the rod on the rail: the right hand goes with it, the left lets go of the reel
-          hands[1] = rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"); hands[0] = null; lean = 0.12; brace = 0;
+          hands[1] = { ...rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"), stem: along(R.seat).p }; hands[0] = null; lean = 0.12; brace = 0;
         } else if (landStage === "pick" && net0) {
           // stooping to the net on the deck, both hands on the hoop, and lifting it over the rail
           const rr = 0.3 * Math.max(1, (fishLen * 0.62) / 0.35);

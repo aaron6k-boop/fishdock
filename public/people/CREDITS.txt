@@ -4,6 +4,8 @@ The people (gardener.glb, m03.glb, m04.glb, m05.glb, m10.glb, m12.glb, m17.glb, 
 f14.glb) and their motion-captured walking, standing and looking-round movements (anims.glb) are from the Microsoft
 Rocketbox avatar library (https://github.com/microsoft/Microsoft-Rocketbox), converted to glTF for the web: textures
 reduced in size, the facial animation and finger detail left out, the walks taken out of their own forward travel.
+The *_hd.glb files (loaded on the High quality and Ultra settings) are the same people with the library's own
+source textures at full size: colour maps at 2048 px and normal maps at 1024 px (source-assets/people_hd.py).
 
 Avatars from the original source files:
   gardener.glb  Professions/Gardener_Male_01     f04.glb  Adults/Female_Adult_04

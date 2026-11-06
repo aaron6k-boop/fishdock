@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { unrle, GROUND, PLACE3D, inside } from "./osmPlace.js";
 import { concrete, sheetPiling, detail, noise2, photoTex, weather, weatherTex, decalTex, grateTex, DECAL } from "./textures3d.js";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { buildBuildings } from "./buildings3d.js";
 import { loadPart, weatherPierProps } from "./glbParts.js";
 import { buildSkyline } from "./skyline.js";
@@ -443,29 +443,33 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (let q = 0; q + 1 < nPost; q += 3) { const f0 = q / nPost, f1 = (q + 1) / nPost; rails.push({ a: [a[0] + (b[0] - a[0]) * f0, LAND + 0.08, a[1] + (b[1] - a[1]) * f0], b: [a[0] + (b[0] - a[0]) * f1, LAND + RAIL.h * 0.5, a[1] + (b[1] - a[1]) * f1], r: 0.014 }); }
   }
   if (posts.length) {
-    const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 7, 1, true), railMat, posts.length), mx = new THREE.Matrix4();
+    const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 24, 1, true), railMat, posts.length), mx = new THREE.Matrix4();
     posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); pm.castShadow = true; group.add(pm);
     // each post's fittings: a domed cap, a ball joint where the middle rail runs through, and a base plate bolted
     // to the deck
     const fit = (geo, y) => { const m = new THREE.InstancedMesh(geo, railMat, posts.length); posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND + y, z); m.setMatrixAt(q, mx); }); m.castShadow = true; group.add(m); };
     // (all the fittings in one mesh: the cap, the ball joint and the base plate with its four bolts)
     const parts = [
-      new THREE.SphereGeometry(0.04, 7, 2, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(0, RAIL.h + 0.02, 0),
-      new THREE.SphereGeometry(0.038, 6, 3).translate(0, RAIL.h * 0.5, 0),
-      new THREE.CylinderGeometry(0.075, 0.08, 0.018, 8, 1).translate(0, 0.009, 0),
-      new THREE.CylinderGeometry(0.036, 0.036, 0.05, 7, 1, true).translate(0, 0.043, 0), // (the post's welded collar)
-      ...[0, 1, 2, 3].map((k) => new THREE.CylinderGeometry(0.009, 0.009, 0.016, 4, 1).translate(Math.cos(k * Math.PI / 2 + 0.785) * 0.055, 0.024, Math.sin(k * Math.PI / 2 + 0.785) * 0.055)),
+      // (round now: they were five to eight sided, and up close every railing read as a bundle of flat strips)
+      new THREE.SphereGeometry(0.04, 24, 6, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(0, RAIL.h + 0.02, 0),
+      new THREE.CylinderGeometry(0.041, 0.041, 0.012, 24, 1, true).translate(0, RAIL.h + 0.016, 0), // (the cap's skirt)
+      new THREE.SphereGeometry(0.038, 20, 12).translate(0, RAIL.h * 0.5, 0),
+      new THREE.CylinderGeometry(0.075, 0.08, 0.018, 28, 1).translate(0, 0.009, 0),
+      new THREE.CylinderGeometry(0.036, 0.036, 0.05, 24, 1, true).translate(0, 0.043, 0), // (the post's welded collar)
+      new THREE.TorusGeometry(0.034, 0.004, 6, 24).rotateX(Math.PI / 2).translate(0, 0.018, 0), // (the weld bead round its foot)
+      ...[0, 1, 2, 3].map((k) => new THREE.CylinderGeometry(0.011, 0.011, 0.014, 6, 1).translate(Math.cos(k * Math.PI / 2 + 0.785) * 0.055, 0.025, Math.sin(k * Math.PI / 2 + 0.785) * 0.055)), // (hex nuts)
+      ...[0, 1, 2, 3].map((k) => new THREE.CylinderGeometry(0.0045, 0.0045, 0.012, 8, 1).translate(Math.cos(k * Math.PI / 2 + 0.785) * 0.055, 0.037, Math.sin(k * Math.PI / 2 + 0.785) * 0.055)), // (the bolts' ends)
     ].map((g2) => g2.toNonIndexed());
     for (const g2 of parts) g2.deleteAttribute("uv");
     const fm = new THREE.InstancedMesh(mergeGeometries(parts), jointMat, posts.length);
     posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND, z); fm.setMatrixAt(q, mx); }); fm.castShadow = true; group.add(fm); void fit;
   }
   if (rails.length) {
-    const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true), railMat, rails.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0);
+    const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 24, 1, true), railMat, rails.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0);
     rails.forEach(({ a, b, r }, q) => { const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b), d = Bv.clone().sub(A), L = d.length(); const qt = new THREE.Quaternion().setFromUnitVectors(up, d.normalize()); mx.compose(A.clone().add(Bv).multiplyScalar(0.5), qt, new THREE.Vector3(r, L + 0.06, r)); rm.setMatrixAt(q, mx); });
     rm.castShadow = true; group.add(rm);
     // a sleeve at each end of a rail where it meets the next (the joints, a little rustier)
-    const sleeve = new THREE.CylinderGeometry(1.35, 1.35, 1, 7, 1, true), sm = new THREE.InstancedMesh(sleeve, jointMat, rails.length * 2);
+    const sleeve = new THREE.CylinderGeometry(1.35, 1.35, 1, 24, 1, true), sm = new THREE.InstancedMesh(sleeve, jointMat, rails.length * 2);
     rails.forEach(({ a, b, r }, q) => {
       const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b), d = Bv.clone().sub(A), L = d.length(), qt = new THREE.Quaternion().setFromUnitVectors(up, d.clone().normalize());
       for (const [k, f] of [[0, 0.05 / L], [1, 1 - 0.05 / L]]) { mx.compose(A.clone().addScaledVector(d, f), qt, new THREE.Vector3(r, 0.07, r)); sm.setMatrixAt(q * 2 + k, mx); }
@@ -651,7 +655,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       pile.computeBoundingSphere(); group.add(pile);
     }
     if (jRail.length) {
-      const rail = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 5, 1, true), railMat, jRail.length), qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+      const rail = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 20, 1, true), railMat, jRail.length), qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
       jRail.forEach(([x, y, z, ang, len], k) => { mx.compose(v.set(x, y, z), q.setFromAxisAngle(up, -ang).multiply(qz), sc.set(1, len, 1)); rail.setMatrixAt(k, mx); });
       rail.computeBoundingSphere(); group.add(rail); void X1;
     }
@@ -716,31 +720,51 @@ function buildFences(group, timber, bars, dTex, wet) {
     // piece's own length so a long rail keeps its grain the right size; greener and darker at the foot of the posts
     const timberMat = (grain) => weather(new THREE.MeshStandardMaterial({ color: 0xb3a999, roughness: 0.92 }), { wood: grain, scale: 1, mottle: 0.2, bump: 0.35, grime: [GROUND.land, GROUND.land + 0.35, 0.3], rough: [0.9, 1.1], wet });
     const wood = timberMat("y"), woodX = timberMat("x");
-    const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.17, H, 0.17), wood, P.length);
+    // (bevelled: sawn timber's edges are rounded off by years of weather and hands, never knife sharp)
+    const pm = new THREE.InstancedMesh(roundedBox(0.17, H, 0.17, 0.018), wood, P.length);
     P.forEach(([x, y, z, ang], k) => { mx.compose(v.set(x, y + H / 2, z), q.setFromAxisAngle(up, -ang), sc.set(1, 1, 1)); pm.setMatrixAt(k, mx); });
     const rm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.16, 0.07), woodX, R.length);
     R.forEach(([x, y, z, ang, len], k) => { mx.compose(v.set(x, y, z), q.setFromAxisAngle(up, -ang), sc.set(len, 1, 1)); rm.setMatrixAt(k, mx); });
     for (const m of [pm, rm]) { m.castShadow = true; m.receiveShadow = true; m.computeBoundingSphere(); group.add(m); }
   }
-  if (bars.length && typeof document !== "undefined") {
-    // the panel's texture: 2 m of railing, 16 bars and a post, a top and a bottom rail (transparent between)
-    const c = document.createElement("canvas"); c.width = 256; c.height = 64; const g = c.getContext("2d");
-    g.clearRect(0, 0, 256, 64); g.fillStyle = "#fff";
-    g.fillRect(0, 0, 256, 5); g.fillRect(0, 54, 256, 4);
-    for (let i = 0; i < 16; i++) g.fillRect(i * 16 + 7, 0, 3, 58);
-    g.fillRect(0, 0, 7, 64);
-    const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;
-    const mat = weather(new THREE.MeshStandardMaterial({ color: 0x9aa0a3, map: t, alphaTest: 0.45, side: THREE.DoubleSide, metalness: 0.5, roughness: 0.6 }), { scale: 0.6, mottle: 0.3, rust: [0.15, 0.16, 0.065, 0.028], grime: [GROUND.land, GROUND.land + 0.4, 0.2], rough: [0.85, 1.2], wet });
-    const p = [], uv = [], ix = []; let run = 0; const H = 1.12;
+  if (bars.length) {
+    // a steel railing of real bars (it was a flat picture of one, which went to a grey smear edge on and showed its
+    // trick close to): square posts every 2 m, a top rail, a bottom rail and round bars 12.5 cm apart between them,
+    // each piece instanced (four draw calls for every such railing in the place)
+    const mat = weather(new THREE.MeshStandardMaterial({ color: 0x9aa0a3, metalness: 0.5, roughness: 0.6 }), { scale: 0.6, mottle: 0.3, bump: 0.5, rust: [0.15, 0.16, 0.065, 0.028], grime: [GROUND.land, GROUND.land + 0.4, 0.2], rough: [0.85, 1.2], wet });
+    const H = 1.12, B = [], Pp = [], Rr = [];
     for (const [a, b, y] of bars) {
-      const len = Math.hypot(b[0] - a[0], b[1] - a[1]), o = p.length / 3;
-      p.push(a[0], y, a[1], b[0], y, b[1], b[0], y + H, b[1], a[0], y + H, a[1]);
-      uv.push(run / 2, 0, (run + len) / 2, 0, (run + len) / 2, 1, run / 2, 1); run += len;
-      ix.push(o, o + 1, o + 2, o, o + 2, o + 3);
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]), ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      const nb = Math.max(1, Math.round(len / 0.125)), np = Math.max(1, Math.round(len / 2));
+      for (let k = 0; k < nb; k++) { const f = (k + 0.5) / nb; B.push([a[0] + (b[0] - a[0]) * f, y, a[1] + (b[1] - a[1]) * f]); }
+      for (let k = 0; k <= np; k++) { const f = k / np; Pp.push([a[0] + (b[0] - a[0]) * f, y, a[1] + (b[1] - a[1]) * f, ang]); }
+      for (const h of [0.1, H - 0.025]) Rr.push([(a[0] + b[0]) / 2, y + h, (a[1] + b[1]) / 2, ang, len]);
     }
-    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(p, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(ix); geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, mat); m.receiveShadow = true; group.add(m);
+    const bm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.009, 0.009, H - 0.12, 10, 1, true).translate(0, 0.1 + (H - 0.12) / 2, 0), mat, B.length);
+    B.forEach(([x, y, z], k) => { mx.makeTranslation(x, y, z); bm.setMatrixAt(k, mx); });
+    const pm = new THREE.InstancedMesh(roundedBox(0.05, H + 0.02, 0.05, 0.006), mat, Pp.length);
+    Pp.forEach(([x, y, z, ang], k) => { mx.compose(v.set(x, y + (H + 0.02) / 2, z), q.setFromAxisAngle(up, -ang), sc.set(1, 1, 1)); pm.setMatrixAt(k, mx); });
+    const rm = new THREE.InstancedMesh(roundedBox(1, 0.04, 0.05, 0.006, "x"), mat, Rr.length);
+    Rr.forEach(([x, y, z, ang, len], k) => { mx.compose(v.set(x, y, z), q.setFromAxisAngle(up, -ang), sc.set(len, 1, 1)); rm.setMatrixAt(k, mx); });
+    for (const m of [bm, pm, rm]) { m.castShadow = true; m.receiveShadow = true; m.computeBoundingSphere(); group.add(m); }
   }
+}
+// a box with its edges rounded (r), centred; "x": long along x and stretched by its instance's scale, so the rounding
+// is kept at the ends' size (the corners are built for a unit length and only the middle stretches)
+function roundedBox(w, h, d, r, long = "y") {
+  const sh = new THREE.Shape(), hw = (long === "x" ? h : w) / 2 - r, hd = d / 2 - r;
+  sh.moveTo(-hw, -hd - r); sh.lineTo(hw, -hd - r); sh.absarc(hw, -hd, r, -Math.PI / 2, 0); sh.lineTo(hw + r, hd); sh.absarc(hw, hd, r, 0, Math.PI / 2);
+  sh.lineTo(-hw, hd + r); sh.absarc(-hw, hd, r, Math.PI / 2, Math.PI); sh.lineTo(-hw - r, -hd); sh.absarc(-hw, -hd, r, Math.PI, Math.PI * 1.5);
+  const L = long === "x" ? w : h;
+  // (no bevel on the ends: a bevel of zero size there left corners with no surface, whose normals came out as NaN)
+  const g = new THREE.ExtrudeGeometry(sh, { depth: L, bevelEnabled: false, curveSegments: 4 });
+  g.translate(0, 0, -L / 2); // (along z, centred)
+  if (long === "x") g.rotateY(Math.PI / 2).rotateX(Math.PI / 2); else g.rotateX(Math.PI / 2);
+  // (smooth round the rounded edges: one normal per corner place; the texture coordinates are kept, as a box's)
+  g.deleteAttribute("normal"); const uv = g.attributes.uv; g.deleteAttribute("uv");
+  const m = mergeVertices(g, 1e-5); m.computeVertexNormals(); g.dispose();
+  m.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(m.attributes.position.count * 2), 2)); void uv;
+  return m;
 }
 function segDist(q, a, b) { const dx = b[0] - a[0], dz = b[1] - a[1], l2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dz) / l2)); return Math.hypot(q[0] - a[0] - dx * t, q[1] - a[1] - dz * t); }
 // a mesh only for the camera's ray (never drawn)

@@ -37,6 +37,13 @@ function loadGLB(name) {
   if (!files.has(name)) { loader ||= new GLTFLoader(); const p = loader.loadAsync(PEOPLE_BASE + name + ".glb"); p.catch(() => files.delete(name)); files.set(name, p); }
   return files.get(name);
 }
+// ---- the detail of the people's clothes and faces ----
+// Each person comes in two files: name.glb (their textures at 1024 px, about a megabyte, for a phone) and
+// name_hd.glb (the Rocketbox library's own 2048 px colour and finer normal maps, two to three megabytes), which the
+// High quality and Ultra settings load (world.js setPeopleDetail), falling back to the lighter file if it can't
+export let PEOPLE_HD = false;
+export function setPeopleDetail(on) { PEOPLE_HD = !!on; }
+const personGLB = (name) => (PEOPLE_HD ? loadGLB(name + "_hd").catch(() => loadGLB(name)) : loadGLB(name));
 // the walks' own speeds where a clip carries no travel of its own (measured from the feet), m/s at the model's size
 const LOCO = ["walk_slow", "walk", "walk_fast", "run"];
 // the retargeted poses blended in while standing (fish_idle: holding a rod; kneel and inspect: down by the fish or the
@@ -200,7 +207,7 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
   // (in first person none of the body is drawn: your forearms and hands are drawn on their own, fpHands.js)
   const show = () => { if (H) H.root.visible = !fp; stand.group.visible = !H && !fp; };
   if (realistic && typeof document !== "undefined") {
-    Promise.all([loadGLB(L.file || "gardener"), clipSet()]).then(([g, clips]) => {
+    Promise.all([personGLB(L.file || "gardener"), clipSet()]).then(([g, clips]) => {
       if (gone) return;
       H = makeHuman(L, g, clips[L.sex === "f" ? "f" : "m"], outfit, venue);
       group.add(H.root); H.setFirstPerson(fp); show();
@@ -867,4 +874,4 @@ function mergeByMaterial(list, gltf) {
 }
 
 /** Load a person's model ahead of time (the picker, a party member who just joined). */
-export function preloadPerson(file) { if (typeof document === "undefined") return Promise.resolve(); return Promise.all([loadGLB(file), clipSet()]).catch(() => {}); }
+export function preloadPerson(file) { if (typeof document === "undefined") return Promise.resolve(); return Promise.all([personGLB(file), clipSet()]).catch(() => {}); }

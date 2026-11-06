@@ -15,6 +15,7 @@ import { planCast } from "./castAim.js";
 import { addRipple, stepRipples } from "./waterFx.js";
 import { shotFor } from "./landCam.js";
 import { createPost } from "./post.js";
+import { setPeopleDetail } from "./human3d.js";
 
 // dpr: the most pixels per screen pixel; ss: the least (a computer's 1x screen is drawn sharper than its pixels and
 // scaled down, which smooths the fine edges of railings, rods and lines); floor: the least the frame pacing drops to;
@@ -58,6 +59,7 @@ export const CAMERA_MODES = [
 
 export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, onFeel, reduceMotion = false, real = null, pano = null, trackJumps = true } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
+  setPeopleDetail(Q.q >= 2); // (High and Ultra: the people's full-detail textures)
   // (with post-processing the antialiasing is the post buffer's own MSAA, so the screen's would be wasted)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !Q.post, powerPreference: "high-performance" });
   const dprMax = Math.min(Q.dpr, Math.max(window.devicePixelRatio || 1, Q.ss || 1));

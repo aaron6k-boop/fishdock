@@ -63,5 +63,7 @@ test("every person's model, portrait and the shared movements are in public/peop
     const f = new URL(`${p}.glb`, dir); assert.ok(existsSync(f), p); const n = statSync(f).size; assert.ok(n > 100000 && n < 1600000, `${p} ${n} bytes`);
     assert.equal(readFileSync(f).subarray(0, 4).toString(), "glTF");
     if (p !== "anims") { assert.ok(existsSync(new URL(`${p}.webp`, dir)), `${p} portrait`); assert.ok(credits.includes(`${p}.glb`), `${p} credited`); }
+    // (and the full-detail version High quality loads: the same person, larger textures)
+    if (p !== "anims") { const hd = new URL(`${p}_hd.glb`, dir); assert.ok(existsSync(hd), `${p}_hd`); const m = statSync(hd).size; assert.ok(m > n && m < 4500000, `${p}_hd ${m} bytes`); assert.equal(readFileSync(hd).subarray(0, 4).toString(), "glTF"); }
   }
 });
