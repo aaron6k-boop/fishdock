@@ -214,7 +214,7 @@ function realArms(scene, { gloves, skinHex }) {
     const mt = o.material = new THREE.MeshStandardMaterial({ map: src.map || null, roughness: 1, metalness: 0, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.14, 0.14) });
     if (D && !gloves) { D.skin.normal.repeat.set(22, 22); D.skin.rough.repeat.set(6, 6); }
     if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
-    else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); } // (your skin tone over the model's)
+    else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); const lum = mt.color.r * 0.3 + mt.color.g * 0.59 + mt.color.b * 0.11; mt.color.lerp(new THREE.Color(lum, lum, lum), 0.14); } // (a touch less saturated: the model's tone read orange under the warm light) // (your skin tone over the model's)
     // light through the skin at its edges (a warm glow where the fingers turn away from you, as real skin does: a cheap
     // stand-in for subsurface scattering); neoprene gloves get a faint cool sheen there instead
     mt.onBeforeCompile = (sh) => {
@@ -226,7 +226,7 @@ function realArms(scene, { gloves, skinHex }) {
             float t = dot(a, a) < dot(b, b) ? ta : tb; if (t < -uFdCut) discard; }`)
         .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
       { float rim = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.6);
-        reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.36, 0.25) * rim * 0.22"};
+        reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.42, 0.32) * rim * 0.15"};
         ${gloves ? "" : "reflectedLight.directDiffuse *= vec3(1.0, 0.96, 0.93);"} }`);
     };
     mt.customProgramCacheKey = () => "fdskin3" + (gloves ? "g" : "");
@@ -487,13 +487,16 @@ function realArms(scene, { gloves, skinHex }) {
         root.updateMatrixWorld(true);
         const t = wrap(S.thumb, V(0, 0, 0), X, GRIP.knobR, 0.0095, null, true, [0.5, 0.4, 0.3], GRIP.knobLen);
         S.thumb.forEach((j) => j.b.quaternion.copy(j.rest));
-        const score = wristBend + (t.hits > 0 ? 0 : 0.3);
-        if (!best || score < best.score) best = { score, Qh, Ph, f: [fk, fk, [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: [t[0], t[1], t[2]], gap: bestC.err, hit: [9, 9, 9, 9], thit: t.hits, wristBend };
+        // (a real reeling hand comes over the knob from behind and above, the fingers reaching forwards and down round
+        // it: from the eye you see the back of the hand and the knuckles, not an open palm reaching up from underneath)
+        const palmUp = Math.max(0, Yt.y + (TUNE.palmTol ?? 0.1)) * (TUNE.palmDown ?? 3);
+        const score = wristBend + (t.hits > 0 ? 0 : 0.3) + palmUp;
+        if (!best || score < best.score) best = { score, Qh, Ph, f: [fk, fk, [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: [t[0], t[1], t[2]], gap: bestC.err, hit: [9, 9, 9, 9], thit: t.hits, wristBend, ny: Nt.y, al };
       }
       S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
     }
     const out = { Ph: best.Ph, Qh: best.Qh, f: best.f, t: best.t };
-    if (typeof window !== "undefined" && window.__fdFilm) (window.__fdGrips ||= {})[S.i + key] = { idx: M.x.clone().applyQuaternion(best.Qh).toArray().map((v) => +v.toFixed(2)), hit: best.hit, thit: best.thit, wrist: +best.wristBend.toFixed(2), gap: +best.gap.toFixed(3), score: +best.score.toFixed(2), f: best.f.map((r) => r.map((v) => +v.toFixed(2))), t: best.t.map((v) => +v.toFixed(2)) };
+    if (typeof window !== "undefined" && window.__fdFilm) (window.__fdGrips ||= {})[S.i + key] = { idx: M.x.clone().applyQuaternion(best.Qh).toArray().map((v) => +v.toFixed(2)), hit: best.hit, thit: best.thit, wrist: +best.wristBend.toFixed(2), gap: +best.gap.toFixed(3), score: +best.score.toFixed(2), f: best.f.map((r) => r.map((v) => +v.toFixed(2))), t: best.t.map((v) => +v.toFixed(2)), ny: best.ny, al: best.al };
     solved.set(key, out); return out;
   }
   const blend = [null, null];
