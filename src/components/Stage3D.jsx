@@ -1,9 +1,9 @@
 // ---- Stage3D: the 3D view with its small tools: camera modes, Look at my rod, Watch a friend, the catch card ----
 // Used by the demo and by Fish Together. The overlay (`children`) is the page's own top bar and fishing tray.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import World3D, { loadView, saveView, loadLevels, saveLevels } from "./World3D.jsx";
 import { setVolumes } from "../lib/sceneAudio.js";
-import { WorldCtx } from "./WorldContext.js";
+import { WorldCtx, SceneCtx } from "./WorldContext.js";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
 import { speciesById } from "../data/species.js";
@@ -41,14 +41,17 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   // other people walking about (Fish Together): their poses straight to the 3D view
   useEffect(() => { if (!poseBus) return undefined; const f = (e) => w.current?.setRemotePose(e.detail.who, e.detail.p); poseBus.addEventListener("pose", f); return () => poseBus.removeEventListener("pose", f); }, [poseBus]);
   // ---- your landed fish: it waits in the net; tap it (or Look at it) to hold it up, then keep it or put it back ----
-  const [kept, setKept] = useState(null), [landed, setLanded] = useState(null), [looking, setLooking] = useState(false);
+  const [kept, setKept] = useState(null), [landed, setLanded] = useState(null), [looking, setLooking] = useState(false), [busy, setBusy] = useState(null);
+  // (the message that it's gone back waits until it has: said when the release ends, not when you tap Put it back)
+  const releaseMsg = useRef(null), keptPrev = useRef(null);
+  useEffect(() => { if (keptPrev.current === "release" && kept !== "release" && releaseMsg.current) { say(releaseMsg.current); releaseMsg.current = null; } keptPrev.current = kept; }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
   const openInspect = () => { if (!landed) return; w.current?.inspectFish(true); setLooking(true); };
   const keepIt = () => { w.current?.keepFish(); setLooking(false); if (landed) { setCard({ ev: landed.ev, key: landed.key, who: null }); setTimeout(() => setCard((c) => (c?.ev === landed.ev ? null : c)), 8000); } setLanded(null); };
   // (how it goes back depends on the place: never dropped off a high pier, but lowered in the drop net. Only the walk
   // down a beach to the water is shortened, and the page says so)
   const putBack = () => {
     w.current?.releaseFish(); setLooking(false); const sp = speciesById(landed?.ev?.data?.species), off = sp ? `: the ${sp.name.toLowerCase()} swims off` : "";
-    say(venue === "pier" ? `Lowered back to the water in the drop net${off}.` : venue === "beach" ? `Back into the shallows (shortened)${off}.` : `Back in the landing net at the water's edge${off}.`); setLanded(null);
+    releaseMsg.current = venue === "pier" ? `Lowered back to the water in the drop net${off}.` : venue === "beach" ? `Back into the shallows (shortened)${off}.` : `Back in the landing net at the water's edge${off}.`; setLanded(null);
   };
   useEffect(() => { if (!kept) { setLooking(false); } }, [kept]);
   useEffect(() => { if (kept === null && landed && !looking) setLanded(null); }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -67,6 +70,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
     watchOne(next.id);
   };
   // someone else has a fish on: a small chip offers to watch it
+  const sceneState = useMemo(() => ({ busy }), [busy]);
   const [alert, setAlert] = useState(null);
   useEffect(() => { if (!alert) return undefined; const t = setTimeout(() => setAlert(null), 14000); return () => clearTimeout(t); }, [alert]);
   return (
@@ -82,9 +86,9 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
           const a = anglers.find((x) => x.id === id);
           if (a && !a.local && phase === "hooked" && !watching) setAlert({ id, name: a.name || "Someone" });
         }}
-        onKept={setKept} onFishTap={() => openInspect()}
+        onKept={setKept} onBusy={setBusy} onFishTap={() => openInspect()}
         onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (alert?.id === id) setAlert(null); if (a?.local && a.inspect) { setLanded({ ev, key: `${id}|${ev?.id || ev?.t}` }); return; } if (a?.local || watch === id) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
-        <div className="fs-overlay"><WorldCtx.Provider value={w}>{children}</WorldCtx.Provider></div>
+        <div className="fs-overlay"><WorldCtx.Provider value={w}><SceneCtx.Provider value={sceneState}>{children}</SceneCtx.Provider></WorldCtx.Provider></div>
         <div className="w3d-toasts" aria-live="polite">
           {toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
           {alert ? <button type="button" className="w3d-toast w3d-watch" onClick={() => watchOne(alert.id)}>{alert.name} has a fish on · <b>Watch</b></button> : null}

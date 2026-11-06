@@ -10,7 +10,8 @@
 // doesn't take a tap meant for Reel in the moment it appears under your thumb.
 import { useContext, useEffect, useRef, useState } from "react";
 import { Icon } from "./ui.jsx";
-import { WorldCtx } from "./WorldContext.js";
+import { WorldCtx, SceneCtx } from "./WorldContext.js";
+import { canCast, busyLabel } from "../lib/fishFlow.js";
 import { GUARD, pressOk } from "../lib/trayGuard.js";
 
 const R = 29, C = 2 * Math.PI * R;
@@ -21,7 +22,7 @@ const HOLD_CYCLE = 1150; // ms from no power to full (then back down: let go at 
  * (useVirtualFishing); note: a short message; opts: { assisted, advanced }.
  */
 export default function FishTray({ phase, last, reel = 0, fight = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
-  const world = useContext(WorldCtx);
+  const world = useContext(WorldCtx), { busy: sceneBusy } = useContext(SceneCtx);
   // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
   const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
   const landOn = useRef(false), castAt = useRef(-1e9), shown = useRef({ act: null, at: -1e9 }), pressed1 = useRef({});
@@ -30,7 +31,9 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   if (phase !== "hooked") landOn.current = false;
   let act = null, label = hint || "", busy = false, status = "", dist = null;
   if (autoplay) { label = "Playing it through"; }
-  else if (phase === "idle" || phase === "ended" || (phase === "waiting" && !lineOut)) { act = "cast"; label = label || (power != null ? "Let go to cast" : last ? "Hold to cast again" : "Hold Cast, aim, let go"); }
+  // (the last fish not finished with yet in the scene: no Cast, and only what's true now)
+  else if (sceneBusy && (phase === "idle" || phase === "ended" || phase === "waiting" || phase === "landing")) { busy = sceneBusy === "landing" || sceneBusy === "release"; label = busyLabel(sceneBusy) || ""; }
+  else if (canCast({ phase, lineOut })) { act = "cast"; label = label || (power != null ? "Let go to cast" : last ? "Hold to cast again" : "Hold Cast, aim, let go"); }
   else if (phase === "cast") { busy = true; label = "Casting"; }
   else if (phase === "waiting" || phase === "missed") { act = onWindIn && !autoplay ? "wait" : null; label = phase === "missed" ? "Missed it. The bait's still out" : "Waiting for a bite"; }
   else if (phase === "bite") { act = "strike"; label = "Bite! Strike now"; }
@@ -74,6 +77,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
     const p = performance.now() - h.t0 < 180 ? 0.5 : h.p;
     const params = world?.current?.castParams?.(p) || { power: p };
     world?.current?.aimCast?.(null); setPower(null);
+    if (act !== "cast") return; // (the scene became busy while it was held: no cast)
     castAt.current = performance.now(); onCast?.(params);
   };
   const castCancel = () => { if (!hold.current) return; hold.current = null; world?.current?.aimCast?.(null); setPower(null); };

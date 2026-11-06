@@ -34,7 +34,7 @@ export function loadView() {
 }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   // the phone can take the 3D drawing away (low memory, the browser in the background): when it gives it back the
@@ -49,7 +49,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
   const [walk, setWalk] = useState(null); // { on, canFish, sprint } while walking about
   useEffect(() => { props.current.onWalk?.(walk); }, [walk]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk, onKept, onFishTap, onPose, onHear };
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk, onKept, onBusy, onFishTap, onPose, onHear };
   const phases = useRef({});
   // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
   const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
@@ -111,11 +111,14 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
         // where you arrived, after the arrival check (spawn.js): for the tests and for anyone looking into a report
         if (canvas.current && w.spawn) { canvas.current.dataset.spawn = JSON.stringify({ safe: w.spawn.spots.length, report: w.spawn.report.filter((r) => r.problem) }); canvas.current.dataset.me = JSON.stringify(w.mySpot); }
         if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
-        let keptWas = null, heardAt = 0;
+        let keptWas = null, heardAt = 0, busyWas = null;
         w.onFrame(({ outs, view, walk: wk, kept, localId }) => {
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
+          // (what your angler is in the middle of, as the scene shows it: the net and the fish take longer than the fight's
+          // own record of a landing, and the fish then waits on the mat until you've dealt with it)
+          { const me = outs[localId], bz = me?.phase === "landing" ? "landing" : ks && ks !== "gone" ? ks : null; if (bz !== busyWas) { busyWas = bz; props.current.onBusy?.(bz); } }
           setWalk((o) => (!wk ? (o ? null : o) : !o || o.canFish !== wk.canFish || o.crowded !== wk.crowded || o.sprint !== wk.sprint || o.auto !== wk.auto || o.going !== wk.going ? wk : o));
           setHeading((h) => { const deg = Math.round(((props.current.facing + (view.yaw * 180) / Math.PI) % 360 + 360) % 360); return Math.abs(deg - h) >= 2 ? deg : h; });
           for (const [id, o] of Object.entries(outs)) {
