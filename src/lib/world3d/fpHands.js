@@ -482,7 +482,7 @@ function realArms(scene, { gloves, skinHex }) {
         if (!bestC || err < bestC.err) { const along = pts.reduce((a2, p2) => a2 + p2.dot(xl), 0) / pts.length; bestC = { err, c, Cl: u.clone().multiplyScalar(cx).addScaledVector(w, cy).addScaledVector(xl, along), rad }; }
       }
       S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
-      const fk = tpl.map((v) => v * bestC.c);
+      const fk = tpl.map((v, k) => v * bestC.c * (TUNE.crankCurl ?? 1) * (k === 0 ? (TUNE.crankRoot ?? 1) : 1));
       // the knuckle row along the knob (index side to the reel, -x), turned round it
       const xTo = (M.x.dot(xl) > 0 ? -1 : 1);
       for (let al = 0; al < Math.PI * 2 - 1e-3; al += Math.PI / 18) {
