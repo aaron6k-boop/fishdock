@@ -910,7 +910,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // one side on a rest)
     // (landing it with the drop net yourself, the rod goes onto the rail once the fish is up at the wall, and your
     // hands go to the net and its rope: the rod laid down where you can see it, not held by nobody in front of you)
-    const fpRodDown = ph === "landing" && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"));
+    const fpRodDown = (!!kept && kept.state !== "gone") || (ph === "landing" && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"))); // (and while your fish is on the deck: the rod stays down, not held up in front of your face as you look down at it)
     if (fp && !fpRodDown) {
       held = true;
       // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
