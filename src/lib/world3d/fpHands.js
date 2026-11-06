@@ -378,10 +378,11 @@ function realArms(scene, { gloves, skinHex }) {
     const M = S.M, yl = M.y.clone().normalize();
     place2(S, Ph, Ph.clone().addScaledVector(yl.clone().applyQuaternion(Qh), -S.len), Qh);
     const A = V(0, 0, 0), D = kind === "seat" ? V(0, 0, 1) : V(1, 0, 0), R = kind === "seat" ? GRIP.rodR : GRIP.knobR, L = kind === "seat" ? 0 : GRIP.knobLen;
+    const cap = kind === "cap";
     const TUCK = [[1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], f = [], hit = [];
     S.fingers.forEach((ch, a) => {
       ch.forEach((j) => j.b.quaternion.copy(j.rest));
-      if (kind !== "seat" && a >= 2) { f[a] = TUCK[a - 2]; hit[a] = 9; return; }
+      if (kind !== "seat" && !cap && a >= 2) { f[a] = TUCK[a - 2]; hit[a] = 9; return; }
       const r = wrap(ch, A, D, R, 0.0085, null, false, kind === "seat" ? [1.25, 1.3, 0.8] : [1.0, 1.1, 0.7], L);
       f[a] = r; hit[a] = r.hits;
       // (how far each segment's end is from the surface of what it holds, as set: a finger round it is on it all along)
@@ -406,7 +407,9 @@ function realArms(scene, { gloves, skinHex }) {
   function solveGrip(S, kind, side, Fin) {
     // (Fin: the way to the elbow in the reel's frame, as the arm actually is; the grip is worked out again only if that
     // changes a lot, which it doesn't while you fish: the elbow's fixed in the view)
-    const Fq = Fin ? [Math.round(Fin.x * 4), Math.round(Fin.y * 4), Math.round(Fin.z * 4)].join(",") : "";
+    // (on the knob the grip is found once and kept: the knob goes round, so the way to the elbow from it changes all
+    // the time, and solving again each time it crossed a step put the hand in a different grip every quarter turn)
+    const Fq = Fin && kind !== "crank" ? [Math.round(Fin.x * 4), Math.round(Fin.y * 4), Math.round(Fin.z * 4)].join(",") : "";
     const key = kind + side + Fq; if (solved.has(key)) return solved.get(key);
     const T = V(0, 0, 1), U = V(0, 1, 0), X = V(1, 0, 0), M = S.M;
     const yl = M.y.clone().normalize(), nl = M.n.clone().addScaledVector(yl, -M.n.dot(yl)).normalize(), xl = yl.clone().cross(nl);
@@ -490,14 +493,47 @@ function realArms(scene, { gloves, skinHex }) {
         S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, a < 2 ? fk[k] : [[1.5, 1.6, 1.0], [1.6, 1.6, 1.05]][a - 2][k]))));
         root.updateMatrixWorld(true);
         const t = wrap(S.thumb, V(0, 0, 0), X, GRIP.knobR, 0.0095, null, true, [0.5, 0.4, 0.3], GRIP.knobLen);
+        if (!(t.hits > 0)) {
+          // (no contact found by bending it the usual way: the thumb set by trying, its pad on the far side of the knob from
+          // the fingers, opposing them; whichever way its joints turn on this model)
+          let tb = null;
+          for (let a0 = -1.0; a0 <= 1.01; a0 += 0.25) for (let a1 = -0.8; a1 <= 1.01; a1 += 0.3) {
+            const ang = [a0, a1, a1 * 0.7]; S.thumb.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, ang[k]))); S.thumb[0].b.updateMatrixWorld(true);
+            const tip = wp(S.thumb[2].b).add(V(0, 1, 0).applyQuaternion(wq(S.thumb[2].b)).multiplyScalar(S.thumb[2].len)), mid = wp(S.thumb[2].b);
+            const e = Math.abs(segSeg(tip, tip.clone().add(V(0, 1e-5, 0)), V(0, 0, 0), X, GRIP.knobLen) - GRIP.knobR - 0.007) + Math.max(0, GRIP.knobR + 0.006 - segSeg(mid, tip, V(0, 0, 0), X, GRIP.knobLen)) * 4 + Math.abs(a0) * 0.004;
+            if (!tb || e < tb.e) tb = { e, ang };
+          }
+          t[0] = tb.ang[0]; t[1] = tb.ang[1]; t[2] = tb.ang[2]; t.hits = tb.e < 0.006 ? 1 : 0;
+        }
         S.thumb.forEach((j) => j.b.quaternion.copy(j.rest));
         // (a real reeling hand comes over the knob from behind and above, the fingers reaching forwards and down round
         // it: from the eye you see the back of the hand and the knuckles, not an open palm reaching up from underneath)
         const palmUp = Math.max(0, Yt.y + (TUNE.palmTol ?? 0.1)) * (TUNE.palmDown ?? 3);
         const score = wristBend + (t.hits > 0 ? 0 : 0.3) + palmUp;
-        if (!best || score < best.score) best = { score, Qh, Ph, f: [fk, fk, [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: [t[0], t[1], t[2]], gap: bestC.err, hit: [9, 9, 9, 9], thit: t.hits, wristBend, ny: Nt.y, al };
+        const tt = [t[0], t[1], t[2]]; // (no contact found: the thumb folded in against the knob's back, not sticking out)
+        if (!best || score < best.score) best = { score, Qh, Ph, f: [fk, fk, [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: tt, gap: bestC.err, hit: [9, 9, 9, 9], thit: t.hits, wristBend, ny: Nt.y, al };
       }
       S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
+      if (TUNE.crankCap && kind === "crank") {
+        // (the grip most anglers use on a round knob: the palm towards the reel, the knob standing out into the hollow
+        // of the hand, the fingers closed round it and the thumb on the other side: the handle arm is seen going into
+        // the hand, rather than the knob hidden in a fist off to one side)
+        best = null;
+        const capOff = TUNE.capOff ?? 0.004;
+        for (let al = 0; al < Math.PI * 2 - 1e-3; al += Math.PI / 18) for (const tl of [-0.35, -0.15, 0, 0.15, 0.35]) {
+          const Nt = X.clone().negate().applyAxisAngle(T, tl).normalize();
+          let Yt = T.clone().applyAxisAngle(X, al); Yt.addScaledVector(Nt, -Yt.dot(Nt)).normalize(); const Xt = Yt.clone().cross(Nt);
+          const Qh = basis(Xt, Yt, Nt).multiply(Rl);
+          // the hollow of the hand (between the palm and the fingers' roots) just past the knob's end
+          const cup = M.palm.clone().lerp(M.hook, TUNE.capCup ?? 0.55).applyQuaternion(Qh);
+          const Ph = X.clone().multiplyScalar(GRIP.knobLen / 2 + capOff).sub(cup);
+          const r = trySet(S, Qh, Ph, "cap");
+          const wristBend = yl.clone().applyQuaternion(Qh).negate().angleTo(F);
+          const miss = r.hit.reduce((a2, h) => a2 + (h >= 1 ? 0 : 1), 0) + (r.thit > 0 ? 0 : 0.6);
+          const score = wristBend * (TUNE.wristW ?? 1.6) + miss * 0.5 + r.gap * 12 + Math.max(0, Yt.y + 0.2) * (TUNE.capDown ?? 1);
+          if (!best || score < best.score) best = { score, Qh, Ph, f: r.f.map((x) => [x[0], x[1], x[2]]), t: [r.t[0], r.t[1], r.t[2]], gap: r.gap, hit: r.hit, thit: r.thit, wristBend, ny: Nt.x, al };
+        }
+      }
     }
     const out = { Ph: best.Ph, Qh: best.Qh, f: best.f, t: best.t };
     if (typeof window !== "undefined" && window.__fdFilm) (window.__fdGrips ||= {})[S.i + key] = { idx: M.x.clone().applyQuaternion(best.Qh).toArray().map((v) => +v.toFixed(2)), hit: best.hit, thit: best.thit, wrist: +best.wristBend.toFixed(2), gap: +best.gap.toFixed(3), score: +best.score.toFixed(2), f: best.f.map((r) => r.map((v) => +v.toFixed(2))), t: best.t.map((v) => +v.toFixed(2)), ny: best.ny, al: best.al };
@@ -515,6 +551,14 @@ function realArms(scene, { gloves, skinHex }) {
       // (solved once, with the hand alone at the origin; the arms put back where they were)
       const Fin = elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).normalize();
       const G = solveGrip(S, kind, sideSign, Fin);
+      if (kind === "crank") {
+        // the knob turns freely in the fingers, so the hand is free to turn round it: each frame it's turned about the
+        // knob's axis so the back of the hand lines up with the forearm (where the elbow is now). That is what keeps the
+        // wrist straight all the way round, rather than the one grip carried round the circle at a fixed angle
+        const bk = S.M.y.clone().normalize().applyQuaternion(G.Qh).negate(); bk.x = 0; const fe = Fin.clone(); fe.x = 0;
+        if (bk.lengthSq() > 1e-6 && fe.lengthSq() > 1e-6) { bk.normalize(); fe.normalize(); const want = Math.atan2(bk.clone().cross(fe).x, bk.dot(fe)) * (TUNE.crankFollow ?? 0.85);
+          const R0 = S.crankRoll ?? want; let d = want - R0; d = Math.atan2(Math.sin(d), Math.cos(d)); S.crankRoll = R0 + d * Math.min(1, dt * 14); roll = S.crankRoll + roll * (TUNE.crankRollExtra ?? 0); }
+      }
       const sq = gq.clone().multiply(quat); if (roll) sq.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), roll));
       const sp = group.localToWorld(pos.clone());
       let Pw = sp.clone().add(G.Ph.clone().applyQuaternion(sq)), Qw = sq.clone().multiply(G.Qh);

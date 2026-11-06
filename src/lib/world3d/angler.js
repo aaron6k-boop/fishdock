@@ -961,7 +961,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the reel: the handle at its angle; the rotor geared up from it (about five turns to one, as a sea spinning reel);
     // the spool moving in and out once a turn to lay the line; the drag letting the spool turn back while a fish takes
     // line; the bail open for the cast until the rig's down, then flipped over
-    { const u = reel.userData, sp = u.spin || 0;
+    { const u = reel.userData; if (local && typeof window !== "undefined" && window.__fdFilm && window.__fdSpinRate) u.spin = (u.spin || 0) + window.__fdSpinRate * dt; // (film only: the handle turned steadily, to check the hand on it)
+      const sp = u.spin || 0;
       handle.rotation.x = -sp; u.rotor.rotation.z = sp * 5.2;
       if (u.spool) { u.spool.position.z = u.spoolZ + 0.0055 * (1 - Math.cos(sp)) - 0.004; u.slip = (u.slip || 0) + (u.slipping ? dt * 9 : 0); u.spool.rotation.z = -u.slip; }
       if (u.bail) { const open = ph === "cast" && age < 2.25 ? 1 : 0; u.bailK = (u.bailK ?? 0) + (open - (u.bailK ?? 0)) * Math.min(1, dt * (open ? 14 : 22)); u.bail.rotation.x = -1.95 * u.bailK; } }
