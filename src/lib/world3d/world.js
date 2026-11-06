@@ -548,8 +548,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     raf = requestAnimationFrame(frame);
     if (!visible || film) return;
     const dt = Math.min(0.1, (ts - (last || ts)) / 1000); last = ts;
-    tick((ts - clock0) / 1000, nowFn(), dt);
+    // (the resolution is changed before this frame is drawn, never after: resizing the canvas clears it, and done after
+    // drawing, the blank canvas was what the phone showed for that frame, a grey flash mid-fight)
     pace(ts, dt);
+    tick((ts - clock0) / 1000, nowFn(), dt);
   }
   // ---- the sky as light and reflection: the sky itself (its gradient, sun glow and clouds; the sea below the horizon,
   // environment.js envSky) made into an environment map whenever the light has changed enough (at most every 90 frames,
