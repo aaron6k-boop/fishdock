@@ -246,7 +246,26 @@ function realArms(scene, { gloves, skinHex }) {
     const thumb = chain("thumb", tAxis);
     // each segment's length at rest (the last one, which has no bone beyond it, about four fifths of the one before)
     for (const ch of [...fingers, thumb]) { for (let k = 0; k < 2; k++) ch[k].len = wp(ch[k].b).distanceTo(wp(ch[k + 1].b)); ch[2].len = ch[1].len * 0.82; }
-    return { i, hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone(), mid: bone("middle_01_" + sfx), ring: bone("ring_01_" + sfx) };
+    // ---- the hand as it really is, measured off the model at rest, in the hand bone's own frame: where the fingers
+    // point (wrist to middle knuckle), which way the index side is, which way the palm faces (the way the fingers bend,
+    // not a guess from the frame: on the mirrored left hand the frame's z was the back of the hand), and the points the
+    // grips are set by (the middle of the palm's surface; between the middle and ring fingers' first bones)
+    const hInv = handW.clone().invert(), toH = (v) => v.clone().applyQuaternion(hInv);
+    const fing = fingers[1][0], t0 = wp(fingers[1][1].b);
+    fing.b.quaternion.copy(fing.rest).multiply(new THREE.Quaternion().setFromAxisAngle(fing.axis, 0.5)); fing.b.updateMatrixWorld(true);
+    const palmW = wp(fingers[1][1].b).sub(t0); fing.b.quaternion.copy(fing.rest); fing.b.updateMatrixWorld(true);
+    palmW.addScaledVector(Yh, -palmW.dot(Yh)).normalize();
+    const idxW = wp(bone("index_01_" + sfx)).sub(wp(bone("pinky_01_" + sfx))); idxW.addScaledVector(Yh, -idxW.dot(Yh)).normalize();
+    const mid1 = wp(bone("middle_01_" + sfx)), mid2 = wp(bone("middle_02_" + sfx)), rin1 = wp(bone("ring_01_" + sfx)), rin2 = wp(bone("ring_02_" + sfx));
+    const ix1 = wp(bone("index_01_" + sfx)), ix2 = wp(bone("index_02_" + sfx));
+    // (where a handle lies in a gripping hand: across the palm just behind the knuckles, in its far crease, not in the
+    // middle of it, so the fingers close round it from their roots)
+    const knAvg = ["index", "middle", "ring", "pinky"].reduce((a2, d) => a2.add(wp(bone(`${d}_01_${sfx}`))), V()).multiplyScalar(0.25);
+    const palmPt = P.clone().lerp(knAvg, 0.82).addScaledVector(palmW, 0.012);
+    const gapPt = mid1.clone().lerp(mid2, 0.5).lerp(rin1.clone().lerp(rin2, 0.5), 0.5);
+    const hookPt = ix1.clone().lerp(ix2, 0.5).lerp(mid1.clone().lerp(mid2, 0.5), 0.5);
+    const M = { y: toH(Yh), n: toH(palmW), x: toH(idxW), palm: toH(palmPt.sub(P)), gap: toH(gapPt.sub(P)), hook: toH(hookPt.sub(P)) };
+    return { i, M, hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone(), mid: bone("middle_01_" + sfx), ring: bone("ring_01_" + sfx) };
   });
   const q = new THREE.Quaternion(), qa = new THREE.Quaternion(), gq = new THREE.Quaternion();
   // (how near a finger's segment, joint to tip, comes to the line through the handle)
@@ -267,7 +286,7 @@ function realArms(scene, { gloves, skinHex }) {
   // however the hand sits on it, rather than curling by a set amount and closing on air (or through the rod).
   const MAXB = [1.75, 1.95, 1.4], STEP = 0.06;
   function wrap(ch, A, D, R, fr, from, both = false, table = null, len = 0) {
-    const out = [0, 0, 0];
+    const out = [0, 0, 0]; out.hits = 0;
     for (let k = 0; k < 3; k++) {
       const j = ch[k], tipOf = () => (k < 2 ? wp(ch[k + 1].b) : wp(j.b).add(V(0, 1, 0).applyQuaternion(wq(j.b)).multiplyScalar(j.len)));
       for (let kk = k + 1; kk < 3; kk++) ch[kk].b.quaternion.copy(ch[kk].rest);
@@ -279,14 +298,18 @@ function realArms(scene, { gloves, skinHex }) {
         let prev = null;
         for (let a = 0; a <= MAXB[k] + 1e-6; a += STEP) {
           j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, a * sg)); j.b.updateMatrixWorld(true);
-          const dd = (len ? segSeg(wp(j.b), tipOf(), A, D, len) : segD(wp(j.b), tipOf(), A, D)) - r;
+          // (the first bone: the nearest any of it comes; the ones beyond start against it already, so their ends: each
+          // bends until its end comes down onto the surface, wrapping on round it)
+          const tp = tipOf(), dd = (k === 0 ? (len ? segSeg(wp(j.b), tp, A, D, len) : segD(wp(j.b), tp, A, D)) : (len ? segSeg(tp, tp.clone().add(V(0, 1e-5, 0)), A, D, len) : segD(tp, tp.clone().add(V(0, 1e-5, 0)), A, D))) - r;
           // (already against it straight, at the knuckle: no bend found; the grip's own curl is used there instead)
           if (dd <= 0) { const c = prev ? (prev.a + STEP * (prev.d / Math.max(1e-6, prev.d - dd))) * sg : NaN; if (got == null || Number.isNaN(got) || Math.abs(c) < Math.abs(got)) got = c; break; }
           prev = { a, d: dd };
         }
       }
+      const met = got != null && !Number.isNaN(got);
       if (got == null) got = both ? 0.25 : MAXB[k] * 0.6;
       // (a finger already against the handle at the knuckle stays straight there and bends at the next joint)
+      if (met) out.hits = (out.hits || 0) + (k === 0 ? 1 : 0.5); // (the root meeting it counts most)
       out[k] = Number.isNaN(got) ? (table?.[k] ?? 0) : both ? got : Math.max(from?.[k] ?? 0, got);
       j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, out[k])); j.b.updateMatrixWorld(true);
     }
@@ -316,8 +339,205 @@ function realArms(scene, { gloves, skinHex }) {
     S.hand.quaternion.copy(foreT.clone().invert().multiply(handT));
     S.hand.updateMatrixWorld(true);
   }
+  // (the forearm laid from the elbow to the wrist, for a hand whose own world turn is given)
+  function place2(S, Pw, Ew, handT) {
+    const dir = Pw.clone().sub(Ew).normalize(), Zt = S.M.n.clone().applyQuaternion(handT); Zt.addScaledVector(dir, -Zt.dot(dir)); if (Zt.lengthSq() < 1e-6) Zt.set(0, 1, 0); Zt.normalize();
+    // (the palm side of the forearm turned the way the palm faces: the model's forearm frame is mapped the same way at rest)
+    const rest = S.M.n.clone().applyQuaternion(S.handW); const dir0 = V(0, 1, 0).applyQuaternion(S.fr0Inv.clone().invert()); void rest; void dir0;
+    const foreT = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(dir.clone().cross(Zt), dir, Zt)).multiply(S.fr0Inv).multiply(S.foreW);
+    const par = S.fore.parent; par.updateWorldMatrix(true, false);
+    S.fore.position.copy(par.worldToLocal(Pw.clone().addScaledVector(dir, -S.len)));
+    CUT.uFdW.value[S.i].copy(Pw); CUT.uFdDir.value[S.i].copy(dir);
+    S.fore.quaternion.copy(par.getWorldQuaternion(q).invert().multiply(foreT));
+    S.fore.updateMatrixWorld(true);
+    S.hand.quaternion.copy(foreT.clone().invert().multiply(handT));
+    S.hand.updateMatrixWorld(true);
+  }
+  // ---- the grips, set on the equipment itself ----
+  // A grip is the hand's place and turn in the frame of what it holds (the reel: z along the rod to the tip, y up, the
+  // reel hanging below; x across), and how far each finger bends. Each is worked out once, from real anglers' grips:
+  //   rod: the hand on the side of the handle at the reel, palm against it (a little under), the handle lying across the
+  //     palm on a slight diagonal; the fingers wrap down and under it, the reel's stem between the middle and ring
+  //     fingers (two in front, two behind), the thumb over the top along the handle
+  //   knob: an overhand grip on the reel's knob: the palm over it, the index and middle fingers curled down round its
+  //     front and under, the thumb closing on it from behind, the ring and little fingers tucked; the knob's axis across
+  //     the fingers, the index side towards the reel
+  // Each frame the hand is set from the grip and where the equipment is now: it can't drift, and the fingers stay as they
+  // are through every turn of the handle (the knob turns in them; the wrist rolls a little with the handle's angle).
+  const basis = (x, y, z) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+  const GRIP = { rodR: 0.0145, knobR: 0.0095, knobLen: 0.032 };
+  // palmTilt: the palm's facing, up (+) or down (-) from level; diag: how far forward the fingers lean (the handle's
+  // diagonal across the palm); wristLim: how far the forearm may turn from straight behind the hand
+  const TUNE = (typeof window !== "undefined" && window.__fdGripTune) || { palmTilt: 0.35, diag: 0.45, wristLim: 0.6 };
+  const solved = new Map();
+  // The grip is found, not guessed: the hand is tried in a range of placements on the handle (or the knob), each
+  // closed on it, and the one kept where every finger meets it from its root and the forearm (coming from the elbow's
+  // side, behind and below) needs the least bend at the wrist. Worked out once per grip, with the hand at the origin.
+  function trySet(S, Qh, Ph, kind) {
+    const M = S.M, yl = M.y.clone().normalize();
+    place2(S, Ph, Ph.clone().addScaledVector(yl.clone().applyQuaternion(Qh), -S.len), Qh);
+    const A = V(0, 0, 0), D = kind === "seat" ? V(0, 0, 1) : V(1, 0, 0), R = kind === "seat" ? GRIP.rodR : GRIP.knobR, L = kind === "seat" ? 0 : GRIP.knobLen;
+    const TUCK = [[1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], f = [], hit = [];
+    S.fingers.forEach((ch, a) => {
+      ch.forEach((j) => j.b.quaternion.copy(j.rest));
+      if (kind !== "seat" && a >= 2) { f[a] = TUCK[a - 2]; hit[a] = 9; return; }
+      const r = wrap(ch, A, D, R, 0.0085, null, false, kind === "seat" ? [1.25, 1.3, 0.8] : [1.0, 1.1, 0.7], L);
+      f[a] = r; hit[a] = r.hits;
+      // (how far each segment's end is from the surface of what it holds, as set: a finger round it is on it all along)
+      ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, r[k])));
+      ch[0].b.updateMatrixWorld(true);
+      let gap = 0;
+      for (let k = 0; k < 3; k++) { const e = k < 2 ? wp(ch[k + 1].b) : wp(ch[2].b).add(V(0, 1, 0).applyQuaternion(wq(ch[2].b)).multiplyScalar(ch[2].len)); const d = (L ? segSeg(e, e.clone().add(V(0, 1e-5, 0)), A, D, L) : segD(e, e.clone().add(V(0, 1e-5, 0)), A, D)) - R - 0.0085; gap += Math.abs(d) * (k === 0 ? 0.5 : 1); }
+      f.gap = (f.gap || 0) + gap;
+    });
+    root.updateMatrixWorld(true);
+    const t = wrap(S.thumb, A, D, R, 0.0095, null, kind !== "seat", [0.5, 0.4, 0.3], L);
+    S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest))); S.thumb.forEach((j) => j.b.quaternion.copy(j.rest));
+    return { f, t, hit, thit: t.hits, gap: f.gap || 0 };
+  }
+  function solveGrip(S, kind, side, Fin) {
+    // (Fin: the way to the elbow in the reel's frame, as the arm actually is; the grip is worked out again only if that
+    // changes a lot, which it doesn't while you fish: the elbow's fixed in the view)
+    const Fq = Fin ? [Math.round(Fin.x * 4), Math.round(Fin.y * 4), Math.round(Fin.z * 4)].join(",") : "";
+    const key = kind + side + Fq; if (solved.has(key)) return solved.get(key);
+    const T = V(0, 0, 1), U = V(0, 1, 0), X = V(1, 0, 0), M = S.M;
+    const yl = M.y.clone().normalize(), nl = M.n.clone().addScaledVector(yl, -M.n.dot(yl)).normalize(), xl = yl.clone().cross(nl);
+    const Rl = basis(xl, yl, nl).invert();
+    // where the forearm comes from (the reel's frame): behind, below, out on the elbow's side
+    const F = Fin ? Fin.clone().normalize() : X.clone().multiplyScalar(0.3 * (kind === "seat" ? side : 1)).addScaledVector(U, -0.35).addScaledVector(T, -0.88).normalize();
+    let best = null;
+    let KD = 0.012;
+    const consider = (Nt, Yt, extra) => {
+      Yt = Yt.clone().addScaledVector(Nt, -Yt.dot(Nt)).normalize(); const Xt = Yt.clone().cross(Nt);
+      const Qh = basis(Xt, Yt, Nt).multiply(Rl);
+      let Ph;
+      if (kind === "seat") {
+        // the handle across the palm behind the knuckles; the reel's stem (z 0) between the middle and ring fingers
+        const palm = M.palm.clone().applyQuaternion(Qh); Ph = Nt.clone().multiplyScalar(-(GRIP.rodR + 0.002)).sub(palm);
+        const gap = Ph.clone().add(M.gap.clone().applyQuaternion(Qh)); Ph.addScaledVector(T, -gap.z);
+      } else {
+        // the knob in the hook of the index and middle fingers, the fingers over its middle
+        const hook = M.hook.clone().applyQuaternion(Qh); Ph = Nt.clone().multiplyScalar(-(GRIP.knobR + KD)).sub(hook); Ph.x = -hook.x;
+      }
+      const r = trySet(S, Qh, Ph, kind);
+      const wristBend = yl.clone().applyQuaternion(Qh).negate().angleTo(F);
+      const miss = r.hit.reduce((a, h) => a + (h >= 1.5 ? 0 : h >= 1 ? 0.3 : 1), 0) + (r.thit > 0 ? 0 : 0.5);
+      // (on the rod the thumb's side of the hand is towards the tip, so the thumb lies along the top of the handle; on the
+      // knob, towards the reel)
+      const ix = M.x.clone().applyQuaternion(Qh), wrongWay = kind === "seat" ? Math.max(0, 0.35 - ix.z) * 3 : Math.max(0, ix.x + 0.5) * 3;
+      // (a finger that meets it straight from its root lies across it rather than round it: each should bend at its root)
+      const flatF = r.f.reduce((a, x, k) => a + (kind !== "seat" && k >= 2 ? 0 : Math.max(0, 0.75 - x[0])), 0) * 1.5;
+      const score = miss * 0.3 + wristBend * 0.8 + wrongWay + flatF + r.gap * 25 + (extra || 0);
+      if (!best || score < best.score) best = { score, Qh, Ph, f: r.f.map((x) => [x[0], x[1], x[2]]), t: [r.t[0], r.t[1], r.t[2]], gap: r.gap, hit: r.hit, thit: r.thit, wristBend };
+    };
+    if (kind === "seat") {
+      // every way round the handle the palm could face it, and every lean of the hand along it
+      for (let th = 0; th < Math.PI * 2 - 1e-3; th += Math.PI / 9) for (let ps = -Math.PI; ps < Math.PI - 1e-3; ps += Math.PI / 12) {
+        const Nt = X.clone().multiplyScalar(Math.cos(th)).addScaledVector(U, Math.sin(th)), W = T.clone().cross(Nt).normalize();
+        consider(Nt, T.clone().multiplyScalar(Math.cos(ps)).addScaledVector(W, Math.sin(ps)));
+      }
+    } else {
+      // the knob: the index and middle fingers curled into a hook just the knob's size (their joints and tips on a circle
+      // round it: the curl found so that circle's radius is the knob's plus a finger's), the knob's axis through the
+      // circle's middle, across the fingers; then the hand turned round the knob for the straightest wrist, the index side
+      // towards the reel. (Closing the fingers on the knob joint by joint left it at the fingertips)
+      const hInv = wq(S.hand).invert(), hP = wp(S.hand);
+      const tpl = [0.85, 1.15, 0.75]; let bestC = null;
+      for (let c = 0.5; c <= 1.7; c += 0.05) {
+        const pts = [];
+        for (const a of [0, 1]) {
+          const ch = S.fingers[a]; ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, tpl[k] * c))); ch[0].b.updateMatrixWorld(true);
+          const e = [wp(ch[1].b), wp(ch[2].b), wp(ch[2].b).add(V(0, 1, 0).applyQuaternion(wq(ch[2].b)).multiplyScalar(ch[2].len))];
+          for (const q2 of e) pts.push(q2.sub(hP).applyQuaternion(hInv));
+        }
+        // a circle through them, in the plane square to the knuckle row (xl)
+        const u = yl, w = nl, P2 = pts.map((p2) => [p2.dot(u), p2.dot(w)]);
+        let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sxz = 0, syz = 0, sz = 0; const n = P2.length;
+        for (const [x, y] of P2) { const z = x * x + y * y; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; sxz += x * z; syz += y * z; sz += z; }
+        // (Kasa: x^2 + y^2 + Dx + Ey + F = 0, least squares)
+        const Mx = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, n]], bv = [-sxz, -syz, -sz];
+        const det = (m3) => m3[0][0] * (m3[1][1] * m3[2][2] - m3[1][2] * m3[2][1]) - m3[0][1] * (m3[1][0] * m3[2][2] - m3[1][2] * m3[2][0]) + m3[0][2] * (m3[1][0] * m3[2][1] - m3[1][1] * m3[2][0]);
+        const d0 = det(Mx); if (Math.abs(d0) < 1e-14) continue;
+        const col = (k) => Mx.map((row, ri) => row.map((v, ci) => (ci === k ? bv[ri] : v)));
+        const Dc = det(col(0)) / d0, Ec = det(col(1)) / d0, Fc = det(col(2)) / d0;
+        const cx = -Dc / 2, cy = -Ec / 2, rad = Math.sqrt(Math.max(0, cx * cx + cy * cy - Fc));
+        const err = Math.abs(rad - (GRIP.knobR + 0.0085));
+        if (!bestC || err < bestC.err) { const along = pts.reduce((a2, p2) => a2 + p2.dot(xl), 0) / pts.length; bestC = { err, c, Cl: u.clone().multiplyScalar(cx).addScaledVector(w, cy).addScaledVector(xl, along), rad }; }
+      }
+      S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
+      const fk = tpl.map((v) => v * bestC.c);
+      // the knuckle row along the knob (index side to the reel, -x), turned round it
+      const xTo = (M.x.dot(xl) > 0 ? -1 : 1);
+      for (let al = 0; al < Math.PI * 2 - 1e-3; al += Math.PI / 18) {
+        const Xt = X.clone().multiplyScalar(xTo), Yt = T.clone().applyAxisAngle(X, al), Nt = Xt.clone().cross(Yt);
+        const Qh = basis(Xt, Yt, Nt).multiply(Rl), Ph = bestC.Cl.clone().applyQuaternion(Qh).negate();
+        const wristBend = yl.clone().applyQuaternion(Qh).negate().angleTo(F);
+        place2(S, Ph, Ph.clone().addScaledVector(yl.clone().applyQuaternion(Qh), -S.len), Qh);
+        S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, a < 2 ? fk[k] : [[1.5, 1.6, 1.0], [1.6, 1.6, 1.05]][a - 2][k]))));
+        root.updateMatrixWorld(true);
+        const t = wrap(S.thumb, V(0, 0, 0), X, GRIP.knobR, 0.0095, null, true, [0.5, 0.4, 0.3], GRIP.knobLen);
+        S.thumb.forEach((j) => j.b.quaternion.copy(j.rest));
+        const score = wristBend + (t.hits > 0 ? 0 : 0.3);
+        if (!best || score < best.score) best = { score, Qh, Ph, f: [fk, fk, [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: [t[0], t[1], t[2]], gap: bestC.err, hit: [9, 9, 9, 9], thit: t.hits, wristBend };
+      }
+      S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
+    }
+    const out = { Ph: best.Ph, Qh: best.Qh, f: best.f, t: best.t };
+    if (typeof window !== "undefined" && window.__fdFilm) (window.__fdGrips ||= {})[S.i + key] = { idx: M.x.clone().applyQuaternion(best.Qh).toArray().map((v) => +v.toFixed(2)), hit: best.hit, thit: best.thit, wrist: +best.wristBend.toFixed(2), gap: +best.gap.toFixed(3), score: +best.score.toFixed(2), f: best.f.map((r) => r.map((v) => +v.toFixed(2))), t: best.t.map((v) => +v.toFixed(2)) };
+    solved.set(key, out); return out;
+  }
+  const blend = [null, null];
   return {
     root,
+    /** hand i held by a grip on the equipment: sock: { pos, quat } (the grip's frame, the group's space), kind "seat" |
+     *  "crank", roll (radians, the wrist's roll about the knob), elbow (the group's space: where the arm comes from),
+     *  dt. Returns { wrist, elbow } (the group's space). */
+    poseSocket(i, group, { pos, quat, kind, roll = 0, elbow, dt = 0.016 }) {
+      const S = sides[i]; group.updateWorldMatrix(true, false); group.getWorldQuaternion(gq);
+      const sideSign = kind === "seat" ? (elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).x >= 0 ? 1 : -1) : 1;
+      // (solved once, with the hand alone at the origin; the arms put back where they were)
+      const Fin = elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).normalize();
+      const G = solveGrip(S, kind, sideSign, Fin);
+      const sq = gq.clone().multiply(quat); if (roll) sq.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), roll));
+      const sp = group.localToWorld(pos.clone());
+      let Pw = sp.clone().add(G.Ph.clone().applyQuaternion(sq)), Qw = sq.clone().multiply(G.Qh);
+      let f = G.f, t = G.t;
+      // easing in from wherever the hand was (a change of grip), never a jump
+      const B = blend[i];
+      if (B && B.kind !== kind) { B.from = { P: B.P.clone(), Q: B.Q.clone(), f: B.f, t: B.t }; B.u = 0; B.kind = kind; }
+      if (B?.from) {
+        B.u = Math.min(1, B.u + dt / 0.3); const e = ease(B.u);
+        Pw = B.from.P.clone().lerp(Pw, e); Qw = B.from.Q.clone().slerp(Qw, e);
+        f = f.map((r, a) => r.map((v, k) => B.from.f[a][k] + (v - B.from.f[a][k]) * e)); t = t.map((v, k) => B.from.t[k] + (v - B.from.t[k]) * e);
+        if (B.u >= 1) B.from = null;
+      }
+      // the forearm: straight back from the wrist, turned towards where the arm comes from by no more than a wrist can bend
+      const back = S.M.y.clone().applyQuaternion(Qw).negate(), toEl = group.localToWorld(elbow.clone()).sub(Pw).normalize();
+      const ang = back.angleTo(toEl), lim = TUNE.wristLim;
+      const dir = ang > lim ? back.clone().lerp(toEl, lim / ang).normalize() : toEl;
+      const Ew = Pw.clone().addScaledVector(dir, S.len);
+      place2(S, Pw, Ew, Qw);
+      S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, f[a][k]))));
+      S.thumb.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, t[k])));
+      root.updateMatrixWorld(true);
+      if (typeof window !== "undefined" && window.__fdShowSock) {
+        // (film only: what the grip was worked out round, drawn where it is, to check it against the real knob and handle)
+        S.dbg ||= (() => { const g = kind === "seat" ? new THREE.CylinderGeometry(GRIP.rodR, GRIP.rodR, 0.3, 16).rotateX(Math.PI / 2) : new THREE.CylinderGeometry(GRIP.knobR, GRIP.knobR, GRIP.knobLen, 16).rotateZ(Math.PI / 2); const mm = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xff2020, wireframe: true })); group.parent?.parent?.add?.(mm); return mm; })();
+        S.dbg.position.copy(sp); S.dbg.quaternion.copy(sq); S.dbg.updateMatrixWorld(true);
+      }
+      if (typeof window !== "undefined" && window.__fdFilm) {
+        const ix = S.fingers[0], md = S.fingers[1], hk = wp(ix[0].b).lerp(wp(ix[1].b), 0.5).lerp(wp(md[0].b).lerp(wp(md[1].b), 0.5), 0.5);
+        (window.__fdSock ||= {})[i] = { kind, sock: sp.toArray().map((v) => +v.toFixed(3)), hook: hk.toArray().map((v) => +v.toFixed(3)), d: +hk.distanceTo(sp).toFixed(3), tips: [0, 1].map((a) => { const c = S.fingers[a][2]; return +wp(c.b).add(V(0, 1, 0).applyQuaternion(wq(c.b)).multiplyScalar(c.len)).distanceTo(sp).toFixed(3); }) };
+      }
+      blend[i] = { ...(B || {}), kind, P: Pw.clone(), Q: Qw.clone(), f, t, from: B?.from || null, u: B?.u ?? 1 };
+      return { wrist: group.worldToLocal(Pw.clone()), elbow: group.worldToLocal(Ew.clone()) };
+    },
+    /** (after any other pose: what the hand's doing now, for the next grip to ease from) */
+    note(i, kind) {
+      const S = sides[i]; const f = S.fingers.map((ch) => ch.map((j) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(j.b.quaternion).w), 0, 1))));
+      const t = S.thumb.map((j) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(j.b.quaternion).w), 0, 1)));
+      blend[i] = { kind, P: wp(S.hand), Q: wq(S.hand), f, t, from: null, u: 1 };
+    },
     /** where the sleeve covers the forearm from: the wrist and the way along the forearm to the hand (world) */
     cuff(i, wristW, dirW) { CUT.uFdW.value[i].copy(wristW); CUT.uFdDir.value[i].copy(dirW); },
     /** hand i at `pos` with frame `quat` (the group's space), its fingers curled as `curl`, the elbow towards `elbow`;
@@ -526,9 +746,19 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // the sleeve: from the wrist back towards the elbow
         // (along the forearm, from a little way up it: the hand's own axis can be bent at the wrist, which stood the
         // sleeve off to one side of the arm)
-        const back = elbow.clone().sub(pos).normalize(), wrist = pos.clone().addScaledVector(back, 0.035);
+        let wr = pos, el = elbow;
+        if (real && spec?.sock && (spec.kind === "seat" || spec.kind === "crank")) {
+          // held by a grip on the equipment itself (realArms.poseSocket): on the knob, the wrist rolls a little as the handle
+          // goes round (the knob turns in the fingers; the hand doesn't go round with it), and the forearm follows
+          const roll = spec.kind === "crank" ? 0.32 * Math.sin((spec.spin || 0) + 0.6) : 0;
+          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind, roll, elbow, dt });
+          wr = r.wrist; el = r.elbow; h.cur = { pos: wr.clone(), quat };
+        } else if (real) {
+          real.pose(i, group, pos, quat, curl, elbow, spec && spec.kind === "butt" && spec.axis ? { at: spec.at, axis: spec.axis, kind: spec.kind, R: 0.0145, w: e } : null);
+          real.note(i, spec?.kind ?? null);
+        }
+        const back = el.clone().sub(wr).normalize(), wrist = wr.clone().addScaledVector(back, 0.035);
         h.sleeve.position.copy(wrist); h.sleeve.quaternion.setFromUnitVectors(V(0, -1, 0), back);
-        if (real) real.pose(i, group, pos, quat, curl, elbow, spec && (spec.kind === "seat" || spec.kind === "crank" || spec.kind === "butt") && spec.axis ? { at: spec.at, axis: spec.axis, stem: spec.stem, kind: spec.kind, R: spec.kind === "crank" ? 0.0095 : 0.0145, w: e } : null);
       }
     },
     /** where each hand is (the wrist, in the group's space), for tests */
