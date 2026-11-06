@@ -293,7 +293,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 rd = reflect(-v, n); rd.y = abs(rd.y);
         float F = .02 + .98*pow(1. - max(dot(n, v), 0.), 5.);
         vec3 refl = skyReflect(normalize(rd));
-        float lit = uDay + uDusk*.55 + uNight*.12, dim = 1. - .25*smoothstep(.5, 1., uCloud) - .15*uRain;
+        // (at dusk the water keeps more of its light: it went near-black under a sky still bright, as on the 6 November
+        // recording, where the real sea at that hour mirrors the sky's glow)
+        float lit = uDay + uDusk*.75 + uNight*.12, dim = 1. - .25*smoothstep(.5, 1., uCloud) - .15*uRain;
         float sd = shoreDist(p), shallow = 1. - smoothstep(0., 16., sd);
         // looking down into it you see the deep colour; at a low angle more of the light scattered back out; the
         // shallows by the land are lighter and greener
