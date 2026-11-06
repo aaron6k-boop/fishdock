@@ -924,7 +924,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
       fpView = { vr, vu, vf };
       fpPullNow += (fpPull - fpPullNow) * Math.min(1, dt * 6);
-      const reelAt = fpEye().addScaledVector(vr, 0.06).addScaledVector(vu, -0.115 - fpPullNow * 0.4).addScaledVector(vf, 0.4 + fpPullNow); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
+      const reelAt = fpEye().addScaledVector(vr, FPR.x).addScaledVector(vu, FPR.y - fpPullNow * 0.4).addScaledVector(vf, FPR.z + fpPullNow); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
       butt = reelAt.addScaledVector(dir, -R.seat);
     }
     // from one way of holding the rod to the next (onto the rail, into your hands, walking off with it) the rod moves
@@ -1250,6 +1250,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // (one place, worked out the same way every frame and before anything is posed: the camera and the rod in your hands
   // both hang off it, so they can never be a frame apart. Your eye height is taken from your body while you stand in
   // third person; leaning out over the rail takes the eye forward and a little down; a slow breath)
+  // where the reel sits in your view (right, up, forward of the eye, metres): low and a little right of the middle, far
+  // enough out that both hands and the reel's handle going round are in the picture above the controls (it was lower
+  // and nearer: the reel hand was half under the Reel button)
+  const FPR = (typeof window !== "undefined" && window.__fdFpr) || { x: 0.07, y: -0.1, z: 0.54 };
   function fpEye() { return new THREE.Vector3(0, eyeH - leanNow * 0.25 + Math.sin(tNow * 1.4) * 0.006, -0.08 - leanNow * 0.85); }
   // the reel's handle for your taps (reelHandle.js)
   // ---- the reel's handle ----
