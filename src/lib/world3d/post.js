@@ -1,0 +1,86 @@
+// ---- post: the picture after the scene is drawn: ambient occlusion, a soft glow on bright light, the final grade ----
+// Without this the scene went straight to the screen: every surface lit evenly, so a bucket on the deck, a person's
+// boots on the concrete and the gaps between the pier's timbers had no shade where they meet, and a sunlit sea or a
+// lamp after dark had no glow. Now, when the graphics setting allows:
+//   level 1 (Balanced): antialiased (4x MSAA) HDR buffer, a faint bloom on the brightest light, and a gentle grade
+//   level 2 (High quality): also ground-truth ambient occlusion (GTAO), the contact shade where things meet
+// The colour pipeline is the same as without: three's Khronos Neutral tone mapping and sRGB output, applied once at
+// the end (OutputPass). The sky and the sea (environment.js) write display colours from their own shaders; with
+// post they're turned back into the linear light the tone mapping expects (their uPostLin uniform), so they look the
+// same either way.
+import * as THREE from "three";
+import { EffectComposer } from "./vendor/three-post/postprocessing/EffectComposer.js";
+import { RenderPass } from "./vendor/three-post/postprocessing/RenderPass.js";
+import { GTAOPass } from "./vendor/three-post/postprocessing/GTAOPass.js";
+import { UnrealBloomPass } from "./vendor/three-post/postprocessing/UnrealBloomPass.js";
+import { ShaderPass } from "./vendor/three-post/postprocessing/ShaderPass.js";
+import { OutputPass } from "./vendor/three-post/postprocessing/OutputPass.js";
+
+// ---- the grade (display colours, after tone mapping): a touch of contrast and colour, a soft vignette, and a
+// little noise so the sky's long gradients don't band ----
+export const GradeShader = {
+  name: "FishDockGrade",
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.05 }, uSat: { value: 1.05 }, uVignette: { value: 0.22 }, uSeed: { value: 0 } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed)*43758.5453); }
+    void main(){
+      vec4 t = texture2D(tDiffuse, vUv); vec3 c = t.rgb;
+      // contrast round mid grey, kept off the ends so nothing clips
+      c = mix(c, smoothstep(0., 1., c), uContrast - 1.);
+      float l = dot(c, vec3(.2126, .7152, .0722)); c = max(mix(vec3(l), c, uSat), 0.);
+      vec2 d = vUv - .5; c *= 1. - uVignette*smoothstep(.35, .95, dot(d, d)*2.2);
+      c += (h(gl_FragCoord.xy) - .5)/255.;
+      gl_FragColor = vec4(c, t.a);
+    }`,
+};
+
+/** level 0: none (draw straight to the screen); 1: MSAA, bloom and grade; 2: plus ambient occlusion; 3: finer AO. */
+export function createPost(renderer, scene, camera, { level = 1 } = {}) {
+  // (the buffer is half-float, for the light brighter than white that the bloom needs: a graphics chip that can't
+  // draw into one gets the plain picture rather than a black one)
+  const ext = renderer.extensions;
+  if (!level || !renderer.capabilities.isWebGL2 || !(ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float"))) return null;
+  const size = renderer.getSize(new THREE.Vector2()), pr = renderer.getPixelRatio();
+  const rt = new THREE.WebGLRenderTarget(size.x * pr, size.y * pr, { type: THREE.HalfFloatType, samples: 4 });
+  const composer = new EffectComposer(renderer, rt);
+  composer.setPixelRatio(pr); composer.setSize(size.x, size.y);
+  composer.addPass(new RenderPass(scene, camera));
+  let ao = null;
+  if (level >= 2) {
+    ao = new GTAOPass(scene, camera, size.x * pr, size.y * pr);
+    // contact shade at a person's or a bucket's scale (half a metre), fading with distance so the far town isn't dirty
+    // (level 3, Ultra: more samples, so the shade is smooth rather than a fine grain)
+    const n = level >= 3 ? 24 : 16;
+    ao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.6, thickness: 1.2, scale: 1, samples: n, distanceFallOff: 1 });
+    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: level >= 3 ? 8 : 6, rings: 2, samples: n });
+    ao.blendIntensity = 0.85;
+    // only solid surfaces shade each other: not name labels and other sprites, lines, spray or anything see-through
+    // (three's own pass leaves out just points and lines, so a label's square cast a dark box round it)
+    const cache = ao._visibilityCache;
+    ao.overrideVisibility = function () {
+      this.scene.traverse((o) => {
+        cache.set(o, o.visible);
+        const m = o.material, see = m && (Array.isArray(m) ? m.some((x) => x.transparent || !x.depthWrite) : (m.transparent || !m.depthWrite));
+        if (o.isPoints || o.isLine || o.isSprite || see) o.visible = false;
+      });
+    };
+    composer.addPass(ao);
+  }
+  // (only the brightest light glows: the sun's glitter on the sea, lamps after dark, the sun low in the sky)
+  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.18, 0.35, 1.0);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+  const grade = new ShaderPass(GradeShader);
+  composer.addPass(grade);
+  let seed = 0;
+  return {
+    level,
+    get ao() { return !!ao?.enabled; },
+    render() { grade.uniforms.uSeed.value = (seed = (seed + 1) % 97); composer.render(); },
+    setSize(w, h) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); },
+    /** frames running late even at the lowest sharpness: drop the ambient occlusion first */
+    dropAO() { if (ao?.enabled) { ao.enabled = false; return true; } return false; },
+    dispose() { composer.passes.forEach((p) => p.dispose?.()); composer.dispose(); },
+  };
+}

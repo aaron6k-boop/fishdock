@@ -72,6 +72,6 @@ export function lookQuality(q = 1) {
     waterDetail: level, // 0: one layer of fine ripples and of raindrop rings; 1: two, plus wind streaks; 2: three
     skyDetail: level > 0 ? 1 : 0, // cloud shading (lit sides and shaded undersides)
     lampLights: [0, 2, 3][level], // lights at the lamp posts nearest the anglers after dark (besides the one over them)
-    shadowMap: [0, 1024, 2048][level],
+    shadowMap: [0, 2048, 4096][level], // (4096 on High: a person's shadow sharp at their feet, not stepped)
   };
 }

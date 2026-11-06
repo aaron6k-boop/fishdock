@@ -14,8 +14,19 @@ import { safeSpots, spawnFor } from "./spawn.js";
 import { planCast } from "./castAim.js";
 import { addRipple, stepRipples } from "./waterFx.js";
 import { shotFor } from "./landCam.js";
+import { createPost } from "./post.js";
 
-export const QUALITY3D = { performance: { dpr: 1.25, shadows: 0, q: 0.5 }, balanced: { dpr: 2, shadows: 1, q: 1 }, high: { dpr: 2, shadows: 1, q: 2 } };
+// dpr: the most pixels per screen pixel; ss: the least (a computer's 1x screen is drawn sharper than its pixels and
+// scaled down, which smooths the fine edges of railings, rods and lines); floor: the least the frame pacing drops to;
+// post: post.js level (1 bloom and grade, 2 plus ambient occlusion)
+export const QUALITY3D = {
+  performance: { dpr: 1.5, ss: 1, floor: 1, shadows: 0, q: 0.5, post: 0 },
+  balanced: { dpr: 2, ss: 1, floor: 1, shadows: 1, q: 1, post: 1 },
+  high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2 },
+  // a computer with a graphics card: drawn at twice the screen's pixels (or more) and scaled down, finer shade
+  // (and kept smooth: a frame slower than about 48 a second counts as late, where the others allow down to 28)
+  ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021 },
+};
 export function autoQuality3d() {
   try {
     // iPhone Safari reports no memory and only a few cores, which put every iPhone (even the newest) on the lowest
@@ -23,9 +34,20 @@ export function autoQuality3d() {
     // from the last several years have strong graphics; they get the balanced setting
     const ua = navigator.userAgent || "", ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
     if (ios) return "balanced";
-    const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4; if (mem <= 2 || cores <= 4) return "performance"; if (mem >= 8 && cores >= 8) return "high";
+    // a computer with its own graphics card (NVIDIA, AMD Radeon, Intel Arc) gets the best, whatever it reports
+    if (!/Android|Mobile/.test(ua) && discreteGpu()) return "ultra";
+    const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4; if (mem <= 2 || cores <= 4) return "performance";
+    if (mem >= 8 && cores >= 8) return "high";
   } catch { /* ignore */ }
   return "balanced";
+}
+function discreteGpu() {
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2"); if (!gl) return false;
+    const ext = gl.getExtension("WEBGL_debug_renderer_info"); const name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "";
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return /NVIDIA|GeForce|RTX|Radeon RX|Radeon Pro|Intel\(R\) Arc/i.test(name || "");
+  } catch { return false; }
 }
 export const HOME_PITCH = -0.09;
 const ease01 = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
@@ -36,14 +58,34 @@ export const CAMERA_MODES = [
 
 export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, onFeel, reduceMotion = false, real = null, pano = null, trackJumps = true } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.q >= 1, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.dpr));
+  // (with post-processing the antialiasing is the post buffer's own MSAA, so the screen's would be wasted)
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !Q.post, powerPreference: "high-performance" });
+  const dprMax = Math.min(Q.dpr, Math.max(window.devicePixelRatio || 1, Q.ss || 1));
+  renderer.setPixelRatio(dprMax);
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0; // (see adapt)
   renderer.shadowMap.enabled = !!Q.shadows; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 5000);
+  // ---- post-processing (post.js), and every texture filtered as sharply as the graphics card allows ----
+  // (not over a 360° photo: that is the photo as taken, not to be graded)
+  let post = null;
+  try { post = pano ? null : createPost(renderer, scene, camera, { level: Q.post }); } catch (e) { console.warn("FishDock 3D: post-processing off", e); post = null; }
+  const maxAniso = Q.q >= 1 ? renderer.capabilities.getMaxAnisotropy() : 4;
+  let texSeen = -1, sharpenAt = 0;
+  function sharpen() {
+    // (textures arrive as the models load: look again whenever the count changes, at most once a second or so)
+    if (++sharpenAt < 60) return; sharpenAt = 0;
+    const n = renderer.info.memory.textures; if (n === texSeen) return; texSeen = n;
+    scene.traverse((o) => {
+      const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null; if (!ms) return;
+      for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "bumpMap", "emissiveMap"]) {
+        const t = m[k]; if (t && t.isTexture && !t.isRenderTargetTexture && t.anisotropy < maxAniso) { t.anisotropy = maxAniso; t.needsUpdate = true; }
+      }
+    });
+  }
+  function drawFrame() { sharpen(); if (post) post.render(); else renderer.render(scene, camera); }
   const tBuild = performance.now();
-  const env = createEnvironment(scene, { venue, quality: Q.q, real, pano });
+  const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
   const buildMs = Math.round(performance.now() - tBuild);
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
@@ -469,11 +511,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // steady frame pacing on a phone: if frames keep coming late (the GPU can't keep up at this sharpness), draw at a
   // slightly lower resolution, a step at a time, and back up again once there's room. Better an even 60 (or 30) than
   // a jerky one
-  const dprMax = Math.min(window.devicePixelRatio || 1, Q.dpr); let dprNow = dprMax, late = 0, paceAt = 0, easyFor = 0;
+  // (late: under about 28 frames a second. It used to count anything under 42 as late, so a steady 40 on a good
+  // phone, or a busy moment, sent the picture down to one pixel per pixel for good, which is what made it look blocky.
+  // It never goes below the setting's floor; at the floor, the ambient occlusion goes first)
+  const dprFloor = Math.min(dprMax, Q.floor || 1); let dprNow = dprMax, late = 0, paceAt = 0, easyFor = 0;
   function pace(ts, dt) {
-    late = late * 0.96 + (dt > 0.024 ? 1 : 0) * 0.04;
+    late = late * 0.96 + (dt > (Q.late || 0.036) ? 1 : 0) * 0.04;
     if (ts - paceAt < 2000) return; paceAt = ts;
-    if (late > 0.4 && dprNow > 1) { dprNow = Math.max(1, dprNow - 0.25); renderer.setPixelRatio(dprNow); resize(); late = 0.2; easyFor = 0; }
+    if (late > 0.4 && dprNow > dprFloor) { dprNow = Math.max(dprFloor, dprNow - 0.25); renderer.setPixelRatio(dprNow); resize(); late = 0.2; easyFor = 0; }
+    else if (late > 0.4 && post?.dropAO()) { late = 0.2; easyFor = 0; }
     else if (late < 0.05 && dprNow < dprMax) { easyFor += 2; if (easyFor >= 20) { dprNow = Math.min(dprMax, dprNow + 0.25); renderer.setPixelRatio(dprNow); resize(); easyFor = 0; } }
     else easyFor = 0;
   }
@@ -505,6 +551,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   function adapt(force = false) {
     const L2 = env.light; if (!L2) return;
     renderer.toneMappingExposure = L2.exposure; scene.environmentIntensity = L2.envIntensity;
+    if (env.waterUniforms.uExpo) env.waterUniforms.uExpo.value = L2.exposure; // (the sky and sea undo it under post)
     skyLight(env.current, force);
   }
 
@@ -535,7 +582,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       get fight() { return lastFight; },
       // for visual checks: a ring on the water, as a fish or the net makes one
       ripple(x, z, s) { ripple({ x, z }, s); },
-      get stats() { const r = renderer.info.render, m = renderer.info.memory; return { dpr: dprNow, late: +late.toFixed(2), calls: r.calls, triangles: r.triangles, geometries: m.geometries, textures: m.textures, programs: renderer.info.programs?.length }; },
+      get stats() { const r = renderer.info.render, m = renderer.info.memory; return { dpr: dprNow, post: post ? post.level : 0, ao: !!post?.ao, late: +late.toFixed(2), calls: r.calls, triangles: r.triangles, geometries: m.geometries, textures: m.textures, programs: renderer.info.programs?.length }; },
       get yaw() { return look.yaw; },
       get lag() { return film ? nowFn() - film.now : 0; },
       get scene() { return scene; },
@@ -619,7 +666,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera);
     adapt();
-    if (draw) renderer.render(scene, camera);
+    if (draw) drawFrame();
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
     onFrame?.({ outs, view, slow, mode, focusId, localId, walk: walkInfo, kept });
@@ -627,6 +674,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   function resize() {
     const w = canvas.clientWidth || canvas.parentElement?.clientWidth || 1, h = canvas.clientHeight || canvas.parentElement?.clientHeight || 1;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    post?.setSize(w, h);
   }
   resize();
   raf = requestAnimationFrame(frame);
@@ -748,7 +796,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     resize,
     /** the screen position (0..1) of a world point, or null when behind the camera */
     project(p) { const v = p.clone().project(camera); return v.z > 1 ? null : { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; },
-    snapshot() { renderer.render(scene, camera); return canvas.toDataURL("image/jpeg", 0.9); },
-    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); env.dispose(); renderer.dispose(); },
+    snapshot() { drawFrame(); return canvas.toDataURL("image/jpeg", 0.9); },
+    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
   };
 }

@@ -109,24 +109,42 @@ function speckle(g, w, h, base, spread, n = 2600, size = 2) {
   for (let i = 0; i < n; i++) { const v = (Math.random() - 0.5) * spread; g.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v)})`; g.fillRect(Math.random() * w, Math.random() * h, size, size); }
 }
 
-export function createEnvironment(scene, { venue = "pier", quality = 1, real = null, pano = null } = {}) {
+export function createEnvironment(scene, { venue = "pier", quality = 1, real = null, pano = null, post = false } = {}) {
   const L = layoutFor(venue);
   const group = new THREE.Group(); scene.add(group);
   const U = {
     uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(0.3, 0.5, -0.8).normalize() }, uMoonDir: { value: new THREE.Vector3(-0.3, 0.4, -0.8).normalize() },
     uDay: { value: 1 }, uDusk: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.3 }, uRain: { value: 0 }, uMoonLight: { value: 0.5 },
+    // with post-processing (post.js) the picture is tone mapped once at the end: the sky and sea write the colours
+    // they mean to show, so under post they're turned back into linear light at the exposure (world.js sets uExpo)
+    uPostLin: { value: post ? 1 : 0 }, uExpo: { value: 1 },
   };
+  // (undoing it: sRGB to linear, then Khronos Neutral backwards: its toe, which takes a little off the darkest
+  // channel, and its shoulder, which rolls off the brightest (held below white, so the sky by a low sun stays a glow
+  // and not a blaze); then the exposure)
+  const POST_GLSL = `uniform float uPostLin, uExpo;
+    vec3 toPost(vec3 c){ if (uPostLin < .5) return c; c = clamp(c, 0., 1.);
+      c = mix(c/12.92, pow((c + .055)/1.055, vec3(2.4)), step(vec3(.04045), c));
+      const float S = .76, D = .24;
+      float np = max(c.r, max(c.g, c.b));
+      if (np > S) { np = min(np, .92); float pk = D*D/(1. - np) - D + S; c *= pk/np; }
+      float m = min(c.r, min(c.g, c.b));
+      c += m < .04 ? sqrt(m/6.25) - m : .04;
+      return c/max(uExpo, .05); }
+  `;
 
   // ---- sky ----
   const LQ = lookQuality(quality);
   const skyShader = (defines) => new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { ...U, uEnvGround: { value: new THREE.Color(0.05, 0.06, 0.06) } }, defines,
     vertexShader: "varying vec3 vD; void main(){ vD = normalize(position); vec4 p = modelViewMatrix*vec4(position, 1.); gl_Position = projectionMatrix*p; gl_Position.z = gl_Position.w; }",
-    fragmentShader: GLSL_NOISE + GLSL_SKY + `uniform vec3 uEnvGround; varying vec3 vD;
+    fragmentShader: GLSL_NOISE + GLSL_SKY + POST_GLSL + `uniform vec3 uEnvGround; varying vec3 vD;
       void main(){ vec3 d = normalize(vD); vec3 c = skyColour(d);
         #ifdef ENV_PASS
           // (for the environment map: below the horizon, the dark of the sea and the land)
           if (d.y < 0.) c = mix(skyBase(vec3(d.x, 0., d.z))*.6, uEnvGround, smoothstep(0., -.25, d.y));
+        #else
+          c = toPost(c);
         #endif
         gl_FragColor = vec4(c, 1.); }`,
   });
@@ -197,7 +215,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vW = w;
         gl_Position = projectionMatrix*viewMatrix*vec4(w, 1.);
       }`,
-    fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + /* glsl */`
+    fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + POST_GLSL + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
       uniform sampler2D uShore, uShoreF; uniform float uShoreFHalf;
       // metres to the nearest land (from the shore maps: the fine one close round the anglers, the coarse one further
@@ -330,7 +348,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float fogK = 1. - exp(-uFogD*uFogD*dist*dist);
         vec3 hz = mix(uFogC, skyBase(normalize(vec3(-v.x, .02, -v.z))), smoothstep(.5, 1., fogK));
         col = mix(col, hz, fogK);
-        gl_FragColor = vec4(col, 1.);
+        gl_FragColor = vec4(toPost(col), 1.);
       }`,
   });
   const water = new THREE.Mesh(wGeo, waterMat); water.frustumCulled = false; water.renderOrder = -5; group.add(water);
