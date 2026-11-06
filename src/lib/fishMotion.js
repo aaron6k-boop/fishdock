@@ -40,10 +40,12 @@ export function restHeight(halfDepth, halfThick, roll = 0) {
   return halfDepth * c + halfThick * s;
 }
 
-/** Where a tired fish's spine sits when it's drawn over the surface on a tight line: just under it, its back breaking
- *  the water (never hanging straight down under the surface, never floating clear of it). */
+/** Where a tired fish's spine sits when it's drawn over the surface on a tight line: just under it, its back (or, lying
+ *  over, its flank) well out of the water (never hanging straight down under the surface, never floating clear of it).
+ *  (Its spine was nearly half its depth under: lying on its side, two or three centimetres showed, which a passing wave
+ *  or a dark sea hid, and the line ran down to nothing while the net came down to it) */
 export function surfaceSpine(waterY, halfDepth) {
-  return waterY - halfDepth * 0.45;
+  return waterY - halfDepth * 0.2;
 }
 
 // ---- putting it back ----

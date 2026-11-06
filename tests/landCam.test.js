@@ -65,3 +65,16 @@ test("the swim-away is close enough to see the fish: a 45 cm fish is over 40 px 
 test("from one stage to the next the camera comes from the same side (no swinging round the angler)", () => {
   for (const s of Object.values(SHOTS)) { assert.ok(s.from[0] < 0, "from your left"); assert.ok(s.from[2] > 0, "out in front"); }
 });
+
+test("lift: on a phone the things to see are framed above the controls at the bottom of the screen", () => {
+  const pts = [[0, 0, 0], [0, 3, 0], [1, 1.5, 2]], dir = [-0.6, 0.3, 0.74], tanV = Math.tan((58 * Math.PI) / 360), tanH = tanV * 0.5;
+  const s = fitShot(pts, dir, { tanH, tanV, margin: 0.8, near: 2, far: 30, lift: 0.2 });
+  // each point inside the picture, and none in its bottom fifth (where the controls are)
+  for (const p of pts) {
+    assert.ok(onScreen(p, s.pos, s.at, { tanH, tanV }), "on screen");
+    const f = [s.at[0] - s.pos[0], s.at[1] - s.pos[1], s.at[2] - s.pos[2]], l = Math.hypot(...f), fw = f.map((x) => x / l);
+    const r0 = [-fw[2], 0, fw[0]], rl = Math.hypot(...r0), r = r0.map((x) => x / rl), u = [r[1] * fw[2] - r[2] * fw[1], r[2] * fw[0] - r[0] * fw[2], r[0] * fw[1] - r[1] * fw[0]];
+    const q = [p[0] - s.pos[0], p[1] - s.pos[1], p[2] - s.pos[2]], z = q[0] * fw[0] + q[1] * fw[1] + q[2] * fw[2], y = (q[0] * u[0] + q[1] * u[1] + q[2] * u[2]) / z;
+    assert.ok(Math.abs(y) <= tanV + 1e-9 && y >= -tanV * 0.6 - 1e-6, `above the bottom fifth: ${(y / tanV).toFixed(2)}`);
+  }
+});

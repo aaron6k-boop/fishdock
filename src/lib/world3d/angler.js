@@ -54,12 +54,31 @@ const ROD = {
 export const rodFor = (venue) => ROD[venue] || ROD.pier;
 
 // ---- the water's height, the same big waves as the shader, so floats and fish ride them ----
+// ---- the sea's height: the same waves the water is drawn with (environment.js GLSL_WAVES, seaWaves), worked out here
+// for whatever rides on it (the float, a fish at the surface, the drop net's hoop). It used to be a simpler set of four
+// waves of its own, which didn't match the drawn sea by as much as a few tens of centimetres: a fish held "at the
+// surface" was under the drawn water half the time, and the line ran down to nothing. (Float32 throughout the noise,
+// as the graphics card works it, so the hashes agree)
+const f32 = Math.fround, fract = (x) => f32(x - Math.floor(x));
+function hash2(x, y) { let px = fract(f32(x * f32(123.34))), py = fract(f32(y * f32(456.21))); const d = f32(f32(px * f32(px + f32(45.32))) + f32(py * f32(py + f32(45.32)))); px = f32(px + d); py = f32(py + d); return fract(f32(px * py)); }
+function noise2(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
+  return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy;
+}
 export function waveHeight(x, z, t, { swell = 0.3, wind = 0.3, windDir = [0.3, -1], kind = 0 } = {}) {
   const sea = kind < 0.5 ? 1 : kind < 1.5 ? 0.5 : 0;
   const wl = Math.hypot(windDir[0], windDir[1]) || 1, wd = [windDir[0] / wl, windDir[1] / wl], wx = [-wd[1], wd[0]];
-  const w = (dx, dz, f, a, s) => { const l = Math.hypot(dx, dz); return a * Math.sin(((x * dx + z * dz) / l) * f + t * s); };
-  return w(0.2, -1, 0.09, (0.18 + 0.55 * swell) * sea, 0.9) + w(-0.35, -1, 0.14, (0.1 + 0.3 * swell) * sea, 1.15)
-    + w(wd[0] + wx[0] * 0.3, wd[1] + wx[1] * 0.3, 0.45, 0.05 + 0.14 * wind, 1.9) + w(wd[0] - wx[0] * 0.4, wd[1] - wx[1] * 0.4, 0.7, 0.03 + 0.08 * wind, 2.4);
+  const g1 = noise2(x * 0.011 + t * 0.021, z * 0.011 - t * 0.013), g2 = noise2(x * 0.017 + 31 - t * 0.017, z * 0.017 + 31 - t * 0.024);
+  const ph = (g1 - 0.5) * 5, A = (0.16 + 0.5 * swell) * sea, B = 0.045 + 0.13 * wind;
+  const tr = (dx, dz, k, a, p) => { const l = Math.hypot(dx, dz) || 1; return a * Math.sin(((x * dx + z * dz) / l) * k - t * Math.sqrt(9.81 * k) + p); };
+  return tr(0.2, -1, 0.085, A * (0.55 + 0.9 * g1), ph)
+    + tr(-0.42, -1, 0.131, A * 0.55 * (0.5 + g2), ph * 0.7 + 1.3)
+    + tr(0.65, -1, 0.207, A * 0.25 * (0.4 + 1.2 * g1), 4.1 - ph * 0.5)
+    + tr(wd[0] + wx[0] * 0.28, wd[1] + wx[1] * 0.28, 0.41, B * (0.6 + 0.8 * g2), ph * 1.3)
+    + tr(wd[0] - wx[0] * 0.43, wd[1] - wx[1] * 0.43, 0.63, B * 0.6 * (0.5 + g1), 2.2 - ph)
+    + tr(wd[0] + wx[0] * 0.77, wd[1] + wx[1] * 0.77, 0.97, B * 0.32 * (0.4 + 1.2 * g2), ph * 1.7 + 5)
+    + tr(wd[0] - wx[0] * 1.1, wd[1] - wx[1] * 1.1, 1.46, B * 0.18, 0.7 - ph * 2);
 }
 
 function label(text, colour = "#ffffff") {

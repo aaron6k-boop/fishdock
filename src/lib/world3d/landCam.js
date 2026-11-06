@@ -64,20 +64,23 @@ function basis(fwd) {
  * the middle of their box, and far enough back that each is inside tanH/tanV (the lens's half-width and half-height,
  * as tangents) times `margin` (0..1). Returns { pos, at, dist } (dist clamped to near..far).
  */
-export function fitShot(points, dir, { tanH, tanV, margin = 0.78, near = 2, far = 12 } = {}) {
+export function fitShot(points, dir, { tanH, tanV, margin = 0.78, near = 2, far = 12, lift = 0 } = {}) {
   const pts = points.filter(Boolean);
   if (!pts.length) return null;
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (const p of pts) for (let i = 0; i < 3; i++) { lo[i] = Math.min(lo[i], p[i]); hi[i] = Math.max(hi[i], p[i]); }
   const at = mul(add(lo, hi), 0.5), d = norm(dir), fwd = mul(d, -1), [r, u] = basis(fwd);
+  // lift: the share of the picture's height kept clear at the bottom (on a phone, the controls and the hints are there):
+  // the things are fitted into the rest, and the view aimed that much lower so they sit above the controls
+  const tv = tanV * (1 - lift);
   let need = near;
   for (const p of pts) {
     const q = sub(p, at), x = Math.abs(dot(q, r)), y = Math.abs(dot(q, u)), z = dot(q, fwd);
     // at distance D the point is D + z in front of the camera: it fits when |x| <= (D + z) tanH margin
-    need = Math.max(need, x / (tanH * margin) - z, y / (tanV * margin) - z, 0.6 - z);
+    need = Math.max(need, x / (tanH * margin) - z, y / (tv * margin) - z, 0.6 - z);
   }
   const dist = clamp(need, near, far);
-  return { pos: add(at, mul(d, dist)), at, dist };
+  return { pos: add(at, mul(d, dist)), at: lift ? sub(at, mul(u, tanV * lift * dist)) : at, dist };
 }
 
 /** A direction in the angler's frame ([right, up, forward]) turned into the world, for an angler facing `face`. */

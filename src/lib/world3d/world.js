@@ -359,7 +359,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         const dropStage = venue === "pier" && (out.tech === "dropnet" || !out.land) ? (out.release ? { deck: "carry", in: "over", lower: "rlower", swim: "swim", swum: "rhaul", haul: "rhaul" }[st] : st) : null;
         const shotFov = (dropStage === "lower" || dropStage === "haul" || dropStage === "rlower" || dropStage === "rhaul" ? 60 : 52) * (camera.aspect < 0.8 ? 1.12 : 1), tanV = Math.tan((shotFov * Math.PI) / 360);
         const arr = (v) => (v ? v.toArray() : null);
-        const framed = dropStage ? shotFor(dropStage, { fish: arr(landing.fish), ahead: arr(out.release?.ahead), net: arr(landing.net), head: arr(out.at.clone().add(new THREE.Vector3(0, 1.72, 0))), feet: arr(out.at.clone().add(new THREE.Vector3(0, 0.05, 0))) }, out.face, { tanV, tanH: tanV * camera.aspect, margin: 0.8 }) : null;
+        const framed = dropStage ? shotFor(dropStage, { fish: arr(landing.fish), ahead: arr(out.release?.ahead), net: arr(landing.net), head: arr(out.at.clone().add(new THREE.Vector3(0, 1.72, 0))), feet: arr(out.at.clone().add(new THREE.Vector3(0, 0.05, 0))) }, out.face, { tanV, tanH: tanV * camera.aspect, margin: 0.8, lift: camera.aspect < 0.8 ? 0.2 : 0.1 }) : null; // (lift: kept clear of the controls at the bottom)
         if (framed) { shot = new THREE.Vector3(...framed.pos); focusAt = new THREE.Vector3(...framed.at); }
         else if (st === "up" || st === "rod") {
           // over your right shoulder, down to the fish held at the surface beside the pier
@@ -398,11 +398,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         // gliding there across empty sea)
         const low = (x) => (x === "lower" || x === "lead" || x === "haul" || x === "swim") && landing.water != null;
         // (and down to the low shot by the water it cuts as well: gliding down there passed over open water)
-        const cutTo = !framed && ((out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage))); // (and back up from it: climbing the wall it passed close over the deck)
+        // (and into the first framed shot of a landing it cuts: gliding there from your own eyes, the view was turned down
+        // towards the fish beside the wall the whole way, and for a second or two the picture was nothing but dark water
+        // with a line across it. The cut lands on a shot already framed round you, the rail and the fish)
+        const firstFramed = framed && !landShot.stage && !landShot.framed;
+        const cutTo = firstFramed || (!framed && ((out.release && st !== "deck" && landShot.stage === "deck") || (landShot.stage && low(st) !== low(landShot.stage)))); // (and back up from it: climbing the wall it passed close over the deck)
         landShot.stage = st; landShot.framed = !!framed;
         landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); if (landing.water != null) landShot.pos.y = Math.max(landShot.pos.y, landing.water + 0.45); /* (never under the surface as the fish swims off) */ landShot.focus = focusAt; landShot.until = t; landShot.wide = framed ? framed.wide : st === "lower" || st === "haul" || st === "swim";
         anglers.get(localId)?.a.showTag(false);
-        if (cutTo) { camPos.copy(landShot.pos); landShot.up = true; landShot.clear = true; const l = lookAt(camPos.toArray(), focusAt.toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch))); for (let i = 0; i < 40; i++) look.step(0.1); }
+        if (cutTo) {
+          camPos.copy(landShot.pos); landShot.up = true; landShot.clear = true; const l = lookAt(camPos.toArray(), focusAt.toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch))); for (let i = 0; i < 40; i++) look.step(0.1);
+          if (framed) { landShot.fs = focusAt.clone(); landShot.fs0 = focusAt.clone(); landShot.p = 1; landShot.d0 = 0.5; landShot.fov = (framed.wide ? 60 : 52) * (camera.aspect < 0.8 ? 1.12 : 1); }
+        }
         // out of your own head by going up first (never back through it), then round to the shot; your head shows once
         // the camera's clear of it
         const above = out.eye.clone().add(new THREE.Vector3(0, 0.95, 0));
