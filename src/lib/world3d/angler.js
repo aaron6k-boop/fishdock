@@ -923,7 +923,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // one side on a rest)
     // (landing it with the drop net yourself, the rod goes onto the rail once the fish is up at the wall, and your
     // hands go to the net and its rope: the rod laid down where you can see it, not held by nobody in front of you)
-    const fpRodDown = (!!kept && kept.state !== "gone") || (ph === "landing" && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"))); // (and while your fish is on the deck: the rod stays down, not held up in front of your face as you look down at it)
+    const fpRodDown = (!!kept && kept.state !== "gone") || (ph === "landing" && (tech === "dropnet" || tech === "net") && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"))); // (drawn up a beach or swung in, the rod stays in your hands until the fish is down: a hand reaching for the line filled the view) // (and while your fish is on the deck: the rod stays down, not held up in front of your face as you look down at it)
     if (fp && !fpRodDown) {
       held = true;
       // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
@@ -1085,7 +1085,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           crouch = clamp(0.8 - net0.y * 0.6, 0, 0.6); lean = 0.18; brace = 0; lookAtW = netAt ? netAt.clone() : lookAtW;
         }
       }
-      if (rigAt && age >= LT.card - 0.3 && tech !== "dropnet" && tech !== "net") hands[0] = { at: toLocal(rigAt).add(V3(0, 0.05, 0)), axis: V3(0, 1, 0), palm: V3(1, 0, 0), kind: "line" };
+      if (rigAt && age >= LT.card - 0.3 && tech !== "dropnet" && tech !== "net" && !fp) hands[0] = { at: toLocal(rigAt).add(V3(0, 0.05, 0)), axis: V3(0, 1, 0), palm: V3(1, 0, 0), kind: "line" };
     }
     if (ph === "lost") { lean = 0.05; lookAtW = rigAt ? rigAt.clone() : null; }
     let kneel = 0;
