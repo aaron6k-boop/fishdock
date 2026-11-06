@@ -72,7 +72,11 @@ vec4 cloudAt(vec3 d, float q){
 vec3 skyColour(vec3 d){
   vec3 c = skyBase(d);
   float sd = max(dot(d, uSunDir), 0.), md = max(dot(d, uMoonDir), 0.);
-  c += vec3(1., .95, .85)*smoothstep(.9994, .9998, sd)*(uDay + uDusk)*3.;
+  // the sun: a small disc (it was a great white plate, three times the real size, blown out by the bloom), darker and
+  // warmer at its edge, inside a soft aureole that fades out into the haze, as it looks through sea air
+  { float disc = smoothstep(.99985, .99993, sd), limb = smoothstep(.99985, .99999, sd);
+    c += vec3(1., .93, .8)*disc*(.75 + .25*limb)*(uDay + uDusk)*2.2;
+    c += vec3(1., .9, .74)*(pow(sd, 900.)*.5 + pow(sd, 60.)*.1)*(uDay + uDusk*.8)*(1. - .6*uCloud); }
   c += vec3(.85, .88, .95)*smoothstep(.9996, .99985, md)*uNight*uMoonLight*1.6;
   if (d.y > 0.) {
     #ifndef ENV_PASS

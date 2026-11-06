@@ -7,7 +7,7 @@ import { spotById } from "../data/spots.js";
 import { Icon } from "./ui.jsx";
 import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
-import { landCamOn } from "../lib/viewPrefs.js";
+import { landCamOn, fishCamOf } from "../lib/viewPrefs.js";
 import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
 import { localFor } from "../lib/world3d/localDetail.js";
 import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/sceneAudio.js";
@@ -27,6 +27,8 @@ export function loadView() {
     const v = { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || "{}") };
     // the landing camera: on for anyone who hasn't chosen; someone who turned it off (then called "landCam") keeps it off
     v.landCam2 = landCamOn(v);
+    // the fishing camera: first person, third person or cinematic (framed landing shots); first person unless chosen
+    v.fishCam = fishCamOf(v);
     return v;
   } catch { return { ...VIEW_DEFAULTS }; }
 }
@@ -122,7 +124,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
             if (o.landed && !phases.current[id].landed) { phases.current[id].landed = true; props.current.onLanded?.(id, o.info.ev); }
           }
         });
-        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.landCam2 !== false); }
+        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.fishCam === "cinematic"); }
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();

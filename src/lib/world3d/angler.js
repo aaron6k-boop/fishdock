@@ -3,6 +3,7 @@
 // remote angler animates the same on every phone, and a viewer who joins midway sees the right moment. Timings,
 // bites, fights and landings are the same rules as the photo scene (sceneActors.js): biteTaps, fightProfile,
 // fishLoad, landingTech and landingTimes.
+import { overRail } from "./netPath.js";
 import * as THREE from "three";
 import { phaseAt, DUR, lineState } from "../liveEvents.js";
 import { biteTaps, fightProfile, fightStyle, fishLoad, landingTimes, landingTech } from "../sceneActors.js";
@@ -450,7 +451,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
   const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0; // first person: the rod held where you can see it; leaning over the rail to land a fish
+  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0; // first person: the rod held where you can see it; leaning over the rail to land a fish
   const toWorld = (v) => v.clone().applyMatrix4(root.matrixWorld);
   const toLocal = (v) => root.worldToLocal(v.clone());
   const pts = Array.from({ length: NSEG + 1 }, () => new THREE.Vector3());
@@ -492,16 +493,22 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     let fishPose = null; // (the fish swimming: where its mouth is, which way its body lies, how hard it beats its tail)
     let jumpWatch = false, jumpAt = null, netRest = 0; // netRest: 0 hanging, 1 set down on the deck (the bag flattens)
     let netOn = false, netAt = null, ropesOn = false, poleFrom = null, inNet = false, actNow = null; // (actNow: a retargeted move played on cue: human3d ACTS)
-    let fpE = 0.4, fpYaw = -0.03, fpView = null, fpPull = 0; // first person: the rod's angle up from level, and a little towards the middle
+    let fpE = 0.4, fpYaw = -0.03, fpView = null, fpPull = 0, fpArm = null; // first person: the rod's angle up from level, and a little towards the middle
     landStage = null; landWater = null; dropRig = null; ropePull = null; releaseInfo = null; releaseRope = null; matOn = false; releasePole = false;
     const ph = info.phase;
     jumpWatch = false; jumpAt = null;
+    fpArm = null;
     if (ph === "idle" || ph === "ended" || ph === "paused") { held = false; showLine = false; }
     else if (ph === "cast") {
       // back over the shoulder, a fast forward sweep, the rig flies out, the rod settles and goes on its rest
       const back = ease(seg(age, 0, 0.6)), fwd = ease(seg(age, 0.6, 0.85));
       pitch = lerp(0.6, -0.55, back); pitch = lerp(pitch, 0.55, fwd); yawOff = 0.25 - fwd * 0.15;
       fpE = lerp(lerp(0.4, 1.45, back), 0.36, fwd); fpYaw = lerp(0.08, -0.03, fwd);
+      // (in first person the hands travel with the cast, not just the rod pivoting about a reel fixed in the view: up and
+      // back beside your right shoulder for the wind-up, then driven forwards and down through the release, the arms
+      // following through and settling back)
+      { const settle = ease(seg(age, 0.85, 1.6)), drive = Math.sin(clamp((age - 0.6) / 0.45, 0, 1) * Math.PI);
+        fpArm = { up: 0.11 * back * (1 - fwd) - 0.035 * drive * (1 - settle), right: 0.05 * back * (1 - fwd), fwd: -0.07 * back * (1 - fwd) + 0.09 * drive * (1 - settle) }; }
       bendT = age < 0.6 ? 0.05 : age < 0.9 ? 0.35 : 0.04;
       if (age < 0.85) showLine = false;
       else if (age < 2.15) { const f = (age - 0.85) / 1.3, tip = tipWorld(); rigAt = tip.clone().lerp(castAt, f); rigAt.y = lerp(tip.y, 0, f) + Math.sin(f * Math.PI) * (castAt.distanceTo(at) * 0.35); slack = 0.05; }
@@ -640,8 +647,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         if (age < B1 + 0.2) { netAt = deck.clone(); netRest = 1; }
         else if (age < T2) {
           // stooping to the net on the deck, lifting it, over the rail (an arc up and over the top rail) and out
-          const f = ease(seg(age, B1 + 0.2, T2)), end = hangAt(0).sub(new THREE.Vector3(0, bridle, 0)), ctrl = railPt.clone().add(new THREE.Vector3(0, 0.45, 0));
-          netAt = deck.clone().multiplyScalar((1 - f) ** 2).addScaledVector(ctrl, 2 * f * (1 - f)).addScaledVector(end, f * f);
+          const f = ease(seg(age, B1 + 0.2, T2)), end = hangAt(0).sub(new THREE.Vector3(0, bridle, 0));
+          netAt = new THREE.Vector3().copy(overRail(railPt, ns, deck, end, f, { x: dirOf(face)[0], z: dirOf(face)[1] }));
           netRest = 1 - ease(seg(age, B1 + 0.2, B1 + 0.6));
         } else if (age < swingIn) {
           hanging = true; netRest = 0;
@@ -675,8 +682,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           netAt.y = Math.max(netAt.y, wh(netAt.x, netAt.z) + 0.05);
         } else {
           // at the rail: both hands on the hoop, up over the top rail in an arc and set down on the deck
-          const f = ease(seg(age, swingIn, LT.end - 0.1)), start = hangAt(0).sub(new THREE.Vector3(0, bridle, 0)), ctrl = railPt.clone().add(new THREE.Vector3(0, 0.5, 0));
-          netAt = start.clone().multiplyScalar((1 - f) ** 2).addScaledVector(ctrl, 2 * f * (1 - f)).addScaledVector(deck, f * f);
+          const f = ease(seg(age, swingIn, LT.end - 0.1)), start = hangAt(0).sub(new THREE.Vector3(0, bridle, 0));
+          netAt = new THREE.Vector3().copy(overRail(railPt, ns, start, deck, f, { x: dirOf(face)[0], z: dirOf(face)[1] }));
           netRest = ease(seg(age, swingIn + 0.5, LT.end - 0.1));
         }
         dropRig = { railPt, hanging, coil: G.coil, waterY, col: col.clone() };
@@ -787,8 +794,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         } else if (step === "over" && G) {
           // both hands on the hoop: up over the top rail in an arc and out over the water
           netOn = true; ropesOn = true; inNet = true;
-          const f = ease(seg(kt, plan.carry, plan.over)), end = G.hangAt(0).sub(new THREE.Vector3(0, G.bridle, 0)), ctrl = G.railPt.clone().add(new THREE.Vector3(0, 0.45, 0));
-          netAt = G.deck.clone().multiplyScalar((1 - f) ** 2).addScaledVector(ctrl, 2 * f * (1 - f)).addScaledVector(end, f * f);
+          const f = ease(seg(kt, plan.carry, plan.over)), end = G.hangAt(0).sub(new THREE.Vector3(0, G.bridle, 0));
+          netAt = new THREE.Vector3().copy(overRail(G.railPt, Math.max(1, (fishLen * 0.62) / 0.35), G.deck, end, f, { x: dirOf(face)[0], z: dirOf(face)[1] }));
           netRest = 1 - ease(seg(kt, plan.carry, plan.carry + 0.4)); rel.stage = "in";
         } else if (step === "over" || step === "lower") {
           const f = seg(kt, plan.over, plan.lower);
@@ -908,7 +915,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // first person: whenever the line is out the rod is in your hands, low and to the right with the reel in view and
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
-    if (fp && !(ph === "landing" && age >= LT.swingIn)) {
+    // (landing it with the drop net yourself, the rod goes onto the rail once the fish is up at the wall, and your
+    // hands go to the net and its rope: the rod laid down where you can see it, not held by nobody in front of you)
+    const fpRodDown = (!!kept && kept.state !== "gone") || (ph === "landing" && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"))); // (and while your fish is on the deck: the rod stays down, not held up in front of your face as you look down at it)
+    if (fp && !fpRodDown) {
       held = true;
       // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
       // lower right of the view, the rod rising from there at its angle for the moment (higher at a cast, lower to
@@ -924,7 +934,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
       fpView = { vr, vu, vf };
       fpPullNow += (fpPull - fpPullNow) * Math.min(1, dt * 6);
-      const reelAt = fpEye().addScaledVector(vr, 0.06).addScaledVector(vu, -0.115 - fpPullNow * 0.4).addScaledVector(vf, 0.4 + fpPullNow); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
+      const reelAt = fpEye().addScaledVector(vr, FPR.x + (fpArm?.right || 0)).addScaledVector(vu, FPR.y - fpPullNow * 0.4 + (fpArm?.up || 0)).addScaledVector(vf, FPR.z + fpPullNow + (fpArm?.fwd || 0)); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
       butt = reelAt.addScaledVector(dir, -R.seat);
     }
     // from one way of holding the rod to the next (onto the rail, into your hands, walking off with it) the rod moves
@@ -958,7 +968,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the reel: the handle at its angle; the rotor geared up from it (about five turns to one, as a sea spinning reel);
     // the spool moving in and out once a turn to lay the line; the drag letting the spool turn back while a fish takes
     // line; the bail open for the cast until the rig's down, then flipped over
-    { const u = reel.userData, sp = u.spin || 0;
+    { const u = reel.userData; if (local && typeof window !== "undefined" && window.__fdFilm && window.__fdSpinRate) u.spin = (u.spin || 0) + window.__fdSpinRate * dt; // (film only: the handle turned steadily, to check the hand on it)
+      const sp = u.spin || 0;
       handle.rotation.x = -sp; u.rotor.rotation.z = sp * 5.2;
       if (u.spool) { u.spool.position.z = u.spoolZ + 0.0055 * (1 - Math.cos(sp)) - 0.004; u.slip = (u.slip || 0) + (u.slipping ? dt * 9 : 0); u.spool.rotation.z = -u.slip; }
       if (u.bail) { const open = ph === "cast" && age < 2.25 ? 1 : 0; u.bailK = (u.bailK ?? 0) + (open - (u.bailK ?? 0)) * Math.min(1, dt * (open ? 14 : 22)); u.bail.rotation.x = -1.95 * u.bailK; } }
@@ -987,7 +998,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const hands = [null, null];
     const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
     const rodGrip = (m, palm, kind) => { const a = along(m); return { at: a.p, axis: a.t, palm, kind }; };
-    let lean = 0, brace = 0, crouch = 0, twist = 0, idleMode = "hang", lookAtW = null;
+    let lean = 0, brace = 0, crouch = 0, twist = 0, idleMode = "hang", lookAtW = null, fpRope = false;
     const tension = ph === "hooked" ? clamp(P.tension || 0.6, 0, 1.6) : 0;
     // the reel's handle, for the left hand to wind (it's on the left of a spinning reel)
     reel.updateMatrixWorld(true);
@@ -995,12 +1006,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const knob = toLocal(handle.localToWorld(kn.clone())), knobAx = toLocal(handle.localToWorld(kn.clone().add(V3(-0.026, 0, 0)))).sub(knob);
     if (walking) hands[1] = rodGrip(R.seat * 0.7, V3(-1, 0, 0.2), "carry");
     else if (held) {
-      hands[1] = { ...rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"), stem: along(R.seat).p }; // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below
+      // (sock: the grip's frame on the reel itself: its foot on the rod, z to the tip, the reel below. The hands are set
+      // from it, so they go wherever the reel goes and can't drift off it)
+      hands[1] = { ...rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"), stem: along(R.seat).p, sock: { pos: reel.position.clone(), quat: reel.quaternion.clone() } }; // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below
       // the other hand: on the butt to cast, on the reel's handle to wind (while a fish is on and landing it); free
       // while you wait
       // (in first person, holding the rod while you wait, the left hand rests lightly on the knob, ready: it hung in the
       // corner of the view with a finger up before)
-      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0 } : null;
+      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() } } : null;
     }
     if (ph === "bite" && !held) {
       // a hand out over the rod, ready to strike: to the nearest part of it within reach, bending down to it if it's low
@@ -1036,16 +1049,25 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // both hands on the rope just behind the top rail, leaning over a little to watch the net. Letting it down,
           // the rope runs through loose hands; hauling, one hand pulls down and back while the other reaches up for the
           // next grip, then they change over (in time with the rope coming up: angler.js's ropePull)
-          const base = V3(-0.3, 1.12, railZ + 0.2);
-          const hold = (hi) => base.clone().add(V3(0, hi ? 0.1 : -0.22, hi ? -0.06 : 0.16));
-          let a0 = base.clone().add(V3(-0.05, 0.06, -0.04)), a1 = base.clone().add(V3(0.07, -0.12, 0.1));
+          // (in first person you lean out over the top rail and hold the rope there, one hand above the other on it, the
+          // rope running straight down from your hands to the net: looking down you see your hands, the rope, the wall and
+          // the net and the fish in the water below. From behind: at your chest just back from the rail)
+          const base = fp ? (() => { const E = fpEye(); return V3(E.x - 0.36, E.y - 0.3, E.z - 0.22); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
+          const hold = (hi) => base.clone().add(fp ? V3(0, hi ? 0.05 : -0.09, 0) : V3(0, hi ? 0.1 : -0.22, hi ? -0.06 : 0.16));
+          let a0 = fp ? hold(true) : base.clone().add(V3(-0.05, 0.06, -0.04)), a1 = fp ? hold(false) : base.clone().add(V3(0.07, -0.12, 0.1));
           if (landStage === "haul" && ropePull) {
+            // hand over hand: one pulls down (the rope sliding up through the other), then they change over
             const u = ease(clamp((ropePull.u - 0.15) / 0.75, 0, 1)), puller = hold(true).lerp(hold(false), u), reacher = hold(false).lerp(hold(true), ease(ropePull.u));
-            if (ropePull.hand) { a1 = puller; a0 = reacher.add(V3(-0.06, 0, 0)); } else { a0 = puller.add(V3(-0.06, 0, 0)); a1 = reacher; }
+            if (fp) { if (ropePull.hand) { a1 = puller; a0 = reacher; } else { a0 = puller; a1 = reacher; } }
+            else if (ropePull.hand) { a1 = puller; a0 = reacher.add(V3(-0.06, 0, 0)); } else { a0 = puller.add(V3(-0.06, 0, 0)); a1 = reacher; }
           }
           hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope" };
           hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope" };
-          lean = 0.22; crouch = 0.06; brace = landStage === "haul" ? 0.25 : 0; lookAtW = netAt ? netAt.clone() : lookAtW;
+          // (in first person each hand closes round the rope as round the reel's knob: the rope across the fingers, the
+          // thumb side up, the hand turned about the rope to line up with the forearm)
+          if (fp) { const rq = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V3(0, -1, 0), V3(0, 0, 1), V3(-1, 0, 0)));
+            for (const hh of hands) hh.sock = { pos: hh.at.clone(), quat: rq.clone() }; }
+          fpRope = fp; lean = fp ? 0.3 : 0.22; crouch = 0.06; brace = landStage === "haul" ? 0.25 : 0; lookAtW = netAt ? netAt.clone() : lookAtW;
         } else if (landStage === "done") { lookAtW = netAt ? netAt.clone() : lookAtW; lean = 0.05; brace = 0;
         } else if (landStage === "in" && net0) {
           // reaching out over the rail for the hoop and bringing it round onto the deck
@@ -1083,16 +1105,19 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (kept?.state === "release" && releasePole && poleFrom && netAt) { hands[0] = { at: toLocal(poleFrom), axis: toLocal(netAt).sub(toLocal(poleFrom)), palm: V3(0, 1, 0), kind: "pole" }; lean = 0.2; lookAtW = netAt.clone(); }
     if (kept?.state === "release" && releaseRope && !keptPose?.lift) {
       // letting it go from the drop net: both hands on the rope at the rail, watching it swim out; then hauling the empty
-      // net back up, a hand over the other (as landing it)
-      const base = V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2);
-      const hold = (hi) => base.clone().add(V3(0, hi ? 0.1 : -0.22, hi ? -0.06 : 0.16));
-      let a0 = base.clone().add(V3(-0.05, 0.06, -0.04)), a1 = base.clone().add(V3(0.07, -0.12, 0.1));
+      // net back up, a hand over the other (as landing it). In first person as when landing it: leaning out past the
+      // wall's top, both hands on the rope one above the other off to your left, watching the fish go below
+      const E = fp ? fpEye() : null, base = fp ? V3(E.x - 0.36, E.y - 0.3, E.z - 0.22) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2);
+      const hold = (hi) => base.clone().add(fp ? V3(0, hi ? 0.05 : -0.09, 0) : V3(0, hi ? 0.1 : -0.22, hi ? -0.06 : 0.16));
+      let a0 = fp ? hold(true) : base.clone().add(V3(-0.05, 0.06, -0.04)), a1 = fp ? hold(false) : base.clone().add(V3(0.07, -0.12, 0.1));
       if (relStep === "haul" && ropePull) {
         const u = ease(clamp((ropePull.u - 0.15) / 0.75, 0, 1)), puller = hold(true).lerp(hold(false), u), reacher = hold(false).lerp(hold(true), ease(ropePull.u));
-        if (ropePull.hand) { a1 = puller; a0 = reacher.add(V3(-0.06, 0, 0)); } else { a0 = puller.add(V3(-0.06, 0, 0)); a1 = reacher; }
+        if (fp) { if (ropePull.hand) { a1 = puller; a0 = reacher; } else { a0 = puller; a1 = reacher; } }
+        else if (ropePull.hand) { a1 = puller; a0 = reacher.add(V3(-0.06, 0, 0)); } else { a0 = puller.add(V3(-0.06, 0, 0)); a1 = reacher; }
       }
       hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope" };
       hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope" };
+      if (fp) { const rq = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V3(0, -1, 0), V3(0, 0, 1), V3(-1, 0, 0))); for (const hh of hands) hh.sock = { pos: hh.at.clone(), quat: rq.clone() }; fpRope = true; }
       lean = 0.22; crouch = 0.06; brace = relStep === "haul" ? 0.2 : 0; lookAtW = releaseInfo?.fish || (netAt ? netAt.clone() : lookAtW);
     }
     if (kept?.state === "release" && relStep === "haul" && releaseInfo?.over && netAt) {
@@ -1109,6 +1134,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (!emote) emoting = null;
     // leaning out over the rail in first person: the body goes with the eye, so the hands still reach the rod
     // (in first person the whole body goes with the eye instead, below, so your shoulders stay where they are in the view)
+    const fpCrouch = crouch; // (first person: the stoop goes into your eye, below; the body isn't drawn)
     if (fp) { brace = 0; crouch = 0; lean = 0.04; }
     // first person: your body turns to face where you look (only your forearms show), so your arms never reach back
     // across the view; the hands' places are worked out in the angler's space, so turn them into the body's
@@ -1123,6 +1149,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       figOff.lerp(want, 1 - Math.exp(-dt * 2.5)); if (figOff.lengthSq() < 1e-8) figOff.set(0, 0, 0); fig.group.position.copy(figOff); }
     const toFig = (v) => (v && figYaw ? v.clone().applyAxisAngle(UP, figYaw) : v);
     const toFigP = (v) => (v ? toFig(v.clone().sub(figOff)) : v);
+    // first person: a hand on the drop net's hoop closes round the hoop's rim itself (the same hook grip as on the rope and
+    // the knob, the rim across the fingers), not a pointing hand floating near it
+    if (fp && netAt && net.visible) for (const hh of hands) if (hh && hh.kind === "hoop") {
+      const c = toLocal(netAt), rr = 0.35 * net.scale.x, rad = hh.at.clone().sub(c); rad.y = 0; if (rad.lengthSq() < 1e-6) rad.set(1, 0, 0); rad.normalize();
+      const at = c.clone().addScaledVector(rad, rr), tan = new THREE.Vector3(0, 1, 0).cross(rad).normalize(), z = tan.clone().cross(V3(0, 1, 0));
+      hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
+    }
     // first person: your hands (fpHands.js) take hold of the same things, placed from the same eye and view as the rod
     if (fp && fpv) {
       const vw = fpView || (() => { const vy = viewIn ? Math.atan2(Math.sin(viewIn.yaw - face), Math.cos(viewIn.yaw - face)) : 0, vp = viewIn ? clamp(viewIn.pitch, -0.9, 0.7) : -0.12; const vf = new THREE.Vector3(Math.sin(vy) * Math.cos(vp), Math.sin(vp), -Math.cos(vy) * Math.cos(vp)), vr = new THREE.Vector3(Math.cos(vy), 0, Math.sin(vy)); return { vf, vr, vu: new THREE.Vector3().crossVectors(vr, vf) }; })();
@@ -1229,18 +1262,27 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         const coil = dropRig?.coil || toWorld(new THREE.Vector3(-0.42, 0.02, 0.18));
         if (dropRig?.hanging) {
           fig.group.updateMatrixWorld(true);
-          const hw = [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h) : toWorld(handsNow[i]); });
+          const hw = [0, 1].map((i) => { if (fp) return toWorld(handsNow[i]); const h = fig.hand(i); return h ? fig.group.localToWorld(h) : toWorld(handsNow[i]); }); // (in first person, through the hands you see on it)
           const hm = hw[0].clone().lerp(hw[1], 0.5);
-          between(ropes[3], hm, dropRig.railPt, 1); between(ropes[4], dropRig.railPt, knot, 1); between(ropes[5], hm, coil, 1);
+          if (fpRope) { const lo = hw[0].y < hw[1].y ? hw[0] : hw[1], hi = lo === hw[0] ? hw[1] : hw[0]; between(ropes[3], hi, lo, 1); between(ropes[4], lo, knot, 1); between(ropes[5], hi, coil, 1); } // (first person, leaning out over the rail: through both hands and straight down to the net)
+          else { between(ropes[3], hm, dropRig.railPt, 1); between(ropes[4], dropRig.railPt, knot, 1); between(ropes[5], hm, coil, 1); }
         } else { between(ropes[3], knot, coil, 1); ropes[4].visible = false; ropes[5].visible = false; }
       }
     }
     prevAge = age;
     // test diagnostics only (window.__fdFilm, never in the app): where the reel, its handle and your hands are this frame
-    if (local && typeof window !== "undefined" && window.__fdFilm) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null }; }
+    if (local && typeof window !== "undefined" && window.__fdFilm) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2) }; }
     const eyeNow = fpEye(); // (the eye the rod and your body were placed from this frame: the camera uses the same one)
-    const leanTo = fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
+    // (letting the drop net down and hauling it up, you lean right out over the rail, your head past the wall's top: from
+    // behind the rail the edge hides the foot of the wall, where the net and the fish are)
+    const overWall = fpRope;
+    const netNear = fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod");
+    const leanTo = overWall ? clamp(edge + 0.15, 0, 1.2) : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
     leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * 2.5));
+    { const st = fp && ph === "landing" && (landStage === "pick" || landStage === "in") ? fpCrouch : 0; stoopNow += (st - stoopNow) * (1 - Math.exp(-dt * 3));
+      // (and a step to the side, to the net on the deck by your left foot: you go to it, rather than an arm reaching a
+      // metre across to it; back again for the rope)
+      const sx = fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod") && netAt ? clamp(toLocal(netAt).x * 0.4, -0.5, 0) : 0; stepNow += (sx - stepNow) * (1 - Math.exp(-dt * 2.2)); }
     return { phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
@@ -1248,7 +1290,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // (one place, worked out the same way every frame and before anything is posed: the camera and the rod in your hands
   // both hang off it, so they can never be a frame apart. Your eye height is taken from your body while you stand in
   // third person; leaning out over the rail takes the eye forward and a little down; a slow breath)
-  function fpEye() { return new THREE.Vector3(0, eyeH - leanNow * 0.25 + Math.sin(tNow * 1.4) * 0.006, -0.08 - leanNow * 0.85); }
+  // where the reel sits in your view (right, up, forward of the eye, metres): low and a little right of the middle, far
+  // enough out that both hands and the reel's handle going round are in the picture above the controls (it was lower
+  // and nearer: the reel hand was half under the Reel button)
+  const FPR = (typeof window !== "undefined" && window.__fdFpr) || { x: 0.07, y: -0.1, z: 0.54 };
+  function fpEye() { return new THREE.Vector3(stepNow, eyeH - leanNow * 0.25 - stoopNow * 0.55 + Math.sin(tNow * 1.4) * 0.006, -0.08 - leanNow * 0.85 - stoopNow * 0.12); } // (stooping: down to the net on the deck, rather than an arm stretched a metre to it)
   // the reel's handle for your taps (reelHandle.js)
   // ---- the reel's handle ----
   // for your taps (reelHandle.js). Something else may have turned it since (winding a fish up to land it): the follow
