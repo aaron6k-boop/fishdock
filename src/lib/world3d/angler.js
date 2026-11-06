@@ -451,7 +451,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
   const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0; // first person: the rod held where you can see it; leaning over the rail to land a fish
+  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0;
+  // ---- your body's weight in first person (metres from where the eye would be: x right, y up, z back) ----
+  // the eye rides on it, and the rod and your hands hang off the eye: rocking back for a cast and throwing the weight
+  // forwards through it, leaning back against a fish and being pulled towards it on a surge. A spring, a touch under
+  // damped, so the weight carries a little past and settles, never snapping to a pose
+  const body = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }; let bodyTo = { x: 0, y: 0, z: 0 }; // first person: the rod held where you can see it; leaning over the rail to land a fish
   const toWorld = (v) => v.clone().applyMatrix4(root.matrixWorld);
   const toLocal = (v) => root.worldToLocal(v.clone());
   const pts = Array.from({ length: NSEG + 1 }, () => new THREE.Vector3());
@@ -497,7 +502,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     landStage = null; landWater = null; dropRig = null; ropePull = null; releaseInfo = null; releaseRope = null; matOn = false; releasePole = false;
     const ph = info.phase;
     jumpWatch = false; jumpAt = null;
-    fpArm = null;
+    fpArm = null; bodyTo = { x: 0, y: 0, z: 0 };
     if (ph === "idle" || ph === "ended" || ph === "paused") { held = false; showLine = false; }
     else if (ph === "cast") {
       // back over the shoulder, a fast forward sweep, the rig flies out, the rod settles and goes on its rest
@@ -508,7 +513,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // back beside your right shoulder for the wind-up, then driven forwards and down through the release, the arms
       // following through and settling back)
       { const settle = ease(seg(age, 0.85, 1.6)), drive = Math.sin(clamp((age - 0.6) / 0.45, 0, 1) * Math.PI);
-        fpArm = { up: 0.11 * back * (1 - fwd) - 0.035 * drive * (1 - settle), right: 0.05 * back * (1 - fwd), fwd: -0.07 * back * (1 - fwd) + 0.09 * drive * (1 - settle) }; }
+        fpArm = { up: 0.11 * back * (1 - fwd) - 0.035 * drive * (1 - settle), right: 0.05 * back * (1 - fwd), fwd: -0.07 * back * (1 - fwd) + 0.09 * drive * (1 - settle) };
+        // (and your weight: back onto the rear foot and turned a little to the right for the wind-up, thrown forwards and
+        // down through the release, then back up to stand)
+        bodyTo = { x: 0.05 * back * (1 - fwd) - 0.02 * drive, y: -0.012 * back * (1 - fwd) - 0.04 * drive * (1 - settle), z: 0.08 * back * (1 - fwd) - 0.12 * drive * (1 - settle) }; }
       bendT = age < 0.6 ? 0.05 : age < 0.9 ? 0.35 : 0.04;
       if (age < 0.85) showLine = false;
       else if (age < 2.15) { const f = (age - 0.85) / 1.3, tip = tipWorld(); rigAt = tip.clone().lerp(castAt, f); rigAt.y = lerp(tip.y, 0, f) + Math.sin(f * Math.PI) * (castAt.distanceTo(at) * 0.35); slack = 0.05; }
@@ -586,12 +594,18 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (a taut line hums: the tip trembles a little, more as the fish pulls harder; and on a surge your arms give a
       // touch towards it, then take it back)
       tipT += clamp(tension, 0, 1.4) * 0.006 * (n1(t * 11 + P.s1) + 0.6 * n1(t * 23 + P.s2));
-      fpPull = 0.012 * surge * clamp(tension, 0, 1.4);
+      // the arms take the load: on a surge they're drawn out towards the fish (more for a heavier fish pulling harder);
+      // between surges you lean back against it and lift, pumping it in, then drop the rod forwards and wind
+      const tk = clamp(tension, 0, 1.4), pump = Math.max(0, Math.sin(age * 0.85 * prof.tempo + P.s1)) ** 2 * clamp((tk - 0.35) / 0.6, 0, 1) * (1 - surge);
+      fpPull = 0.055 * surge * tk;
+      fpArm = { up: 0.05 * pump - 0.03 * surge * tk, right: 0.012 * run * st.runWidth, fwd: -0.05 * pump };
+      bodyTo = { x: clamp(run * 0.05 * st.runWidth, -0.05, 0.05), y: -0.012 * tk - 0.025 * surge * tk, z: 0.03 * tk + 0.03 * pump - 0.08 * surge * tk };
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
-      fpE = 0.5 + 0.1 * surge; fpYaw = clamp(run * 0.22 * st.runWidth, -0.3, 0.3);
+      fpE = 0.5 + 0.1 * surge + 0.22 * pump; fpYaw = clamp(run * 0.22 * st.runWidth, -0.3, 0.3);
       // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
       pitch += 0.38 * strikeK; fpE += 0.32 * strikeK; bendT += 0.25 * strikeK;
+      bodyTo.z += 0.07 * strikeK; bodyTo.y -= 0.015 * strikeK; // (your weight thrown back into the strike)
       P.tension = tension;
       if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); else onSound?.("swish", at); feel("hooked", {}, true); } // (the strike: the rod swept up)
       if (fl) {
@@ -1291,6 +1305,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const netNear = fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod");
     const leanTo = overWall ? clamp(edge + 0.15, 0, 1.2) : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
     leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * 2.5));
+    { const k = 55, c = 2 * Math.sqrt(k) * 0.75, h = Math.min(dt, 0.05), to = fp ? bodyTo : { x: 0, y: 0, z: 0 };
+      for (const a of ["x", "y", "z"]) { const v = "v" + a; body[v] += (k * (to[a] - body[a]) - c * body[v]) * h; body[a] += body[v] * h; } }
     { const st = fp && ph === "landing" && (landStage === "pick" || landStage === "in") ? fpCrouch : 0; stoopNow += (st - stoopNow) * (1 - Math.exp(-dt * 3));
       // (and a step to the side, to the net on the deck by your left foot: you go to it, rather than an arm reaching a
       // metre across to it; back again for the rope)
@@ -1306,7 +1322,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // enough out that both hands and the reel's handle going round are in the picture above the controls (it was lower
   // and nearer: the reel hand was half under the Reel button)
   const FPR = (typeof window !== "undefined" && window.__fdFpr) || { x: 0.07, y: -0.1, z: 0.54 };
-  function fpEye() { return new THREE.Vector3(stepNow, eyeH - leanNow * 0.25 - stoopNow * 0.55 + Math.sin(tNow * 1.4) * 0.006, -0.08 - leanNow * 0.85 - stoopNow * 0.12); } // (stooping: down to the net on the deck, rather than an arm stretched a metre to it)
+  function fpEye() { return new THREE.Vector3(stepNow + body.x, eyeH - leanNow * 0.25 - stoopNow * 0.55 + Math.sin(tNow * 1.4) * 0.006 + body.y, -0.08 - leanNow * 0.85 - stoopNow * 0.12 + body.z); } // (stooping: down to the net on the deck, rather than an arm stretched a metre to it)
   // the reel's handle for your taps (reelHandle.js)
   // ---- the reel's handle ----
   // for your taps (reelHandle.js). Something else may have turned it since (winding a fish up to land it): the follow
