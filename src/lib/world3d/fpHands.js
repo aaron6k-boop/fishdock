@@ -443,7 +443,7 @@ function realArms(scene, { gloves, skinHex }) {
       // (how a real angler holds a spinning rod: the hand along the right side of the handle, palm towards it, the
       // fingers running down that side and curling under it round the reel's stem, the thumb along the top. Not the
       // hand on top with the fingers hooked over and down the far side, which is what reads as a claw)
-      const side = kind === "seat" ? Math.max(0, (TUNE.palmX ?? 0.7) - Nt.x * (TUNE.palmSign ?? 1)) * (TUNE.sideW ?? 4) + Math.max(0, Yt.y + (TUNE.fingDown ?? 0.45)) * (TUNE.downW ?? 2) : 0;
+      const side = kind === "seat" ? Math.max(0, (TUNE.palmX ?? 0.7) - Nt.x * (TUNE.palmSign ?? 1)) * (TUNE.sideW ?? 4) + Math.max(0, (TUNE.palmUpY ?? -1) - Nt.y) * (TUNE.sideW ?? 4) + Math.max(0, Yt.y + (TUNE.fingDown ?? 0.45)) * (TUNE.downW ?? 2) : 0;
       const score = side + (kind === "seat" && wristBend > (TUNE.wristMax ?? 1.0) ? 10 + wristBend : 0) + miss * 0.3 + wristBend * (TUNE.wristW ?? 1.6) + wrongWay + flatF + r.gap * 25 + r.over * 60 + r.thumbLow * 40 + (extra || 0);
       if (typeof window !== "undefined" && window.__fdFilm && kind === "seat") (window.__fdCand ||= []).push({ th: +CTH.toFixed(2), ps: +CPS.toFixed(2), sy: SY, se: SE, score: +score.toFixed(2), wrist: +wristBend.toFixed(2), over: +r.over.toFixed(3), tl: +r.thumbLow.toFixed(3), gap: +r.gap.toFixed(3), miss: +miss.toFixed(2), ww: +wrongWay.toFixed(2), flat: +flatF.toFixed(2) });
       if (!best || score < best.score) best = { score, Qh, Ph, f: r.f.map((x) => [x[0], x[1], x[2]]), t: [r.t[0], r.t[1], r.t[2]], gap: r.gap, hit: r.hit, thit: r.thit, wristBend, ny: Nt.x, al: Yt.y };
