@@ -819,7 +819,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // held by a grip on the equipment itself (realArms.poseSocket): on the knob, the wrist rolls a little as the handle
           // goes round (the knob turns in the fingers; the hand doesn't go round with it), and the forearm follows
           const roll = spec.kind === "crank" ? 0.32 * Math.sin((spec.spin || 0) + 0.6) : 0;
-          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "seat" : spec.kind, roll, elbow, dt, free: spec.kind === "rope" ? "z" : null }); // (a rope is held as the rod's handle is: round it)
+          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "crank" : spec.kind, roll: spec.kind === "rope" ? 0 : roll, elbow, dt }); // (a rope is held as the knob is: across the fingers) // (a rope is held as the rod's handle is: round it)
           wr = r.wrist; el = r.elbow; h.cur = { pos: wr.clone(), quat };
         } else if (real) {
           real.pose(i, group, pos, quat, curl, elbow, spec && spec.kind === "butt" && spec.axis ? { at: spec.at, axis: spec.axis, kind: spec.kind, R: 0.0145, w: e } : null);
