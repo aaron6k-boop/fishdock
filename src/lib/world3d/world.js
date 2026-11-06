@@ -267,7 +267,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // going down, the fish led in, the net coming up), then to the fish on the deck; drag and you look where you like,
       // and after a moment it carries on with what's happening. (No cut to a camera beside you: that's Cinematic)
       const L = out.land, R2 = out.release;
-      steerTo = L ? (L.stage === "lower" || L.stage === "lead" || L.stage === "haul" ? (L.net || L.fish) : L.stage === "pick" || L.stage === "in" || L.stage === "done" ? (L.net || L.fish) : (L.fish || out.fishAt || out.rig))
+      steerTo = L ? (L.stage === "rod" ? out.at.clone().add(new THREE.Vector3(0, 1.0, 0)).lerp(out.tip, 0.22) /* (watching your hands lay the rod on the rail) */ : L.stage === "lower" || L.stage === "lead" || L.stage === "haul" ? (L.net || L.fish) : L.stage === "pick" || L.stage === "in" || L.stage === "done" ? (L.net || L.fish) : (L.fish || out.fishAt || out.rig))
         : R2 ? (R2.net || R2.fish || out.keptAt) : out.keptAt;
       if (steerTo) { steerTo = steerTo.clone(); if (L?.water != null && steerTo.y < L.water + 0.3) steerTo.y += 0.25; } // (a little above the net in the water, so the view isn't all dark sea)
       fpDown = true;
@@ -548,8 +548,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     raf = requestAnimationFrame(frame);
     if (!visible || film) return;
     const dt = Math.min(0.1, (ts - (last || ts)) / 1000); last = ts;
-    tick((ts - clock0) / 1000, nowFn(), dt);
+    // (the resolution is changed before this frame is drawn, never after: resizing the canvas clears it, and done after
+    // drawing, the blank canvas was what the phone showed for that frame, a grey flash mid-fight)
     pace(ts, dt);
+    tick((ts - clock0) / 1000, nowFn(), dt);
   }
   // ---- the sky as light and reflection: the sky itself (its gradient, sun glow and clouds; the sea below the horizon,
   // environment.js envSky) made into an environment map whenever the light has changed enough (at most every 90 frames,
