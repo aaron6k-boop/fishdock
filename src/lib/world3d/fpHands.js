@@ -720,6 +720,9 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         if (spec?.kind === "crank" && spec.hub) elbow.addScaledVector(tmpV.copy(spec.at).sub(spec.hub), CRANK.follow);
         // (the arm comes in to the reel seat from behind and out to the side at about 45 degrees, as it does holding a spinning
         // rod: the handle lies diagonally across the palm, the butt along the forearm further back)
+        // (on the drop net's rope the forearms reach forwards to it, nearly level, elbows back by your sides: not up
+        // from below, which bent the wrists right back to close the fist round a rope running the same way as the arm)
+        if (spec?.kind === "rope") elbow.copy(spec.at).add(V(h.s * 0.13, -0.1, 0.27));
         if (spec?.kind === "seat" && spec.axis) elbow.copy(spec.at).addScaledVector(spec.axis.clone().normalize(), -0.24).addScaledVector(vu, -0.14).addScaledVector(vr, (TUNE_ELBOW.seatOut ?? 0.24) * h.s);
         let want;
         if (spec) {
@@ -762,11 +765,11 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // (along the forearm, from a little way up it: the hand's own axis can be bent at the wrist, which stood the
         // sleeve off to one side of the arm)
         let wr = pos, el = elbow;
-        if (real && spec?.sock && (spec.kind === "seat" || spec.kind === "crank")) {
+        if (real && spec?.sock && (spec.kind === "seat" || spec.kind === "crank" || spec.kind === "rope")) {
           // held by a grip on the equipment itself (realArms.poseSocket): on the knob, the wrist rolls a little as the handle
           // goes round (the knob turns in the fingers; the hand doesn't go round with it), and the forearm follows
           const roll = spec.kind === "crank" ? 0.32 * Math.sin((spec.spin || 0) + 0.6) : 0;
-          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind, roll, elbow, dt });
+          const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "seat" : spec.kind, roll, elbow, dt }); // (a rope is held as the rod's handle is: round it)
           wr = r.wrist; el = r.elbow; h.cur = { pos: wr.clone(), quat };
         } else if (real) {
           real.pose(i, group, pos, quat, curl, elbow, spec && spec.kind === "butt" && spec.axis ? { at: spec.at, axis: spec.axis, kind: spec.kind, R: 0.0145, w: e } : null);
