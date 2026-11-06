@@ -256,12 +256,22 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // fought and landed in first or third person, or another angler's catch you chose to watch
     const idle = performance.now() - look.touched > 2500;
     const watched = followId && anglers.get(followId)?.out;
-    let steerTo = null;
+    let steerTo = null, fpDown = false;
     if (watched && t < followUntil) {
       const wo = watched, busy = wo.phase === "hooked" || wo.phase === "landing" || wo.phase === "bite";
       steerTo = busy ? (wo.fishAt || wo.rig || wo.tip) : wo.at.clone().add(new THREE.Vector3(0, 1.2, 0));
       if (wo.phase === "landing" && wo.landed) followUntil = Math.min(followUntil, t + 2.5);
     } else if (followId && t >= followUntil) followId = null;
+    else if (out && focus?.a.local && mode === "first" && !landShotOn && (out.land || out.kept === "deck" || out.kept === "inspect" || out.release)) {
+      // landing it yourself, through your own eyes: your head turns down over the rail to the net and the fish (the net
+      // going down, the fish led in, the net coming up), then to the fish on the deck; drag and you look where you like,
+      // and after a moment it carries on with what's happening. (No cut to a camera beside you: that's Cinematic)
+      const L = out.land, R2 = out.release;
+      steerTo = L ? (L.stage === "lower" || L.stage === "lead" || L.stage === "haul" ? (L.net || L.fish) : L.stage === "pick" || L.stage === "in" || L.stage === "done" ? (L.net || L.fish) : (L.fish || out.fishAt || out.rig))
+        : R2 ? (R2.net || R2.fish || out.keptAt) : out.keptAt;
+      if (steerTo) { steerTo = steerTo.clone(); if (L?.water != null && steerTo.y < L.water + 0.3) steerTo.y += 0.25; } // (a little above the net in the water, so the view isn't all dark sea)
+      fpDown = true;
+    }
     else if (out && focus?.a.local && (mode === "first" || mode === "third") && (out.phase === "hooked" || out.phase === "landing") && !(out.phase === "landing" && out.landed)) {
       steerTo = out.phase === "landing" ? (out.fishAt || out.rig) : (out.rig ? out.tip.clone().lerp(out.rig, 0.55) : null);
       // never swung round to the pier or the town by a fish running sideways: within 25° of the water you face
@@ -272,7 +282,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // closer in for a far leap, so a 50 cm fish 40 m out is more than a few pixels (the camera zooms; the fish isn't scaled)
     jumpZoom += ((leap ? Math.max(0.4, Math.min(0.8, 12 / Math.max(1, camPos.distanceTo(leap)))) : 1) - jumpZoom) * (1 - Math.exp(-dt * (leap ? 3 : 1.5)));
     const mk = anglers.get(localId)?.out;
-    if (mk?.keptAt && mk.kept === "inspect") {
+    if (mk?.keptAt && mk.kept === "inspect" && !(mode === "first" && !landShotOn)) {
       // looking at your fish: in front of you, a little to the side, looking back at it as you hold it up
       const [fx, fz] = [Math.sin(mk.face), -Math.cos(mk.face)], c = mk.kept === "inspect" ? mk.keptAt : inspectFrom || mk.keptAt;
       if (!inspectFrom) inspectFrom = mk.keptAt.clone();
@@ -500,7 +510,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const settling = t - modeSince < 0.6;
     if (mode !== "cinematic") { camPos.lerp(pos, (mode === "first" || mode === "free") && !settling ? 1 : 1 - Math.exp(-dt * (mode === "spectator" ? 2.5 : settling ? 9 : 6))); cineShot = null; }
     // (never steered steeply down: a fish close in under the pier would tip the view down into the water)
-    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(-0.5, Math.min(0.6, l.pitch))); steering = true; }
+    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(fpDown ? -1.05 : -0.5, Math.min(0.6, l.pitch))); steering = true; }
     else if (steering && idle && !steerTo) { steering = false; const h = look.home; if (mode === "first" || mode === "third") look.aim(h.yaw, h.pitch); }
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
     if (camOverride) camPos.copy(camOverride); // test hook only: a fixed viewpoint for visual checks

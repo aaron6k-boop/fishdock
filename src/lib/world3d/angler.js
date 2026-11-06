@@ -908,7 +908,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // first person: whenever the line is out the rod is in your hands, low and to the right with the reel in view and
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
-    if (fp && !(ph === "landing" && age >= LT.swingIn)) {
+    // (landing it with the drop net yourself, the rod goes onto the rail once the fish is up at the wall, and your
+    // hands go to the net and its rope: the rod laid down where you can see it, not held by nobody in front of you)
+    const fpRodDown = ph === "landing" && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"));
+    if (fp && !fpRodDown) {
       held = true;
       // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
       // lower right of the view, the rod rising from there at its angle for the moment (higher at a cast, lower to
