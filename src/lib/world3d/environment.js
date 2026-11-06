@@ -244,10 +244,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec2 flow = uKind > 1.5 && uKind < 2.5 ? vec2(-uTime*.6, 0.) : -wd*uTime*.35;
         float gust = .45 + 1.1*noise(p*.021 - flow*.12 + 7.);
         vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
-        g += r1.yz*vec2(1.9, 2.6)*(.024 + .05*uWind)*gust*(1. - smoothstep(30., 220., dist));
+        // (softer, and gone sooner with distance: at full strength out to 220 m it laid one even grain over the whole sea,
+        // the fine repeated ripple in the audit's 00:24 frame)
+        g += r1.yz*vec2(1.9, 2.6)*(.018 + .038*uWind)*gust*(1. - smoothstep(20., 150., dist));
         #if WQ > 0
           vec3 r2 = noised(mat2(.47, .88, -.88, .47)*p*6.1 + flow*1.6);
-          g += r2.yz*6.1*(.004 + .011*uWind)*gust*(1. - smoothstep(14., 90., dist));
+          g += r2.yz*6.1*(.004 + .011*uWind)*gust*(1. - smoothstep(10., 60., dist));
         #endif
         #if WQ > 1
           vec3 r3 = noised(p*13.7 - flow*2.1 + 3.);
