@@ -352,7 +352,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // of an arm filling the view, then glides back. Drag and you look round from there as usual
     // (and after it, while your fish waits in the net on the deck for you to have a look, the camera stays on it, rather
     // than going back to the open water with the fish behind you)
-    const ownView = landShotOn && out && focus?.a.local && (mode === "first" || mode === "third");
+    // (in third person the landing is always shown from these framed outside shots, you and the net and the fish together:
+    // from behind you, the wall hid the net and the fish below. In first person only if you chose Cinematic)
+    const ownView = out && focus?.a.local && ((landShotOn && mode === "first") || mode === "third");
     const landing = ownView && out.land ? out.land : ownView && out.kept === "deck" && out.keptAt ? { stage: "deck", net: out.keptAt, fish: out.keptAt, edge: out.edge }
       : ownView && out.release ? { stage: out.release.stage, net: out.release.net, fish: out.release.fish || out.keptAt, edge: out.edge, water: out.release.water ?? null } : null; // (putting it back: the same shots)
     if (landShot && !out) landShot = null;
