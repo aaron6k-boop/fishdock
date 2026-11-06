@@ -923,7 +923,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // one side on a rest)
     // (landing it with the drop net yourself, the rod goes onto the rail once the fish is up at the wall, and your
     // hands go to the net and its rope: the rod laid down where you can see it, not held by nobody in front of you)
-    const fpRodDown = (!!kept && kept.state !== "gone") || (ph === "landing" && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"))); // (and while your fish is on the deck: the rod stays down, not held up in front of your face as you look down at it)
+    const fpRodDown = (!!kept && kept.state !== "gone") || (ph === "landing" && (tech === "dropnet" || tech === "net") && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"))); // (drawn up a beach or swung in, the rod stays in your hands until the fish is down: a hand reaching for the line filled the view) // (and while your fish is on the deck: the rod stays down, not held up in front of your face as you look down at it)
     if (fp && !fpRodDown) {
       held = true;
       // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
@@ -1062,7 +1062,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
-          const hold = (hi) => (fp ? base.clone().addScaledVector(rd, hi ? 0 : 0.17) : base.clone().add(V3(0, hi ? 0.1 : -0.22, hi ? -0.06 : 0.16)));
+          const hold = (hi) => (fp ? base.clone().addScaledVector(rd, hi ? 0 : 0.17) : base.clone().add(V3(hi ? 0 : 0.04, hi ? 0.2 : -0.26, hi ? -0.24 : 0.12)) /* (from behind: reaching out over the rail for the next grip, then pulling it right down to the hip, so the hand over hand reads from a distance) */);
           let a0 = fp ? hold(true) : base.clone().add(V3(-0.05, 0.06, -0.04)), a1 = fp ? hold(false) : base.clone().add(V3(0.07, -0.12, 0.1));
           if (landStage === "haul" && ropePull) {
             // hand over hand: one pulls down (the rope sliding up through the other), then they change over
@@ -1085,7 +1085,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           crouch = clamp(0.8 - net0.y * 0.6, 0, 0.6); lean = 0.18; brace = 0; lookAtW = netAt ? netAt.clone() : lookAtW;
         }
       }
-      if (rigAt && age >= LT.card - 0.3 && tech !== "dropnet" && tech !== "net") hands[0] = { at: toLocal(rigAt).add(V3(0, 0.05, 0)), axis: V3(0, 1, 0), palm: V3(1, 0, 0), kind: "line" };
+      if (rigAt && age >= LT.card - 0.3 && tech !== "dropnet" && tech !== "net" && !fp) hands[0] = { at: toLocal(rigAt).add(V3(0, 0.05, 0)), axis: V3(0, 1, 0), palm: V3(1, 0, 0), kind: "line" };
     }
     if (ph === "lost") { lean = 0.05; lookAtW = rigAt ? rigAt.clone() : null; }
     let kneel = 0;
@@ -1120,7 +1120,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
-          const hold = (hi) => (fp ? base.clone().addScaledVector(rd, hi ? 0 : 0.17) : base.clone().add(V3(0, hi ? 0.1 : -0.22, hi ? -0.06 : 0.16)));
+          const hold = (hi) => (fp ? base.clone().addScaledVector(rd, hi ? 0 : 0.17) : base.clone().add(V3(hi ? 0 : 0.04, hi ? 0.2 : -0.26, hi ? -0.24 : 0.12)) /* (from behind: reaching out over the rail for the next grip, then pulling it right down to the hip, so the hand over hand reads from a distance) */);
       let a0 = fp ? hold(true) : base.clone().add(V3(-0.05, 0.06, -0.04)), a1 = fp ? hold(false) : base.clone().add(V3(0.07, -0.12, 0.1));
       if (relStep === "haul" && ropePull) {
         const u = ease(clamp((ropePull.u - 0.15) / 0.75, 0, 1)), puller = hold(true).lerp(hold(false), u), reacher = hold(false).lerp(hold(true), ease(ropePull.u));
