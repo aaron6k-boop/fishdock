@@ -242,7 +242,7 @@ function realArms(scene, { gloves, skinHex }) {
     // skin: the model's colour with fine pores and creases over it (a normal and a roughness map, tiled), a little oilier
     // than before (real skin has a soft sheen, not a matte plastic look)
     // (a little less shine than before, and that shine broken up: the even waxy sheen was much of the plastic look)
-    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 1.08, metalness: 0, specularIntensity: 0.55, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.16, 0.16) });
+    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 0.66, metalness: 0, specularIntensity: 0.5, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.3, 0.3) }); // (a soft sheen broken up by the pores, and the pores and creases visible: fully matte, it read as clay)
     if (D && !gloves) { D.skin.normal.repeat.set(30, 30); D.skin.rough.repeat.set(9, 9); }
     if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
     else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); const lum = mt.color.r * 0.3 + mt.color.g * 0.59 + mt.color.b * 0.11; mt.color.lerp(new THREE.Color(lum, lum, lum), 0.14); } // (a touch less saturated: the model's tone read orange under the warm light) // (your skin tone over the model's)
@@ -255,8 +255,8 @@ function realArms(scene, { gloves, skinHex }) {
         .replace("#include <color_fragment>", `#include <color_fragment>
           ${gloves ? "" : `{ float cr = smoothstep(0.0, 1.0, vCurv), cv = smoothstep(0.0, 1.0, -vCurv);
             // folds darker and warmer (blood close under thin skin), ridges a touch paler and drier
-            diffuseColor.rgb *= mix(vec3(1.0), vec3(0.74, 0.6, 0.56), cr * 0.75);
-            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.06, 1.0, 0.96), cv * 0.6);
+            diffuseColor.rgb *= mix(vec3(1.0), vec3(0.64, 0.48, 0.45), cr * 0.95);
+            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 1.0, 0.95), cv * 0.7);
             // faint uneven colour across the skin, as real skin has (redder in patches, paler in others)
             #ifdef USE_MAP
               vec2 bq = vMapUv * 38.0; float bn = fract(sin(dot(floor(bq), vec2(12.9898, 78.233))) * 43758.5453);
@@ -846,7 +846,9 @@ function realArms(scene, { gloves, skinHex }) {
  */
 // ---- the sleeve and its cuff (y down the arm from the cuff's edge at 0, the sleeve's axis) ----
 function sleeveGeo(seed) {
-  const pts = []; for (let k = 0; k <= 24; k++) { const y = -0.04 - (k / 24) * 0.5; pts.push(new THREE.Vector2(0.05 + 0.017 * Math.pow(k / 24, 0.7), y)); }
+  // (85 cm from the cuff, widening to the upper arm: at 54 cm, reaching out over the rail for the net's rope, its open
+  // top end came into view as an empty tube)
+  const pts = []; for (let k = 0; k <= 32; k++) { const f = k / 32, y = -0.04 - f * 0.85; pts.push(new THREE.Vector2(0.05 + 0.017 * Math.pow(Math.min(1, f / 0.6), 0.7) + 0.012 * Math.max(0, f - 0.6) / 0.4, y)); }
   const g = new THREE.LatheGeometry(pts, 40), p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), r = Math.hypot(x, z);

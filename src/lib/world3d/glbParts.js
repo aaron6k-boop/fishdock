@@ -77,8 +77,8 @@ export function fitNet(net, scene, kind = "drop") {
         // (green knotted nylon, as pier drop nets are sold, with a bigger mesh than a landing net's: the cords were a fine
         // black grid that read as a sieve; cut out more firmly so each cord shows)
         for (const k of ["map", "alphaMap", "normalMap"]) if (m[k]) { m[k] = m[k].clone(); m[k].repeat.multiplyScalar(0.55); m[k].needsUpdate = true; }
-        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 5.0, 0.0, 1.0); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.15, 0.14), 0.85);"); };
-        m.customProgramCacheKey = () => "fdnet3"; o.renderOrder = 2;
+        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 5.0, 0.0, 1.0); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.15, 0.14), 0.85);\n#ifdef USE_ALPHAMAP\n{ vec2 q = vAlphaMapUv, e = vec2(0.0032); float a2 = texture2D(alphaMap, q).g; a2 = max(a2, max(max(texture2D(alphaMap, q + vec2(e.x, 0.0)).g, texture2D(alphaMap, q - vec2(e.x, 0.0)).g), max(texture2D(alphaMap, q + vec2(0.0, e.y)).g, texture2D(alphaMap, q - vec2(0.0, e.y)).g))); diffuseColor.a = clamp(max(diffuseColor.a, a2 * 3.0), 0.0, 1.0); diffuseColor.rgb *= 0.75 + 0.35 * texture2D(alphaMap, q).g; }\n#endif"); }; // (the cords thickened, each grown by a few texels: thin, they read as wire, not knotted nylon cord; their middles a shade lighter, rounded)
+        m.customProgramCacheKey = () => "fdnet4"; o.renderOrder = 2;
       }
     });
   }
