@@ -859,7 +859,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           want = { pos, quat, kind: spec.kind };
         } else {
           // nothing to hold: down by your side, out of the view, fingers forward, palm in
-          const pos = elbow.clone().addScaledVector(vu, -0.12).addScaledVector(vf, 0.1);
+          const pos = elbow.clone().add(V(0, -0.32, 0)).addScaledVector(vf, -0.05); // (hanging at your side, well below the view: just under the elbow it rose into the picture as you leant into a cast)
           const Y = vf.clone(), Z = vr.clone().multiplyScalar(-h.s), X = Y.clone().cross(Z);
           want = { pos, quat: new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(X, Y, Z)), kind: null };
         }

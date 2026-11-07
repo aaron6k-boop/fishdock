@@ -517,7 +517,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       { const settle = ease(seg(age, 0.85, 1.6)), drive = Math.sin(clamp((age - 0.6) / 0.45, 0, 1) * Math.PI);
         // (the hands go up and back beside your right shoulder for the wind-up, the elbow bending, then the arms extend
         // forwards and down through the release and settle)
-        fpArm = { up: 0.17 * back * (1 - fwd) - 0.05 * drive * (1 - settle), right: 0.13 * back * (1 - fwd), fwd: -0.22 * back * (1 - fwd) + 0.12 * drive * (1 - settle) };
+        fpArm = { up: 0.15 * back * (1 - fwd) - 0.05 * drive * (1 - settle), right: 0.1 * back * (1 - fwd), fwd: -0.12 * back * (1 - fwd) + 0.12 * drive * (1 - settle) }; // (not so near: closer, the inside of the sleeve filled the edge of the view)
         // (and your weight: back onto the rear foot and turned a little to the right for the wind-up, thrown forwards and
         // down through the release, then back up to stand)
         bodyTo = { x: 0.05 * back * (1 - fwd) - 0.02 * drive, y: -0.012 * back * (1 - fwd) - 0.04 * drive * (1 - settle), z: 0.08 * back * (1 - fwd) - 0.12 * drive * (1 - settle) }; }
@@ -1134,7 +1134,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // letting it go from the drop net: both hands on the rope at the rail, watching it swim out; then hauling the empty
       // net back up, a hand over the other (as landing it). In first person as when landing it: leaning out past the
       // wall's top, both hands on the rope one above the other off to your left, watching the fish go below
-      const E = fp ? fpEye() : null, base = fp ? V3(E.x - 0.34, E.y - 0.34, E.z - 0.32) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2);
+      const E = fp ? fpEye() : null, base = fp ? V3(E.x - 0.5, E.y - 0.3, E.z - 0.36) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
