@@ -450,6 +450,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // reach, not polished chrome. The fittings (caps, ball joints, base plates, the sleeves where rails join, the bolts)
   // are where the zinc wears through first: rust in their crevices and a run of it down from each joint
   const railMat = weather(new THREE.MeshStandardMaterial({ color: 0xaeb2b1, metalness: 0.6, roughness: 0.62 }), { scale: 0.7, mottle: 0.35, bump: 0.6, rust: [0.32, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.5, 0.26], rough: [0.8, 1.25], wet: place.deckWet }); // (rustier: a North Sea pier's railings are brown along their joints and streaked below them)
+  // (the jetties' handrails: thin tubes of dull galvanising)
+  const jRailMat = new THREE.MeshStandardMaterial({ color: 0x8a8e8c, metalness: 0.3, roughness: 0.8 }); // (no weathering: on tubes this thin it shaded them past white, a row of glowing bars)
   const jointMat = weather(new THREE.MeshStandardMaterial({ color: 0xa2a6a5, metalness: 0.55, roughness: 0.66 }), { scale: 0.35, mottle: 0.4, bump: 0.8, rust: [0.85, 0.15, 0.06, 0.025], grime: [LAND, LAND + 0.4, 0.25], rough: [0.8, 1.2], wet: place.deckWet });
   const posts = [], rails = [], timberRuns = [], barRuns = [];
   for (const e of walls) {
@@ -687,7 +689,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           for (let q = 0; q < np; q++) rp.push([a2[0] + (b2[0] - a2[0]) * q / np, a2[1] + (b2[1] - a2[1]) * q / np]);
           for (const y of [RAIL.h, RAIL.h * 0.5]) rr.push({ a: [a2[0], p.h + y, a2[1]], b: [b2[0], p.h + y, b2[1]], r: y === RAIL.h ? 0.026 : 0.018 });
         }
-        if (rp.length) { const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 8), railMat, rp.length), mx = new THREE.Matrix4(); rp.forEach(([x, z], q) => { mx.makeTranslation(x, p.h + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); group.add(pm); }
+        if (rp.length) { const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 8, 1, true), railMat, rp.length) /* (open-topped under the rail, as the pier's own posts: their flat sunlit caps lined up in perspective into bright bars) */, mx = new THREE.Matrix4(); rp.forEach(([x, z], q) => { mx.makeTranslation(x, p.h + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); group.add(pm); }
         if (rr.length) { const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8), railMat, rr.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0); rr.forEach(({ a: A0, b: B0, r }, q) => { const A = new THREE.Vector3(...A0), Bv = new THREE.Vector3(...B0), d = Bv.clone().sub(A), L2 = d.length(); mx.compose(A.clone().add(Bv).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(up, d.normalize()), new THREE.Vector3(r, L2 + 0.06, r)); rm.setMatrixAt(q, mx); }); group.add(rm); }
       }
       if (ring.some(([x, z]) => nearSpot(x, z, NEAR_SOLID + 60))) solids.push(m);
@@ -705,7 +707,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       pile.computeBoundingSphere(); group.add(pile);
     }
     if (jRail.length) {
-      const rail = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 20, 1, true), railMat, jRail.length), qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+      const rail = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 20, 1, true), jRailMat, jRail.length), qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
       jRail.forEach(([x, y, z, ang, len], k) => { mx.compose(v.set(x, y, z), q.setFromAxisAngle(up, -ang).multiply(qz), sc.set(1, len, 1)); rail.setMatrixAt(k, mx); });
       rail.computeBoundingSphere(); group.add(rail); void X1;
     }

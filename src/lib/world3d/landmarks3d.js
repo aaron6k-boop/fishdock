@@ -89,9 +89,10 @@ function gorlestonLighthouse(group, ring, base) {
   K.box("brick", 1.7, G, W + 0.1, -ex * (L / 2 - 0.81), y0 + G / 2, 0);
   K.box("iron", 1.72, 0.95, W + 0.12, -ex * (L / 2 - 0.81), y0 + 0.2 + 0.475, 0);
   K.box("iron", 0.06, 2.0, 0.9, -ex * (L / 2 + 0.06), y0 + 0.2 + 1.0, nzS * W * 0.2);
-  for (const s of [-1, 1]) for (let i = 0; i < 4; i++) K.box("panel", L / 4 - 0.12, 2.0, 0.05, (i - 1.5) * (L / 4), y0 + 1.05, s * (W / 2 + 0.025));
-  for (const e of [-1, 1]) for (let i = 0; i < 2; i++) K.box("panel", 0.05, 2.0, W / 2 - 0.12, e * (L / 2 + 0.025), y0 + 1.05, (i - 0.5) * (W / 2));
-  for (const s of [-1, 1]) K.box("glass", 1.0, 2.1, 0.07, -ex * L * 0.18, y0 + 1.05, s * (W / 2 + 0.04));
+  // (the panels and doors start on top of the concrete step: dipping into it, their edges glinted along the foot)
+  for (const s of [-1, 1]) for (let i = 0; i < 4; i++) K.box("panel", L / 4 - 0.12, 1.9, 0.006, (i - 1.5) * (L / 4), y0 + 1.2, s * (W / 2 + 0.003)); // (all but flush, as boarding is: a deeper top edge caught the sun and glowed as a bright bar)
+  for (const e of [-1, 1]) for (let i = 0; i < 2; i++) K.box("panel", 0.006, 1.9, W / 2 - 0.12, e * (L / 2 + 0.003), y0 + 1.2, (i - 0.5) * (W / 2));
+  for (const s of [-1, 1]) K.box("glass", 1.0, 2.0, 0.012, -ex * L * 0.18, y0 + 1.22, s * (W / 2 + 0.006));
   // ---- first slab: cantilevered well out all round, a downstand under its edge and brackets under it ----
   // (photographed: only a little way out along the long sides, further at the ends, where the balcony wraps round)
   const o1x = 1.0, o1z = 0.5, y1 = y0 + G;
@@ -217,10 +218,10 @@ function gorlestonLighthouse(group, ring, base) {
   const sign = signTexture();
   const M = {
     // (the ground storey is painted brick: the paint's own unevenness over the brick's courses)
-    // (the render photograph is a warm mid grey, about 0.4 in linear light: lifted to the white paint's own shade)
-    paint: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color().setRGB(1.98, 2.16, 2.1) : new THREE.Color(0xe9e7e1), map: pPhoto || null, normalMap: bN || brk.normalMap, normalScale: new THREE.Vector2(0.45, 0.45), roughnessMap: pR || null, roughness: pR ? 1 : 0.9 }),
-    panel: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color().setRGB(1.92, 2.1, 2.14) : new THREE.Color(0xe2e2df), map: pPhoto || null, normalMap: pN || null, roughness: 0.8 }),
-    white: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color().setRGB(2.15, 2.38, 2.45) : new THREE.Color(0xf1f0ec), map: pPhoto || null, normalMap: pN || null, roughnessMap: pR || null, roughness: pR ? 1 : 0.85 }),
+    // (the render photograph comes already lifted to white paint: source-assets/prepare_textures.py "rgb-white")
+    paint: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color(0xf4f4f0) : new THREE.Color(0xe9e7e1), map: pPhoto || null, normalMap: bN || brk.normalMap, normalScale: new THREE.Vector2(0.45, 0.45), roughnessMap: pR || null, roughness: pR ? 1 : 0.9 }),
+    panel: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color(0xe8e8e4) : new THREE.Color(0xe2e2df), map: pPhoto || null, roughness: 0.85 }),
+    white: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color(0xffffff) : new THREE.Color(0xf1f0ec), map: pPhoto || null, normalMap: pN || null, roughnessMap: pR || null, roughness: pR ? 1 : 0.85 }),
     brick: bPhoto ? new THREE.MeshStandardMaterial({ map: bPhoto, normalMap: bN, roughnessMap: bR, roughness: 1, color: 0xe2d4ca })
       : new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.88 }),
     trim: new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.5 }),
@@ -240,10 +241,13 @@ function gorlestonLighthouse(group, ring, base) {
   // runs off it; the white slabs and fascia with grey runs from their drips; the red railings faded and rust-spotted;
   // the iron stair and the galvanised masts dull, rusting at the joints.
   const age = {
-    paint: { scale: 0.8, mottle: 0.12, grime: [base, base + 0.8, 0.22], streaks: [y1, 2.4, 0.13], rough: [0.9, 1.1] },
-    panel: { scale: 0.8, mottle: 0.12, grime: [base, base + 0.6, 0.2], streaks: [y1, 2.4, 0.1] },
-    white: { scale: 1.2, mottle: 0.1, streaks: [yR + S2, 1.2, 0.12], rough: [0.9, 1.1] },
-    brick: { scale: 0.8, mottle: 0.15, streaks: [yU + sill, 1.0, 0.12] },
+    // (as photographed: the white paint grubby towards the deck and streaked grey where rain runs off the slab above it;
+    // the slabs' edges streaked and stained; the brick weathered unevenly, darker under the sills)
+    paint: { scale: 0.8, mottle: 0.18, grime: [base, base + 1.1, 0.34], streaks: [y1, 2.6, 0.24], rough: [0.9, 1.15] },
+    panel: { scale: 0.8, mottle: 0.16, grime: [base, base + 0.9, 0.3], streaks: [y1, 2.6, 0.2] },
+    white: { scale: 1.2, mottle: 0.16, streaks: [yR + S2, 1.4, 0.22], rough: [0.9, 1.15] },
+    brick: { scale: 0.8, mottle: 0.22, streaks: [yU + sill, 1.1, 0.18], grime: [yU, yU + 0.3, 0.12] },
+    plinth: { scale: 0.6, mottle: 0.3, grime: [base, base + 0.2, 0.25] },
     red: { scale: 0.4, mottle: 0.35, bump: 0.35, rust: [0.4, 0.15, 0.06, 0.025], rough: [0.85, 1.3] },
     redbox: { scale: 0.4, mottle: 0.25, rust: [0.15, 0.15, 0.06, 0.025] },
     iron: { scale: 0.3, mottle: 0.3, bump: 0.3, rust: [0.35, 0.14, 0.055, 0.024], grime: [base, base + 0.5, 0.2] },
