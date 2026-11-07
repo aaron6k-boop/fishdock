@@ -709,7 +709,7 @@ function realArms(scene, { gloves, skinHex }) {
       for (let sw = -1.2; sw <= 1.21; sw += 0.15) for (let a0 = -1.2; a0 <= 1.21; a0 += 0.15) for (let a1 = -0.3; a1 <= 1.21; a1 += 0.15) {
         const ang = [a0, a1, a1 * 0.6, sw]; setThumb(S, ang);
         const tip = thumbTip(), mid = wp(S.thumb[2].b), r = Math.hypot(tip.x, tip.y), rm = Math.hypot(mid.x, mid.y), Rs = GRIP.rodR + 0.008;
-        const e = Math.abs(r - Rs) * 6 + Math.abs(rm - Rs - 0.002) * 3 + Math.max(0, Rs - 0.003 - r) * 10 + Math.max(0, Rs - 0.003 - rm) * 10 + Math.max(0, 0.004 - tip.y) * 6 + Math.max(0, mid.z - tip.z + 0.01) * (TUNE.thumbFwd ?? 4); // (pointing up the rod: its tip further towards the tip than the joint before it)
+        const e = Math.abs(r - Rs) * 6 + Math.abs(rm - Rs - 0.002) * 3 + Math.max(0, Rs - 0.003 - r) * 10 + Math.max(0, Rs - 0.003 - rm) * 10 + Math.max(0, 0.004 - tip.y) * 6 + Math.max(0, mid.z - tip.z + 0.01) * (TUNE.thumbFwd ?? 2) + Math.hypot(tip.x + side * Rs * 0.7, tip.y - Rs * 0.7) * (TUNE.thumbOver ?? 5); // (pointing up the rod, and over the top towards the far side: pressed on the handle, as for a firm hold; aimed only along the top it stood off beside the handle as the rod was raised, a thumbs-up)
         if (!tb || e < tb.e) tb = { e, ang };
       }
       S.thumb.forEach((j) => j.b.quaternion.copy(j.rest));
