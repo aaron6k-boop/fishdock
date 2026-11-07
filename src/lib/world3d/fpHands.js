@@ -1064,7 +1064,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         const back = el.clone().sub(wr).normalize(), wrist = wr.clone().addScaledVector(back, 0.035);
         h.sleeve.position.copy(wrist); h.sleeve.quaternion.setFromUnitVectors(V(0, -1, 0), back);
         // the upper arm, elbow to shoulder (the shoulder by your eye: out to the side, a little below and behind it)
-        { const sh = eye.clone().addScaledVector(vr, h.s * 0.19).add(V(0, -0.21, 0)).addScaledVector(fh, -0.05), elw = wr.clone().addScaledVector(back, Math.min(0.3, el.distanceTo(wr))), d = sh.clone().sub(elw), L = d.length();
+        { const sh = eye.clone().addScaledVector(vr, h.s * 0.2).add(V(0, -0.16, 0)).addScaledVector(fh, -0.24) /* (behind the eye, where the shoulder is: the arm leaves the view at its edge, never ending in the air) */, elw = wr.clone().addScaledVector(back, Math.min(0.3, el.distanceTo(wr))), d = sh.clone().sub(elw), L = d.length();
           if (L > 0.05) { h.upper.visible = h.sleeve.visible; h.upper.position.copy(elw); h.upper.quaternion.setFromUnitVectors(V(0, -1, 0), d.multiplyScalar(1 / L)); h.upper.scale.set(1, L, 1); } else h.upper.visible = false; }
       }
     },
