@@ -42,7 +42,9 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     zoom(factor) { s.fov = clamp(s.fov / factor, FOV.min, FOV.max); s.touched = performance.now(); },
     setFov(f) { s.fov = clamp(f, FOV.min, FOV.max); },
     /** turn smoothly to look at a heading (and pitch) */
-    aim(yaw, pitch = s.pitch) { s.aim = { yaw: wrap(yaw), pitch: clamp(pitch, s.pmin, s.pmax) }; s.vyaw = 0; s.vpitch = 0; },
+    // (rate: the most it may turn a second, radians, as a head does: a big change of where to look then takes its time
+    // rather than whipping round; none for the usual quick ease)
+    aim(yaw, pitch = s.pitch, rate = 0) { s.aim = { yaw: wrap(yaw), pitch: clamp(pitch, s.pmin, s.pmax), rate }; s.vyaw = 0; s.vpitch = 0; },
     recenter() { api.aim(s.home.yaw, s.home.pitch); s.fov = s.baseFov ?? FOV.base; s.touched = -1e9; },
     setHome(yaw, pitch = s.home.pitch) { s.home = { yaw: wrap(yaw), pitch }; },
     /** a tap: returns true for a double tap (two taps within 320 ms that didn't move), which recentres */
@@ -64,8 +66,8 @@ export function createLook({ yaw = 0, pitch = -0.08, fov = FOV.base, home = { ya
     step(dt) {
       if (s.dragging) return api;
       if (s.aim) {
-        const k = 1 - Math.exp(-dt * 5);
-        s.yaw = wrap(s.yaw + wrap(s.aim.yaw - s.yaw) * k); s.pitch += (s.aim.pitch - s.pitch) * k;
+        const k = 1 - Math.exp(-dt * 5), R = s.aim.rate, lim = (v) => (R > 0 ? clamp(v, -R * dt, R * dt) : v);
+        s.yaw = wrap(s.yaw + lim(wrap(s.aim.yaw - s.yaw) * k)); s.pitch += lim((s.aim.pitch - s.pitch) * k) * (R > 0 ? 0.8 : 1);
         if (Math.abs(wrap(s.aim.yaw - s.yaw)) < 0.002 && Math.abs(s.aim.pitch - s.pitch) < 0.002) s.aim = null;
         return api;
       }

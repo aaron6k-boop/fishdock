@@ -1307,7 +1307,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // behind the rail the edge hides the foot of the wall, where the net and the fish are)
     const overWall = fpRope;
     const netNear = fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod");
-    const leanTo = overWall ? clamp(edge + 0.15, 0, 1.2) : fp && ph === "landing" && (landStage === "in" || (landStage === "haul" && netAt && toLocal(netAt).y > 0.35)) ? -0.32 /* (swinging the net in over the rail you step back from it: leaning in, the hoop came over at eye height a hand's length from your face and the camera ended up inside the net) */ : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
+    const leanTo = overWall ? clamp(edge + 0.15, 0, 1.2) : fp && ph === "landing" && (landStage === "in" || (landStage === "haul" && netAt && toLocal(netAt).y > 0.35) || ((landStage === "pick" || landStage === "lower") && netAt && toLocal(netAt).y > 0.45)) ? -0.32 /* (swinging the net in over the rail you step back from it: leaning in, the hoop came over at eye height a hand's length from your face and the camera ended up inside the net) */ : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
     leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * (leanTo < 0 ? 5 : 2.5)));
     { const k = 55, c = 2 * Math.sqrt(k) * 0.75, h = Math.min(dt, 0.05), to = fp ? bodyTo : { x: 0, y: 0, z: 0 };
       for (const a of ["x", "y", "z"]) { const v = "v" + a; body[v] += (k * (to[a] - body[a]) - c * body[v]) * h; body[a] += body[v] * h; } }

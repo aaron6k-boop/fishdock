@@ -268,7 +268,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // going down, the fish led in, the net coming up), then to the fish on the deck; drag and you look where you like,
       // and after a moment it carries on with what's happening. (No cut to a camera beside you: that's Cinematic)
       const L = out.land, R2 = out.release;
-      steerTo = L ? (L.stage === "rod" ? out.at.clone().add(new THREE.Vector3(0, 1.0, 0)).lerp(out.tip, 0.22) /* (watching your hands lay the rod on the rail) */ : L.stage === "lower" || L.stage === "lead" || L.stage === "haul" ? (L.net || L.fish) : L.stage === "pick" || L.stage === "in" || L.stage === "done" ? (L.net || L.fish) : (L.fish || out.fishAt || out.rig))
+      steerTo = L ? (L.stage === "rod" ? out.at.clone().add(new THREE.Vector3(0, 1.0, 0)).lerp(out.tip, 0.5) /* (watching your hands lay the rod on the rail, out in front: nearer your feet, the point was almost straight below your eye and the view spun round to wherever that put it) */ : L.stage === "lower" || L.stage === "lead" || L.stage === "haul" ? (L.net || L.fish) : L.stage === "pick" || L.stage === "in" || L.stage === "done" ? (L.net || L.fish) : (L.fish || out.fishAt || out.rig))
         : R2 ? (R2.net || R2.fish || out.keptAt) : out.keptAt;
       if (steerTo) { steerTo = steerTo.clone(); if (L?.water != null && steerTo.y < L.water + 0.3) steerTo.y += 0.25; } // (a little above the net in the water, so the view isn't all dark sea)
       fpDown = true;
@@ -513,7 +513,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const settling = t - modeSince < 0.6;
     if (mode !== "cinematic") { camPos.lerp(pos, (mode === "first" || mode === "free") && !settling ? 1 : 1 - Math.exp(-dt * (mode === "spectator" ? 2.5 : settling ? 9 : 6))); cineShot = null; }
     // (never steered steeply down: a fish close in under the pier would tip the view down into the water)
-    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(fpDown ? -1.38 : -0.5, Math.min(fpDown ? -0.3 : 0.6, l.pitch))); steering = true; }
+    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(fpDown ? -1.38 : -0.5, Math.min(fpDown ? -0.3 : 0.6, l.pitch)), fpDown ? 1.6 : 0); steering = true; } // (landing it yourself, your head turns at a head's pace, about 90 degrees a second at most)
     else if (steering && idle && !steerTo) { steering = false; const h = look.home; if (mode === "first" || mode === "third") look.aim(h.yaw, h.pitch); }
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
     if (camOverride) camPos.copy(camOverride); // test hook only: a fixed viewpoint for visual checks
