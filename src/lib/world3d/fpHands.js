@@ -954,7 +954,8 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       if (!group.visible) return;
       // (until the rod and reel have loaded there's nothing for the hands to take hold of, and they hung loose in the
       // first moments, a forearm across the view; so they wait for them, a few seconds at most on a slow connection)
-      if (real) real.root.visible = !(specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock) && performance.now() - born < 20000);
+      { const wait = (!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 20000;
+        if (real) real.root.visible = !wait; for (const h of hands) h.sleeve.visible = !wait; } // (the sleeves too: without their hands they were two empty blue tubes)
       for (let i = 0; i < 2; i++) {
         const h = hands[i], spec = specs[i];
         // the elbow: fixed in the view, below and out to the side, out of sight

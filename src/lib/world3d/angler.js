@@ -263,17 +263,27 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   {
     const mBox = new THREE.MeshStandardMaterial({ color: 0x24402e, roughness: 0.55 }), mLid = new THREE.MeshStandardMaterial({ color: 0x31573f, roughness: 0.5 });
     const mBlack = new THREE.MeshStandardMaterial({ color: 0x151719, roughness: 0.6 }), mSteel = new THREE.MeshStandardMaterial({ color: 0xb9bec2, roughness: 0.3, metalness: 0.85 });
+    // (moulded plastic: every edge rounded, the base a touch narrower at the foot, a raised rim where the lid meets it;
+    // a sharp-edged box read as a green block)
+    const rbox = (w, h, d, r, taper = 0) => { const g = new THREE.BoxGeometry(w, h, d, 10, 6, 8), q = g.attributes.position, v = new THREE.Vector3(), c = new THREE.Vector3();
+      for (let i = 0; i < q.count; i++) { v.fromBufferAttribute(q, i); const k = 1 - taper * (0.5 - v.y / h); const hw = w / 2 * k - r, hd = d / 2 * k - r, hh = h / 2 - r;
+        c.set(Math.max(-hw, Math.min(hw, v.x * k)), Math.max(-hh, Math.min(hh, v.y)), Math.max(-hd, Math.min(hd, v.z * k))); const n = v.set(v.x * k, v.y, v.z * k).sub(c); if (n.lengthSq() > 1e-10) n.setLength(r); q.setXYZ(i, c.x + n.x, c.y + n.y, c.z + n.z); }
+      g.computeVertexNormals(); return g; };
     const box = new THREE.Group(); box.position.set(-0.55, 0, 0.25); kit.add(box);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.27, 0.31, 2, 2, 2), mBox); base.position.y = 0.135; box.add(base);
-    const lid = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 24, 1), mLid); lid.scale.set(0.235, 0.05, 0.16); lid.position.y = 0.295; box.add(lid);
-    const lidTop = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.28), mLid); lidTop.position.y = 0.295; box.add(lidTop);
+    const base = new THREE.Mesh(rbox(0.46, 0.27, 0.31, 0.025, 0.05), mBox); base.position.y = 0.135; box.add(base);
+    const rimB = new THREE.Mesh(rbox(0.47, 0.022, 0.32, 0.01), mBox); rimB.position.y = 0.268; box.add(rimB);
+    const lidTop = new THREE.Mesh(rbox(0.455, 0.055, 0.305, 0.024), mLid); lidTop.position.y = 0.3; box.add(lidTop);
+    for (const sz of [-1, 1]) { const rib = new THREE.Mesh(rbox(0.4, 0.012, 0.03, 0.005), mLid); rib.position.set(0, 0.33, sz * 0.09); box.add(rib); } // (the moulded grip ribs on the seat)
     for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.06, 8), mSteel); post.position.set(sx * 0.13, 0.35, 0); box.add(post);
       const clip = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.012), mSteel); clip.position.set(sx * 0.14, 0.255, -0.158); box.add(clip); }
     const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.28, 10), mBlack); grip.rotation.z = Math.PI / 2; grip.position.set(0, 0.385, 0); box.add(grip);
     const strap = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.025, 0.32), mBlack); strap.position.y = 0.06; box.add(strap);
     const mBucket = new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.45 }), mBlue = new THREE.MeshStandardMaterial({ color: 0x2e5a8c, roughness: 0.5 });
     const bk = new THREE.Group(); bk.position.set(-0.32, 0, 0.64); kit.add(bk);
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.105, 0.28, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.45, side: THREE.DoubleSide })); body.position.y = 0.14; bk.add(body);
+    // (a little scuffed and grubby, as bait buckets get: darker towards the foot)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.105, 0.28, 32, 6, true), new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.5, side: THREE.DoubleSide, vertexColors: true })); body.position.y = 0.14; bk.add(body);
+    { const q = body.geometry.attributes.position, col = new Float32Array(q.count * 3); for (let i = 0; i < q.count; i++) { const y = q.getY(i) / 0.28 + 0.5, k = 0.72 + 0.28 * Math.min(1, y * 1.6) - 0.04 * Math.sin(q.getX(i) * 90 + q.getZ(i) * 60) ** 2; col[i * 3] = col[i * 3 + 1] = k; col[i * 3 + 2] = k * 0.97; } body.geometry.setAttribute("color", new THREE.BufferAttribute(col, 3)); }
+    for (const yy of [0.07, 0.2]) { const band = new THREE.Mesh(new THREE.TorusGeometry(0.111 + yy * 0.068, 0.0035, 5, 32), mBucket); band.rotation.x = Math.PI / 2; band.position.y = yy; bk.add(band); } // (the moulded hoops round it)
     const bottom = new THREE.Mesh(new THREE.CircleGeometry(0.105, 24), mBucket); bottom.rotation.x = -Math.PI / 2; bottom.position.y = 0.004; bk.add(bottom);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(0.132, 0.008, 6, 28), mBucket); rim.rotation.x = Math.PI / 2; rim.position.y = 0.28; bk.add(rim);
     const lidB = new THREE.Mesh(new THREE.CylinderGeometry(0.136, 0.136, 0.018, 24), mBlue); lidB.position.y = 0.29; bk.add(lidB);

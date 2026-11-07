@@ -62,7 +62,8 @@ vec4 cloudAt(vec3 d, float q){
     n1 = cloudDens(cp, warp);
     #if SKYQ > 0
       vec2 st = normalize(uSunDir.xz + vec2(1e-4))*.2;
-      float od = max(cloudDens(cp + st, warp) - thr, 0.) + max(cloudDens(cp + st*2.4, warp) - thr, 0.)*.8;
+      // (one cheaper step towards the sun, the finest detail left out of it: the light only needs the broad shape)
+      vec2 q2 = cp + st*1.7; float od = max(fbm3(q2*.36 + warp*.45)*.66 + fbm3(q2*1.55 + warp)*.46 - .07 - thr, 0.)*1.7;
       // (beer's law for the light reaching it, and the "powder" darkening of a thin edge facing away)
       shade = exp(-od*5.5)*(1. - exp(-max(n1 - thr, 0.)*9.))*1.15 + .18;
     #endif
