@@ -508,12 +508,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // back over the shoulder, a fast forward sweep, the rig flies out, the rod settles and goes on its rest
       const back = ease(seg(age, 0, 0.6)), fwd = ease(seg(age, 0.6, 0.85));
       pitch = lerp(0.6, -0.55, back); pitch = lerp(pitch, 0.55, fwd); yawOff = 0.25 - fwd * 0.15;
-      fpE = lerp(lerp(0.4, 1.45, back), 0.36, fwd); fpYaw = lerp(0.08, -0.03, fwd);
+      // (first person: the rod goes back over your right shoulder, past upright, its tip behind you, then is driven
+      // forwards over the top and down to point at the water: was tipped up to upright in front of you and back down)
+      fpE = lerp(lerp(0.4, 2.05, back), 0.36, fwd); fpYaw = lerp(lerp(-0.03, 0.42, back), -0.03, fwd);
       // (in first person the hands travel with the cast, not just the rod pivoting about a reel fixed in the view: up and
       // back beside your right shoulder for the wind-up, then driven forwards and down through the release, the arms
       // following through and settling back)
       { const settle = ease(seg(age, 0.85, 1.6)), drive = Math.sin(clamp((age - 0.6) / 0.45, 0, 1) * Math.PI);
-        fpArm = { up: 0.11 * back * (1 - fwd) - 0.035 * drive * (1 - settle), right: 0.05 * back * (1 - fwd), fwd: -0.07 * back * (1 - fwd) + 0.09 * drive * (1 - settle) };
+        // (the hands go up and back beside your right shoulder for the wind-up, the elbow bending, then the arms extend
+        // forwards and down through the release and settle)
+        fpArm = { up: 0.17 * back * (1 - fwd) - 0.05 * drive * (1 - settle), right: 0.13 * back * (1 - fwd), fwd: -0.22 * back * (1 - fwd) + 0.12 * drive * (1 - settle) };
         // (and your weight: back onto the rear foot and turned a little to the right for the wind-up, thrown forwards and
         // down through the release, then back up to stand)
         bodyTo = { x: 0.05 * back * (1 - fwd) - 0.02 * drive, y: -0.012 * back * (1 - fwd) - 0.04 * drive * (1 - settle), z: 0.08 * back * (1 - fwd) - 0.12 * drive * (1 - settle) }; }
@@ -590,7 +594,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // comes up near the top
       if (!jumping && Math.floor(age / 0.7 + P.s1) !== Math.floor((age - dt) / 0.7 + P.s1)) { const w = f.clone(); w.y = wh(w.x, w.z); rippleCb?.(w, (0.16 + 0.22 * surge) * (f.y > -1.5 ? 1.6 : 1)); }
       const tension = fl ? (0.35 + 1.05 * fl.tension) * Math.max(0.8, load) : load * (0.72 + 0.4 * surge) * st.heavy;
-      bendT = 0.16 + 0.26 * tension; tipT = 0.05 * surge + (st.pump ? 0.05 * Math.max(0, Math.sin(age * 5.5)) : 0);
+      bendT = 0.2 + 0.5 * tension; // (a loaded rod: its top half pulled well round towards the fish, more the harder it pulls) tipT = 0.05 * surge + (st.pump ? 0.05 * Math.max(0, Math.sin(age * 5.5)) : 0);
       // (a taut line hums: the tip trembles a little, more as the fish pulls harder; and on a surge your arms give a
       // touch towards it, then take it back)
       tipT += clamp(tension, 0, 1.4) * 0.006 * (n1(t * 11 + P.s1) + 0.6 * n1(t * 23 + P.s2));
@@ -601,7 +605,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       fpArm = { up: 0.05 * pump - 0.03 * surge * tk, right: 0.012 * run * st.runWidth, fwd: -0.05 * pump };
       bodyTo = { x: clamp(run * 0.05 * st.runWidth, -0.05, 0.05), y: -0.012 * tk - 0.025 * surge * tk, z: 0.03 * tk + 0.03 * pump - 0.08 * surge * tk };
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
-      fpE = 0.5 + 0.1 * surge + 0.22 * pump; fpYaw = clamp(run * 0.22 * st.runWidth, -0.3, 0.3);
+      fpE = 0.95 - 0.22 * surge * tk + 0.28 * pump; fpYaw = -0.08 + clamp(run * 0.22 * st.runWidth, -0.3, 0.3); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
       // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
       pitch += 0.38 * strikeK; fpE += 0.32 * strikeK; bendT += 0.25 * strikeK;
@@ -1033,7 +1037,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // while you wait
       // (in first person, holding the rod while you wait, the left hand rests lightly on the knob, ready: it hung in the
       // corner of the view with a finger up before)
-      hands[0] = ph === "cast" && age < 2.4 ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() } } : null;
+      hands[0] = ph === "cast" && age < 2.4 && !fp ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "cast" && fp && age < 1.25 ? null /* (first person: the left hand off down out of sight for the cast, back on the reel as the line goes out: on the butt it showed as a stray thumb at the bottom, on the reel the whole arm swept across the view) */ : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() } } : null;
     }
     if (ph === "bite" && !held) {
       // a hand out over the rod, ready to strike: to the nearest part of it within reach, bending down to it if it's low
@@ -1297,7 +1301,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     }
     prevAge = age;
     // test diagnostics only (window.__fdFilm, never in the app): where the reel, its handle and your hands are this frame
-    if (local && typeof window !== "undefined" && window.__fdFilm) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2) }; }
+    if (local && typeof window !== "undefined" && window.__fdFilm) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, rod: pts.map((p) => toWorld(p).toArray()), lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2) }; }
     const eyeNow = fpEye(); // (the eye the rod and your body were placed from this frame: the camera uses the same one)
     // (letting the drop net down and hauling it up, you lean right out over the rail, your head past the wall's top: from
     // behind the rail the edge hides the foot of the wall, where the net and the fish are)

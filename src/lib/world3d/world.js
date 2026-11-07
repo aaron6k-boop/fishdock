@@ -150,6 +150,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   }
 
   // ---- anglers ----
+  let script = null, scriptHint = null; // (film only: a scripted event log for your angler, __fdWorld.play)
   function setAnglers(list) {
     const seen = new Set();
     for (const a of list) {
@@ -168,7 +169,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         x = { a: made, spotId: a.spot, outfit: a.outfit, lookKey, name: a.name, out: null };
         anglers.set(a.id, x);
       }
-      x.a.setEvents(a.events); x.a.setHint(a.fishHint || null); x.inspect = !!a.inspect && !!a.local;
+      x.a.setEvents(a.local && script ? script : a.events); x.a.setHint(a.local && scriptHint ? scriptHint : a.fishHint || null); x.inspect = !!a.inspect && !!a.local;
       if (a.local) localId = a.id;
     }
     for (const [id, x] of anglers) if (!seen.has(id)) { x.a.dispose(); anglers.delete(id); }
@@ -591,6 +592,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   if (typeof window !== "undefined" && window.__fdFilm) {
     window.__fdWorld = {
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
+      // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),
+      // so every phase plays through the real animation code from a known start, frame for frame the same each run:
+      // play([["cast", 0], ["hooked", 4], ["catch", 20, { species, lengthCm }]], { species, lengthCm })
+      play(list, hint = null) { if (!film) this.freeze(); const t0 = film.now; script = list ? list.map(([type, s, data]) => ({ type, t: t0 + s * 1000, data: data || null })) : null; scriptHint = hint; const me = anglers.get(localId); me?.a.setEvents(script || []); if (hint) me?.a.setHint(hint); },
+      // the fight as the tray would send it: progress 0-1, tension 0-1.4, the handle's turns
+      fightIn(f) { anglers.get(localId)?.a.setFight(f); },
+      keep(state) { anglers.get(localId)?.a.keepFish(state); },
       step(ms) { if (!film) return; const n = Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
       get mode() { return mode; },
       // for visual checks: the weather and light as given (eased in: step the clock a few seconds after)

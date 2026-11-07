@@ -421,7 +421,7 @@ function realArms(scene, { gloves, skinHex }) {
     // changes a lot, which it doesn't while you fish: the elbow's fixed in the view)
     // (on the knob the grip is found once and kept: the knob goes round, so the way to the elbow from it changes all
     // the time, and solving again each time it crossed a step put the hand in a different grip every quarter turn)
-    const Fq = Fin && kind !== "crank" && kind !== "ropeg" ? [Math.round(Fin.x * 4), Math.round(Fin.y * 4), Math.round(Fin.z * 4)].join(",") : "";
+    const Fq = ""; // (each grip worked out once and kept: on the handle too, solving again whenever the elbow's way crossed a step changed the grip mid-cast, the fingers opening off the handle as it eased to the new one)
     const key = kind + side + Fq; if (solved.has(key)) return solved.get(key);
     const T = V(0, 0, 1), U = V(0, 1, 0), X = V(1, 0, 0), M = S.M;
     // (the knob, or for "ropeg" the drop net's rope or the hoop's rim: thinner and longer, so the fingers close further)
@@ -595,10 +595,12 @@ function realArms(scene, { gloves, skinHex }) {
       root.updateMatrixWorld(true);
       const thumbTip = () => wp(S.thumb[2].b).add(V(0, 1, 0).applyQuaternion(wq(S.thumb[2].b)).multiplyScalar(S.thumb[2].len));
       let tb = null;
-      for (let a0 = -1.2; a0 <= 1.21; a0 += 0.15) for (let a1 = -0.6; a1 <= 1.21; a1 += 0.15) {
+      // (lying on it: the pad and the joint before it both on the handle's surface; aimed up the rod only a little. Aimed
+      // at the tip first, it stood 2 cm off the handle and read as a finger pointing)
+      for (let a0 = -1.6; a0 <= 1.61; a0 += 0.1) for (let a1 = -0.6; a1 <= 1.61; a1 += 0.1) {
         const ang = [a0, a1, a1 * 0.6]; S.thumb.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, ang[k]))); S.thumb[0].b.updateMatrixWorld(true);
-        const tip = thumbTip(), mid = wp(S.thumb[2].b), r = Math.hypot(tip.x, tip.y);
-        const e = Math.abs(r - GRIP.rodR - 0.008) * 3 + Math.max(0, 0.006 - tip.y) * 3 + Math.max(0, GRIP.rodR + 0.006 - Math.hypot(mid.x, mid.y)) * 4 - tip.z * 0.4 + Math.abs(tip.x) * 0.5;
+        const tip = thumbTip(), mid = wp(S.thumb[2].b), r = Math.hypot(tip.x, tip.y), rm = Math.hypot(mid.x, mid.y), Rs = GRIP.rodR + 0.008;
+        const e = Math.abs(r - Rs) * 6 + Math.abs(rm - Rs - 0.002) * 3 + Math.max(0, Rs - 0.003 - r) * 10 + Math.max(0, Rs - 0.003 - rm) * 10 + Math.max(0, -tip.y) * 2 - tip.z * 0.1;
         if (!tb || e < tb.e) tb = { e, ang };
       }
       S.thumb.forEach((j) => j.b.quaternion.copy(j.rest));
@@ -616,7 +618,7 @@ function realArms(scene, { gloves, skinHex }) {
      *  dt. Returns { wrist, elbow } (the group's space). */
     poseSocket(i, group, { pos, quat, kind, roll = 0, elbow, dt = 0.016, free = null }) {
       const S = sides[i]; group.updateWorldMatrix(true, false); group.getWorldQuaternion(gq);
-      const sideSign = kind === "seat" ? (elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).x >= 0 ? 1 : -1) : 1;
+      const sideSign = kind === "seat" ? (i === 1 ? -1 : 1) : 1; // (the right hand on the rod's right, always: worked out from where the elbow was, it flipped to the far side, palm out, whenever the rod was swung across you)
       // (solved once, with the hand alone at the origin; the arms put back where they were)
       const Fin = elbow.clone().sub(pos).applyQuaternion(quat.clone().invert()).normalize();
       const G = solveGrip(S, kind, sideSign, Fin);
@@ -627,7 +629,7 @@ function realArms(scene, { gloves, skinHex }) {
         // (a rope through the fist turns the same way, about its own length)
         const ax = free === "z" ? "z" : "x";
         const bk = S.M.y.clone().normalize().applyQuaternion(G.Qh).negate(); bk[ax] = 0; const fe = Fin.clone(); fe[ax] = 0;
-        if (bk.lengthSq() > 1e-6 && fe.lengthSq() > 1e-6) { bk.normalize(); fe.normalize(); const want = Math.atan2(bk.clone().cross(fe)[ax], bk.dot(fe)) * (TUNE.crankFollow ?? 0.85);
+        if (bk.lengthSq() > 1e-6 && fe.lengthSq() > 1e-6) { bk.normalize(); fe.normalize(); const want = Math.atan2(bk.clone().cross(fe)[ax], bk.dot(fe)) * (TUNE.crankFollow ?? 0.3);
           const R0 = S.crankRoll ?? want; let d = want - R0; d = Math.atan2(Math.sin(d), Math.cos(d)); S.crankRoll = R0 + d * Math.min(1, dt * 14); roll = S.crankRoll + roll * (TUNE.crankRollExtra ?? 0); }
       }
       const sq = gq.clone().multiply(quat); if (roll) sq.multiply(new THREE.Quaternion().setFromAxisAngle(free === "z" ? V(0, 0, 1) : V(1, 0, 0), roll));
