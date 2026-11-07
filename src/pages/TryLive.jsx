@@ -145,7 +145,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
               <span className="grow" />
               {/* in 3D these live in the view's one menu (top right); the photo view keeps its buttons */}
               {!view3d ? <>
-                <button type="button" className="fs-btn" onClick={() => setView3d(true)} aria-label="Look around in 3D (Beta)" title="360° look-around (Beta)"><Icon name="compass" /></button>
+                <button type="button" className="fs-chip back3d" onClick={() => setView3d(true)} aria-label="Back to 3D" title="Back to the 3D view"><Icon name="compass" />Back to 3D</button>
                 <button type="button" className="fs-btn" onClick={() => setInvite(true)} aria-label="Invite a friend here" title="Invite a friend here"><Icon name="users" /></button>
                 <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
                 <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
@@ -162,11 +162,11 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D onWindIn={vf.windIn} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "Photo view", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (
-            <FishingScene ref={sceneRef} feel={haptics.feel} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={() => setUiHidden((h) => !h)}>
+            <FishingScene ref={sceneRef} feel={haptics.feel} scene={scene} events={events} status="running" now={Date.now} env={{ cond: c, light: lightNow, kind: place.kind, venue }} quality={quality} sound={sound} volume={volume} floatRig={fresh} fishHint={{ species: sp.id, lengthCm: length }} rod={rod} tipLight={tipLight} demo onTap={undefined /* (the 2D view keeps its controls: a tap on the picture hid them all, and it looked as if nothing could be done) */}>
               {overlay}
             </FishingScene>
           )}
