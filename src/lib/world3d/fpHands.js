@@ -653,17 +653,11 @@ function realArms(scene, { gloves, skinHex }) {
       place2(S, Pw, Ew, Qw);
       S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, f[a][k]))));
       S.thumb.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, t[k])));
-      if (typeof window !== "undefined" && window.__fdForceF?.[i] != null) { const a0 = window.__fdForceF[i]; S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, a0)))); }
       root.updateMatrixWorld(true);
       if (typeof window !== "undefined" && window.__fdShowSock) {
         // (film only: what the grip was worked out round, drawn where it is, to check it against the real knob and handle)
         S.dbg ||= (() => { const g = kind === "seat" ? new THREE.CylinderGeometry(GRIP.rodR, GRIP.rodR, 0.3, 16).rotateX(Math.PI / 2) : new THREE.CylinderGeometry(GRIP.knobR, GRIP.knobR, GRIP.knobLen, 16).rotateZ(Math.PI / 2); const mm = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xff2020, wireframe: true })); group.parent?.parent?.add?.(mm); return mm; })();
         S.dbg.position.copy(sp); S.dbg.quaternion.copy(sq); S.dbg.updateMatrixWorld(true);
-        // (and a dot at each fingertip, red to yellow index to little; knuckles white)
-        S.dots ||= [...Array(9)].map((_, k) => { const mm = new THREE.Mesh(new THREE.SphereGeometry(0.004, 8, 6), new THREE.MeshBasicMaterial({ color: k < 4 ? [0xff0000, 0xff8800, 0xffff00, 0x00ff00][k] : k === 8 ? 0x0088ff : 0xffffff, depthTest: false })); mm.renderOrder = 99; group.parent?.parent?.add?.(mm); return mm; });
-        S.fingers.forEach((ch, a) => { S.dots[a].position.copy(wp(ch[2].b).add(V(0, 1, 0).applyQuaternion(wq(ch[2].b)).multiplyScalar(ch[2].len))); S.dots[4 + a].position.copy(wp(ch[0].b)); });
-        S.dots[8].position.copy(wp(S.thumb[2].b));
-        S.dots.forEach((d) => d.updateMatrixWorld(true));
       }
       if (typeof window !== "undefined" && window.__fdFilm) {
         const ix = S.fingers[0], md = S.fingers[1], hk = wp(ix[0].b).lerp(wp(ix[1].b), 0.5).lerp(wp(md[0].b).lerp(wp(md[1].b), 0.5), 0.5);
@@ -737,7 +731,7 @@ function sleeveGeo(seed) {
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), r = Math.hypot(x, z);
     // folds: rings gathered above the cuff, fading up the arm, broken up round it; flatter front to back, as an arm is
-    const u = clamp((-y - 0.04) / 0.22, 0, 1), fold = (1 - u) * (0.0032 * Math.sin(y * 150 + Math.sin(a * 3 + seed) * 1.6) + 0.0018 * Math.sin(a * 5 + y * 60 + seed * 2));
+    const u = clamp((-y - 0.04) / 0.22, 0, 1), fold = (1 - u * 0.7) * (0.0045 * Math.sin(y * 150 + Math.sin(a * 3 + seed) * 1.6) + 0.0025 * Math.sin(a * 5 + y * 60 + seed * 2)) + 0.0022 * Math.sin(a * 2 + y * 22 + seed * 3); // (and a few long soft creases up the arm, where it bends)
     const rr = r + fold + 0.0012 * Math.sin(a * 7 + y * 23 + seed);
     p.setXYZ(i, Math.cos(a) * rr, y, Math.sin(a) * rr * 0.92);
   }
@@ -758,7 +752,9 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: gloves ? 0.55 : 0.6, metalness: 0 });
   // the jacket's sleeve: a woven softshell (seen from inside too, so its open end never shows a hole) and a ribbed cuff
   const D0 = detailMaps();
-  const sleeveMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.8, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, roughnessMap: D0?.cloth.rough || null, normalScale: new THREE.Vector2(0.6, 0.6) });
+  // (with a fabric sheen: the soft pale edge a softshell or fleece shows where it turns away from you, which is most
+  // of what makes it read as cloth rather than painted plastic; it costs one extra lobe on two small meshes)
+  const sleeveMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.78, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, roughnessMap: D0?.cloth.rough || null, normalScale: new THREE.Vector2(0.65, 0.65), sheen: 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xc8d0dc), 0.55) });
   if (D0) { D0.cloth.normal.repeat.set(10, 18); D0.cloth.rough.repeat.set(10, 18); }
   const hemMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(coatHex).multiplyScalar(0.62), roughness: 0.9, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, normalScale: new THREE.Vector2(0.8, 0.8) });
   const built = buildHand(gloves, skinHex);

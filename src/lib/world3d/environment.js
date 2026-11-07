@@ -177,7 +177,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   };
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
   wU.uKind.value = kind;
-  wU.uWater.value.set([0x1b4752, 0x1b4752, 0x34463a, 0x2b3d33, 0x17302c][[0, 0, 1, 2, 3][kind] ?? 0]);
+  wU.uWater.value.set([0x21433f, 0x21433f, 0x34463a, 0x2b3d33, 0x17302c][[0, 0, 1, 2, 3][kind] ?? 0]); // (the sea: the grey-green of British coastal water, carrying silt, not a clear tropical teal)
   const wGeo = new THREE.PlaneGeometry(1600, 1600, LQ.waterGrid, LQ.waterGrid);
   wGeo.rotateX(-Math.PI / 2);
   // denser near the middle (the camera), so near waves are smooth and far ones cheap
@@ -317,6 +317,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud));
         float sp = max(dot(rd, uSunDir), 0.);
         col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 600.)*5. + pow(sp, 60.)*.16)*sunVis;
+        // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
+        // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
+        #if WQ > 0
+          float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
+          float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
+          col += mix(vec3(1., .95, .85), vec3(1., .78, .52), uDusk)*glit*(pow(sp, 18.)*1.6 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
+        #endif
         float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
         // lamps on piers and promenades after dark: warm streaks broken up by the waves
         for (int i = 0; i < 4; i++) { vec4 L = uLamps[i]; if (L.w <= 0.) continue; vec3 ld = normalize(L.xyz - vW); float s2 = max(dot(rd, ld), 0.); vec2 o = L.xz - vW.xz; float fall = 1./(1. + dot(o, o)*.003);
@@ -550,7 +557,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   let look = lightingFor({ day: 1, dusk: 0, night: 0, cloud: 0.3, rain: 0, moonLight: 0 });
   function apply(st) {
     U.uDay.value = st.day; U.uDusk.value = st.dusk; U.uNight.value = st.night; U.uCloud.value = st.cloud; U.uRain.value = st.rain; U.uMoonLight.value = st.moonLight;
-    U.uSunDir.value.copy(st.sunDir); U.uMoonDir.value.copy(st.moonDir);
+    U.uSunDir.value.copy(st.sunDir); if (typeof window !== "undefined" && window.__fdFilm && window.__fdSun) U.uSunDir.value.set(...window.__fdSun).normalize(); /* (film only: the sun put where a check needs it) */ U.uMoonDir.value.copy(st.moonDir);
     wind = st.wind; windDir = [st.windDir.x, st.windDir.y];
     wU.uWind.value = st.wind; wU.uWindDir.value.copy(st.windDir).normalize(); wU.uSwell.value = st.swell;
     // ---- light (skyLook.js): the sun by day, the moon at night, gold and low at dusk; cloud hides it and the sky's
