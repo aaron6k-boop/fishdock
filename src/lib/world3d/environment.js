@@ -189,7 +189,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uLamps: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
     uShore: { value: null }, uShoreOn: { value: 0 }, uShoreHalf: { value: SHORE.half },
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
+    uNrm: { value: null }, uNrmOn: { value: 0 },
   };
+  // the sea's fine ripples: a water normal map (three.js's, MIT; source-assets/ASSET-LICENCES.json), until it has
+  // loaded the old noise ripples stand in
+  if (typeof document !== "undefined") new THREE.TextureLoader().load(((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/water_normal.jpg", (t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.NoColorSpace; t.needsUpdate = true; wU.uNrm.value = t; wU.uNrmOn.value = 1;
+  });
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
   wU.uKind.value = kind;
   wU.uWater.value.set([0x21433f, 0x21433f, 0x34463a, 0x2b3d33, 0x17302c][[0, 0, 1, 2, 3][kind] ?? 0]); // (the sea: the grey-green of British coastal water, carrying silt, not a clear tropical teal)
@@ -236,7 +242,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       }`,
     fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + POST_GLSL + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
-      uniform sampler2D uShore, uShoreF; uniform float uShoreFHalf;
+      uniform sampler2D uShore, uShoreF, uNrm; uniform float uShoreFHalf, uNrmOn;
       // metres to the nearest land (from the shore maps: the fine one close round the anglers, the coarse one further
       // out), or far when off the map
       float shoreDist(vec2 p){ vec2 uv = p/(2.*uShoreHalf) + .5; if (uShoreOn < .5 || uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return 99.;
@@ -262,18 +268,25 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // Further out they're smaller than a pixel and are left out rather than shimmer
         vec2 flow = uKind > 1.5 && uKind < 2.5 ? vec2(-uTime*.6, 0.) : -wd*uTime*.35;
         float gust = .45 + 1.1*noise(p*.021 - flow*.12 + 7.);
-        vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
-        // (softer, and gone sooner with distance: at full strength out to 220 m it laid one even grain over the whole sea,
-        // the fine repeated ripple in the audit's 00:24 frame)
-        g += r1.yz*vec2(1.9, 2.6)*(.018 + .038*uWind)*gust*(1. - smoothstep(20., 150., dist));
-        #if WQ > 0
-          vec3 r2 = noised(mat2(.47, .88, -.88, .47)*p*6.1 + flow*1.6);
-          g += r2.yz*6.1*(.004 + .011*uWind)*gust*(1. - smoothstep(10., 60., dist));
-        #endif
-        #if WQ > 1
-          vec3 r3 = noised(p*13.7 - flow*2.1 + 3.);
-          g += r3.yz*13.7*(.0016 + .004*uWind)*(1. - smoothstep(8., 45., dist));
-        #endif
+        if (uNrmOn > .5) {
+          // (a real photographed-style water normal map, two layers drifting different ways at different sizes: the chop's
+          // fine facets as water really has them, and cheaper than the three noises it replaces. Further out the finer
+          // layer fades before the broad one, so the far sea never shimmers)
+          vec2 fl2 = flow*.05;
+          vec3 m1 = texture2D(uNrm, mat2(.8, -.6, .6, .8)*p*.085 + fl2 + vec2(uTime*.011, -uTime*.006)).xyz*2. - 1.;
+          vec3 m2 = texture2D(uNrm, mat2(.47, .88, -.88, .47)*p*.23 - fl2*1.7 + vec2(-uTime*.017, uTime*.012)).xyz*2. - 1.;
+          float fd = 1. - smoothstep(25., 220., dist);
+          g += (m1.xy*(.10 + .2*uWind)*fd + m2.xy*(.06 + .14*uWind)*(1. - smoothstep(10., 90., dist)))*gust;
+        } else {
+          vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
+          // (softer, and gone sooner with distance: at full strength out to 220 m it laid one even grain over the whole sea,
+          // the fine repeated ripple in the audit's 00:24 frame)
+          g += r1.yz*vec2(1.9, 2.6)*(.018 + .038*uWind)*gust*(1. - smoothstep(20., 150., dist));
+          #if WQ > 0
+            vec3 r2 = noised(mat2(.47, .88, -.88, .47)*p*6.1 + flow*1.6);
+            g += r2.yz*6.1*(.004 + .011*uWind)*gust*(1. - smoothstep(10., 60., dist));
+          #endif
+        }
         vec3 n = normalize(vec3(-g.x, 1., -g.y));
         // rain: a scatter of drop rings, each kept inside its own cell (cut off at the cell's edge they showed as
         // squares), and only close by: further out they're smaller than a pixel and alias into blocks

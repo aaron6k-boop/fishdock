@@ -571,6 +571,25 @@
      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/gltf/8k/concrete_wall_004/concrete_wall_004.bin"
     }
    ]
+  },
+  {
+   "id": "threejs:waternormals",
+   "name": "Water normals",
+   "source": "https://github.com/mrdoob/three.js/blob/dev/examples/textures/waternormals.jpg",
+   "author": "three.js authors",
+   "licence": "MIT (the three.js repository's licence)",
+   "attribution": "Copyright 2010-2025 three.js authors, MIT licence",
+   "type": "textures",
+   "resolution": "1024 px, cut to 512 px",
+   "use": "the sea's fine ripples (public/textures/water_normal.jpg)",
+   "downloaded": "2026-11-07",
+   "files": [
+    {
+     "file": "public/textures/water_normal.jpg",
+     "sha256": "b6a8fc64afc2149a228f808fd40f6995920f6a7fb795bfb2b22c55dad22b38c7",
+     "url": "https://github.com/mrdoob/three.js (git, examples/textures/waternormals.jpg at f2b6a71)"
+    }
+   ]
   }
  ]
 }

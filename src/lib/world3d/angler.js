@@ -271,6 +271,39 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     g.fillStyle = "#1d2a33"; g.font = "bold 34px Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("SEAFORM 30", 128, 34);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
   }
+  // ---- the unhooking mat's top: quilted cloth (colour and a normal map from the same quilting) and a ruler ----
+  function quiltTex() {
+    const W = 512, H = 268, S = 46, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
+    const img = g.createImageData(W, H), hgt = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const a = (x + y) / S, b = (x - y + 1e4) / S, d1 = Math.min(a % 1, 1 - (a % 1)), d2 = Math.min(b % 1, 1 - (b % 1));
+      const h = Math.sqrt(Math.min(1, Math.min(d1, d2) * 3.2)); hgt[y * W + x] = h;
+      const k = (0.62 + 0.38 * h) * (0.96 + Math.random() * 0.06), i = (y * W + x) * 4;
+      img.data[i] = 47 * k; img.data[i + 1] = 92 * k; img.data[i + 2] = 61 * k; img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    // the ruler along the near edge: a pale strip with centimetre ticks and the tens numbered
+    g.fillStyle = "#d8dccf"; g.fillRect(0, H - 30, W, 30);
+    g.fillStyle = "#1e2a22"; g.font = "bold 11px Arial, sans-serif"; g.textAlign = "center";
+    for (let cm = 0; cm <= 84; cm++) { const x = 6 + cm * (W - 12) / 84, t = cm % 10 === 0 ? 14 : cm % 5 === 0 ? 10 : 6; g.fillRect(x - 0.6, H - 30, 1.2, t); if (cm % 10 === 0 && cm > 0) g.fillText(String(cm), x, H - 6); }
+    const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 4;
+    const n = document.createElement("canvas"); n.width = W; n.height = H; const gn = n.getContext("2d"), ni = gn.createImageData(W, H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const hx = hgt[y * W + Math.min(W - 1, x + 1)] - hgt[y * W + Math.max(0, x - 1)], hy = hgt[Math.min(H - 1, y + 1) * W + x] - hgt[Math.max(0, y - 1) * W + x];
+      const v = new THREE.Vector3(-hx * 2.2, hy * 2.2, 1).normalize(), i = (y * W + x) * 4, rule = y > H - 31 ? 0 : 1;
+      ni.data[i] = (rule ? v.x * 0.5 + 0.5 : 0.5) * 255; ni.data[i + 1] = (rule ? v.y * 0.5 + 0.5 : 0.5) * 255; ni.data[i + 2] = (rule ? v.z * 0.5 + 0.5 : 1) * 255; ni.data[i + 3] = 255;
+    }
+    gn.putImageData(ni, 0, 0);
+    const normal = new THREE.CanvasTexture(n); normal.colorSpace = THREE.NoColorSpace;
+    return { map, normal };
+  }
+  // a slab with rounded edges whose top face carries the whole texture (uv from x and z)
+  function roundSlab(w, h, d, r) {
+    const g = new THREE.BoxGeometry(w, h, d, 12, 2, 8), q = g.attributes.position, uv = g.attributes.uv, v = new THREE.Vector3(), c = new THREE.Vector3();
+    for (let i = 0; i < q.count; i++) { v.fromBufferAttribute(q, i); c.set(Math.max(-w / 2 + r, Math.min(w / 2 - r, v.x)), Math.max(-h / 2 + r * 0.5, Math.min(h / 2 - r * 0.5, v.y)), Math.max(-d / 2 + r, Math.min(d / 2 - r, v.z)));
+      const n = v.clone().sub(c); if (n.lengthSq() > 1e-12) n.setLength(r); else n.set(0, 0, 0); const p = n.lengthSq() ? c.clone().add(n) : v; q.setXYZ(i, p.x, Math.min(h / 2, p.y), p.z); uv.setXY(i, p.x / w + 0.5, 0.5 - p.z / d); }
+    g.computeVertexNormals(); return g;
+  }
   // tackle box and bucket beside them
   // (they stay at the spot when you walk off)
   const kit = new THREE.Group(); world.add(kit);
@@ -330,9 +363,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // an unhooking mat (a padded, wipe-clean mat: where a fish you'll put back is laid to be looked at and unhooked)
   const mat = new THREE.Group(); world.add(mat); mat.visible = false;
   const MAT_AT = new THREE.Vector3(0.05, 0, -0.62); // (where it's laid: in front of you)
-  { const top = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.04, 0.46), new THREE.MeshStandardMaterial({ color: 0x2f5a3c, roughness: 0.75 })); top.position.y = 0.022;
-    const edgeM = new THREE.MeshStandardMaterial({ color: 0x1f2c24, roughness: 0.8 });
-    for (const [w, d, x, z] of [[0.9, 0.05, 0, 0.235], [0.9, 0.05, 0, -0.235], [0.05, 0.5, 0.43, 0], [0.05, 0.5, -0.43, 0]]) { const e = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), edgeM); e.position.set(x, 0.025, z); mat.add(e); }
+  // (a real unhooking mat: a padded, quilted top in wipe-clean green, a printed ruler along the near edge to measure the
+  // fish against, and soft rolled bolsters down the long sides so a flapping fish can't slip off. A flat green board
+  // with a dark frame read as a tray)
+  { const Q = quiltTex();
+    const top = new THREE.Mesh(roundSlab(0.84, 0.032, 0.44, 0.014), new THREE.MeshStandardMaterial({ map: Q.map, normalMap: Q.normal, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.62 })); top.position.y = 0.024;
+    const edgeM = new THREE.MeshStandardMaterial({ color: 0x24402c, roughness: 0.66 });
+    for (const sz of [-1, 1]) { const b = new THREE.Mesh(new THREE.CapsuleGeometry(0.026, 0.8, 6, 14), edgeM); b.rotation.z = Math.PI / 2; b.scale.set(1, 1, 0.9); b.position.set(0, 0.03, sz * 0.236); mat.add(b); } // the bolsters
     mat.add(top); mat.traverse((m) => { if (m.isMesh) { m.receiveShadow = true; m.castShadow = true; } });
     mat.add(contactShadow(1.1, 0.72, 0.4)); }
   // the drop net's rope: thin braided polypropylene (a muted blue), and its three bridles to the hoop
