@@ -10,6 +10,11 @@ const area2 = (ring) => { let a = 0; for (let i = 0; i < ring.length; i++) { con
 export const footprintArea = (ring) => Math.abs(area2(ring));
 const hashOf = (n) => { let h = (Number(n) || 7) * 2654435761; h ^= h >>> 15; return (h >>> 0) / 4294967296; };
 
+// a place's own town style, from photographs (localDetail.js "town"): how many of its houses are painted render rather
+// than brick, and whether they're taller than the usual two storeys. Set while that place's buildings are built.
+let town = null;
+export function setTownStyle(t) { town = t || null; }
+
 /** The style for one building: { type, walls, roof, roofMat, storeys, h, shop, chimneys, tint } (walls/roof as in textures3d). */
 export function styleFor(b) {
   const A = footprintArea(b.ring), r = hashOf(b.id ?? Math.round(A * 13)), r2 = hashOf((b.id ?? 3) * 7 + 1);
@@ -28,8 +33,8 @@ export function styleFor(b) {
     const flat = A > 1400 || b.roof === "flat";
     return { type: "warehouse", walls: r < 0.55 ? "cladding" : "brick", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: b.levels || 2, h: b.tall ? b.h : 8, pitch: 0.28, tint: [1, 1, 1] };
   }
-  const storeys = b.levels || (/^(hotel|apartments|flats)$/.test(k) ? 4 : A < 110 ? 2 : r < 0.7 ? 2 : 3);
-  const brick = /^(terrace|house|semidetached_house|detached)$/.test(k) ? r < 0.6 : r < 0.45;
+  const storeys = b.levels || (/^(hotel|apartments|flats)$/.test(k) ? 4 : town?.tall ? (A < 70 ? 2 : r < 0.3 ? 4 : 3) : A < 110 ? 2 : r < 0.7 ? 2 : 3);
+  const brick = town?.render != null ? r < 1 - town.render : /^(terrace|house|semidetached_house|detached)$/.test(k) ? r < 0.6 : r < 0.45;
   const roofShape = b.roof === "flat" ? "flat" : b.roof === "gabled" ? "gable" : b.roof === "hipped" ? "hip" : k === "terrace" ? "gable" : r2 < 0.55 ? "hip" : "gable";
   return {
     type: "house", walls: brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < 0.62 ? "slate" : "clay",

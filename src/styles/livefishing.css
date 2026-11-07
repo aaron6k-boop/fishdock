@@ -386,6 +386,7 @@ html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(saf
 .cam-menu button { text-align: left; }
 /* Settings → Graphics: a panel over the scene (the scene keeps running behind it, so changes show at once) */
 .gfx-panel { position: absolute; z-index: 9; left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); top: calc(56px + env(safe-area-inset-top)); bottom: calc(14px + env(safe-area-inset-bottom)); max-width: 460px; margin: 0 auto; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: #0a141bf0; border: 1px solid #ffffff26; color: #fff; pointer-events: auto; }
+.w3d-keys { position: absolute; z-index: 5; left: 50%; transform: translateX(-50%); bottom: calc(6px + env(safe-area-inset-bottom)); padding: 4px 10px; border-radius: 999px; background: #0008; color: #dfe8ee; font-size: 12px; white-space: nowrap; pointer-events: none; }
 .gfx-head { display: flex; align-items: center; justify-content: space-between; font-size: 16px; }
 .gfx-presets .ft-pill { padding-inline: 4px; }
 .gfx-note, .gfx-why { margin: 0; font-size: 12px; line-height: 1.35; color: #b9c8d1; }

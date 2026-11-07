@@ -5,7 +5,7 @@
 // lookout. All buildings share a handful of meshes (one per material), so a town of 500 stays quick on a phone.
 import * as THREE from "three";
 import { styleFor, pitchedRoof, obb, footprintArea } from "./architecture.js";
-import { facade, roof, bricks, FACADE_TILE } from "./textures3d.js";
+import { facade, roof, bricks, FACADE_TILE, photoTex } from "./textures3d.js";
 
 const area2 = (ring) => { let a = 0; for (let i = 0; i < ring.length; i++) { const [x1, z1] = ring[i], [x2, z2] = ring[(i + 1) % ring.length]; a += x1 * z2 - x2 * z1; } return a / 2; };
 
@@ -30,6 +30,38 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const brk = bricks(17);
   const M = {};
   for (const [k, t] of Object.entries(tex)) { t.map.wrapS = t.map.wrapT = THREE.ClampToEdgeWrapping; t.emissiveMap.wrapS = t.emissiveMap.wrapT = THREE.ClampToEdgeWrapping; M[k] = new THREE.MeshStandardMaterial({ map: t.map, vertexColors: true, roughness: 0.88, emissive: 0xffc070, emissiveMap: t.emissiveMap, emissiveIntensity: 0 }); }
+  // ---- the walls' own surface, photographed (Poly Haven CC0: public/textures), laid over the drawn facades at its
+  // real size in the world (about 1.1 m a tile), the windows left clear ----
+  // The drawn facades are small (128 px a bay): from the pier the town read as flat, smooth toy houses. Over them now:
+  // real brick (its mortar, its uneven bricks) on the brick houses, real render's unevenness on the painted ones; only
+  // its variation is taken, over its own average, so each house keeps its colour.
+  const wallPhoto = { brick: photoTex("brick_red_diff"), render: photoTex("plaster_diff"), stone: photoTex("plaster_diff") };
+  for (const [k, ph] of Object.entries(wallPhoto)) {
+    if (!ph || !M[k]) continue;
+    const m = M[k], strong = k === "brick" ? 1.0 : 0.55;
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uWallPh = { value: ph };
+      sh.vertexShader = "varying vec3 vWallW;\nvarying vec3 vWallN;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvWallW = (modelMatrix * vec4(transformed, 1.0)).xyz; vWallN = normalize(mat3(modelMatrix) * objectNormal);");
+      sh.fragmentShader = "uniform sampler2D uWallPh;\nvarying vec3 vWallW;\nvarying vec3 vWallN;\n" + sh.fragmentShader.replace("#include <map_fragment>", `#include <map_fragment>
+        {
+          vec3 an = abs(vWallN);
+          if (an.y < 0.6) { // (walls, not roofs or sills facing up)
+            vec2 q = vec2(an.x > an.z ? vWallW.z : vWallW.x, vWallW.y) / 1.1;
+            vec3 ph = texture2D(uWallPh, q).rgb, avg = texture2D(uWallPh, vec2(0.5), 12.0).rgb;
+            vec3 v = ph / max(avg, vec3(0.03));
+            ${k === "brick" ? "" : "v = vec3(dot(v, vec3(0.3, 0.59, 0.11)));"}
+            #ifdef USE_EMISSIVEMAP
+              float win = texture2D(emissiveMap, vEmissiveMapUv).r; // (the windows' glow map: glass there, not wall)
+            #else
+              float win = 0.0;
+            #endif
+            float fade = 1.0 - smoothstep(60.0, 260.0, length(vWallW - cameraPosition)); // (far off, its fine grain would shimmer)
+            diffuseColor.rgb *= mix(vec3(1.0), clamp(v, 0.0, 1.8), ${strong.toFixed(2)} * (1.0 - smoothstep(0.05, 0.3, win)) * fade);
+          }
+        }`);
+    };
+    m.customProgramCacheKey = () => "fdwall1" + k;
+  }
   for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, vertexColors: true, roughness: k === "slate" ? 0.6 : 0.85 });
   M.tower = new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.85 });
   M.trim = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.6, vertexColors: true, side: THREE.DoubleSide });

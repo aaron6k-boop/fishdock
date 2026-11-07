@@ -373,18 +373,18 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     mat.add(top); mat.traverse((m) => { if (m.isMesh) { m.receiveShadow = true; m.castShadow = true; } });
     mat.add(contactShadow(1.1, 0.72, 0.4)); }
   // the drop net's rope: thin braided polypropylene (a muted blue), and its three bridles to the hoop
-  // the drop net's rope: 10 mm three-strand polypropylene, the twist drawn on (a canvas of diagonal strands and the
+  // the drop net's rope: 10 mm black three-strand polypropylene, the twist drawn on (a canvas of diagonal strands and the
   // grooves between them, as a colour and a bump), its pitch kept true to the rope's length each frame. It was a thin
   // flat-coloured five-sided rod that read as a thread
   const ropeTex = (() => {
     if (typeof document === "undefined") return null;
     const c = document.createElement("canvas"); c.width = 32; c.height = 64; const g = c.getContext("2d"), img = g.createImageData(32, 64);
-    for (let y = 0; y < 64; y++) for (let x = 0; x < 32; x++) { const t = ((x / 32) * 3 + y / 64 * 3) % 1, k = Math.sin(t * Math.PI), v = 0.45 + 0.55 * Math.pow(k, 0.6); img.data.set([58 * v + 8, 82 * v + 10, 112 * v + 14, 255], (y * 32 + x) * 4); }
+    for (let y = 0; y < 64; y++) for (let x = 0; x < 32; x++) { const t = ((x / 32) * 3 + y / 64 * 3) % 1, k = Math.sin(t * Math.PI), v = 0.45 + 0.55 * Math.pow(k, 0.6); img.data.set([34 * v + 9, 35 * v + 9, 38 * v + 10, 255], (y * 32 + x) * 4); } /* (black rope) */
     g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   const ropes = [0, 1, 2, 3, 4, 5].map(() => {
     const map = ropeTex ? ropeTex.clone() : null; if (map) map.needsUpdate = true;
-    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 8, 1, true), new THREE.MeshStandardMaterial({ color: map ? 0xffffff : 0x3f5874, map, bumpMap: map, bumpScale: 0.6, roughness: 0.85 }));
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 8, 1, true), new THREE.MeshStandardMaterial({ color: map ? 0xffffff : 0x1c1d20, map, bumpMap: map, bumpScale: 0.6, roughness: 0.8 }));
     r.onBeforeRender = () => { if (map) map.repeat.set(1, Math.max(1, r.scale.y / 0.035)); }; // (a strand round every 3.5 cm, whatever the length)
     world.add(r); r.visible = false; return r;
   });

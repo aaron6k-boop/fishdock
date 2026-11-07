@@ -19,6 +19,9 @@ export const LOCAL = {
     dunes: (x, z) => z < -85 && z > -175 && x > -140 && x < 80,
     // beyond the mapped square, north of the harbour mouth: the South Denes port and industrial estate (low sheds)
     industry: (x, z) => z < -120 && x > -450,
+    // the town round the harbour mouth (photographs from the pier, the harbour and Pier Road): Victorian and Edwardian
+    // houses and hotels, most of them painted render in white and cream, three storeys and more, some brick
+    town: { render: 0.68, tall: true },
     note: "The lighthouse, lamps and fences at Gorleston are modelled from photographs; their sizes are estimates.",
   },
 };

@@ -70,7 +70,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
   }, [power != null]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => world?.current?.aimCast?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
   // (one cast at a time: a second press straight after a cast, before the scene has caught up, is ignored)
-  const castDown = (e) => { e.preventDefault(); if (performance.now() - castAt.current < GUARD.again.cast || performance.now() - shown.current.at < GUARD.appear.cast) return; e.currentTarget.setPointerCapture?.(e.pointerId); hold.current = { t0: performance.now(), p: 0 }; setPower(0); };
+  const castDown = (e) => { e.preventDefault(); if (performance.now() - castAt.current < GUARD.again.cast || performance.now() - shown.current.at < GUARD.appear.cast) return; try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* (a key press stands in for a pointer: nothing to capture) */ } hold.current = { t0: performance.now(), p: 0 }; setPower(0); };
   const castUp = () => {
     const h = hold.current; if (!h) return; hold.current = null;
     // a quick tap is a gentle cast; holding sets the power
