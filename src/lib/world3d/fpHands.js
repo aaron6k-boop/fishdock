@@ -241,7 +241,7 @@ function realArms(scene, { gloves, skinHex }) {
     // skin: the model's colour with fine pores and creases over it (a normal and a roughness map, tiled), a little oilier
     // than before (real skin has a soft sheen, not a matte plastic look)
     // (a little less shine than before, and that shine broken up: the even waxy sheen was much of the plastic look)
-    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 1.08, metalness: 0, specularIntensity: 0.55, sheen: gloves ? 0 : 0.35, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xffd9c7), normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.16, 0.16) });
+    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 1.08, metalness: 0, specularIntensity: 0.55, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.16, 0.16) });
     if (D && !gloves) { D.skin.normal.repeat.set(30, 30); D.skin.rough.repeat.set(9, 9); }
     if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
     else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); const lum = mt.color.r * 0.3 + mt.color.g * 0.59 + mt.color.b * 0.11; mt.color.lerp(new THREE.Color(lum, lum, lum), 0.14); } // (a touch less saturated: the model's tone read orange under the warm light) // (your skin tone over the model's)
@@ -873,7 +873,10 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   const D0 = detailMaps();
   // (with a fabric sheen: the soft pale edge a softshell or fleece shows where it turns away from you, which is most
   // of what makes it read as cloth rather than painted plastic; it costs one extra lobe on two small meshes)
-  const sleeveMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.78, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, roughnessMap: D0?.cloth.rough || null, normalScale: new THREE.Vector2(0.4, 0.4), sheen: 1, sheenRoughness: 0.55, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xc8d0dc), 0.55) });
+  const sleeveMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.78, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, roughnessMap: D0?.cloth.rough || null, normalScale: new THREE.Vector2(0.4, 0.4) });
+  // (the cloth's soft pale edge as a cheap rim term rather than three's sheen lobe: the sleeves fill a third of the view
+  // in first person, and the physical material's extra lobe cost a phone frames in the fight)
+  sleeveMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "{ float rim = pow(1. - abs(dot(normalize(vViewPosition), normal)), 3.); outgoingLight += vec3(.55, .6, .68)*rim*.18*(.4 + .6*totalDiffuse.g*4.); }\n#include <opaque_fragment>"); };
   if (D0) { D0.cloth.normal.repeat.set(16, 30); D0.cloth.rough.repeat.set(16, 30); } // (a finer weave: coarser, it read as stripes close up)
   const hemMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(coatHex).multiplyScalar(0.62), roughness: 0.9, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, normalScale: new THREE.Vector2(0.8, 0.8) });
   const built = buildHand(gloves, skinHex);

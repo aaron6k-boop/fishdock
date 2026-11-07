@@ -331,14 +331,18 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float sp = max(dot(rd, uSunDir), 0.);
         // (the sharp reflection broken up close by into sparkles on the small facets of the chop: whole, it lay in big
         // white blotches the shape of each wave's face, like paper cut-outs on the water)
-        float brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
+        float brk = 1.;
+        if (sp > .99 && dist < 70.) brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
         col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.14)*sunVis;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
-          float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
-          float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
-          col += mix(vec3(1., .95, .85), vec3(1., .78, .52), uDusk)*glit*(pow(sp, 18.)*1.6 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
+          // (only where the sun's path is: everywhere else it added nothing but cost four noises a pixel)
+          if (sunVis > .01 && sp > .85 && dist < 160.) {
+            float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
+            float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
+            col += mix(vec3(1., .95, .85), vec3(1., .78, .52), uDusk)*glit*(pow(sp, 18.)*1.6 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
+          }
         #endif
         float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
         // lamps on piers and promenades after dark: warm streaks broken up by the waves
@@ -349,10 +353,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // whitecaps once the wind is up (about force 4): on the higher crests, in patches that come and go, drawn
         // out down wind
         vec2 pf = vec2(dot(p, wd), dot(p, wx));
-        float capPatch = smoothstep(.36, .7, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
-        float cap = smoothstep(.22, .55, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .8, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
-        float streak = 0.;
+        float cap = 0., streak = 0.;
+        if (uWind > .35 && sea > .5) {
+          float capPatch = smoothstep(.36, .7, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
+          cap = smoothstep(.22, .55, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .8, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
+        }
         #if WQ > 0
+        if (uWind > .55 && sea > .5)
           // old foam lying in streaks along the wind, broken into short lengths and thin patches (unbroken, they read as
           // long pale lines drawn across the sea)
           streak = smoothstep(.74, .92, noise(pf*vec2(.07, 1.1) + vec2(-uTime*.15, 0.)))*smoothstep(.45, .75, noise(p*.45 + 5.)*.6 + noise(p*1.7 - uTime*.1)*.4)*smoothstep(.55, 1., uWind)*sea*.22*(1. - smoothstep(40., 200., dist));
@@ -366,10 +373,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // breathing in and out as each wave arrives and drains (two noises at small scales thresholded into clumps,
         // a third opening gaps between them, the clumps sparser away from the wall). The band reaches a metre or two
         // out (further as bigger waves arrive), on the fine shore map, and fades with distance so it never shimmers
-        float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
-        float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
-        float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
-        float edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
+        float edge = 0.;
+        if (uShoreOn > .5 && sd < 3. && dist < 90.) { // (only near a wall: three noises a pixel over the whole sea for a band a metre or two wide)
+          float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
+          float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
+          float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
+          edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
+        }
         float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.8*uShoreOn + churn*.7;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
         foam = clamp(foam, 0., .8);
