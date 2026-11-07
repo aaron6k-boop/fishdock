@@ -23,5 +23,19 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FishParty"] }],
   "d1_databases": [
     { "binding": "DB", "database_name": "fishdock", "database_id": "d6a8e717-4f54-460f-b5c4-6e6c55f206ba" }
-  ]
+  ],
+  // ---- staging: a private test copy for trying a branch on a phone before it goes live ----
+  // Deployed by its own Workers Build (project name "fishdock-staging", branch "staging", deploy command
+  // `npx wrangler deploy --env staging`). Its own Worker, its own Fish Together objects and its own empty D1 database
+  // (created on its first deploy; never the live one), at fishdock-staging.<account>.workers.dev. No keys: anything that
+  // needs one says it isn't connected there.
+  "env": {
+    "staging": {
+      "name": "fishdock-staging",
+      "vars": { "FIREBASE_PROJECT_ID": "fishdock", "FISHDOCK_STAGING": "1" },
+      "durable_objects": { "bindings": [{ "name": "PARTY", "class_name": "FishParty" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FishParty"] }],
+      "d1_databases": [{ "binding": "DB", "database_name": "fishdock-staging" }]
+    }
+  }
 }
