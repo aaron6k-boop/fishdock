@@ -8,6 +8,7 @@ import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
 import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
 import { lightingFor, lampPools, poolLight, lookQuality } from "./skyLook.js";
+import { FILM } from "./film.js";
 
 // ---- shared shader pieces: noise and the sky's colour in any direction ----
 export const GLSL_NOISE = /* glsl */`
@@ -40,34 +41,53 @@ vec3 skyBase(vec3 d){
   vec3 night = mix(vec3(.050, .060, .088), vec3(.010, .016, .036), t) + vec3(.05, .06, .08)*pow(max(dot(normalize(d), uMoonDir), 0.), 6.)*uMoonLight;
   vec3 c = day*uDay + dusk*uDusk + night*uNight;
   // overcast: a soft grey, a little brighter overhead; darker and cooler in rain
-  vec3 grey = mix(vec3(.60, .63, .66), vec3(.66, .69, .72), t)*(uDay + uDusk*.5 + uNight*.06)*(1. - uRain*.38);
+  // (a coastal overcast is bright: a pale silvery grey, whitest high up and over the sun's side, a little darker and
+  // bluer low down away from it. A mid grey all over read as dusk, and took the whole picture down with it)
+  vec3 grey = mix(vec3(.70, .73, .76), vec3(.82, .84, .86), t)*(.94 + .1*ts)*(uDay + uDusk*.5 + uNight*.06)*(1. - uRain*.38);
   grey *= mix(vec3(1.), vec3(.92, .96, 1.04), uRain);
   return mix(c, grey, smoothstep(.5, 1., uCloud)*.9);
 }
 // ---- clouds on a high layer, drifting with the wind: rgb their colour, a how much they cover ----
 // (q 1: full detail and shading, for the sky; 0: a cheaper, softer version, for reflections)
+// (fair-weather cumulus as over the North Sea coast: separate heaps with firm, cauliflower edges, bright where the sun
+// catches them, flat grey-blue bases, thin wisps between; packed closer and flattened towards the horizon, where you
+// see the layer side on. A broad shape for the heaps and a finer one eating into their edges; the light is how much
+// cloud lies between each point and the sun (two steps towards it), so the sunlit side is bright and the far side
+// and the base go grey, with a bright rim on thin edges round the sun)
+float cloudDens(vec2 cp, vec2 warp){ return fbm3(cp*.36 + warp*.45)*.66 + fbm(cp*1.55 + warp)*.46 - .07; }
 vec4 cloudAt(vec3 d, float q){
-  vec2 cp = d.xz/(d.y + .1)*.75 + vec2(uTime*.004, uTime*.0016);
-  float n1, shade = .6;
-  if (q > .5) {
-    vec2 warp = vec2(fbm3(cp*.5), fbm3(cp*.5 + 5.2))*.7;
-    n1 = fbm(cp*1.2 + warp);
-    #if SKYQ > 0
-      // lit on the side towards the sun, grey beneath and on the far side (the cloud is thicker between you and the sun)
-      shade = clamp(.55 + (n1 - fbm3(cp*1.2 + warp + normalize(uSunDir.xz + vec2(1e-4))*.16))*3.2, 0., 1.);
-    #endif
-  } else n1 = fbm3(cp*1.2);
+  vec2 cp = d.xz/(d.y + .075)*.62 + vec2(uTime*.004, uTime*.0016);
   float thr = mix(.66, .30, uCloud);
-  float cover = max(smoothstep(thr, thr + .2, n1), smoothstep(.78, 1., uCloud));
-  float thick = smoothstep(thr, thr + .5, n1);
-  vec3 lit = vec3(.98, .97, .95)*uDay + vec3(1., .80, .66)*uDusk*.85 + vec3(.11, .12, .15)*uNight*(.3 + uMoonLight);
-  vec3 dark = vec3(.58, .62, .70)*uDay + vec3(.36, .33, .42)*uDusk + vec3(.025, .028, .04)*uNight;
-  vec3 cc = mix(dark, lit, shade*(1. - thick*.45));
+  float n1, shade = .62;
+  if (q > .5) {
+    vec2 warp = vec2(fbm3(cp*.42), fbm3(cp*.42 + 5.2))*.8;
+    n1 = cloudDens(cp, warp);
+    #if SKYQ > 0
+      vec2 st = normalize(uSunDir.xz + vec2(1e-4))*.2;
+      // (one cheaper step towards the sun, the finest detail left out of it: the light only needs the broad shape)
+      vec2 q2 = cp + st*1.7; float od = max(fbm3(q2*.36 + warp*.45)*.66 + fbm3(q2*1.55 + warp)*.46 - .07 - thr, 0.)*1.7;
+      // (beer's law for the light reaching it, and the "powder" darkening of a thin edge facing away)
+      shade = exp(-od*5.5)*(1. - exp(-max(n1 - thr, 0.)*9.))*1.15 + .18;
+    #endif
+  } else n1 = fbm3(cp*.36)*.66 + fbm3(cp*1.55)*.46 - .07;
+  float cover = max(smoothstep(thr, thr + .1 + .12*(1. - q), n1), smoothstep(.78, 1., uCloud));
+  float thick = smoothstep(thr, thr + .42, n1);
+  vec3 lit = vec3(1., .98, .95)*uDay + vec3(1., .80, .64)*uDusk*.9 + vec3(.11, .12, .15)*uNight*(.3 + uMoonLight);
+  vec3 dark = vec3(.50, .55, .64)*uDay + vec3(.34, .31, .40)*uDusk + vec3(.025, .028, .04)*uNight;
+  vec3 cc = mix(dark, lit, clamp(shade, 0., 1.)*(1. - thick*.35));
+  // the bright rim where thin cloud passes in front of the sun
+  float sd = max(dot(d, uSunDir), 0.);
+  cc += vec3(1., .94, .82)*pow(sd, 7.)*(1. - thick)*(uDay + uDusk*.8)*.55;
   // a grey deck: mottled, darker the thicker; darker still in rain
-  cc *= mix(1., .48 + .55*smoothstep(.25, .75, n1), smoothstep(.55, 1., uCloud))*(1. - uRain*.35);
+  // a full cover is never a flat grey: stratocumulus in rolls and heaps, dark grey-blue where it's thick, paler where
+  // it thins, brighter towards the sun, as a North Sea overcast looks
+  { float ov = smoothstep(.6, 1., uCloud);
+    float lum = smoothstep(.12, .9, n1*1.15 - .08 + (shade - .6)*.35);
+    vec3 deckC = mix(vec3(.27, .30, .35), vec3(.78, .80, .84), lum)*(1. + .25*pow(max(dot(d, uSunDir), 0.), 4.))*(uDay + uDusk*.6 + uNight*.05);
+    cc = mix(cc, deckC, ov)*(1. - uRain*.35); }
   // far off they melt into the haze along the horizon
-  cc = mix(cc, skyBase(d), exp(-d.y*7.)*.55);
-  return vec4(cc, cover*smoothstep(0., .06, d.y));
+  cc = mix(cc, skyBase(d), exp(-d.y*16.)*.45); // (only the last few degrees melt into the haze: it washed the whole lower sky out)
+  return vec4(cc, cover*smoothstep(0., .05, d.y));
 }
 vec3 skyColour(vec3 d){
   vec3 c = skyBase(d);
@@ -174,10 +194,16 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uLamps: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
     uShore: { value: null }, uShoreOn: { value: 0 }, uShoreHalf: { value: SHORE.half },
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
+    uNrm: { value: null }, uNrmOn: { value: 0 },
   };
+  // the sea's fine ripples: a water normal map (three.js's, MIT; source-assets/ASSET-LICENCES.json), until it has
+  // loaded the old noise ripples stand in
+  if (typeof document !== "undefined") new THREE.TextureLoader().load(((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/water_normal.jpg", (t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.colorSpace = THREE.NoColorSpace; t.needsUpdate = true; wU.uNrm.value = t; wU.uNrmOn.value = 1;
+  });
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
   wU.uKind.value = kind;
-  wU.uWater.value.set([0x1b4752, 0x1b4752, 0x34463a, 0x2b3d33, 0x17302c][[0, 0, 1, 2, 3][kind] ?? 0]);
+  wU.uWater.value.set([0x21433f, 0x21433f, 0x34463a, 0x2b3d33, 0x17302c][[0, 0, 1, 2, 3][kind] ?? 0]); // (the sea: the grey-green of British coastal water, carrying silt, not a clear tropical teal)
   const wGeo = new THREE.PlaneGeometry(1600, 1600, LQ.waterGrid, LQ.waterGrid);
   wGeo.rotateX(-Math.PI / 2);
   // denser near the middle (the camera), so near waves are smooth and far ones cheap
@@ -221,7 +247,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       }`,
     fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + POST_GLSL + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
-      uniform sampler2D uShore, uShoreF; uniform float uShoreFHalf;
+      uniform sampler2D uShore, uShoreF, uNrm; uniform float uShoreFHalf, uNrmOn;
       // metres to the nearest land (from the shore maps: the fine one close round the anglers, the coarse one further
       // out), or far when off the map
       float shoreDist(vec2 p){ vec2 uv = p/(2.*uShoreHalf) + .5; if (uShoreOn < .5 || uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return 99.;
@@ -247,18 +273,25 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // Further out they're smaller than a pixel and are left out rather than shimmer
         vec2 flow = uKind > 1.5 && uKind < 2.5 ? vec2(-uTime*.6, 0.) : -wd*uTime*.35;
         float gust = .45 + 1.1*noise(p*.021 - flow*.12 + 7.);
-        vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
-        // (softer, and gone sooner with distance: at full strength out to 220 m it laid one even grain over the whole sea,
-        // the fine repeated ripple in the audit's 00:24 frame)
-        g += r1.yz*vec2(1.9, 2.6)*(.018 + .038*uWind)*gust*(1. - smoothstep(20., 150., dist));
-        #if WQ > 0
-          vec3 r2 = noised(mat2(.47, .88, -.88, .47)*p*6.1 + flow*1.6);
-          g += r2.yz*6.1*(.004 + .011*uWind)*gust*(1. - smoothstep(10., 60., dist));
-        #endif
-        #if WQ > 1
-          vec3 r3 = noised(p*13.7 - flow*2.1 + 3.);
-          g += r3.yz*13.7*(.0016 + .004*uWind)*(1. - smoothstep(8., 45., dist));
-        #endif
+        if (uNrmOn > .5) {
+          // (a real photographed-style water normal map, two layers drifting different ways at different sizes: the chop's
+          // fine facets as water really has them, and cheaper than the three noises it replaces. Further out the finer
+          // layer fades before the broad one, so the far sea never shimmers)
+          vec2 fl2 = flow*.05;
+          vec3 m1 = texture2D(uNrm, mat2(.8, -.6, .6, .8)*p*.085 + fl2 + vec2(uTime*.011, -uTime*.006)).xyz*2. - 1.;
+          vec3 m2 = texture2D(uNrm, mat2(.47, .88, -.88, .47)*p*.23 - fl2*1.7 + vec2(-uTime*.017, uTime*.012)).xyz*2. - 1.;
+          float fd = 1. - smoothstep(25., 220., dist);
+          g += (m1.xy*(.10 + .2*uWind)*fd + m2.xy*(.06 + .14*uWind)*(1. - smoothstep(10., 90., dist)))*gust;
+        } else {
+          vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
+          // (softer, and gone sooner with distance: at full strength out to 220 m it laid one even grain over the whole sea,
+          // the fine repeated ripple in the audit's 00:24 frame)
+          g += r1.yz*vec2(1.9, 2.6)*(.018 + .038*uWind)*gust*(1. - smoothstep(20., 150., dist));
+          #if WQ > 0
+            vec3 r2 = noised(mat2(.47, .88, -.88, .47)*p*6.1 + flow*1.6);
+            g += r2.yz*6.1*(.004 + .011*uWind)*gust*(1. - smoothstep(10., 60., dist));
+          #endif
+        }
         vec3 n = normalize(vec3(-g.x, 1., -g.y));
         // rain: a scatter of drop rings, each kept inside its own cell (cut off at the cell's edge they showed as
         // squares), and only close by: further out they're smaller than a pixel and alias into blocks
@@ -301,6 +334,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // shallows by the land are lighter and greener
         vec3 body = mix(uWater*1.25 + vec3(0., .012, .01), uWater*.72, pow(clamp(v.y, 0., 1.), .6));
         body = mix(body, uWater*1.55 + vec3(.012, .03, .018), shallow*.7)*lit*dim;
+        // under a grey sky the North Sea goes a lighter grey-green (the cloud's light scattered back out of the silty
+        // water), not the dark teal of a clear day
+        { float ovs = smoothstep(.55, 1., uCloud); body = mix(body, vec3(.11, .14, .135)*lit, ovs*.55); }
         // light through the thin water at the crests, more so looking towards the sun
         float crest = smoothstep(-.05, .4, h)*(1. - uNight);
         float toward = pow(max(dot(-v, normalize(vec3(uSunDir.x, 0., uSunDir.z))), 0.), 3.);
@@ -316,7 +352,21 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // the sun's glitter (a gold path at dusk, never a red one) and the moon's
         float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud));
         float sp = max(dot(rd, uSunDir), 0.);
-        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 600.)*5. + pow(sp, 60.)*.16)*sunVis;
+        // (the sharp reflection broken up close by into sparkles on the small facets of the chop: whole, it lay in big
+        // white blotches the shape of each wave's face, like paper cut-outs on the water)
+        float brk = 1.;
+        if (sp > .99 && dist < 70.) brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
+        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.14)*sunVis;
+        // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
+        // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
+        #if WQ > 0
+          // (only where the sun's path is: everywhere else it added nothing but cost four noises a pixel)
+          if (sunVis > .01 && sp > .85 && dist < 160.) {
+            float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
+            float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
+            col += mix(vec3(1., .95, .85), vec3(1., .78, .52), uDusk)*glit*(pow(sp, 18.)*1.6 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
+          }
+        #endif
         float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
         // lamps on piers and promenades after dark: warm streaks broken up by the waves
         for (int i = 0; i < 4; i++) { vec4 L = uLamps[i]; if (L.w <= 0.) continue; vec3 ld = normalize(L.xyz - vW); float s2 = max(dot(rd, ld), 0.); vec2 o = L.xz - vW.xz; float fall = 1./(1. + dot(o, o)*.003);
@@ -326,10 +376,14 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // whitecaps once the wind is up (about force 4): on the higher crests, in patches that come and go, drawn
         // out down wind
         vec2 pf = vec2(dot(p, wd), dot(p, wx));
-        float capPatch = smoothstep(.36, .7, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
-        float cap = smoothstep(.22, .55, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .8, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
-        float streak = 0.;
+        float cap = 0., streak = 0.;
+        if (uWind > .22 && sea > .5) {
+          // (white horses from about force 4, as a North Sea pier sees most days: they began only in a near gale)
+          float capPatch = smoothstep(.3, .62, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
+          cap = smoothstep(.1, .42, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.22, .62, uWind)*sea*capPatch*(.4 + .9*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
+        }
         #if WQ > 0
+        if (uWind > .55 && sea > .5)
           // old foam lying in streaks along the wind, broken into short lengths and thin patches (unbroken, they read as
           // long pale lines drawn across the sea)
           streak = smoothstep(.74, .92, noise(pf*vec2(.07, 1.1) + vec2(-uTime*.15, 0.)))*smoothstep(.45, .75, noise(p*.45 + 5.)*.6 + noise(p*1.7 - uTime*.1)*.4)*smoothstep(.55, 1., uWind)*sea*.22*(1. - smoothstep(40., 200., dist));
@@ -343,10 +397,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // breathing in and out as each wave arrives and drains (two noises at small scales thresholded into clumps,
         // a third opening gaps between them, the clumps sparser away from the wall). The band reaches a metre or two
         // out (further as bigger waves arrive), on the fine shore map, and fades with distance so it never shimmers
-        float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
-        float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
-        float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
-        float edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
+        float edge = 0.;
+        if (uShoreOn > .5 && sd < 3. && dist < 90.) { // (only near a wall: three noises a pixel over the whole sea for a band a metre or two wide)
+          float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
+          float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
+          float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
+          edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
+        }
         float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.8*uShoreOn + churn*.7;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
         foam = clamp(foam, 0., .8);
@@ -550,7 +607,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   let look = lightingFor({ day: 1, dusk: 0, night: 0, cloud: 0.3, rain: 0, moonLight: 0 });
   function apply(st) {
     U.uDay.value = st.day; U.uDusk.value = st.dusk; U.uNight.value = st.night; U.uCloud.value = st.cloud; U.uRain.value = st.rain; U.uMoonLight.value = st.moonLight;
-    U.uSunDir.value.copy(st.sunDir); U.uMoonDir.value.copy(st.moonDir);
+    U.uSunDir.value.copy(st.sunDir); if (typeof window !== "undefined" && FILM && window.__fdSun) U.uSunDir.value.set(...window.__fdSun).normalize(); /* (film only: the sun put where a check needs it) */ U.uMoonDir.value.copy(st.moonDir);
     wind = st.wind; windDir = [st.windDir.x, st.windDir.y];
     wU.uWind.value = st.wind; wU.uWindDir.value.copy(st.windDir).normalize(); wU.uSwell.value = st.swell;
     // ---- light (skyLook.js): the sun by day, the moon at night, gold and low at dusk; cloud hides it and the sky's
@@ -576,7 +633,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
   return {
-    group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids,
+    group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids, sun, // (sun: its shadows, set by Settings → Graphics)
     /** The sky (no stars, the sea below the horizon) for world.js's environment map. */
     envSky,
     /** The conditions as shown right now (eased) and their light (skyLook.js lightingFor). */

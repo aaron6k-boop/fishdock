@@ -9,5 +9,5 @@ export const ART_IDS = new Set([
 ]);
 
 export const hasArt = (id) => ART_IDS.has(id);
-export const artUrl = (id, size = "s") => `/fish/${id}${size === "s" ? "-s" : ""}.webp`;
+export const artUrl = (id, size = "s") => `${(typeof window !== "undefined" && window.__fdAssetBase) || ""}/fish/${id}${size === "s" ? "-s" : ""}.webp`;
 export const artSrcSet = (id) => `${artUrl(id, "s")} 480w, ${artUrl(id, "l")} 1200w`;

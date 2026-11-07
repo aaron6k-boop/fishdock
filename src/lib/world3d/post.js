@@ -20,7 +20,7 @@ import { OutputPass } from "./vendor/three-post/postprocessing/OutputPass.js";
 // little noise so the sky's long gradients don't band ----
 export const GradeShader = {
   name: "FishDockGrade",
-  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.05 }, uSat: { value: 1.05 }, uVignette: { value: 0.22 }, uSeed: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.22 }, uSat: { value: 0.94 }, uVignette: { value: 0.3 }, uSeed: { value: 0 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed)*43758.5453); }
@@ -29,6 +29,10 @@ export const GradeShader = {
       // contrast round mid grey, kept off the ends so nothing clips
       c = mix(c, smoothstep(0., 1., c), uContrast - 1.);
       float l = dot(c, vec3(.2126, .7152, .0722)); c = max(mix(vec3(l), c, uSat), 0.);
+      // (a photograph's look on a grey coast: the shadows a touch cool, the highlights a touch warm, a little deeper
+      // in the darks; the grade was so gentle the picture read flat and milky next to a real photo)
+      c *= mix(vec3(.95, .99, 1.05), vec3(1.03, 1.01, .97), smoothstep(.15, .8, l));
+      c = pow(c, vec3(1.06));
       vec2 d = vUv - .5; c *= 1. - uVignette*smoothstep(.35, .95, dot(d, d)*2.2);
       c += (h(gl_FragCoord.xy) - .5)/255.;
       gl_FragColor = vec4(c, t.a);
@@ -46,14 +50,12 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   const composer = new EffectComposer(renderer, rt);
   composer.setPixelRatio(pr); composer.setSize(size.x, size.y);
   composer.addPass(new RenderPass(scene, camera));
-  let ao = null;
-  if (level >= 2) {
+  let ao = null, aoLevel = 0;
+  // (made when first needed: at level 2 or 3 from the start, or later when Settings → Graphics turns it on)
+  function makeAO() {
     ao = new GTAOPass(scene, camera, size.x * pr, size.y * pr);
-    // contact shade at a person's or a bucket's scale (half a metre), fading with distance so the far town isn't dirty
-    // (level 3, Ultra: more samples, so the shade is smooth rather than a fine grain)
-    const n = level >= 3 ? 24 : 16;
-    ao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.6, thickness: 1.2, scale: 1, samples: n, distanceFallOff: 1 });
-    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: level >= 3 ? 8 : 6, rings: 2, samples: n });
+    ao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.6, thickness: 1.2, scale: 1, samples: 16, distanceFallOff: 1 });
+    ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
     ao.blendIntensity = 0.85;
     // only solid surfaces shade each other: not name labels and other sprites, lines, spray or anything see-through
     // (three's own pass leaves out just points and lines, so a label's square cast a dark box round it)
@@ -65,7 +67,18 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
         if (o.isPoints || o.isLine || o.isSprite || see) o.visible = false;
       });
     };
-    composer.addPass(ao);
+    composer.insertPass(ao, 1); // (straight after the scene is drawn)
+  }
+  // contact shade at a person's or a bucket's scale (half a metre), fading with distance so the far town isn't dirty.
+  // 1: 16 samples; 2 (Ultra, "Fine"): 24, so the shade is smooth rather than a fine grain
+  function setAO(n) {
+    n = Math.max(0, Math.min(2, n | 0));
+    if (n && !ao) makeAO();
+    if (ao) {
+      ao.enabled = n > 0;
+      if (n) { const k = n >= 2 ? 24 : 16; ao.updateGtaoMaterial({ samples: k }); ao.updatePdMaterial({ radius: n >= 2 ? 8 : 6, samples: k }); }
+    }
+    aoLevel = n;
   }
   // (only the brightest light glows: the sun's glitter on the sea, lamps after dark, the sun low in the sky)
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.18, 0.35, 1.0);
@@ -78,14 +91,27 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   composer.addPass(new OutputPass());
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
-  let seed = 0;
+  setAO(level >= 3 ? 2 : level >= 2 ? 1 : 0);
+  let seed = 0, samples = 4;
   return {
     level,
     get ao() { return !!ao?.enabled; },
+    get aoLevel() { return ao?.enabled ? aoLevel : 0; },
+    get bloom() { return bloom.enabled; },
+    get samples() { return samples; },
+    // ---- Settings → Graphics, while playing ----
+    setAO,
+    /** the soft glow on the brightest light (sun glitter, lamps after dark) */
+    setBloom(on) { bloom.enabled = !!on; },
+    /** antialiasing: 0 (off), 2 or 4 samples a pixel (the buffers are made again at the new count) */
+    setAA(n) {
+      n = n >= 4 ? 4 : n >= 2 ? 2 : 0; if (n === samples) return; samples = n;
+      for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = n; t.dispose(); }
+    },
     render() { grade.uniforms.uSeed.value = (seed = (seed + 1) % 97); composer.render(); },
     setSize(w, h) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); },
     /** frames running late even at the lowest sharpness: drop the ambient occlusion first */
-    dropAO() { if (ao?.enabled) { ao.enabled = false; return true; } return false; },
+    dropAO() { if (ao?.enabled) { ao.enabled = false; aoLevel = 0; return true; } return false; },
     dispose() { composer.passes.forEach((p) => p.dispose?.()); composer.dispose(); },
   };
 }

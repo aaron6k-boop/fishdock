@@ -9,6 +9,7 @@ import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
 import { landCamOn, fishCamOf } from "../lib/viewPrefs.js";
 import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
+import { effectiveGfx } from "./GraphicsPanel.jsx";
 import { localFor } from "../lib/world3d/localDetail.js";
 import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/sceneAudio.js";
 
@@ -127,7 +128,8 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
             if (o.landed && !phases.current[id].landed) { phases.current[id].landed = true; props.current.onLanded?.(id, o.info.ev); }
           }
         });
-        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.fishCam === "cinematic"); }
+        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.fishCam === "cinematic"); W.current?.setGfx(effectiveGfx(q, v0.gfxC, !!v0.battery)); }
+        usedQ.current = q;
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();
@@ -187,7 +189,9 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
     return () => { el.removeEventListener("pointerdown", down); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); el.removeEventListener("pointercancel", up); el.removeEventListener("wheel", wheel); el.removeEventListener("keydown", key); el.removeEventListener("keyup", keyUp); };
   }, []);
 
+  const usedQ = useRef(null); // (the preset the view was built with: Auto's choice shows in Settings → Graphics)
   useImperativeHandle(ref, () => ({
+    setGfx: (o) => W.current?.setGfx(o), get gfx() { return W.current ? { ...W.current.gfx, preset: usedQ.current } : null; }, perf: () => W.current?.perf() || null,
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
     setTrack: (on) => W.current?.setTrack(on), setLandShot: (on) => W.current?.setLandShot(on),
