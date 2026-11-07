@@ -87,3 +87,32 @@ test("'running' only while the fish is really taking line: the distance grows wh
     }
   }
 });
+
+// ---- each kind of fish fights its own way, and a bigger one fights harder ----
+const fightOf = (species, cm, rate = 4, secs = 30, seed = 5) => {
+  let s = createFight({ species, lengthCm: cm, startM: 40, seed }); const tap = tapper(rate), out = [];
+  for (let t = 0; t < secs && !s.near && !s.out; t += 0.05) { s = fightStep(s, 0.05, tap(0.05)); out.push({ t, ...s }); }
+  return out;
+};
+const mean = (a, k) => a.reduce((x, s) => x + s[k], 0) / Math.max(1, a.length);
+const turnsOf = (a) => { let n = 0; for (let i = 1; i < a.length; i++) if (Math.sign(a[i].dir) !== Math.sign(a[i - 1].dir) && Math.abs(a[i].dir - a[i - 1].dir) > 0.02) n++; return n / (a[a.length - 1].t || 1); };
+
+test("a bass's first run takes line off the drag; a cod knocks and bores down instead", () => {
+  for (const seed of [1, 2, 3, 4]) {
+    const bass = fightOf("bass", 55, 4, 5, seed), cod = fightOf("cod", 55, 4, 5, seed);
+    assert.ok(bass.some((s) => s.slipping), `bass (seed ${seed}) runs off the drag at the start`);
+    assert.ok(mean(cod.slice(0, 60), "dive") > 0.6 && mean(bass.slice(0, 60), "dive") < 0.35, "cod dives, bass runs");
+  }
+});
+
+test("a mackerel darts about, changing direction far more often than a cod; a cod shakes its head slowly", () => {
+  const mk = fightOf("mackerel", 32, 4, 12), cod = fightOf("cod", 55, 4, 12);
+  assert.ok(turnsOf(mk) > 3 * turnsOf(cod), `mackerel ${turnsOf(mk).toFixed(2)}/s vs cod ${turnsOf(cod).toFixed(2)}/s`);
+  assert.ok(mk.length < cod.length, "a mackerel is in quicker than a cod");
+});
+
+test("a bigger fish of the same kind pulls harder and takes longer", () => {
+  const small = fightOf("cod", 40, 4, 120), big = fightOf("cod", 85, 4, 120);
+  assert.ok(mean(big, "tension") > mean(small, "tension") + 0.05, `big ${mean(big, "tension").toFixed(2)} vs small ${mean(small, "tension").toFixed(2)}`);
+  assert.ok(big.length > small.length * 1.3, `big ${big.length} steps vs small ${small.length}`);
+});

@@ -548,12 +548,17 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // the fish comes in as the line does: eased, since a friend's fight arrives a few times a second
       if (fl) fightPr = fightPr == null ? fl.progress : fightPr + (fl.progress - fightPr) * Math.min(1, dt * (local ? 12 : 4)); else fightPr = null;
       const st = fightStyle(prof), pr = fl ? clamp(fightPr, 0, 1) : 1 - Math.exp(-age / (16 * prof.long));
-      const run = n1(age * 0.22 * prof.tempo * st.runSpeed + P.s1), surge = Math.max(0, Math.sin(age * 0.95 * prof.tempo + n1(age * 0.3 + P.s2) * 2.2)) ** 6;
+      // (where the fight model is running, the fish goes the way it says: its runs and turns, its diving, its head-shakes;
+      // a friend's fight or a replay without them falls back on the species' own pattern)
+      const flDir = fl && Number.isFinite(fl.dir) ? fl.dir : null;
+      if (flDir != null) P.dirNow = (P.dirNow ?? flDir) + (flDir - (P.dirNow ?? flDir)) * Math.min(1, dt * 3);
+      const run = flDir != null ? P.dirNow : n1(age * 0.22 * prof.tempo * st.runSpeed + P.s1), surge = Math.max(0, Math.sin(age * 0.95 * prof.tempo + n1(age * 0.3 + P.s2) * 2.2)) ** 6;
+      const shake = fl && Number.isFinite(fl.shake) ? fl.shake : 0, diveK = fl && Number.isFinite(fl.dive) ? 0.6 + 0.8 * fl.dive : 1;
       const f = castAt.clone().lerp(nearAt, pr * 0.85);
       const [dx, dz] = dirOf(face), side = [-dz, dx];
       const lateral = run * 8 * st.runWidth * (1 - pr * 0.6);
       f.x += side[0] * lateral; f.z += side[1] * lateral;
-      f.y = -st.depth * (0.5 + 0.5 * Math.max(0, n1(age * 0.17 + P.s2))) * (1 - pr * 0.7);
+      f.y = -st.depth * diveK * (0.5 + 0.5 * Math.max(0, n1(age * 0.17 + P.s2))) * (1 - pr * 0.7);
       // the approach: tiring, it comes up as it nears you (most fish show at the top before they're netted; a diver
       // stays down longer), and once up it wallows, rolling a flank to the light now and then
       const upK = ease(clamp((pr - 0.6) / 0.3, 0, 1)) * (st.depth > 1.5 ? 0.85 : 1), surfNow = wh(f.x, f.z);
@@ -598,11 +603,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (a taut line hums: the tip trembles a little, more as the fish pulls harder; and on a surge your arms give a
       // touch towards it, then take it back)
       tipT += clamp(tension, 0, 1.4) * 0.006 * (n1(t * 11 + P.s1) + 0.6 * n1(t * 23 + P.s2));
+      tipT += shake * 0.045 * Math.sin(t * 19 + P.s1); // (its head-shakes knock the tip)
       // the arms take the load: on a surge they're drawn out towards the fish (more for a heavier fish pulling harder);
       // between surges you lean back against it and lift, pumping it in, then drop the rod forwards and wind
       const tk = clamp(tension, 0, 1.4), pump = Math.max(0, Math.sin(age * 0.85 * prof.tempo + P.s1)) ** 2 * clamp((tk - 0.35) / 0.6, 0, 1) * (1 - surge);
       fpPull = 0.055 * surge * tk;
-      fpArm = { up: 0.05 * pump - 0.03 * surge * tk, right: 0.012 * run * st.runWidth, fwd: -0.05 * pump };
+      fpArm = { up: 0.05 * pump - 0.03 * surge * tk + 0.006 * shake * Math.sin(t * 19 + P.s1), right: 0.03 * run * st.runWidth * tk, fwd: -0.05 * pump }; // (and through the rod into your hands; a run drags them its way)
       bodyTo = { x: clamp(run * 0.05 * st.runWidth, -0.05, 0.05), y: -0.012 * tk - 0.025 * surge * tk, z: 0.03 * tk + 0.03 * pump - 0.08 * surge * tk };
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
       fpE = 0.95 - 0.22 * surge * tk + 0.28 * pump; fpYaw = -0.08 + clamp(run * 0.22 * st.runWidth, -0.3, 0.3); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)

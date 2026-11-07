@@ -83,7 +83,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
       const n = pending.current; pending.current = 0;
       const s = fightStep(fightRef.current, dt, { taps: n, rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
       fightRef.current = s; reelRef.current = s.progress; setReel(s.progress);
-      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode });
+      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina });
       if (s.out) { clearInterval(id); say(s.out === "broke" ? "The line broke. Ease the drag off when it runs." : "The hook came free. Keep the line tight."); add("lost", { why: s.out }); return; }
       if (s.near && autoplayRef.current) { clearInterval(id); land(); }
     }, 50);
