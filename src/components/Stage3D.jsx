@@ -28,6 +28,47 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   };
   const stopWalk = () => w.current?.walk(false);
   const fishHere = () => { const sp = w.current?.fishHere(); if (sp) say("Fishing from here. Cast when you're ready."); };
+  // ---- on a computer: W A S D to walk (Shift sprints, Space jumps), Space to cast (hold for power), strike and reel
+  // (hold to wind), E for the next thing to do (land it, start fishing here, back to your spot), drag to look ----
+  // The keys press the same buttons a thumb would, so the fishing behaves exactly as it does on a phone.
+  const keyState = useRef({ held: new Set(), space: null });
+  const walkRef = useRef(null); walkRef.current = walk;
+  useEffect(() => {
+    const root = () => document.querySelector(".stage3d") || document;
+    const press = (el, type) => { if (!el) return; const r = el.getBoundingClientRect(); el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 41, pointerType: "mouse", isPrimary: true, button: 0, buttons: type === "pointerdown" ? 1 : 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 })); };
+    const typing = (e) => { const t = e.target; return t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); };
+    const move = () => {
+      const h = keyState.current.held, x = (h.has("KeyD") ? 1 : 0) - (h.has("KeyA") ? 1 : 0), y = (h.has("KeyW") ? 1 : 0) - (h.has("KeyS") ? 1 : 0), sp = h.has("ShiftLeft") || h.has("ShiftRight");
+      if ((x || y) && !walkRef.current) { startWalk(); }
+      stick.current = [x, y]; w.current?.setWalkInput({ x, y, sprint: sp });
+    };
+    const down = (e) => {
+      if (typing(e) || e.metaKey || e.ctrlKey || e.altKey || document.querySelector("[role=dialog]")) return;
+      const c = e.code, R = root();
+      if (["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight"].includes(c)) { if (!keyState.current.held.has(c)) { keyState.current.held.add(c); move(); } e.preventDefault(); return; }
+      if (c === "Space") {
+        e.preventDefault(); if (e.repeat) return;
+        if (walkRef.current) { w.current?.jump(); return; }
+        const btn = R.querySelector(".ft-cast, .ft-strike, .ft-reel, .ft-land");
+        if (btn) { keyState.current.space = btn; press(btn, "pointerdown"); }
+        return;
+      }
+      if (c === "KeyE") {
+        e.preventDefault(); if (e.repeat) return;
+        const b = R.querySelector(".ft-land") || R.querySelector(".walk-fish") || (walkRef.current ? R.querySelector(".walk-pill[aria-label='Stop walking']") : null);
+        if (b?.classList.contains("ft-land")) { press(b, "pointerdown"); press(b, "pointerup"); } else b?.click();
+      }
+    };
+    const up = (e) => {
+      const c = e.code;
+      if (keyState.current.held.has(c)) { keyState.current.held.delete(c); move(); }
+      if (c === "Space" && keyState.current.space) { const b = keyState.current.space; keyState.current.space = null; press(b, "pointerup"); }
+    };
+    const blur = () => { keyState.current.held.clear(); move(); if (keyState.current.space) { press(keyState.current.space, "pointerup"); keyState.current.space = null; } };
+    addEventListener("keydown", down); addEventListener("keyup", up); addEventListener("blur", blur);
+    return () => { removeEventListener("keydown", down); removeEventListener("keyup", up); removeEventListener("blur", blur); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const finePointer = useMemo(() => { try { return matchMedia("(pointer: fine)").matches; } catch { return false; } }, []);
   const [sprint, setSprint] = useState(false), [myPhase, setMyPhase] = useState("idle");
   const busyFishing = !!fight || myPhase === "bite" || myPhase === "hooked" || myPhase === "cast";
   // (the stick's last position, so Sprint takes effect at once, without having to move your thumb)
@@ -160,6 +201,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
         </div>
         {/* walking about: its own button, bottom right (while walking, the walking controls take its place) */}
         {!walk && !busyFishing ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
+        {finePointer && !menu ? <div className="w3d-keys" aria-hidden="true">W A S D walk · Shift sprint · Space cast, strike, reel · E land or fish here · drag to look</div> : null}
         {gfxOpen ? <GraphicsPanel view={view} setOpts={setOpts} world={w.current} onClose={() => setGfxOpen(false)} /> : null}
         {view.fpsShow ? <FpsMeter world={w.current} /> : null}
         {card ? <div className="w3d-card"><CatchCard ev={card.ev} demo={demo} compact photoUrl={catchPhoto?.(card.ev)} onClose={() => setCard(null)} who={card.who} /></div> : null}

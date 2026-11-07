@@ -846,9 +846,8 @@ function realArms(scene, { gloves, skinHex }) {
  */
 // ---- the sleeve and its cuff (y down the arm from the cuff's edge at 0, the sleeve's axis) ----
 function sleeveGeo(seed) {
-  // (85 cm from the cuff, widening to the upper arm: at 54 cm, reaching out over the rail for the net's rope, its open
-  // top end came into view as an empty tube)
-  const pts = []; for (let k = 0; k <= 32; k++) { const f = k / 32, y = -0.04 - f * 0.85; pts.push(new THREE.Vector2(0.05 + 0.017 * Math.pow(Math.min(1, f / 0.6), 0.7) + 0.012 * Math.max(0, f - 0.6) / 0.4, y)); }
+  // (the forearm's sleeve, from the cuff to just past the elbow; the upper arm is its own piece, bent at the elbow)
+  const pts = []; for (let k = 0; k <= 24; k++) { const f = k / 24, y = -0.04 - f * 0.36; pts.push(new THREE.Vector2(0.05 + 0.018 * Math.pow(f, 0.7), y)); }
   const g = new THREE.LatheGeometry(pts, 40), p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x), r = Math.hypot(x, z);
@@ -858,6 +857,11 @@ function sleeveGeo(seed) {
     p.setXYZ(i, Math.cos(a) * rr, y, Math.sin(a) * rr * 0.92);
   }
   g.computeVertexNormals(); return g;
+}
+function upperGeo() {
+  // a unit length down -y (scaled to the elbow-shoulder distance), rounder and wider than the forearm, a fold at the elbow
+  const pts = []; for (let k = 0; k <= 16; k++) { const f = k / 16; pts.push(new THREE.Vector2(0.062 + 0.012 * Math.sin(f * Math.PI * 0.9) + (f < 0.12 ? 0.006 * (1 - f / 0.12) : 0), -f)); }
+  const g = new THREE.LatheGeometry(pts, 28); g.scale(1, 1, 0.9); g.computeVertexNormals(); return g;
 }
 function cuffGeo() {
   // the rib: a band of fine ridges round the wrist, its edge rolled
@@ -899,8 +903,12 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
     const tube = new THREE.Mesh(sleeveGeo(i), sleeveMat);
     const cuff = new THREE.Mesh(cuffGeo(), hemMat);
     sleeve.add(tube, cuff);
-    group.add(mesh, sleeve);
-    return { mesh, sleeve, bones: b.bones, joints: b.joints, s: i ? 1 : -1, cur: null, from: null, u: 1, kind: undefined, curl: GRIPS.rest };
+    // the upper arm: from the elbow back up to your shoulder, by your eye and a little below and out to the side. One
+    // straight sleeve carried on past the elbow in the forearm's line, through the rail as you hauled the net up and
+    // down off the edges of the view as you knelt by it; a real arm bends there and goes back to the shoulder
+    const upper = new THREE.Mesh(upperGeo(), sleeveMat); upper.frustumCulled = false;
+    group.add(mesh, sleeve, upper);
+    return { mesh, sleeve, upper, bones: b.bones, joints: b.joints, s: i ? 1 : -1, cur: null, from: null, u: 1, kind: undefined, curl: GRIPS.rest };
   });
 
   // ---- the real hands: forearms and hands cut from a MakeHuman (MPFB, CC0) person in Blender (public/models/
@@ -970,8 +978,11 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       const vf = fh.clone().multiplyScalar(Math.cos(pB)).add(V(0, Math.sin(pB), 0)), vu = vr.clone().cross(vf).normalize();
       // (until the rod and reel have loaded there's nothing for the hands to take hold of, and they hung loose in the
       // first moments, a forearm across the view; so they wait for them, a few seconds at most on a slow connection)
-      { const wait = (!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 90000;
-        if (real) real.root.visible = !wait; for (const h of hands) h.sleeve.visible = !wait; } // (the sleeves too: without their hands they were two empty blue tubes)
+      // (nothing in either hand, as when you crouch by the landed fish before picking it up: the arms are put away, as
+      // in any first-person game; hanging by your sides they filled the bottom of the view looking down at the deck)
+      const empty = !specs[0] && !specs[1];
+      { const wait = empty || ((!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 90000);
+        if (real) real.root.visible = !wait; for (const h of hands) { h.sleeve.visible = !wait; h.upper.visible = !wait; } } // (the sleeves too: without their hands they were two empty blue tubes)
       for (let i = 0; i < 2; i++) {
         const h = hands[i], spec = specs[i];
         // the elbow: fixed in the view, below and out to the side, out of sight
@@ -1052,10 +1063,13 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         }
         const back = el.clone().sub(wr).normalize(), wrist = wr.clone().addScaledVector(back, 0.035);
         h.sleeve.position.copy(wrist); h.sleeve.quaternion.setFromUnitVectors(V(0, -1, 0), back);
+        // the upper arm, elbow to shoulder (the shoulder by your eye: out to the side, a little below and behind it)
+        { const sh = eye.clone().addScaledVector(vr, h.s * 0.19).add(V(0, -0.21, 0)).addScaledVector(fh, -0.05), elw = wr.clone().addScaledVector(back, Math.min(0.3, el.distanceTo(wr))), d = sh.clone().sub(elw), L = d.length();
+          if (L > 0.05) { h.upper.visible = h.sleeve.visible; h.upper.position.copy(elw); h.upper.quaternion.setFromUnitVectors(V(0, -1, 0), d.multiplyScalar(1 / L)); h.upper.scale.set(1, L, 1); } else h.upper.visible = false; }
       }
     },
     /** where each hand is (the wrist, in the group's space), for tests */
     get wrists() { return hands.map((h) => (h.cur ? h.cur.pos.clone() : null)); },
-    dispose() { built.geo.dispose(); geoL.dispose(); mat.dispose(); sleeveMat.dispose(); hemMat.dispose(); for (const h of hands) h.sleeve.traverse((o) => o.geometry?.dispose?.()); },
+    dispose() { built.geo.dispose(); geoL.dispose(); mat.dispose(); sleeveMat.dispose(); hemMat.dispose(); for (const h of hands) { h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry.dispose(); } },
   };
 }

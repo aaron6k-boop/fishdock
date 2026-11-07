@@ -20,9 +20,14 @@ export const LANDMARKS = [
   { id: "britannia-monument", lat: 52.588439, lon: 1.733643, kind: "column", h: 44 },
   // Scroby Sands offshore wind farm: 30 Vestas 2 MW turbines, centre 52.6489, 1.7903, hub 68 m, rotor 80 m
   // (Wikipedia, "Scroby Sands Wind Farm"). Layout approximate: three rows of ten along the bank.
+  // Great Yarmouth Power Station, South Denes: the combined-cycle gas plant built 1998-2001, position 52.583884, 1.733255
+  // (Wikipedia, "Great Yarmouth Power Station"). Its sizes aren't published: drawn at a typical single-shaft plant's
+  // (a clad turbine hall about 70 x 35 m and 28 m high, the boiler house beside it, one exhaust stack about 60 m),
+  // approximate, and said so where the place is credited.
+  { id: "great-yarmouth-power", lat: 52.583884, lon: 1.733255, kind: "powerstation", approx: true },
   { id: "scroby-sands", lat: 52.6489, lon: 1.7903, kind: "windfarm", n: 30, rows: 3, hub: 68, rotor: 80, bearing: 18 },
 ];
-export const SKYLINE_NOTE = "Landmarks beyond the mapped area are placed from published positions; the distant town is indicative, not mapped buildings.";
+export const SKYLINE_NOTE = "Landmarks beyond the mapped area are placed from published positions (the power station's size is approximate); the distant town is indicative, not mapped buildings.";
 
 const NEAR_AS = 4200; // metres: the furthest anything is drawn (the camera sees to 5 km)
 const hazeMat = (hex, k, opts = {}) => {
@@ -53,6 +58,17 @@ export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industr
         [new THREE.BoxGeometry(3.2, 0.8, 3.2), L.h - 5.6], [new THREE.CylinderGeometry(1.1, 1.4, 2.4, 10), L.h - 4], [new THREE.SphereGeometry(0.9, 10, 8), L.h - 2.2], [new THREE.ConeGeometry(0.55, 2.2, 8), L.h - 0.6]]
         .map(([g, y]) => g.translate(0, y, 0).toNonIndexed());
       const m = new THREE.Mesh(merge(geos), hazeMat(0xd9d2c2, 0.75)); m.position.set(x, groundY, z); group.add(m); hazed(m, d, far);
+    } else if (L.kind === "powerstation") {
+      // pale grey cladding, a darker band at the eaves, the boiler house taller and plainer, the steel stack beside it
+      const clad = hazeMat(0xc9ccca, 0.7), dark = hazeMat(0x6f7477, 0.7), stack = hazeMat(0xa7abad, 0.7);
+      const turn = Math.atan2(x, z); // (its long side across the view from the pier, as seen)
+      const part = (geo, mat, px, py, pz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x + Math.cos(turn) * px + Math.sin(turn) * pz, groundY + py, z - Math.sin(turn) * px + Math.cos(turn) * pz); m.rotation.y = turn; group.add(m); hazed(m, d, far); };
+      part(new THREE.BoxGeometry(70, 28, 35), clad, 0, 14, 0); // the turbine hall
+      part(new THREE.BoxGeometry(70.4, 2.2, 35.4), dark, 0, 27, 0); // (its eaves band)
+      part(new THREE.BoxGeometry(26, 36, 22), clad, 50, 18, 4); // the boiler house
+      part(new THREE.BoxGeometry(14, 10, 12), dark, -44, 5, -6); // (a transformer and its compound)
+      part(new THREE.CylinderGeometry(3.2, 3.6, 60, 14), stack, 66, 30, 4); // the stack
+      part(new THREE.CylinderGeometry(3.4, 3.4, 1.4, 14), dark, 66, 59.3, 4);
     } else if (L.kind === "windfarm") {
       // instanced: the towers in one draw, the blades in another (their matrices turned each frame)
       const white = hazeMat(0xe9ecee, 0.9), b = (L.bearing * Math.PI) / 180, along = [Math.sin(b), -Math.cos(b)], across = [Math.cos(b), Math.sin(b)];
