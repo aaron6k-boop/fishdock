@@ -3,7 +3,7 @@
 // OpenStreetMap. Sizes are estimates from photographs.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { bricks, weather } from "./textures3d.js";
+import { bricks, weather, photoTex } from "./textures3d.js";
 
 // ---- a few shapes merged by material: one mesh (one draw call) per material ----
 function kit() {
@@ -84,32 +84,63 @@ function gorlestonLighthouse(group, ring, base) {
   const G = 3.25, S1 = 0.32, U = 3.0, S2 = 0.36; // ground storey, first slab, lookout storey, roof slab (metres)
   // ---- ground storey: painted brick, boarded panels below, a dark door on each long side ----
   K.box("paint", L, G, W, 0, y0 + G / 2, 0);
-  for (const s of [-1, 1]) for (let i = 0; i < 4; i++) K.box("panel", L / 4 - 0.12, 2.0, 0.05, (i - 1.5) * (L / 4), y0 + 1.05, s * (W / 2 + 0.025));
-  for (const e of [-1, 1]) for (let i = 0; i < 2; i++) K.box("panel", 0.05, 2.0, W / 2 - 0.12, e * (L / 2 + 0.025), y0 + 1.05, (i - 0.5) * (W / 2));
-  for (const s of [-1, 1]) K.box("glass", 1.0, 2.1, 0.07, -ex * L * 0.18, y0 + 1.05, s * (W / 2 + 0.04));
+  K.box("plinth", L + 0.5, 0.2, W + 0.5, 0, y0 + 0.1, 0); // (it stands on a low concrete step, as photographed)
+  // the landward end of the ground storey is bare brick, its foot painted black, with a black door
+  K.box("brick", 1.7, G, W + 0.1, -ex * (L / 2 - 0.81), y0 + G / 2, 0);
+  K.box("iron", 1.72, 0.95, W + 0.12, -ex * (L / 2 - 0.81), y0 + 0.2 + 0.475, 0);
+  K.box("iron", 0.06, 2.0, 0.9, -ex * (L / 2 + 0.06), y0 + 0.2 + 1.0, nzS * W * 0.2);
+  // (the panels and doors start on top of the concrete step: dipping into it, their edges glinted along the foot)
+  for (const s of [-1, 1]) for (let i = 0; i < 4; i++) K.box("panel", L / 4 - 0.12, 1.9, 0.006, (i - 1.5) * (L / 4), y0 + 1.2, s * (W / 2 + 0.003)); // (all but flush, as boarding is: a deeper top edge caught the sun and glowed as a bright bar)
+  for (const e of [-1, 1]) for (let i = 0; i < 2; i++) K.box("panel", 0.006, 1.9, W / 2 - 0.12, e * (L / 2 + 0.003), y0 + 1.2, (i - 0.5) * (W / 2));
+  for (const s of [-1, 1]) K.box("glass", 1.0, 2.0, 0.012, -ex * L * 0.18, y0 + 1.22, s * (W / 2 + 0.006));
   // ---- first slab: cantilevered well out all round, a downstand under its edge and brackets under it ----
-  const o1 = 0.95, y1 = y0 + G;
-  K.box("white", L + o1 * 2, S1, W + o1 * 2, 0, y1 + S1 / 2, 0);
-  K.box("white", L + o1 * 2 - 0.1, 0.16, W + o1 * 2 - 0.1, 0, y1 - 0.08, 0);
-  for (const s of [-1, 1]) for (let i = 0; i < 5; i++) K.box("white", 0.18, 0.4, o1, (i - 2) * (L / 4.3), y1 - 0.2, s * (W / 2 + o1 / 2));
+  // (photographed: only a little way out along the long sides, further at the ends, where the balcony wraps round)
+  const o1x = 1.0, o1z = 0.5, y1 = y0 + G;
+  K.box("white", L + o1x * 2, S1, W + o1z * 2, 0, y1 + S1 / 2, 0);
+  K.box("white", L + o1x * 2 - 0.1, 0.16, W + o1z * 2 - 0.1, 0, y1 - 0.08, 0);
+  for (const s of [-1, 1]) for (let i = 0; i < 5; i++) K.box("white", 0.18, 0.4, o1z, (i - 2) * (L / 4.3), y1 - 0.2, s * (W / 2 + o1z / 2));
   // ---- the lookout storey: inset from the slab's edge ----
   const li = 0.15, lL = L - li * 2, lW = W - li * 2, yU = y1 + S1;
   const sill = 1.15, win = 1.15, fas = U - sill - win;
+  // the lookout storey, as photographed from all sides: bare red-brown brick up to the sills all round. The seaward half
+  // is the watch room: a band of windows wrapping the seaward end and along each side, under a white fascia with the
+  // navy "National Coastwatch" plate. The landward half is brick right up to the roof slab, with small separate windows
+  // and a door out onto the balcony.
+  const lk = lL * 0.5, xSea = ex * (lL / 2 - lk / 2), xLand = -ex * (lk / 2);
   K.box("brick", lL, sill, lW, 0, yU + sill / 2, 0);
-  K.box("trim", lL + 0.08, 0.08, lW + 0.08, 0, yU + sill + 0.04, 0); // the sill
-  // the window band: glass all round, white mullions at the corners and between the panes, a white head
-  K.box("glass", lL - 0.06, win, lW - 0.06, 0, yU + sill + win / 2, 0);
-  const posts = (len, n) => Array.from({ length: n + 1 }, (_, k) => -len / 2 + (len * k) / n);
-  for (const x of posts(lL, 7)) for (const s of [-1, 1]) K.box("trim", 0.1, win, 0.1, x, yU + sill + win / 2, s * lW / 2);
-  for (const z of posts(lW, 3)) for (const e of [-1, 1]) K.box("trim", 0.1, win, 0.1, e * lL / 2, yU + sill + win / 2, z);
-  K.box("white", lL + 0.06, fas, lW + 0.06, 0, yU + sill + win + fas / 2, 0); // the fascia
-  for (const e of [-1, 1]) for (const s of [-1, 1]) K.box("frame", 0.16, fas + 0.02, 0.16, e * lL / 2, yU + sill + win + fas / 2, s * lW / 2); // (dark corner posts)
+  K.box("trim", lk + 0.04, 0.08, lW + 0.08, xSea, yU + sill + 0.04, 0); // the sill under the watch windows
+  K.box("white", lk - 0.02, win, lW - 0.02, xSea, yU + sill + win / 2, 0); // (behind the glass)
+  K.box("brick", lL - lk, win + fas, lW, xLand, yU + sill + (win + fas) / 2, 0);
+  // ---- the windows: white frames proud of the brick, a concrete sill under each, the glass just behind the frame ----
+  // (as photographed: a row of separate windows down each long side, a wide three-light window on the seaward end for
+  // the watch out to sea, a single one on the landward end)
+  const wy = yU + sill + win / 2;
+  const windowAt = (w, h, x, z, face, lights = 2) => { // face: the way out (+x, -x, +z or -z)
+    const ax = face === "x+" || face === "x-", sgn = face === "x+" || face === "z+" ? 1 : -1, o = 0.03; // (o: how far the frame stands proud)
+    const at = (u, d) => (ax ? [x + sgn * d, z + u] : [x + u, z + sgn * d]); // u along the wall, d out from it
+    const bx = (mat, uw, hh, dd, u, y, d) => { const [px, pz] = at(u, d); K.box(mat, ax ? dd : uw, hh, ax ? uw : dd, px, y, pz); };
+    bx("glass", w - 0.08, h - 0.08, 0.02, 0, wy, 0.004);
+    bx("trim", w, 0.08, 0.07, 0, wy + h / 2 - 0.04, o); bx("trim", w, 0.08, 0.07, 0, wy - h / 2 + 0.04, o); // head and foot of the frame
+    for (let k = 0; k <= lights; k++) bx("trim", 0.07, h, 0.07, -w / 2 + 0.035 + (w - 0.07) * k / lights, wy, o); // jambs and mullions
+    bx("trim", w - 0.07, 0.05, 0.05, 0, wy + h * 0.22, o); // a transom: the small opening lights at the top
+    bx("white", w + 0.16, 0.07, 0.12, 0, wy - h / 2 - 0.035, 0.06); // the sill, projecting
+  };
+  for (const sd of [1, -1]) {
+    windowAt(lk - 0.1, win - 0.06, xSea + ex * 0.03, sd * lW / 2, sd > 0 ? "z+" : "z-", 4); // the watch band along the side
+    // the landward half: two small windows, white frames in the brick (one top-hung, as photographed)
+    for (const f of [0.3, 0.7]) windowAt(0.75, win * 0.7, -ex * (lL / 2 - (lL - lk) * f), sd * lW / 2, sd > 0 ? "z+" : "z-", 1);
+  }
+  windowAt(lW - 0.2, win - 0.06, ex * lL / 2, 0, ex > 0 ? "x+" : "x-", 4); // right across the seaward end
+  windowAt(0.75, win * 0.7, -ex * lL / 2, 0, ex > 0 ? "x-" : "x+", 1); // landward end
+  // the door out onto the balcony, on the river side of the landward half
+  K.box("frame", 0.85, 2.0, 0.06, -ex * (lL / 2 - (lL - lk) * 0.5), yU + 1.0, -nzS * (lW / 2 + 0.02));
+  K.box("white", lk + 0.03, fas, lW + 0.06, xSea, yU + sill + win + fas / 2, 0); // the fascia over the watch windows
   // ---- roof slab: deep, cantilevered, stepped under its edge ----
   const o2 = 0.8, yR = yU + U;
   K.box("white", lL + o2 * 2, S2, lW + o2 * 2, 0, yR + S2 / 2, 0);
   K.box("white", lL + o2 * 2 - 0.5, 0.18, lW + o2 * 2 - 0.5, 0, yR - 0.09, 0);
   // ---- red railings: round the balcony and round the roof ----
-  const b1x = L / 2 + o1 - 0.12, b1z = W / 2 + o1 - 0.12;
+  const b1x = L / 2 + o1x - 0.12, b1z = W / 2 + o1z - 0.12;
   railing(K, "red", [[-b1x, -b1z], [b1x, -b1z], [b1x, b1z], [-b1x, b1z], [-b1x, -b1z]], y1 + S1, 1.05, 1.4);
   const rT = yR + S2, b2x = lL / 2 + o2 - 0.15, b2z = lW / 2 + o2 - 0.15;
   railing(K, "red", [[-b2x, -b2z], [b2x, -b2z], [b2x, b2z], [-b2x, b2z], [-b2x, -b2z]], rT, 1.0, 1.6);
@@ -142,8 +173,24 @@ function gorlestonLighthouse(group, ring, base) {
   // ---- a flagpole off the balcony's seaward end ----
   const fX = ex * (b1x - 0.1), fZ = -nzS * (b1z - 0.25); // (at the river-side corner, by the stair)
   K.box("galv", 0.05, 3.2, 0.05, fX, y1 + S1 + 1.6, fZ);
+  // ---- the steel stair up the landward end: deck to the balcony, then the balcony to the roof (zigzag, outside the
+  // slabs), galvanised treads and stringers, red handrails, a landing across to each level ----
+  const flight = (x, za, zb, ya, yb, w = 0.8) => {
+    const n = Math.max(4, Math.round((yb - ya) / 0.2));
+    for (let k = 0; k < n; k++) { const f = (k + 0.5) / n; K.box("galv", w, 0.04, 0.24, x, ya + (yb - ya) * ((k + 1) / n), za + (zb - za) * f); }
+    for (const sx of [-w / 2, w / 2]) {
+      K.bar("galv", [x + sx, ya, za], [x + sx, yb, zb], 0.06);
+      K.bar("red", [x + sx, ya + 0.95, za], [x + sx, yb + 0.95, zb], 0.045);
+      for (let k = 0; k <= 3; k++) { const f = k / 3; K.box("red", 0.04, 0.95, 0.04, x + sx, ya + (yb - ya) * f + 0.475, za + (zb - za) * f); }
+    }
+  };
+  const stX = -ex * (L / 2 + o1x + 0.55), zA = nzS * (W / 2 - 0.1), zB = -nzS * (W / 2 - 0.4);
+  flight(stX, zA, zB, y0, y1 + S1); // up to the balcony
+  K.box("galv", 1.25, 0.06, 0.9, stX + ex * 0.4, y1 + S1, zB - nzS * 0.45); // the landing, across to the balcony
+  flight(stX, zB - nzS * 0.9, zA, y1 + S1, yR + S2); // and on up to the roof
+  K.box("galv", Math.abs(stX) - (lL / 2 + o2) + 0.4, 0.06, 0.9, (stX + -ex * (lL / 2 + o2)) / 2, yR + S2, zA + nzS * 0.45);
   // ---- the tall lattice mast beside it on the landward side ----
-  const tX = -ex * (L / 2 + 4.5), tZ = nzS * W * 0.35, tH = 15; // (off the landward end, on the south side)
+  const tX = -ex * (L / 2 + o1x + 2.4), tZ = nzS * W * 0.35, tH = 15; // (close by the landward end, as photographed)
   lattice(K, "galv", tX, tZ, y0, tH, 1.5, 0.9, 1.5, 0.06);
   K.box("galv", 1.4, 0.08, 1.4, tX, y0 + tH, tZ);
   railing(K, "galv", [[tX - 0.7, tZ - 0.7], [tX + 0.7, tZ - 0.7], [tX + 0.7, tZ + 0.7], [tX - 0.7, tZ + 0.7], [tX - 0.7, tZ - 0.7]], y0 + tH, 0.9, 0.7, 0.035);
@@ -154,25 +201,35 @@ function gorlestonLighthouse(group, ring, base) {
   // ---- signs, banners and the flag: flat quads with their part of the sign texture ----
   const sq = (key, w, h, x, y, z, ry) => { const g = new THREE.PlaneGeometry(w, h), [u0, v0, u1, v1] = SIGN_UV[key], uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * (u1 - u0), v0 + uv.getY(i) * (v1 - v0)); g.rotateY(ry); g.translate(x, y, z); (K.parts.sign ||= []).push(g); };
   const endX = ex * (lL / 2 + 0.035), faceEnd = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
-  sq("fascia", lW, fas, endX, yU + sill + win + fas / 2, 0, faceEnd); // (the plate on the seaward end)
-  sq("fascia", lW, fas, -endX, yU + sill + win + fas / 2, 0, -faceEnd);
+  // (the black "National Coastwatch" plate on the long sides' fascia, over the watch windows, as photographed)
+  for (const sd of [1, -1]) sq("fascia", Math.min(2.4, lk * 0.8), fas * 0.72, xSea, yU + sill + win + fas / 2, sd * (lW / 2 + 0.045), sd > 0 ? 0 : Math.PI);
+  void endX; void faceEnd;
   const bX = ex * (b1x + 0.03);
   sq("navy", 2.9, 0.36, bX, y1 + S1 + 0.72, nzS * 1.55 * (W / 6.5), faceEnd); // (navy on the south half, white on the river half)
   sq("white", 2.6, 0.5, bX, y1 + S1 + 0.7, -nzS * 1.55 * (W / 6.5), faceEnd);
   sq("flag", 1.1, 0.7, fX, y1 + S1 + 2.75, fZ + nzS * 0.6, Math.PI / 2); // (flying in over the balcony from the pole)
 
   const brk = bricks(23, [116, 74, 60]); // (a darker, browner brick than the town's, as photographed)
+  // photographed brick and painted render (Poly Haven CC0, public/textures): real mortar, chipped faces and the
+  // unevenness of old paint, where the drawn ones were too regular to read as a real wall. Both tile at about 1.1 m
+  // (the brick: fourteen 75 mm courses a tile, as British brick is laid)
+  const bPhoto = photoTex("brick_red_diff"), bN = bPhoto && photoTex("brick_red_nor", { srgb: false }), bR = bPhoto && photoTex("brick_red_rough", { srgb: false });
+  const pPhoto = photoTex("plaster_diff"), pN = pPhoto && photoTex("plaster_nor", { srgb: false }), pR = pPhoto && photoTex("plaster_rough", { srgb: false });
   const sign = signTexture();
   const M = {
-    paint: new THREE.MeshStandardMaterial({ color: 0xe9e7e1, normalMap: brk.normalMap, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.9 }),
-    panel: new THREE.MeshStandardMaterial({ color: 0xe2e2df, roughness: 0.8 }),
-    white: new THREE.MeshStandardMaterial({ color: 0xf1f0ec, roughness: 0.85 }),
-    brick: new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.88 }),
+    // (the ground storey is painted brick: the paint's own unevenness over the brick's courses)
+    // (the render photograph comes already lifted to white paint: source-assets/prepare_textures.py "rgb-white")
+    paint: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color(0xf4f4f0) : new THREE.Color(0xe9e7e1), map: pPhoto || null, normalMap: bN || brk.normalMap, normalScale: new THREE.Vector2(0.45, 0.45), roughnessMap: pR || null, roughness: pR ? 1 : 0.9 }),
+    panel: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color(0xe8e8e4) : new THREE.Color(0xe2e2df), map: pPhoto || null, roughness: 0.85 }),
+    white: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color(0xffffff) : new THREE.Color(0xf1f0ec), map: pPhoto || null, normalMap: pN || null, roughnessMap: pR || null, roughness: pR ? 1 : 0.85 }),
+    brick: bPhoto ? new THREE.MeshStandardMaterial({ map: bPhoto, normalMap: bN, roughnessMap: bR, roughness: 1, color: 0xe2d4ca })
+      : new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.88 }),
     trim: new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.5 }),
     frame: new THREE.MeshStandardMaterial({ color: 0x4a3328, roughness: 0.7 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x55636c, roughness: 0.08, metalness: 0.5, emissive: 0xffd890, emissiveIntensity: 0 }),
-    red: new THREE.MeshStandardMaterial({ color: 0xb8342a, roughness: 0.55, metalness: 0.2 }),
-    redbox: new THREE.MeshStandardMaterial({ color: 0xb4482e, roughness: 0.75 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x8a98a2, roughness: 0.05, metalness: 0.92, emissive: 0xffd890, emissiveIntensity: 0 }), // (dark, reflecting the sky as window glass does from outside)
+    red: new THREE.MeshStandardMaterial({ color: 0x8e3a2e, roughness: 0.6, metalness: 0.2 }), // (a faded, rusting maroon red, as photographed)
+    plinth: new THREE.MeshStandardMaterial({ color: 0x9a9890, map: photoTex("cap_concrete_diff") || null, roughness: 0.95 }),
+    redbox: new THREE.MeshStandardMaterial({ color: 0xd9561e, roughness: 0.7 }), // (the roof box is orange, as photographed)
     drum: new THREE.MeshStandardMaterial({ color: 0x3a2a26, roughness: 0.5, metalness: 0.3 }),
     iron: new THREE.MeshStandardMaterial({ color: 0x1e2124, roughness: 0.6, metalness: 0.4 }),
     galv: new THREE.MeshStandardMaterial({ color: 0xa9adae, roughness: 0.6, metalness: 0.55 }),
@@ -184,11 +241,14 @@ function gorlestonLighthouse(group, ring, base) {
   // runs off it; the white slabs and fascia with grey runs from their drips; the red railings faded and rust-spotted;
   // the iron stair and the galvanised masts dull, rusting at the joints.
   const age = {
-    paint: { scale: 0.8, mottle: 0.12, grime: [base, base + 0.8, 0.22], streaks: [y1, 2.4, 0.13], rough: [0.9, 1.1] },
-    panel: { scale: 0.8, mottle: 0.12, grime: [base, base + 0.6, 0.2], streaks: [y1, 2.4, 0.1] },
-    white: { scale: 1.2, mottle: 0.1, streaks: [yR + S2, 1.2, 0.12], rough: [0.9, 1.1] },
-    brick: { scale: 0.8, mottle: 0.15, streaks: [yU + sill, 1.0, 0.12] },
-    red: { scale: 0.4, mottle: 0.3, bump: 0.3, rust: [0.25, 0.15, 0.06, 0.025], rough: [0.85, 1.25] },
+    // (as photographed: the white paint grubby towards the deck and streaked grey where rain runs off the slab above it;
+    // the slabs' edges streaked and stained; the brick weathered unevenly, darker under the sills)
+    paint: { scale: 0.8, mottle: 0.18, grime: [base, base + 1.1, 0.34], streaks: [y1, 2.6, 0.24], rough: [0.9, 1.15] },
+    panel: { scale: 0.8, mottle: 0.16, grime: [base, base + 0.9, 0.3], streaks: [y1, 2.6, 0.2] },
+    white: { scale: 1.2, mottle: 0.16, streaks: [yR + S2, 1.4, 0.22], rough: [0.9, 1.15] },
+    brick: { scale: 0.8, mottle: 0.22, streaks: [yU + sill, 1.1, 0.18], grime: [yU, yU + 0.3, 0.12] },
+    plinth: { scale: 0.6, mottle: 0.3, grime: [base, base + 0.2, 0.25] },
+    red: { scale: 0.4, mottle: 0.35, bump: 0.35, rust: [0.4, 0.15, 0.06, 0.025], rough: [0.85, 1.3] },
     redbox: { scale: 0.4, mottle: 0.25, rust: [0.15, 0.15, 0.06, 0.025] },
     iron: { scale: 0.3, mottle: 0.3, bump: 0.3, rust: [0.35, 0.14, 0.055, 0.024], grime: [base, base + 0.5, 0.2] },
     galv: { scale: 0.5, mottle: 0.35, rust: [0.2, 0.16, 0.065, 0.028] },
@@ -199,7 +259,10 @@ function gorlestonLighthouse(group, ring, base) {
   const turn = Math.atan2(-ax[1], ax[0]), meshes = [];
   for (const [k, list] of Object.entries(K.parts)) {
     const g = mergeGeometries(list.map((q) => (q.index ? q.toNonIndexed() : q)));
-    if (k === "brick" || k === "paint") { const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) { const sideX = Math.abs(n.getX(i)) > 0.5; uv.setXY(i, (sideX ? p.getZ(i) : p.getX(i)) / 0.86, p.getY(i) / 0.6); } }
+    // (the walls and slabs: uvs from their size, so the brick and render keep their real scale on every face; the
+    // drawn brick's tile was 0.86 by 0.6 m, the photographs' about 1.1 m square)
+    const tile = bPhoto ? [1.1, 1.1] : [0.86, 0.6];
+    if (k === "brick" || k === "paint" || (pPhoto && (k === "white" || k === "panel"))) { const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) { const sideX = Math.abs(n.getX(i)) > 0.5, flat = Math.abs(n.getY(i)) > 0.5; uv.setXY(i, (sideX ? p.getZ(i) : p.getX(i)) / tile[0], (flat ? p.getZ(i) : p.getY(i)) / tile[1]); } }
     g.rotateY(turn); g.translate(cx, 0, cz);
     const m = new THREE.Mesh(g, M[k]); m.castShadow = k !== "sign"; m.receiveShadow = k !== "galv" && k !== "red" && k !== "iron"; group.add(m); meshes.push(m);
   }

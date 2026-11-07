@@ -24,7 +24,7 @@ const res = await build({
   entryPoints: [join(root, "src/main.jsx")], bundle: true, minify: true, format: "iife", target: ["es2020", "safari15"],
   jsx: "automatic", loader: { ".js": "jsx" }, outdir: out, write: false, legalComments: "none",
   nodePaths: [join(root, "node_modules"), "/opt/npm-tools/node_modules"],
-  define: { __PREVIEW__: server ? "false" : "true", __BUILD_ID__: JSON.stringify(Date.now().toString(36)), __APP_VERSION__: JSON.stringify(pkg.version), "process.env.NODE_ENV": '"production"' },
+  define: { __FD_FILM__: process.env.FISHDOCK_FILM === "1" ? "true" : "false", __PREVIEW__: server ? "false" : "true", __BUILD_ID__: JSON.stringify(Date.now().toString(36)), __APP_VERSION__: JSON.stringify(pkg.version), "process.env.NODE_ENV": '"production"' },
   plugins: [stubs], logLevel: "warning",
 });
 const js = res.outputFiles.find((f) => f.path.endsWith(".js")).text;

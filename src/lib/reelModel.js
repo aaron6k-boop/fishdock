@@ -31,26 +31,69 @@ const rngOf = (seed) => { let a = seed | 0 || 1; return () => { a = (a + 0x6d2b7
  * The state is plain data: { progress 0..1, dist (m), tension 0..~1.3, slipping, near, out: null | "broke" | "free",
  * drag, age, runs: [[start, end, strength]], ... }.
  */
+// ---- how each kind of fish fights (the game's model, from how these fish are known to behave on rod and line) ----
+//   strike: [strength, seconds] of what it does the moment it's hooked; runs: [shortest, longest] seconds of a run, and
+//   gap: [shortest, longest] seconds between them; turn: how often it changes direction (a second); shake: head-shakes
+//   [beats a second, strength]; dive: how much of its effort goes down rather than away; tire: how quickly it tires (1
+//   usual); size: a typical fish's length (cm), against which a bigger or smaller one pulls harder or less
+const STYLE = {
+  // knocks, then dogged and heavy: short runs straight down, slow head-shakes; tires and comes up like a sack
+  cod: { strike: [0.7, 1.2], runs: [0.8, 1.8], gap: [5, 9], turn: 0.12, shake: [2.2, 0.55], dive: 0.85, tire: 1.25, size: 55 },
+  // a hard, fast first run off the drag, more runs with sharp turns, head-shakes near the top; real stamina
+  bass: { strike: [1.25, 3.2], runs: [1.6, 3.4], gap: [3.5, 7], turn: 0.55, shake: [3.4, 0.45], dive: 0.25, tire: 0.75, size: 50 },
+  // frantic darting, constant changes of direction, a buzzing tremble on the line; small, so in quickly
+  mackerel: { strike: [1.05, 0.9], runs: [0.4, 1.0], gap: [1.2, 2.6], turn: 1.6, shake: [7.5, 0.6], dive: 0.35, tire: 1.1, size: 32 },
+  pollack: { strike: [1.3, 2.2], runs: [1.2, 2.6], gap: [4, 8], turn: 0.25, shake: [2.4, 0.4], dive: 0.95, tire: 1.0, size: 50 },
+  coalfish: { strike: [1.25, 2.0], runs: [1.2, 2.4], gap: [4, 8], turn: 0.3, shake: [2.6, 0.4], dive: 0.85, tire: 0.95, size: 50 },
+  whiting: { strike: [0.5, 0.6], runs: [0.3, 0.8], gap: [1.5, 3], turn: 1.0, shake: [6, 0.5], dive: 0.5, tire: 1.3, size: 30 },
+  garfish: { strike: [1.0, 1.2], runs: [0.6, 1.4], gap: [1.5, 3], turn: 1.3, shake: [5, 0.5], dive: 0.1, tire: 1.0, size: 60 },
+  "thick-lipped-mullet": { strike: [1.2, 2.6], runs: [1.2, 2.8], gap: [3, 6], turn: 0.6, shake: [3, 0.4], dive: 0.3, tire: 0.8, size: 45 },
+  "thornback-ray": { strike: [0.6, 1.5], runs: [2, 4], gap: [6, 11], turn: 0.08, shake: [0.8, 0.2], dive: 1.0, tire: 0.9, size: 60 },
+  conger: { strike: [1.1, 2.0], runs: [1.5, 3.5], gap: [3, 6], turn: 0.3, shake: [1.6, 0.7], dive: 1.0, tire: 0.7, size: 120 },
+  tope: { strike: [1.5, 5.0], runs: [2.5, 6], gap: [6, 12], turn: 0.25, shake: [1.2, 0.3], dive: 0.5, tire: 0.6, size: 120 },
+};
+/** A species' fighting style: its own above, otherwise worked out from its fightProfile (pace, darting, strength). */
+export function fightStyleOf(species) {
+  if (STYLE[species]) return STYLE[species];
+  const p = fightProfile(species), e = p.erratic ?? 0.4;
+  return { strike: [0.6 + 0.5 * p.pull, 0.8 + p.long], runs: [0.5 + 0.6 * p.long, 1.2 + 1.6 * p.long], gap: [6 / p.tempo, 10 / p.tempo], turn: 0.1 + 1.2 * e, shake: [1.5 + 3 * e, 0.3 + 0.3 * e], dive: p.ray || p.eel ? 1 : p.flat ? 0.6 : p.splashy > 0.6 ? 0.2 : 0.6, tire: 1, size: 45 };
+}
+/** How much harder (or easier) this fish is than a typical one of its kind: about with its weight's square root. */
+export const sizeFactor = (species, lengthCm) => Math.max(0.35, Math.min(2.6, ((lengthCm || 40) / fightStyleOf(species).size) ** 1.5));
+
 export function createFight({ species = null, lengthCm = 40, startM = 30, mode = "standard", seed = 1 } = {}) {
-  const p = fightProfile(species), rnd = rngOf(seed);
-  const runs = [];
-  // the fish's runs: sudden bursts, more and harder for the quick fighters, fewer as it tires
-  for (let t = 1.5 + rnd() * 3; t < 120; t += (5 + rnd() * 8) / Math.max(0.5, p.tempo)) runs.push([t, t + 0.8 + rnd() * 1.6 * p.long, 0.5 + rnd() * 0.6]);
+  const p = fightProfile(species), st = fightStyleOf(species), rnd = rngOf(seed), size = sizeFactor(species, lengthCm);
+  const runs = [], between = (a) => a[0] + rnd() * (a[1] - a[0]);
+  // what it does when hooked, then its runs: each a burst one way, fewer and shorter as it tires (bigger fish keep going
+  // longer), each with its own direction (dir: -1 left .. 1 right, as you face it)
+  runs.push([0.15, 0.15 + st.strike[1] * Math.sqrt(size), st.strike[0], rnd() < 0.5 ? -1 : 1]);
+  for (let t = runs[0][1] + between(st.gap) * 0.6; t < 160; t += between(st.gap)) runs.push([t, t + between(st.runs) * (0.7 + 0.3 * Math.sqrt(size)), 0.55 + rnd() * 0.55, rnd() < 0.5 ? -1 : 1]);
+  // its heading wanders on its own between runs, more often for a darting fish
+  const heads = []; for (let t = 0; t < 160; t += (0.35 + rnd()) / Math.max(0.05, st.turn)) heads.push([t, rnd() * 2 - 1]);
   return {
     species, lengthCm, startM: Math.max(3, startM), mode, seed,
-    pull: p.pull, tempo: p.tempo, long: p.long, need: fightSeconds(species, lengthCm), runs,
+    pull: p.pull * size, tempo: p.tempo, long: p.long * Math.sqrt(size) / st.tire, need: fightSeconds(species, lengthCm), runs, heads, style: st, size,
     progress: 0, dist: Math.max(3, startM), tension: 0, slipping: false, near: false, out: null, drag: DRAG.standard,
-    age: 0, slack: 0, over: 0, turns: 0, fishPull: 0, running: false, taking: false,
+    age: 0, slack: 0, over: 0, turns: 0, fishPull: 0, running: false, taking: false, dir: 0, shake: 0, dive: 0, stamina: 1,
   };
 }
 
-/** How hard the fish pulls right now (0..~1.6): its strength, its runs and surges, less as it tires. */
+/** How hard the fish pulls right now (0..~2.5), which way (dir -1..1), how much it's shaking its head (0..1) and diving
+ *  (0..1): its strength, its runs and surges, less as it tires. */
 export function fishPull(s, age = s.age) {
+  const st = s.style || fightStyleOf(s.species);
   const stamina = Math.exp(-age / (22 * s.long));
   const surge = Math.max(0, Math.sin(age * 0.95 * s.tempo + 1.3)) ** 6;
   const run = s.runs.find(([a, b]) => age >= a && age < b);
   const runK = run ? run[2] * Math.sin(Math.PI * (age - run[0]) / (run[1] - run[0])) : 0;
-  return { pull: s.pull * (0.35 + 0.65 * stamina) * (0.42 + 0.35 * surge + 0.75 * runK), running: runK > 0.25 };
+  // its heading: along the run while it runs, wandering between (smoothly, never a jump)
+  const tw = s.heads || [], i = tw.findIndex(([t]) => t > age), a0 = tw[Math.max(0, i - 1)] || [0, 0], a1 = tw[i] || a0, u = a1[0] > a0[0] ? (age - a0[0]) / (a1[0] - a0[0]) : 0;
+  const wander = a0[1] + (a1[1] - a0[1]) * (u * u * (3 - 2 * u));
+  const dir = Math.max(-1, Math.min(1, run ? wander * 0.35 + run[3] * 0.75 * Math.min(1, runK * 1.6) : wander * 0.6));
+  // head-shakes: in bursts, stronger when it's fresh and near the top
+  const shake = st.shake[1] * (0.4 + 0.6 * stamina) * Math.max(0, Math.sin(age * st.shake[0] * Math.PI * 2)) ** 2 * (0.5 + 0.5 * Math.max(0, Math.sin(age * 0.7 + s.seed)));
+  const pull = s.pull * (0.35 + 0.65 * stamina) * (0.42 + 0.35 * surge + 0.75 * runK + 0.25 * shake);
+  return { pull, running: runK > 0.25, dir, shake, dive: st.dive * (0.4 + 0.6 * stamina), stamina };
 }
 
 /**
@@ -66,8 +109,8 @@ export function fightStep(s0, dt, input = {}) {
   s.age += dt;
   const rate = input.assisted ? REEL.assistedRate : input.rate || 0, e = effort(rate);
   const taps = input.assisted ? REEL.assistedRate * dt : Math.max(0, input.taps || 0);
-  const { pull, running } = fishPull(s);
-  s.fishPull = pull;
+  const { pull, running, dir, shake, dive, stamina } = fishPull(s);
+  s.fishPull = pull; s.dir = dir; s.shake = shake; s.dive = dive; s.stamina = stamina;
   const pullN = Math.min(1.2, pull / 1.4);
   // the drag: set by you in Advanced mode, otherwise set to give before the line could part
   s.drag = s.mode === "advanced" ? Math.max(DRAG.min, Math.min(DRAG.max, input.drag ?? s.drag)) : DRAG.standard;
@@ -84,10 +127,10 @@ export function fightStep(s0, dt, input = {}) {
   let dp = taps * perTap * (1 - 0.5 * pullN) * frantic * (s.slipping ? 0.1 : 1);
   if (s.slipping) dp -= (tension - s.drag + 0.08 + 0.25 * (running ? 1 : 0)) * span * 2.4 * dt; // the fish takes line
   if (rate < 0.3 && !input.assisted) dp -= span * 0.22 * pullN * dt; // not winding: it slowly swims off
-  s.progress = Math.max(0, Math.min(1, s.progress + dp));
+  const was = s.progress; s.progress = Math.max(0, Math.min(1, s.progress + dp));
   s.dist = s.startM * (1 - s.progress);
   s.turns += taps * REEL.turnsPerTap; // the handle turns with each tap, exactly
-  s.taking = dp < -1e-6; s.running = running && s.taking;
+  s.taking = s.progress < was - 1e-9; s.running = running && s.taking; // (line actually going out: at the very start, with none won yet, there's none to take)
   s.near = s.progress >= REEL.nearAt;
   // slack: a long time with hardly any pressure and the hook can come out
   s.slack = tension < 0.12 && !s.near ? s.slack + dt : Math.max(0, s.slack - dt * 2);

@@ -11,7 +11,9 @@ export function overRail(railPt, ns, a, b, f, n = null) {
   // (where the way from a to b crosses the rail's line: n is the way out over the water, square to the rail)
   const nx = n ? n.x : dx, nz = n ? n.z : dz, dn = dx * nx + dz * nz;
   const along = Math.abs(dn) > 1e-6 ? clamp01(((railPt.x - a.x) * nx + (railPt.z - a.z) * nz) / dn / dl) * dl : dl / 2;
-  const cx = a.x + dx * along, cz = a.z + dz * along, m = 0.14 / Math.max(0.3, Math.abs(dn));
+  // (m: how far either side of the rail it rises and comes down: the hoop's own half-width and a little, so the hoop
+  // never comes down through the rail or a post; 14 cm let it cut through the post it came down beside)
+  const cx = a.x + dx * along, cz = a.z + dz * along, m = Math.max(0.14, 0.36 * ns + 0.08) / Math.max(0.3, Math.abs(dn));
   const pts = [a, { x: cx - dx * m, y: Math.max(top, a.y), z: cz - dz * m }, { x: cx + dx * m, y: Math.max(top, b.y), z: cz + dz * m }, b];
   const seg = []; let D = 0;
   for (let i = 1; i < pts.length; i++) { const p = pts[i - 1], q = pts[i], l = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z); seg.push(l); D += l; }

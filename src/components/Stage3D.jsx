@@ -8,6 +8,7 @@ import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
 import { speciesById } from "../data/species.js";
 import { catchInfo } from "../lib/catchInfo.js";
+import GraphicsPanel, { FpsMeter } from "./GraphicsPanel.jsx";
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
@@ -56,6 +57,9 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   useEffect(() => { if (!kept) { setLooking(false); } }, [kept]);
   useEffect(() => { if (kept === null && landed && !looking) setLanded(null); }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!walk) setSprint(false); }, [walk]);
+  // (several settings at once, from one view: Settings → Graphics)
+  const setOpts = (o) => { setView((cur) => { const next = { ...cur, ...o }; saveView(next); return next; }); };
+  const [gfxOpen, setGfxOpen] = useState(false);
   const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "fishCam") { w.current?.setLandShot(v === "cinematic"); const m = v === "third" ? "third" : "first"; setMode(m); w.current?.setMode(m); } if (k === "look" || k === "smooth") w.current?.setLookFeel(next); if (k === "side") { if (v === "left") document.documentElement.dataset.hand = "left"; else delete document.documentElement.dataset.hand; } };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
@@ -142,10 +146,11 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("camDist", { near: "normal", normal: "far", far: "near" }[view.camDist] || "normal")} title="How far behind you the camera follows when you walk about (pinch to change it as you go)">Walking camera: {{ near: "Near", normal: "Normal", far: "Far" }[view.camDist] || "Normal"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={!!view.autoBtn} className={`ft-pill${view.autoBtn ? " on" : ""}`} onClick={() => setOpt("autoBtn", !view.autoBtn)} title="An Auto button when you walk about: keep walking where you look until you touch the stick">Auto-walk button</button>
               {reelOpts ? <>
+                <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.holdReel !== false} className={`ft-pill${reelOpts.holdReel !== false ? " on" : ""}`} onClick={() => onReelOpts?.({ holdReel: reelOpts.holdReel === false })} title="Hold the Reel button to wind in steadily; tapping works as well">Hold to reel</button>
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.assisted} className={`ft-pill${reelOpts.assisted ? " on" : ""}`} onClick={() => onReelOpts?.({ assisted: !reelOpts.assisted })} title="One tap starts winding at a steady rate, another stops it, instead of tapping again and again">Assisted reeling</button>
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.advanced} className={`ft-pill${reelOpts.advanced ? " on" : ""}`} onClick={() => onReelOpts?.({ advanced: !reelOpts.advanced })} title="Set the drag yourself while you fight a fish: too tight and the line can break">Advanced fight</button>
               </> : null}
-              <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("gfx", { auto: "performance", performance: "balanced", balanced: "high", high: "ultra", ultra: "auto" }[view.gfx] || "auto")} title="Performance runs smoother and saves battery; High quality looks best on a newer phone; Ultra is for a computer with a graphics card">Graphics: {{ auto: "Auto", performance: "Performance", balanced: "Balanced", high: "High quality", ultra: "Ultra" }[view.gfx] || "Auto"}</button>
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); setGfxOpen(true); }} title="Preset, resolution, frame rate, shadows, ambient occlusion and more">Graphics: {{ auto: "Auto", performance: "Low", balanced: "Medium", high: "High", ultra: "Ultra" }[view.gfx] || "Auto"}{view.gfxC && Object.keys(view.gfxC).length ? " (custom)" : ""}</button>
               {sound ? <SoundLevels /> : null}
               {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
@@ -153,6 +158,8 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
         </div>
         {/* walking about: its own button, bottom right (while walking, the walking controls take its place) */}
         {!walk && !busyFishing ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
+        {gfxOpen ? <GraphicsPanel view={view} setOpts={setOpts} world={w.current} onClose={() => setGfxOpen(false)} /> : null}
+        {view.fpsShow ? <FpsMeter world={w.current} /> : null}
         {card ? <div className="w3d-card"><CatchCard ev={card.ev} demo={demo} compact photoUrl={catchPhoto?.(card.ev)} onClose={() => setCard(null)} who={card.who} /></div> : null}
       </World3D>
     </div>

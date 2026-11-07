@@ -2,7 +2,8 @@
 // Cast (with the power and aim you chose), and a fish bites by itself after a while (sooner for quick, plentiful
 // fish); strike in time (too soon or too late and it can let go); then tap the reel to wind it in while it fights
 // back (reelModel.js): watch the line's tension, let the drag do its work through a run, and land it once it's close.
-// Assisted reeling (an option) winds at a steady rate after one tap, for anyone who can't tap repeatedly. Every catch
+// Holding the Reel button winds at a steady rate for as long as it's held (on unless turned off), and Assisted reeling
+// (an option) winds steadily after one tap, for anyone who can't tap or hold. Every catch
 // made here is simulated and says so (data.simulated), and nothing here is ever saved as a real catch.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DUR } from "./liveEvents.js";
@@ -11,7 +12,8 @@ import { createFight, fightStep, tapRate, DRAG, strikeTiming } from "./reelModel
 
 // ---- reeling options, saved on this phone: Assisted reeling, and Advanced (set the drag yourself) ----
 const OPT_KEY = "fishdock.reel";
-export function loadReelOpts() { try { const v = JSON.parse(localStorage.getItem(OPT_KEY) || "{}"); return { assisted: !!v.assisted, advanced: !!v.advanced }; } catch { return { assisted: false, advanced: false }; } }
+export function loadReelOpts() { try { const v = JSON.parse(localStorage.getItem(OPT_KEY) || "{}"); return { assisted: !!v.assisted, advanced: !!v.advanced, holdReel: v.holdReel !== false }; } catch { return { assisted: false, advanced: false, holdReel: true }; } }
+// (holdReel, on unless turned off: holding the Reel button winds steadily for as long as it's held; tapping still works too)
 export function saveReelOpts(o) { try { localStorage.setItem(OPT_KEY, JSON.stringify(o)); } catch { /* ignore */ } }
 export { strikeTiming };
 
@@ -79,11 +81,11 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     // twenty steps a second; the taps made since the last one each wind in there and then
     const id = setInterval(() => {
       const now = performance.now(), dt = Math.min(0.3, (now - prev) / 1000); prev = now;
-      const assisted = assistOn.current || autoplayRef.current;
+      const assisted = assistOn.current || autoplayRef.current || (holding.current && optsRef.current.holdReel !== false);
       const n = pending.current; pending.current = 0;
       const s = fightStep(fightRef.current, dt, { taps: n, rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
       fightRef.current = s; reelRef.current = s.progress; setReel(s.progress);
-      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode });
+      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina });
       if (s.out) { clearInterval(id); say(s.out === "broke" ? "The line broke. Ease the drag off when it runs." : "The hook came free. Keep the line tight."); add("lost", { why: s.out }); return; }
       if (s.near && autoplayRef.current) { clearInterval(id); land(); }
     }, 50);

@@ -22,5 +22,5 @@ function precacheList() {
 
 export default defineConfig({
   plugins: [react(), precacheList()],
-  define: { __BUILD_ID__: JSON.stringify(BUILD_ID), __APP_VERSION__: JSON.stringify(APP_VERSION), __PREVIEW__: "false" },
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID), __APP_VERSION__: JSON.stringify(APP_VERSION), __PREVIEW__: "false", __FD_FILM__: "false" },
 });

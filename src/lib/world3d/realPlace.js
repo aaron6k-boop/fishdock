@@ -52,9 +52,9 @@ function segIndex(segs, cell = 8) {
 // and darker concrete, smoother worn concrete (Poly Haven's concrete_floor_worn_001) where feet go, a few old stains,
 // and along the walls a ragged band of damp (darker, a little greener, less rough) with dried salt just inside it.
 // Wet (rain) darkens it and makes it shine. Until the photographs have loaded (or if they can't) the drawn one shows.
-export const PIER_TEX = "/textures/pier_concrete_";
+export const PIER_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/pier_concrete_"; // (__fdAssetBase: only a self-contained preview page sets it, its files beside it; the app leaves it unset)
 const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
-function pierConcrete(mat, quality = 1) {
+function pierConcrete(mat, quality = 1, axis = 0) {
   const wet = { value: 0 };
   if (typeof document === "undefined") return wet;
   const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
@@ -66,28 +66,47 @@ function pierConcrete(mat, quality = 1) {
     mat.normalMap = nor; mat.roughnessMap = rough; mat.normalScale.set(0.9, 0.9);
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWet = wet; sh.uniforms.pWorn = { value: worn }; sh.uniforms.pNoise = { value: noise };
+      sh.uniforms.uAxis = { value: new THREE.Vector2(Math.cos(axis), Math.sin(axis)) };
       sh.vertexShader = "attribute float aDamp;\nvarying float vDamp;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvDamp = aDamp;");
-      sh.fragmentShader = "uniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0;\n" + sh.fragmentShader
+      sh.fragmentShader = "uniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
         .replace("#include <map_fragment>", `#include <map_fragment>
         ${WET_PREP}
         {
           vec2 pu = vMapUv * ${PHOTO_TILE.toFixed(3)};
-          vec3 a = texture2D(pDiff, pu).rgb, b = texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb;
-          float m = ${quality < 1 ? "0.0" : "smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6)"}; // (one sample on Performance)
+          vec3 a = texture2D(pDiff, pu).rgb, b = ${quality < 2 ? "a" : "texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb"};
+          float m = ${quality < 2 ? "0.0" : "smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6)"}; // (the second, turned sample that breaks up the tiling only on High: the deck fills the view while you land a fish, and on a phone those samples halved the frame rate)
           vec3 avg = texture2D(pDiff, vec2(0.5), 12.0).rgb; // its smallest mip: the photograph's own average colour
           vec3 p = mix(a, b, m) / max(avg, vec3(0.02)); // over its average: the drawn colour stays the colour
           p = mix(vec3(dot(p, vec3(0.3, 0.59, 0.11))), p, 0.35);
-          diffuseColor.rgb *= mix(vec3(1.0), p, 0.6);
+          // (the photograph's pale flecks, at full strength, read as a speckled, blotchy floor: kept for its patches, softer)
+          p = mix(vec3(1.0), p, 0.7);
+          diffuseColor.rgb *= mix(vec3(1.0), p, 0.5);
+          // ---- the deck as cast: bays about 4.5 m long, square across the pier, with sawn joints between them ----
+          // (each joint a dark, sharp line a centimetre or so wide, grime settled a hand's width either side; each bay a
+          // shade different from the next, as concrete poured on different days is)
+          {
+            vec2 wq = vMapUv * 8.0; float al = dot(wq, uAxis), ac = dot(wq, vec2(-uAxis.y, uAxis.x));
+            float bay = al / 4.5, f = fract(bay), dj = min(f, 1.0 - f) * 4.5; // metres to the nearest joint
+            float px = max(fwidth(al), 1e-4);
+            float line = 1.0 - smoothstep(0.006, 0.006 + px * 1.5, dj);
+            float wob = (texture2D(pNoise, vec2(ac * 0.21, floor(bay) * 0.37)).r - 0.5) * 0.04; // (a little ragged, chipped)
+            float grime = 1.0 - smoothstep(0.0, 0.12 + wob, dj);
+            float fade = 1.0 - smoothstep(18.0, 60.0, px * 900.0); // (thin lines far off would shimmer: they fade into the grime)
+            fdJoint = line * fade;
+            diffuseColor.rgb *= 1.0 - line * 0.55 * fade - grime * 0.12;
+            float shade = fract(sin(floor(bay) * 12.9898 + floor(ac / 9.0) * 4.1) * 43758.5453);
+            diffuseColor.rgb *= 0.95 + shade * 0.08;
+          }
           // broad patches (about 70 m and 15 m across, turned so they never line up with the 8 m tile)
           vec4 nA = texture2D(pNoise, mat2(0.6, 0.8, -0.8, 0.6) * vMapUv * 0.11), nB = texture2D(pNoise, vMapUv * 0.53 + 0.3);
-          diffuseColor.rgb *= 0.93 + nA.g * 0.14;
+          diffuseColor.rgb *= (0.8 + nA.g * 0.3) * vec3(0.97, 0.955, 0.93); // (darker and a touch browner, with more of the weathered variation a real pier deck has: it read as a clean pale floor)
           // worn, smoother concrete where people walk (its own photograph, over its average)
           fdWorn = smoothstep(0.52, 0.74, nB.g * 0.7 + nA.g * 0.5);
-          ${quality < 1 ? "" : `vec3 w = texture2D(pWorn, vMapUv * 2.1).rgb / max(texture2D(pWorn, vec2(0.5), 10.0).rgb, vec3(0.02));
+          ${quality < 2 ? "" : `vec3 w = texture2D(pWorn, vMapUv * 2.1).rgb / max(texture2D(pWorn, vec2(0.5), 10.0).rgb, vec3(0.02));
           diffuseColor.rgb *= mix(vec3(1.0), mix(vec3(dot(w, vec3(0.3, 0.59, 0.11))), w, 0.3), fdWorn * 0.55);`}
           // old stains: a few darker blotches a metre or so across
           float stn = smoothstep(0.74, 0.8, texture2D(pNoise, vMapUv * 1.7 + 0.71).g) * smoothstep(0.4, 0.6, nA.r);
-          diffuseColor.rgb *= 1.0 - stn * 0.16;
+          diffuseColor.rgb *= 1.0 - stn * 0.3;
           // damp along the walls, ragged; dried salt just inside it
           fdDamp = smoothstep(0.35, 0.95, vDamp + (nB.r - 0.5) * 0.6);
           float salt = smoothstep(0.08, 0.35, vDamp) * (1.0 - fdDamp) * smoothstep(0.45, 0.7, texture2D(pNoise, vMapUv * 3.1).r);
@@ -98,7 +117,7 @@ function pierConcrete(mat, quality = 1) {
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`);
     };
-    mat.customProgramCacheKey = () => "fdpier2" + (quality < 1 ? "p" : "");
+    mat.customProgramCacheKey = () => "fdpier5" + (quality < 1 ? "p" : quality < 2 ? "b" : "");
     mat.needsUpdate = true;
   }).catch(() => {});
   return wet;
@@ -338,9 +357,12 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(all, 1) : new THREE.Uint16BufferAttribute(all, 1));
   g.addGroup(0, idxDeck.length, 0); g.addGroup(idxDeck.length, idxSoft.length, 1);
   g.computeVertexNormals();
-  const cTex = concrete({ seed: 3 }), dTex = detail(13);
+  const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
-  place.deckWet = pierConcrete(deckMat, quality);
+  // the pier's own direction (its longest run of wall near the fishing spots), for the deck's slab joints: square across
+  // it, not across the map's north and south
+  let axis = 0; { let best = 0; for (const e of walls) { const L = Math.hypot(e[2] - e[0], e[3] - e[1]), mx = (e[0] + e[2]) / 2, mz = (e[1] + e[3]) / 2; const near = spots.length ? Math.min(...spots.map((sp) => Math.hypot(mx - sp.at[0], mz - sp.at[2]))) : 0; const w = L / (1 + near / 60); if (w > best) { best = w; axis = Math.atan2(e[3] - e[1], e[2] - e[0]); } } }
+  place.deckWet = pierConcrete(deckMat, quality, axis);
   const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
@@ -427,8 +449,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // galvanised steel: dull, mottled zinc gone grey with weather, darker towards the deck where the spray and the dirt
   // reach, not polished chrome. The fittings (caps, ball joints, base plates, the sleeves where rails join, the bolts)
   // are where the zinc wears through first: rust in their crevices and a run of it down from each joint
-  const railMat = weather(new THREE.MeshStandardMaterial({ color: 0xaeb2b1, metalness: 0.6, roughness: 0.62 }), { scale: 0.7, mottle: 0.35, bump: 0.6, rust: [0.18, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.5, 0.22], rough: [0.8, 1.25], wet: place.deckWet });
-  const jointMat = weather(new THREE.MeshStandardMaterial({ color: 0xa2a6a5, metalness: 0.55, roughness: 0.66 }), { scale: 0.35, mottle: 0.4, bump: 0.8, rust: [0.6, 0.15, 0.06, 0.025], grime: [LAND, LAND + 0.4, 0.25], rough: [0.8, 1.2], wet: place.deckWet });
+  const railMat = weather(new THREE.MeshStandardMaterial({ color: 0xaeb2b1, metalness: 0.6, roughness: 0.62 }), { scale: 0.7, mottle: 0.35, bump: 0.6, rust: [0.32, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.5, 0.26], rough: [0.8, 1.25], wet: place.deckWet }); // (rustier: a North Sea pier's railings are brown along their joints and streaked below them)
+  // (the jetties' handrails: thin tubes of dull galvanising)
+  const jRailMat = new THREE.MeshStandardMaterial({ color: 0x8a8e8c, metalness: 0.3, roughness: 0.8 }); // (no weathering: on tubes this thin it shaded them past white, a row of glowing bars)
+  const jointMat = weather(new THREE.MeshStandardMaterial({ color: 0xa2a6a5, metalness: 0.55, roughness: 0.66 }), { scale: 0.35, mottle: 0.4, bump: 0.8, rust: [0.85, 0.15, 0.06, 0.025], grime: [LAND, LAND + 0.4, 0.25], rough: [0.8, 1.2], wet: place.deckWet });
   const posts = [], rails = [], timberRuns = [], barRuns = [];
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
@@ -476,6 +500,34 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     });
     sm.castShadow = true; group.add(sm);
   }
+  // ---- the worn yellow safety line painted along the edge, a little in from the railings, and cast-iron bollards ----
+  // (chipped and faded paint, worn through where feet go; the bollards squat and rusty, every dozen metres or so)
+  { const runs = []; for (const e of walls) { const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
+      if (len < 0.5 || Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > RAIL.within) continue;
+      if (!landAt([(x1 + x2) / 2 - nx * 0.9, (z1 + z2) / 2 - nz * 0.9])) continue;
+      if (fenceKind((x1 + x2) / 2 - nx * RAIL.inset, (z1 + z2) / 2 - nz * RAIL.inset, nx, nz) !== "rail") continue;
+      runs.push({ x1, z1, x2, z2, nx, nz, len }); }
+    if (runs.length && typeof document !== "undefined") {
+      const c = document.createElement("canvas"); c.width = 512; c.height = 32; const g = c.getContext("2d");
+      g.fillStyle = "rgb(214,178,52)"; g.fillRect(0, 4, 512, 24);
+      g.globalCompositeOperation = "destination-out"; // (chips and wear)
+      for (let i = 0; i < 260; i++) { g.globalAlpha = 0.25 + Math.random() * 0.75; g.beginPath(); g.ellipse(Math.random() * 512, 4 + Math.random() * 24, 1 + Math.random() * 7, 1 + Math.random() * 3, Math.random() * 3, 0, Math.PI * 2); g.fill(); }
+      g.globalAlpha = 0.5; for (let i = 0; i < 6; i++) { g.fillRect(Math.random() * 512, 0, 10 + Math.random() * 40, 32); }
+      const tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+      const lineMat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5, depthWrite: false });
+      const pos = [], uvs = [], idx = []; const IN = RAIL.inset + 0.42, W = 0.1;
+      for (const r of runs) { const dx = (r.x2 - r.x1) / r.len, dz = (r.z2 - r.z1) / r.len, b = pos.length / 3;
+        for (const [f, side] of [[0, 0], [0, 1], [1, 0], [1, 1]]) { const off = IN + side * W; pos.push(r.x1 + dx * r.len * f - r.nx * off, LAND + 0.004, r.z1 + dz * r.len * f - r.nz * off); uvs.push(f * r.len / 1.6, side); }
+        idx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); }
+      const lg = new THREE.BufferGeometry(); lg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); lg.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2)); lg.setIndex(idx); lg.computeVertexNormals();
+      const lm = new THREE.Mesh(lg, lineMat); lm.receiveShadow = true; lm.material.side = THREE.DoubleSide; group.add(lm);
+      // bollards: a squat cast-iron post with a flared head on a base plate, rust through the black paint
+      const prof = [[0, 0], [0.13, 0], [0.13, 0.03], [0.1, 0.04], [0.085, 0.07], [0.08, 0.26], [0.1, 0.3], [0.11, 0.34], [0.07, 0.37], [0, 0.375]].map(([x, y]) => new THREE.Vector2(x, y));
+      const bGeo = new THREE.LatheGeometry(prof, 24);
+      const bMat = weather(new THREE.MeshStandardMaterial({ color: 0x2a2624, metalness: 0.5, roughness: 0.72 }), { scale: 0.25, mottle: 0.5, bump: 0.9, rust: [0.9, 0.2, 0.08, 0.03], grime: [LAND, LAND + 0.2, 0.3], rough: [0.8, 1.2], wet: place.deckWet });
+      const spots = []; for (const r of runs) { const n = Math.floor(r.len / 12); for (let q = 0; q < n; q++) { const f = (q + 0.5) / n, dx = (r.x2 - r.x1), dz = (r.z2 - r.z1); spots.push([r.x1 + dx * f - r.nx * (RAIL.inset + 0.3), r.z1 + dz * f - r.nz * (RAIL.inset + 0.3)]); } }
+      if (spots.length) { const bm = new THREE.InstancedMesh(bGeo, bMat, spots.length), mx = new THREE.Matrix4(); spots.forEach(([x, z], q) => { mx.makeTranslation(x, LAND, z); bm.setMatrixAt(q, mx); }); bm.castShadow = true; bm.receiveShadow = true; group.add(bm); place.bollards = spots.map(([x, z]) => [x, z]); }
+    } }
   place.railings = posts.length;
 
   // ---- on the pier: lamp posts, lifebuoys and benches along the edge (never on a fishing spot) ----
@@ -637,7 +689,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           for (let q = 0; q < np; q++) rp.push([a2[0] + (b2[0] - a2[0]) * q / np, a2[1] + (b2[1] - a2[1]) * q / np]);
           for (const y of [RAIL.h, RAIL.h * 0.5]) rr.push({ a: [a2[0], p.h + y, a2[1]], b: [b2[0], p.h + y, b2[1]], r: y === RAIL.h ? 0.026 : 0.018 });
         }
-        if (rp.length) { const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 8), railMat, rp.length), mx = new THREE.Matrix4(); rp.forEach(([x, z], q) => { mx.makeTranslation(x, p.h + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); group.add(pm); }
+        if (rp.length) { const pm = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.03, 0.032, RAIL.h + 0.04, 8, 1, true), railMat, rp.length) /* (open-topped under the rail, as the pier's own posts: their flat sunlit caps lined up in perspective into bright bars) */, mx = new THREE.Matrix4(); rp.forEach(([x, z], q) => { mx.makeTranslation(x, p.h + RAIL.h / 2, z); pm.setMatrixAt(q, mx); }); group.add(pm); }
         if (rr.length) { const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8), railMat, rr.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0); rr.forEach(({ a: A0, b: B0, r }, q) => { const A = new THREE.Vector3(...A0), Bv = new THREE.Vector3(...B0), d = Bv.clone().sub(A), L2 = d.length(); mx.compose(A.clone().add(Bv).multiplyScalar(0.5), new THREE.Quaternion().setFromUnitVectors(up, d.normalize()), new THREE.Vector3(r, L2 + 0.06, r)); rm.setMatrixAt(q, mx); }); group.add(rm); }
       }
       if (ring.some(([x, z]) => nearSpot(x, z, NEAR_SOLID + 60))) solids.push(m);
@@ -655,7 +707,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       pile.computeBoundingSphere(); group.add(pile);
     }
     if (jRail.length) {
-      const rail = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 20, 1, true), railMat, jRail.length), qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+      const rail = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 20, 1, true), jRailMat, jRail.length), qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
       jRail.forEach(([x, y, z, ang, len], k) => { mx.compose(v.set(x, y, z), q.setFromAxisAngle(up, -ang).multiply(qz), sc.set(1, len, 1)); rail.setMatrixAt(k, mx); });
       rail.computeBoundingSphere(); group.add(rail); void X1;
     }

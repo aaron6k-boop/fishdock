@@ -14,6 +14,7 @@ import { speciesById } from "../data/species.js";
 import { soundOn, soundOff, soundEnv, setVolume, play } from "../lib/sceneAudio.js";
 import { fmtTime } from "../lib/time.js";
 import { Icon } from "./ui.jsx";
+import { FILM } from "../lib/world3d/film.js";
 
 export const QUALITY = {
   saver: { label: "Battery Saver", scale: 0.5, fps: 20, oct: 2, flow: 0.6, parts: 0.4, frame: 800, ui: 0.8 },
@@ -210,9 +211,9 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     const r = R.current;
     const qq = QUALITY[q] || QUALITY.balanced;
     let lastPhase = "";
-    // test hook (never used by the app): with window.__fdFilm set before loading, a test can freeze this scene's clock
+    // test hook (never used by the app): with FILM set before loading, a test can freeze this scene's clock
     // and step it a set time per frame, to film a landing exactly where frames are slow (software graphics)
-    if (typeof window !== "undefined" && window.__fdFilm) window.__fdScene = { freeze() { r.film = { ts: performance.now(), now: props.current.now() }; }, step(ms) { if (!r.film) return; r.film.ts += ms; r.film.now += ms; loop(r.film.ts, true); } };
+    if (typeof window !== "undefined" && FILM) window.__fdScene = { freeze() { r.film = { ts: performance.now(), now: props.current.now() }; }, step(ms) { if (!r.film) return; r.film.ts += ms; r.film.now += ms; loop(r.film.ts, true); } };
     const loop = (ts, forced = false) => {
       if (!forced) { r.raf = requestAnimationFrame(loop); if (r.film) return; }
       if (!forced && (!r.visible || !r.onScreen)) return;
