@@ -590,6 +590,70 @@
      "url": "https://github.com/mrdoob/three.js (git, examples/textures/waternormals.jpg at f2b6a71)"
     }
    ]
+  },
+  {
+   "id": "polyhaven:red_brick_03",
+   "name": "Red Brick 03",
+   "source": "https://polyhaven.com/a/red_brick_03",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness)",
+   "downloaded": "2026-11-04",
+   "files": [
+    {
+     "file": "downloads/polyhaven/red_brick_03/textures/red_brick_03_diff_1k.jpg",
+     "bytes": 694500,
+     "sha256": "9c58254c099b2d211478f50a427fcdde622af24249ff2e94da41fb836f8c857f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick_03/red_brick_03_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/red_brick_03/textures/red_brick_03_nor_gl_1k.jpg",
+     "bytes": 955430,
+     "sha256": "9bfd45e24720d851017c1e1678b70219c72239b2ac6b25e11d57d458bdab8503",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick_03/red_brick_03_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/red_brick_03/textures/red_brick_03_rough_1k.jpg",
+     "bytes": 286623,
+     "sha256": "cd865623c1422926848024e877103e9dfe857b2ca8221fce49264b74c9ff48b1",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick_03/red_brick_03_rough_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:painted_plaster_wall",
+   "name": "Painted Plaster Wall",
+   "source": "https://polyhaven.com/a/painted_plaster_wall",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "the coastwatch building's white paint and render (public/textures/plaster_*.jpg)",
+   "downloaded": "2026-11-04",
+   "files": [
+    {
+     "file": "downloads/polyhaven/painted_plaster_wall/textures/painted_plaster_wall_diff_1k.jpg",
+     "bytes": 686726,
+     "sha256": "440310f05af089f2c93353167573403cbc3f805948203237b5d26431eeb9e19c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/painted_plaster_wall/textures/painted_plaster_wall_nor_gl_1k.jpg",
+     "bytes": 900461,
+     "sha256": "8eb01647d126eb5341e2c325821ad48c8ca11349dbef53447c95422c5d91cc9d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/painted_plaster_wall/textures/painted_plaster_wall_rough_1k.jpg",
+     "bytes": 354762,
+     "sha256": "e0564c297b22ab1cf4ef02a82157b84ce3b92eb4fd49d9c64b7256a8b300af82",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_rough_1k.jpg"
+    }
+   ]
   }
  ]
 }

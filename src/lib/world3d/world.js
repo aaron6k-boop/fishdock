@@ -24,7 +24,8 @@ import { FILM } from "./film.js";
 export const QUALITY3D = {
   performance: { dpr: 1.5, ss: 1, floor: 1, shadows: 0, q: 0.5, post: 0 },
   balanced: { dpr: 2, ss: 1, floor: 1.25, shadows: 1, q: 1, post: 1, late: 0.025, easy: 10 }, // (steps down when frames run under about 40 a second, as landing a fish with the deck filling the view did on a phone, and back up after 20 s of easy frames; never below 1.25)
-  high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2 },
+  // (High also steps down, the same as Balanced, so a phone that can't hold it at a busy moment gets smoother rather than jerky)
+  high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2, late: 0.025, easy: 10 },
   // a computer with a graphics card: drawn at twice the screen's pixels (or more) and scaled down, finer shade
   // (and kept smooth: a frame slower than about 48 a second counts as late, where the others allow down to 28)
   ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021 },
@@ -33,23 +34,25 @@ export function autoQuality3d() {
   try {
     // iPhone Safari reports no memory and only a few cores, which put every iPhone (even the newest) on the lowest
     // setting: no antialiasing, one pixel per three and no shadows, so edges were jagged and everything soft. iPhones
-    // from the last several years have strong graphics; they get the balanced setting
+    // from the last several years have strong graphics. A recent one (iOS 18 or later: iPhone XS and newer, and
+    // Balanced measured a steady 60 with room to spare on an iPhone 17 Pro) starts on High quality, which steps itself
+    // down if frames run late; older ones get Balanced
     const ua = navigator.userAgent || "", ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-    if (ios) return "balanced";
+    if (ios) { const v = +(ua.match(/Version\/(\d+)/) || ua.match(/OS (\d+)_/) || [0, 0])[1]; return v >= 18 ? "high" : "balanced"; }
     // a computer with its own graphics card (NVIDIA, AMD Radeon, Intel Arc) gets the best, whatever it reports
-    if (!/Android|Mobile/.test(ua) && discreteGpu()) return "ultra";
+    if (!/Android|Mobile/.test(ua)) { const g = gpuName(); if (/NVIDIA|GeForce|RTX|Radeon RX|Radeon Pro|Intel\(R\) Arc/i.test(g)) return "ultra"; if (/Apple M\d/i.test(g)) return "high"; } // (a Mac with Apple silicon: High)
     const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4; if (mem <= 2 || cores <= 4) return "performance";
     if (mem >= 8 && cores >= 8) return "high";
   } catch { /* ignore */ }
   return "balanced";
 }
-function discreteGpu() {
+function gpuName() {
   try {
-    const gl = document.createElement("canvas").getContext("webgl2"); if (!gl) return false;
+    const gl = document.createElement("canvas").getContext("webgl2"); if (!gl) return "";
     const ext = gl.getExtension("WEBGL_debug_renderer_info"); const name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "";
     gl.getExtension("WEBGL_lose_context")?.loseContext();
-    return /NVIDIA|GeForce|RTX|Radeon RX|Radeon Pro|Intel\(R\) Arc/i.test(name || "");
-  } catch { return false; }
+    return name || "";
+  } catch { return ""; }
 }
 export const HOME_PITCH = -0.09;
 const ease01 = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));

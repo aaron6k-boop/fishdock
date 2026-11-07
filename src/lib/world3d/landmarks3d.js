@@ -3,7 +3,7 @@
 // OpenStreetMap. Sizes are estimates from photographs.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { bricks, weather } from "./textures3d.js";
+import { bricks, weather, photoTex } from "./textures3d.js";
 
 // ---- a few shapes merged by material: one mesh (one draw call) per material ----
 function kit() {
@@ -162,12 +162,20 @@ function gorlestonLighthouse(group, ring, base) {
   sq("flag", 1.1, 0.7, fX, y1 + S1 + 2.75, fZ + nzS * 0.6, Math.PI / 2); // (flying in over the balcony from the pole)
 
   const brk = bricks(23, [116, 74, 60]); // (a darker, browner brick than the town's, as photographed)
+  // photographed brick and painted render (Poly Haven CC0, public/textures): real mortar, chipped faces and the
+  // unevenness of old paint, where the drawn ones were too regular to read as a real wall. Both tile at about 1.1 m
+  // (the brick: fourteen 75 mm courses a tile, as British brick is laid)
+  const bPhoto = photoTex("brick_red_diff"), bN = bPhoto && photoTex("brick_red_nor", { srgb: false }), bR = bPhoto && photoTex("brick_red_rough", { srgb: false });
+  const pPhoto = photoTex("plaster_diff"), pN = pPhoto && photoTex("plaster_nor", { srgb: false }), pR = pPhoto && photoTex("plaster_rough", { srgb: false });
   const sign = signTexture();
   const M = {
-    paint: new THREE.MeshStandardMaterial({ color: 0xe9e7e1, normalMap: brk.normalMap, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.9 }),
-    panel: new THREE.MeshStandardMaterial({ color: 0xe2e2df, roughness: 0.8 }),
-    white: new THREE.MeshStandardMaterial({ color: 0xf1f0ec, roughness: 0.85 }),
-    brick: new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.88 }),
+    // (the ground storey is painted brick: the paint's own unevenness over the brick's courses)
+    // (the render photograph is a warm mid grey, about 0.4 in linear light: lifted to the white paint's own shade)
+    paint: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color().setRGB(1.98, 2.16, 2.1) : new THREE.Color(0xe9e7e1), map: pPhoto || null, normalMap: bN || brk.normalMap, normalScale: new THREE.Vector2(0.45, 0.45), roughnessMap: pR || null, roughness: pR ? 1 : 0.9 }),
+    panel: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color().setRGB(1.92, 2.1, 2.14) : new THREE.Color(0xe2e2df), map: pPhoto || null, normalMap: pN || null, roughness: 0.8 }),
+    white: new THREE.MeshStandardMaterial({ color: pPhoto ? new THREE.Color().setRGB(2.15, 2.38, 2.45) : new THREE.Color(0xf1f0ec), map: pPhoto || null, normalMap: pN || null, roughnessMap: pR || null, roughness: pR ? 1 : 0.85 }),
+    brick: bPhoto ? new THREE.MeshStandardMaterial({ map: bPhoto, normalMap: bN, roughnessMap: bR, roughness: 1, color: 0xe2d4ca })
+      : new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.88 }),
     trim: new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.5 }),
     frame: new THREE.MeshStandardMaterial({ color: 0x4a3328, roughness: 0.7 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x55636c, roughness: 0.08, metalness: 0.5, emissive: 0xffd890, emissiveIntensity: 0 }),
@@ -199,7 +207,10 @@ function gorlestonLighthouse(group, ring, base) {
   const turn = Math.atan2(-ax[1], ax[0]), meshes = [];
   for (const [k, list] of Object.entries(K.parts)) {
     const g = mergeGeometries(list.map((q) => (q.index ? q.toNonIndexed() : q)));
-    if (k === "brick" || k === "paint") { const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) { const sideX = Math.abs(n.getX(i)) > 0.5; uv.setXY(i, (sideX ? p.getZ(i) : p.getX(i)) / 0.86, p.getY(i) / 0.6); } }
+    // (the walls and slabs: uvs from their size, so the brick and render keep their real scale on every face; the
+    // drawn brick's tile was 0.86 by 0.6 m, the photographs' about 1.1 m square)
+    const tile = bPhoto ? [1.1, 1.1] : [0.86, 0.6];
+    if (k === "brick" || k === "paint" || (pPhoto && (k === "white" || k === "panel"))) { const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) { const sideX = Math.abs(n.getX(i)) > 0.5, flat = Math.abs(n.getY(i)) > 0.5; uv.setXY(i, (sideX ? p.getZ(i) : p.getX(i)) / tile[0], (flat ? p.getZ(i) : p.getY(i)) / tile[1]); } }
     g.rotateY(turn); g.translate(cx, 0, cz);
     const m = new THREE.Mesh(g, M[k]); m.castShadow = k !== "sign"; m.receiveShadow = k !== "galv" && k !== "red" && k !== "iron"; group.add(m); meshes.push(m);
   }

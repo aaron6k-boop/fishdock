@@ -19,6 +19,12 @@ JOBS = [
   ("cap_concrete_diff", "concrete_wall_004", "diff_1k", 512, "rgb"),
   ("cap_concrete_nor", "concrete_wall_004", "nor_gl_1k", 512, "rgb"),
   ("cap_concrete_rough", "concrete_wall_004", "rough_1k", 256, "grey"),
+  ("brick_red_diff", "red_brick_03", "diff_1k", 1024, "rgb"),
+  ("brick_red_nor", "red_brick_03", "nor_gl_1k", 512, "rgb"),
+  ("brick_red_rough", "red_brick_03", "rough_1k", 256, "grey"),
+  ("plaster_diff", "painted_plaster_wall", "diff_1k", 1024, "rgb"),
+  ("plaster_nor", "painted_plaster_wall", "nor_gl_1k", 512, "rgb"),
+  ("plaster_rough", "painted_plaster_wall", "rough_1k", 256, "grey"),
 ]
 
 for name, folder, part, size, kind in JOBS:
