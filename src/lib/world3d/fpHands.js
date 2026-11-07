@@ -535,7 +535,7 @@ function realArms(scene, { gloves, skinHex }) {
       //   al: which way the fingers point round the knob (radians from straight down, towards the rod's tip)
       //   cup: how far the knob's end sits into the hollow of the palm (metres); lat: the knob between the index and
       //   middle fingers (0) or further towards the little finger (+)
-      const KG = { al: 1.75, cup: 0.004, lat: 0.004, press: 0.08, minCurl: 0.5, ...(TUNE.knob || {}) };
+      const KG = { al: 1.75, cup: -0.02, lat: 0.004, press: 0.08, minCurl: 0.5, tuck: [0.85, 0.95], it: [0.9, 0.85, 0.5], mt: [0.95, 0.9, 0.52], ...(TUNE.knob || {}) }; // (the knob out in the fingers, the ring and little fingers loosely curled: with it deep in the palm and those two clenched, the hand read as a fist)
       const KR2 = GRIP.knobR, KL2 = GRIP.knobLen, end = X.clone().multiplyScalar(KL2 / 2); // (the knob's outer end: its axis runs from the handle's arm outwards along +x)
       const Nt = X.clone().negate(), Yt = V(0, -Math.cos(KG.al), Math.sin(KG.al)), Xt = Yt.clone().cross(Nt).normalize();
       let Qh = basis(Xt, Yt, Nt).multiply(Rl);
@@ -556,7 +556,7 @@ function realArms(scene, { gloves, skinHex }) {
       };
       // (round the knob from their roots, the middle joints only part-bent: closing mostly at the middle joints hooked
       // them over it like a claw)
-      const f = [close(S.fingers[0], [1.2, 0.95, 0.62]), close(S.fingers[1], [1.25, 1.0, 0.65]), close(S.fingers[2], [1, 1.0, 0.7], 1.15), close(S.fingers[3], [1, 0.95, 0.7], 1.22)]; // (folded in, not clenched: tighter, their tips pushed out through the back of the hand)
+      const f = [close(S.fingers[0], KG.it || [1.2, 0.95, 0.62]), close(S.fingers[1], KG.mt || [1.25, 1.0, 0.65]), close(S.fingers[2], [1, 1.0, 0.7], (KG.tuck || [1.15, 1.22])[0]), close(S.fingers[3], [1, 0.95, 0.7], (KG.tuck || [1.15, 1.22])[1])]; // (folded in, not clenched: tighter, their tips pushed out through the back of the hand)
       // the thumb: its pad on the knob's side across from the fingers' pads
       const fp2 = wp(S.fingers[0][2].b).lerp(wp(S.fingers[1][2].b), 0.5), opp = fp2.clone(); opp.x = 0; opp.normalize().negate();
       const want = opp.multiplyScalar(KR2 + 0.007);
@@ -906,7 +906,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   // for the first moments), and only show if the model can't load or takes too long
   for (const h of hands) h.mesh.visible = false;
   const fallback = () => { if (!real) for (const h of hands) h.mesh.visible = true; };
-  const slow = setTimeout(fallback, 8000);
+  const slow = setTimeout(fallback, 20000), born = performance.now(); // (a phone on a slow connection can take a while)
   loadPart("fp_arms").then((sc) => { try { real = realArms(sc, { gloves, skinHex }); } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
 
   const m4 = new THREE.Matrix4();
@@ -952,6 +952,9 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
     pose(o) {
       const { hands: specs = [null, null], eye, vr, vu, vf, dt = 0.016 } = o;
       if (!group.visible) return;
+      // (until the rod and reel have loaded there's nothing for the hands to take hold of, and they hung loose in the
+      // first moments, a forearm across the view; so they wait for them, a few seconds at most on a slow connection)
+      if (real) real.root.visible = !(specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock) && performance.now() - born < 20000);
       for (let i = 0; i < 2; i++) {
         const h = hands[i], spec = specs[i];
         // the elbow: fixed in the view, below and out to the side, out of sight

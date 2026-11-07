@@ -328,7 +328,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // the sun's glitter (a gold path at dusk, never a red one) and the moon's
         float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud));
         float sp = max(dot(rd, uSunDir), 0.);
-        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 600.)*5. + pow(sp, 60.)*.16)*sunVis;
+        // (the sharp reflection broken up close by into sparkles on the small facets of the chop: whole, it lay in big
+        // white blotches the shape of each wave's face, like paper cut-outs on the water)
+        float brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
+        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.14)*sunVis;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
