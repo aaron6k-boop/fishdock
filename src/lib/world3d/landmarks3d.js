@@ -95,13 +95,27 @@ function gorlestonLighthouse(group, ring, base) {
   // ---- the lookout storey: inset from the slab's edge ----
   const li = 0.15, lL = L - li * 2, lW = W - li * 2, yU = y1 + S1;
   const sill = 1.15, win = 1.15, fas = U - sill - win;
-  K.box("brick", lL, sill, lW, 0, yU + sill / 2, 0);
-  K.box("trim", lL + 0.08, 0.08, lW + 0.08, 0, yU + sill + 0.04, 0); // the sill
-  // the window band: glass all round, white mullions at the corners and between the panes, a white head
-  K.box("glass", lL - 0.06, win, lW - 0.06, 0, yU + sill + win / 2, 0);
-  const posts = (len, n) => Array.from({ length: n + 1 }, (_, k) => -len / 2 + (len * k) / n);
-  for (const x of posts(lL, 7)) for (const s of [-1, 1]) K.box("trim", 0.1, win, 0.1, x, yU + sill + win / 2, s * lW / 2);
-  for (const z of posts(lW, 3)) for (const e of [-1, 1]) K.box("trim", 0.1, win, 0.1, e * lL / 2, yU + sill + win / 2, z);
+  // the lookout storey's walls: plain unpainted brick from the slab to the fascia (the building's lower storey is
+  // painted white, its upper one left as bare brick), with separate windows set into it, not a band of glass all round
+  K.box("brick", lL, sill + win, lW, 0, yU + (sill + win) / 2, 0);
+  // ---- the windows: white frames proud of the brick, a concrete sill under each, the glass just behind the frame ----
+  // (as photographed: a row of separate windows down each long side, a wide three-light window on the seaward end for
+  // the watch out to sea, a single one on the landward end)
+  const wy = yU + sill + win / 2;
+  const windowAt = (w, h, x, z, face, lights = 2) => { // face: the way out (+x, -x, +z or -z)
+    const ax = face === "x+" || face === "x-", sgn = face === "x+" || face === "z+" ? 1 : -1, o = 0.03; // (o: how far the frame stands proud)
+    const at = (u, d) => (ax ? [x + sgn * d, z + u] : [x + u, z + sgn * d]); // u along the wall, d out from it
+    const bx = (mat, uw, hh, dd, u, y, d) => { const [px, pz] = at(u, d); K.box(mat, ax ? dd : uw, hh, ax ? uw : dd, px, y, pz); };
+    bx("glass", w - 0.08, h - 0.08, 0.02, 0, wy, 0.004);
+    bx("trim", w, 0.08, 0.07, 0, wy + h / 2 - 0.04, o); bx("trim", w, 0.08, 0.07, 0, wy - h / 2 + 0.04, o); // head and foot of the frame
+    for (let k = 0; k <= lights; k++) bx("trim", 0.07, h, 0.07, -w / 2 + 0.035 + (w - 0.07) * k / lights, wy, o); // jambs and mullions
+    bx("trim", w - 0.07, 0.05, 0.05, 0, wy + h * 0.22, o); // a transom: the small opening lights at the top
+    bx("white", w + 0.16, 0.07, 0.12, 0, wy - h / 2 - 0.035, 0.06); // the sill, projecting
+  };
+  const nL = Math.max(2, Math.round(lL / 2.3)), wl = Math.min(1.5, lL / nL - 0.5);
+  for (let k = 0; k < nL; k++) { const x = -lL / 2 + (lL * (k + 0.5)) / nL; windowAt(wl, win, x, lW / 2, "z+"); windowAt(wl, win, x, -lW / 2, "z-"); }
+  windowAt(Math.min(lW - 0.6, 3.4), win, ex * lL / 2, 0, ex > 0 ? "x+" : "x-", 3); // seaward: the watch window
+  windowAt(1.2, win, -ex * lL / 2, 0, ex > 0 ? "x-" : "x+", 2); // landward
   K.box("white", lL + 0.06, fas, lW + 0.06, 0, yU + sill + win + fas / 2, 0); // the fascia
   for (const e of [-1, 1]) for (const s of [-1, 1]) K.box("frame", 0.16, fas + 0.02, 0.16, e * lL / 2, yU + sill + win + fas / 2, s * lW / 2); // (dark corner posts)
   // ---- roof slab: deep, cantilevered, stepped under its edge ----
@@ -178,7 +192,7 @@ function gorlestonLighthouse(group, ring, base) {
       : new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.88 }),
     trim: new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.5 }),
     frame: new THREE.MeshStandardMaterial({ color: 0x4a3328, roughness: 0.7 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x55636c, roughness: 0.08, metalness: 0.5, emissive: 0xffd890, emissiveIntensity: 0 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x8a98a2, roughness: 0.05, metalness: 0.92, emissive: 0xffd890, emissiveIntensity: 0 }), // (dark, reflecting the sky as window glass does from outside)
     red: new THREE.MeshStandardMaterial({ color: 0xb8342a, roughness: 0.55, metalness: 0.2 }),
     redbox: new THREE.MeshStandardMaterial({ color: 0xb4482e, roughness: 0.75 }),
     drum: new THREE.MeshStandardMaterial({ color: 0x3a2a26, roughness: 0.5, metalness: 0.3 }),
