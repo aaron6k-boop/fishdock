@@ -5,6 +5,7 @@
 // steel sheet piling under a concrete cap; galvanised railings along them near the anglers; jetties on piles; the
 // buildings from the architecture library (buildings3d.js). Materials are drawn on the phone (textures3d.js).
 import * as THREE from "three";
+import { setTownStyle } from "./architecture.js";
 import { unrle, GROUND, PLACE3D, inside } from "./osmPlace.js";
 import { concrete, sheetPiling, detail, noise2, photoTex, weather, weatherTex, decalTex, grateTex, DECAL } from "./textures3d.js";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -630,12 +631,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     solids.push(collider(cbp, cbi));
   }
   if (beacons.length) place.beacons = beacons;
+  setTownStyle(local?.town || null);
   const res = buildBuildings(group, (place.buildings || []).filter((b) => !marks[b.id]), {
     groundAt: (x, z) => groundAt(x, z) || LAND,
     // nothing on a fishing spot, the deck round it or in front of it
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
     near: (x, z) => nearSpot(x, z, NEAR_SOLID + 30),
   });
+  setTownStyle(null);
   place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; for (const m of res.meshes) m.userData.kind = "a building"; targets.push(...res.meshes);
   for (const c of res.colliders) {
     const cbp = [], cbi = [];
