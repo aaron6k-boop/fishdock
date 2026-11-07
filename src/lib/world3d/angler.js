@@ -781,7 +781,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // shoulder)
       const holdDir = side.clone().multiplyScalar(0.85).addScaledVector(away, -0.53).normalize();
       const railIn = -Math.max(0.3, edge - 0.22) + 0.06, holdZ = Math.max(railIn + fishLen * 0.3, -(0.4 + 0.3 * fishLen));
-      const hold = toWorld(new THREE.Vector3(-0.12 - 0.1 * fishLen, 0.74, holdZ));
+      // (through your own eyes you stand and bring it up to look at it: about 45 cm in front of your face and a little
+      // below, elbows bent, so the hands and the fish fill the view and the forearms run short out of the bottom of it.
+      // Held at kneeling chest height, nearly a metre below a standing eye, the arms reached straight down the view like
+      // two long tubes)
+      const fpH = fp ? fpEye() : null;
+      const hold = fp ? toWorld(new THREE.Vector3(fpH.x - 0.03, fpH.y - 0.24, Math.max(railIn + fishLen * 0.3, fpH.z - 0.44)))
+        : toWorld(new THREE.Vector3(-0.12 - 0.1 * fishLen, 0.74, holdZ));
       const poseD = (c, dir, roll, kk) => ({ mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir: dir.clone().normalize(), roll, beat: kk.beat ?? 0.1, curl: kk.curl ?? 0, centre: c, lift: !!kk.lift });
       const pose = (c, roll, kk) => poseD(c, side.clone().negate(), roll, kk);
       const LIE = -Math.PI / 2; // (on its side: rolled this way its tail lifts, rather than digging into the mat, as it flaps)
@@ -1316,7 +1322,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // behind the rail the edge hides the foot of the wall, where the net and the fish are)
     const overWall = fpRope;
     const netNear = fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod");
-    const leanTo = overWall ? clamp(edge + 0.15, 0, 1.2) : fp && ph === "landing" && (landStage === "in" || (landStage === "haul" && netAt && toLocal(netAt).y > 0.35) || ((landStage === "pick" || landStage === "lower") && netAt && toLocal(netAt).y > 0.45)) ? -0.32 /* (swinging the net in over the rail you step back from it: leaning in, the hoop came over at eye height a hand's length from your face and the camera ended up inside the net) */ : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
+    // (putting it back, the same: the net lifted out over the rail, and the empty one hauled back over it, with you
+    // stepped back from the rail so the hoop passes at arm's length rather than across your face)
+    const netOverRail = fp && kept?.state === "release" && venue === "pier" && (relStep === "over" || (relStep === "haul" && !!releaseInfo?.over));
+    const leanTo = netOverRail ? -0.32 : overWall ? clamp(edge + 0.15, 0, 1.2) : fp && ph === "landing" && (landStage === "in" || (landStage === "haul" && netAt && toLocal(netAt).y > 0.35) || ((landStage === "pick" || landStage === "lower") && netAt && toLocal(netAt).y > 0.45)) ? -0.32 /* (swinging the net in over the rail you step back from it: leaning in, the hoop came over at eye height a hand's length from your face and the camera ended up inside the net) */ : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
     leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * (leanTo < 0 ? 5 : 2.5)));
     { const k = 55, c = 2 * Math.sqrt(k) * 0.75, h = Math.min(dt, 0.05), to = fp ? bodyTo : { x: 0, y: 0, z: 0 };
       for (const a of ["x", "y", "z"]) { const v = "v" + a; body[v] += (k * (to[a] - body[a]) - c * body[v]) * h; body[a] += body[v] * h; } }
