@@ -42,7 +42,7 @@ const GRIPS = {
   // (the ring and little fingers tucked in under the hand, out of the way of the reel: they were left spread over it)
   crank: { f: [[1.0, 1.1, 0.7], [1.1, 1.2, 0.8], [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0 },
-  fish: { f: [[0.25, 0.3, 0.2], [0.3, 0.35, 0.22], [0.35, 0.38, 0.25], [0.4, 0.4, 0.28]], t: [0.1, 0.15, 0.1], spread: 0.05 },
+  fish: { f: [[0.55, 0.5, 0.3], [0.6, 0.55, 0.32], [0.65, 0.58, 0.34], [0.7, 0.6, 0.36]], t: [0.3, 0.25, 0.15], spread: 0.03 }, // (cupped up round its belly, as you support a fish, not flat and stiff under it)
 };
 let BETA = 1.0; export const _tune = (o) => { if (o.beta != null) BETA = o.beta; };
 const gripOf = (kind) => (kind === "seat" ? GRIPS.seat : kind === "crank" ? GRIPS.crank : kind === "fish" ? GRIPS.fish : kind ? GRIPS.fist : GRIPS.rest);
@@ -1018,7 +1018,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           const r = real.poseSocket(i, group, { pos: spec.sock.pos, quat: spec.sock.quat, kind: spec.kind === "rope" ? "ropeg" : spec.kind, roll: spec.kind === "rope" ? 0 : roll, elbow, dt }); // (a rope is held as the knob is: across the fingers, closed further round it)
           wr = r.wrist; el = r.elbow; h.cur = { pos: wr.clone(), quat };
         } else if (real) {
-          real.pose(i, group, pos, quat, curl, elbow, spec && spec.kind === "butt" && spec.axis ? { at: spec.at, axis: spec.axis, kind: spec.kind, R: 0.0145, w: e } : null);
+          real.pose(i, group, pos, quat, curl, elbow, spec && (spec.kind === "butt" || spec.kind === "tailwrist") && spec.axis ? { at: spec.at, axis: spec.axis, kind: "butt", R: spec.R ?? 0.0145, w: e } : null); // (the wrist of a fish's tail: the fingers closed round it until they touch, as round the rod's butt)
           real.note(i, spec?.kind ?? null);
         }
         const back = el.clone().sub(wr).normalize(), wrist = wr.clone().addScaledVector(back, 0.035);

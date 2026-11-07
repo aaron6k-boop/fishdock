@@ -764,6 +764,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (ph === "cast" || ph === "bite" || ph === "hooked") { kept = null; matOut = false; } // a new cast: that fish is done with (and the mat's packed away)
     let keptPose = null, relStep = null;
     if (kept && kept.t0 == null) kept.t0 = t;
+    // (a fish kept without its fight seen here, as after rejoining: its own look from the catch, not the plain stand-in)
+    if (kept && kept.state !== "gone" && !fishFor) { const c = events.slice().reverse().find((e) => e.type === "catch"); if (c?.data) setFish(c.data.species || null, c.data.lengthCm || null, c.data.weightKg || null); }
     if (kept && kept.state !== "gone" && !(ph === "landing" && age < LT.card)) {
       const ns = Math.max(1, (fishLen * 0.62) / 0.35), kt = t - kept.t0, crossed2 = (k, m) => prevKt < m && k >= m;
       const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]), away = new THREE.Vector3(dirOf(face)[0], 0, dirOf(face)[1]);
@@ -786,7 +788,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // Held at kneeling chest height, nearly a metre below a standing eye, the arms reached straight down the view like
       // two long tubes)
       const fpH = fp ? fpEye() : null;
-      const hold = fp ? toWorld(new THREE.Vector3(fpH.x - 0.03, fpH.y - 0.24, Math.max(railIn + fishLen * 0.3, fpH.z - 0.44)))
+      const hold = fp ? toWorld(new THREE.Vector3(fpH.x - 0.08 - 0.12 * fishLen, fpH.y - 0.26, Math.max(railIn + fishLen * 0.3, fpH.z - 0.5)))
         : toWorld(new THREE.Vector3(-0.12 - 0.1 * fishLen, 0.74, holdZ));
       const poseD = (c, dir, roll, kk) => ({ mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir: dir.clone().normalize(), roll, beat: kk.beat ?? 0.1, curl: kk.curl ?? 0, centre: c, lift: !!kk.lift });
       const pose = (c, roll, kk) => poseD(c, side.clone().negate(), roll, kk);
@@ -1130,7 +1132,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // it's turned: they used to sit a few centimetres under the spine, inside a fish of any size)
       const below = restHeight(halfDepth(), halfThick(), keptPose.roll || 0) + 0.022;
       const under = (k) => toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * k)).add(V3(0, -below, 0));
-      if (keptPose.lift) { hands[0] = { at: under(0.28), axis: d, palm: upL, kind: "fish" }; hands[1] = { at: under(0.7), axis: d, palm: upL, kind: "fish" }; }
+      if (keptPose.lift) {
+        // (one hand under it behind the head, cupped round the belly; the other closed round the wrist of its tail, as
+        // anyone holds a fish to look at it: two flat palms under it read as a tray)
+        const wrist = toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.86));
+        hands[0] = { at: under(0.3), axis: d, palm: upL, kind: "fish" }; hands[1] = { at: wrist, axis: d, palm: upL, kind: "tailwrist", R: Math.max(0.008, halfDepth() * 0.32) }; }
       else { hands[1] = { at: toLocal(keptPose.centre).add(V3(0.02, halfThick() + 0.02, 0.03)), axis: d, palm: V3(0, -1, 0), kind: "fish" }; hands[0] = null; }
       lookAtW = keptPose.centre.clone(); kneel = 1; crouch = 0.6; lean = keptPose.lift ? 0.06 : 0.42; brace = 0; // (upright while holding it out, so your head stays clear of it)
       // the shoulders turned towards it (it's off to one side lifting it from the net, in front on the mat), and bent

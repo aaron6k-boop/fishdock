@@ -47,28 +47,39 @@ vec3 skyBase(vec3 d){
 }
 // ---- clouds on a high layer, drifting with the wind: rgb their colour, a how much they cover ----
 // (q 1: full detail and shading, for the sky; 0: a cheaper, softer version, for reflections)
+// (fair-weather cumulus as over the North Sea coast: separate heaps with firm, cauliflower edges, bright where the sun
+// catches them, flat grey-blue bases, thin wisps between; packed closer and flattened towards the horizon, where you
+// see the layer side on. A broad shape for the heaps and a finer one eating into their edges; the light is how much
+// cloud lies between each point and the sun (two steps towards it), so the sunlit side is bright and the far side
+// and the base go grey, with a bright rim on thin edges round the sun)
+float cloudDens(vec2 cp, vec2 warp){ return fbm3(cp*.36 + warp*.45)*.66 + fbm(cp*1.55 + warp)*.46 - .07; }
 vec4 cloudAt(vec3 d, float q){
-  vec2 cp = d.xz/(d.y + .1)*.75 + vec2(uTime*.004, uTime*.0016);
-  float n1, shade = .6;
-  if (q > .5) {
-    vec2 warp = vec2(fbm3(cp*.5), fbm3(cp*.5 + 5.2))*.7;
-    n1 = fbm(cp*1.2 + warp);
-    #if SKYQ > 0
-      // lit on the side towards the sun, grey beneath and on the far side (the cloud is thicker between you and the sun)
-      shade = clamp(.55 + (n1 - fbm3(cp*1.2 + warp + normalize(uSunDir.xz + vec2(1e-4))*.16))*3.2, 0., 1.);
-    #endif
-  } else n1 = fbm3(cp*1.2);
+  vec2 cp = d.xz/(d.y + .075)*.62 + vec2(uTime*.004, uTime*.0016);
   float thr = mix(.66, .30, uCloud);
-  float cover = max(smoothstep(thr, thr + .2, n1), smoothstep(.78, 1., uCloud));
-  float thick = smoothstep(thr, thr + .5, n1);
-  vec3 lit = vec3(.98, .97, .95)*uDay + vec3(1., .80, .66)*uDusk*.85 + vec3(.11, .12, .15)*uNight*(.3 + uMoonLight);
-  vec3 dark = vec3(.58, .62, .70)*uDay + vec3(.36, .33, .42)*uDusk + vec3(.025, .028, .04)*uNight;
-  vec3 cc = mix(dark, lit, shade*(1. - thick*.45));
+  float n1, shade = .62;
+  if (q > .5) {
+    vec2 warp = vec2(fbm3(cp*.42), fbm3(cp*.42 + 5.2))*.8;
+    n1 = cloudDens(cp, warp);
+    #if SKYQ > 0
+      vec2 st = normalize(uSunDir.xz + vec2(1e-4))*.2;
+      float od = max(cloudDens(cp + st, warp) - thr, 0.) + max(cloudDens(cp + st*2.4, warp) - thr, 0.)*.8;
+      // (beer's law for the light reaching it, and the "powder" darkening of a thin edge facing away)
+      shade = exp(-od*5.5)*(1. - exp(-max(n1 - thr, 0.)*9.))*1.15 + .18;
+    #endif
+  } else n1 = fbm3(cp*.36)*.66 + fbm3(cp*1.55)*.46 - .07;
+  float cover = max(smoothstep(thr, thr + .1 + .12*(1. - q), n1), smoothstep(.78, 1., uCloud));
+  float thick = smoothstep(thr, thr + .42, n1);
+  vec3 lit = vec3(1., .98, .95)*uDay + vec3(1., .80, .64)*uDusk*.9 + vec3(.11, .12, .15)*uNight*(.3 + uMoonLight);
+  vec3 dark = vec3(.50, .55, .64)*uDay + vec3(.34, .31, .40)*uDusk + vec3(.025, .028, .04)*uNight;
+  vec3 cc = mix(dark, lit, clamp(shade, 0., 1.)*(1. - thick*.35));
+  // the bright rim where thin cloud passes in front of the sun
+  float sd = max(dot(d, uSunDir), 0.);
+  cc += vec3(1., .94, .82)*pow(sd, 7.)*(1. - thick)*(uDay + uDusk*.8)*.55;
   // a grey deck: mottled, darker the thicker; darker still in rain
   cc *= mix(1., .48 + .55*smoothstep(.25, .75, n1), smoothstep(.55, 1., uCloud))*(1. - uRain*.35);
   // far off they melt into the haze along the horizon
-  cc = mix(cc, skyBase(d), exp(-d.y*7.)*.55);
-  return vec4(cc, cover*smoothstep(0., .06, d.y));
+  cc = mix(cc, skyBase(d), exp(-d.y*9.)*.6);
+  return vec4(cc, cover*smoothstep(0., .05, d.y));
 }
 vec3 skyColour(vec3 d){
   vec3 c = skyBase(d);
