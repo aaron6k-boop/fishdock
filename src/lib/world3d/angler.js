@@ -1076,7 +1076,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (in first person you lean out over the top rail and hold the rope there, one hand above the other on it, the
           // rope running straight down from your hands to the net: looking down you see your hands, the rope, the wall and
           // the net and the fish in the water below. From behind: at your chest just back from the rail)
-          const base = fp ? (() => { const E = fpEye(); return V3(E.x - 0.36, E.y - 0.3, E.z - 0.22); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
+          const base = fp ? (() => { const E = fpEye(); return V3(E.x - 0.34, E.y - 0.34, E.z - 0.32); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
           // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1134,7 +1134,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // letting it go from the drop net: both hands on the rope at the rail, watching it swim out; then hauling the empty
       // net back up, a hand over the other (as landing it). In first person as when landing it: leaning out past the
       // wall's top, both hands on the rope one above the other off to your left, watching the fish go below
-      const E = fp ? fpEye() : null, base = fp ? V3(E.x - 0.36, E.y - 0.3, E.z - 0.22) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2);
+      const E = fp ? fpEye() : null, base = fp ? V3(E.x - 0.34, E.y - 0.34, E.z - 0.32) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2);
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1307,8 +1307,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // behind the rail the edge hides the foot of the wall, where the net and the fish are)
     const overWall = fpRope;
     const netNear = fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod");
-    const leanTo = overWall ? clamp(edge + 0.15, 0, 1.2) : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
-    leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * 2.5));
+    const leanTo = overWall ? clamp(edge + 0.15, 0, 1.2) : fp && ph === "landing" && (landStage === "in" || (landStage === "haul" && netAt && toLocal(netAt).y > 0.35)) ? -0.32 /* (swinging the net in over the rail you step back from it: leaning in, the hoop came over at eye height a hand's length from your face and the camera ended up inside the net) */ : netNear ? 0.15 : fp && (ph === "landing" ? age < LT.card + 0.5 : ph === "hooked" && age > 3) ? clamp(edge - 0.35, 0, 0.7) : 0;
+    leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * (leanTo < 0 ? 5 : 2.5)));
     { const k = 55, c = 2 * Math.sqrt(k) * 0.75, h = Math.min(dt, 0.05), to = fp ? bodyTo : { x: 0, y: 0, z: 0 };
       for (const a of ["x", "y", "z"]) { const v = "v" + a; body[v] += (k * (to[a] - body[a]) - c * body[v]) * h; body[a] += body[v] * h; } }
     { const st = fp && ph === "landing" && (landStage === "pick" || landStage === "in") ? fpCrouch : 0; stoopNow += (st - stoopNow) * (1 - Math.exp(-dt * 3));

@@ -853,7 +853,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // rod: the handle lies diagonally across the palm, the butt along the forearm further back)
         // (on the drop net's rope the forearms reach forwards to it, nearly level, elbows back by your sides: not up
         // from below, which bent the wrists right back to close the fist round a rope running the same way as the arm)
-        if (spec?.kind === "rope") elbow.copy(spec.at).add(V(h.s > 0 ? 0.12 : -0.04, -0.06, 0.3)); // (above the rail, so the forearm comes over it, not through it)
+        if (spec?.kind === "rope") { const fh = tmpV.set(vf.x, 0, vf.z).normalize(); elbow.copy(spec.at).addScaledVector(vr, h.s * (TUNE_ELBOW.ropeX ?? 0.24)).add(V(0, TUNE_ELBOW.ropeY ?? -0.3, 0)).addScaledVector(fh, -(TUNE_ELBOW.ropeZ ?? 0.1)); } // (down in the world, not down the view: looking down at the net, "down the view" was towards your chest and the forearm ran up the middle of the picture) // (hauling a rope the elbows are down and out to your sides: set back towards your eye, the forearm ran past the camera and filled half the view) // (above the rail, so the forearm comes over it, not through it)
         if (spec?.kind === "seat" && spec.axis) elbow.copy(spec.at).addScaledVector(spec.axis.clone().normalize(), -0.24).addScaledVector(vu, -0.14).addScaledVector(vr, (TUNE_ELBOW.seatOut ?? 0.24) * h.s);
         let want;
         if (spec) {
