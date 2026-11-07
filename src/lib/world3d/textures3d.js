@@ -38,7 +38,7 @@ function normalFrom(hf, w, h, strength = 2) {
 function greyTex(vals, w, h) { const c = canvas(w, h), g = c.getContext("2d"), img = g.createImageData(w, h); for (let i = 0; i < w * h; i++) { const v = Math.max(0, Math.min(255, vals[i] * 255)); img.data.set([v, v, v, 255], i * 4); } g.putImageData(img, 0, 0); return toTex(c, { srgb: false }); }
 
 // ---- weathered concrete: one tile covers 8 m; faint expansion joints every 4 m, aggregate, stains and hairline cracks ----
-export function concrete({ size = 256, seed = 3, tint = [196, 186, 166] } = {}) { // sun-bleached, warm pale concrete (as Gorleston's deck)
+export function concrete({ size = 256, seed = 3, tint = [196, 186, 166], joints = true } = {}) { // sun-bleached, warm pale concrete (as Gorleston's deck)
   const n = size, col = canvas(n), g = col.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n), rough = new Float32Array(n * n);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
     const u = x / n, v = y / n, i = y * n + x;
@@ -46,7 +46,7 @@ export function concrete({ size = 256, seed = 3, tint = [196, 186, 166] } = {}) 
     const grit = hash(x, y, seed), pit = 0; // (no pock marks: at this scale they read as a pattern of holes)
     // joints: a shallow groove every half tile, slightly wavy so it doesn't read as a drawn grid
     const jx = Math.abs(((u * 2 + noise2(v * 4, 0.5, 4, seed + 4) * 0.004) % 1 + 1) % 1 - 0.5), jy = Math.abs(((v * 2 + noise2(u * 4, 0.3, 4, seed + 5) * 0.004) % 1 + 1) % 1 - 0.5);
-    const joint = Math.max(0, 1 - Math.min(jx, jy) * n / 1.6) * (Math.min(jx, jy) > 0.48 ? 1 : 0);
+    const joint = joints ? Math.max(0, 1 - Math.min(jx, jy) * n / 1.6) * (Math.min(jx, jy) > 0.48 ? 1 : 0) : 0; // (joints: false where the deck's shader draws its own, square to the pier)
     const crack = Math.abs(fbm(u * 3, v * 3, 3, seed + 7, 3) - 0.5) < 0.008 && noise2(u * 1.5, v * 1.5, 1.5, seed + 8) > 0.55 ? 1 : 0;
     let L = 0.9 + (stain - 0.5) * 0.28 + (blotch - 0.5) * 0.18 + (grit - 0.5) * 0.06 - pit * 0.18 - joint * 0.2 - crack * 0.07;
     const warm = (blotch - 0.5) * 10;

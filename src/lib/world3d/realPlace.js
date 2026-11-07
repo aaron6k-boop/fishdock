@@ -54,7 +54,7 @@ function segIndex(segs, cell = 8) {
 // Wet (rain) darkens it and makes it shine. Until the photographs have loaded (or if they can't) the drawn one shows.
 export const PIER_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/pier_concrete_"; // (__fdAssetBase: only a self-contained preview page sets it, its files beside it; the app leaves it unset)
 const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
-function pierConcrete(mat, quality = 1) {
+function pierConcrete(mat, quality = 1, axis = 0) {
   const wet = { value: 0 };
   if (typeof document === "undefined") return wet;
   const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
@@ -66,8 +66,9 @@ function pierConcrete(mat, quality = 1) {
     mat.normalMap = nor; mat.roughnessMap = rough; mat.normalScale.set(0.9, 0.9);
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWet = wet; sh.uniforms.pWorn = { value: worn }; sh.uniforms.pNoise = { value: noise };
+      sh.uniforms.uAxis = { value: new THREE.Vector2(Math.cos(axis), Math.sin(axis)) };
       sh.vertexShader = "attribute float aDamp;\nvarying float vDamp;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvDamp = aDamp;");
-      sh.fragmentShader = "uniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0;\n" + sh.fragmentShader
+      sh.fragmentShader = "uniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
         .replace("#include <map_fragment>", `#include <map_fragment>
         ${WET_PREP}
         {
@@ -77,7 +78,25 @@ function pierConcrete(mat, quality = 1) {
           vec3 avg = texture2D(pDiff, vec2(0.5), 12.0).rgb; // its smallest mip: the photograph's own average colour
           vec3 p = mix(a, b, m) / max(avg, vec3(0.02)); // over its average: the drawn colour stays the colour
           p = mix(vec3(dot(p, vec3(0.3, 0.59, 0.11))), p, 0.35);
-          diffuseColor.rgb *= mix(vec3(1.0), p, 0.6);
+          // (the photograph's pale flecks, at full strength, read as a speckled, blotchy floor: kept for its patches, softer)
+          p = mix(vec3(1.0), p, 0.7);
+          diffuseColor.rgb *= mix(vec3(1.0), p, 0.5);
+          // ---- the deck as cast: bays about 4.5 m long, square across the pier, with sawn joints between them ----
+          // (each joint a dark, sharp line a centimetre or so wide, grime settled a hand's width either side; each bay a
+          // shade different from the next, as concrete poured on different days is)
+          {
+            vec2 wq = vMapUv * 8.0; float al = dot(wq, uAxis), ac = dot(wq, vec2(-uAxis.y, uAxis.x));
+            float bay = al / 4.5, f = fract(bay), dj = min(f, 1.0 - f) * 4.5; // metres to the nearest joint
+            float px = max(fwidth(al), 1e-4);
+            float line = 1.0 - smoothstep(0.006, 0.006 + px * 1.5, dj);
+            float wob = (texture2D(pNoise, vec2(ac * 0.21, floor(bay) * 0.37)).r - 0.5) * 0.04; // (a little ragged, chipped)
+            float grime = 1.0 - smoothstep(0.0, 0.12 + wob, dj);
+            float fade = 1.0 - smoothstep(18.0, 60.0, px * 900.0); // (thin lines far off would shimmer: they fade into the grime)
+            fdJoint = line * fade;
+            diffuseColor.rgb *= 1.0 - line * 0.55 * fade - grime * 0.12;
+            float shade = fract(sin(floor(bay) * 12.9898 + floor(ac / 9.0) * 4.1) * 43758.5453);
+            diffuseColor.rgb *= 0.95 + shade * 0.08;
+          }
           // broad patches (about 70 m and 15 m across, turned so they never line up with the 8 m tile)
           vec4 nA = texture2D(pNoise, mat2(0.6, 0.8, -0.8, 0.6) * vMapUv * 0.11), nB = texture2D(pNoise, vMapUv * 0.53 + 0.3);
           diffuseColor.rgb *= (0.8 + nA.g * 0.3) * vec3(0.97, 0.955, 0.93); // (darker and a touch browner, with more of the weathered variation a real pier deck has: it read as a clean pale floor)
@@ -98,7 +117,7 @@ function pierConcrete(mat, quality = 1) {
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`);
     };
-    mat.customProgramCacheKey = () => "fdpier4" + (quality < 1 ? "p" : quality < 2 ? "b" : "");
+    mat.customProgramCacheKey = () => "fdpier5" + (quality < 1 ? "p" : quality < 2 ? "b" : "");
     mat.needsUpdate = true;
   }).catch(() => {});
   return wet;
@@ -338,9 +357,12 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(all, 1) : new THREE.Uint16BufferAttribute(all, 1));
   g.addGroup(0, idxDeck.length, 0); g.addGroup(idxDeck.length, idxSoft.length, 1);
   g.computeVertexNormals();
-  const cTex = concrete({ seed: 3 }), dTex = detail(13);
+  const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
-  place.deckWet = pierConcrete(deckMat, quality);
+  // the pier's own direction (its longest run of wall near the fishing spots), for the deck's slab joints: square across
+  // it, not across the map's north and south
+  let axis = 0; { let best = 0; for (const e of walls) { const L = Math.hypot(e[2] - e[0], e[3] - e[1]), mx = (e[0] + e[2]) / 2, mz = (e[1] + e[3]) / 2; const near = spots.length ? Math.min(...spots.map((sp) => Math.hypot(mx - sp.at[0], mz - sp.at[2]))) : 0; const w = L / (1 + near / 60); if (w > best) { best = w; axis = Math.atan2(e[3] - e[1], e[2] - e[0]); } } }
+  place.deckWet = pierConcrete(deckMat, quality, axis);
   const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
