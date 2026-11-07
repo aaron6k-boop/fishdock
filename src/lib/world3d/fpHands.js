@@ -910,7 +910,9 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   // for the first moments), and only show if the model can't load or takes too long
   for (const h of hands) h.mesh.visible = false;
   const fallback = () => { if (!real) for (const h of hands) h.mesh.visible = true; };
-  const slow = setTimeout(fallback, 20000), born = performance.now(); // (a phone on a slow connection can take a while)
+  // (only if the model fails to load: on a slow connection it can take well over 20 seconds, and the simple hands that
+  // showed meanwhile looked like a misshapen lump on the rod; better nothing in your hands for those moments)
+  const slow = null, born = performance.now(); // (slow: no timer now; clearTimeout(null) below does nothing)
   loadPart("fp_arms").then((sc) => { try { real = realArms(sc, { gloves, skinHex }); } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
 
   const m4 = new THREE.Matrix4();
@@ -966,7 +968,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       const vf = fh.clone().multiplyScalar(Math.cos(pB)).add(V(0, Math.sin(pB), 0)), vu = vr.clone().cross(vf).normalize();
       // (until the rod and reel have loaded there's nothing for the hands to take hold of, and they hung loose in the
       // first moments, a forearm across the view; so they wait for them, a few seconds at most on a slow connection)
-      { const wait = (!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 20000;
+      { const wait = (!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 90000;
         if (real) real.root.visible = !wait; for (const h of hands) h.sleeve.visible = !wait; } // (the sleeves too: without their hands they were two empty blue tubes)
       for (let i = 0; i < 2; i++) {
         const h = hands[i], spec = specs[i];
