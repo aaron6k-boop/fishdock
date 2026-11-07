@@ -384,6 +384,16 @@ html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(saf
 .fs-btn.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: color-mix(in srgb, var(--action) 60%, transparent); }
 .cam-menu { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: 14px; background: #0a141be6; border: 1px solid #ffffff26; }
 .cam-menu button { text-align: left; }
+/* Settings → Graphics: a panel over the scene (the scene keeps running behind it, so changes show at once) */
+.gfx-panel { position: absolute; z-index: 9; left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); top: calc(56px + env(safe-area-inset-top)); bottom: calc(14px + env(safe-area-inset-bottom)); max-width: 460px; margin: 0 auto; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: #0a141bf0; border: 1px solid #ffffff26; color: #fff; pointer-events: auto; }
+.gfx-head { display: flex; align-items: center; justify-content: space-between; font-size: 16px; }
+.gfx-presets .ft-pill { padding-inline: 4px; }
+.gfx-note, .gfx-why { margin: 0; font-size: 12px; line-height: 1.35; color: #b9c8d1; }
+.gfx-row { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-top: 1px solid #ffffff14; }
+.gfx-row.off { opacity: .5; }
+.gfx-panel .ft-pill.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: var(--action); } /* (the chosen setting, clearly marked) */
+.gfx-label { font-size: 13px; font-weight: 600; }
+.fps-meter { position: absolute; z-index: 6; left: max(10px, env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); padding: 5px 8px; border-radius: 8px; background: #000a; color: #fff; font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: none; }
 /* controls on the right (for a right thumb): Cast, Strike and Reel bottom right, the camera tools bottom left */
 html:not([data-hand="left"]) .fs-bottom { align-self: flex-end; align-items: flex-end; }
 html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }

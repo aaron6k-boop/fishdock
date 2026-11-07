@@ -19,6 +19,7 @@ import { subdivide } from "./subdivide.js";
 import { FILM } from "./film.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const ARM_PITCH = 0.33; // (how much of looking up or down the arms' frame takes: see pose)
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
@@ -953,8 +954,16 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
     group,
     show(on) { group.visible = !!on; if (!on) for (const h of hands) h.cur = null; },
     pose(o) {
-      const { hands: specs = [null, null], eye, vr, vu, vf, dt = 0.016 } = o;
+      const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible) return;
+      // ---- the arms' own frame: your body's, not your view's ----
+      // The elbows hang from your shoulders, which turn with you but don't tip forward when you look down or back when
+      // you look up. Tied to the view, looking down at the deck swung the winding arm round until its forearm came in
+      // flat from the edge of the screen, twisted. So the frame follows the view round fully and up and down only a
+      // little (a third: enough for the forearms to stay below the view when you look up, as they are when you do)
+      const vfV = o.vf, vr = o.vr, pitchV = Math.asin(clamp(vfV.y, -1, 1)), pB = pitchV * ARM_PITCH;
+      const fh = V(vfV.x, 0, vfV.z); if (fh.lengthSq() < 1e-6) fh.copy(V(0, 0, -1)); fh.normalize();
+      const vf = fh.clone().multiplyScalar(Math.cos(pB)).add(V(0, Math.sin(pB), 0)), vu = vr.clone().cross(vf).normalize();
       // (until the rod and reel have loaded there's nothing for the hands to take hold of, and they hung loose in the
       // first moments, a forearm across the view; so they wait for them, a few seconds at most on a slow connection)
       { const wait = (!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 20000;
@@ -969,7 +978,10 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // (winding, the forearm comes in from out to the left and below, as it does when you wind: the hand meets the knob
         // from the side, beyond the reel, rather than from straight below the view, where it came between your eye and
         // the reel at the top of each turn)
-        if (spec?.kind === "crank") elbow.addScaledVector(vr, (TUNE_ELBOW.crankX ?? 0.45) * h.s).addScaledVector(vu, TUNE_ELBOW.crankY ?? 0.25).addScaledVector(vf, TUNE_ELBOW.crankZ ?? 0.05);
+        // (from the knob itself, not from your eye: back towards you, down and out to the side, a forearm's length away.
+        // Placed from the eye, the elbow stayed at the same height whatever the reel did, so when you looked down and the
+        // reel sank in the view the forearm ran flat in from the edge of the screen)
+        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(fh, -(TUNE_ELBOW.crankBack ?? 0.17)).add(V(0, -(TUNE_ELBOW.crankDown ?? 0.17), 0)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.12) * h.s);
         if (spec?.kind === "crank" && spec.hub) elbow.addScaledVector(tmpV.copy(spec.at).sub(spec.hub), TUNE_ELBOW.follow ?? 0.3);
         // (the arm comes in to the reel seat from behind and out to the side at about 45 degrees, as it does holding a spinning
         // rod: the handle lies diagonally across the palm, the butt along the forearm further back)

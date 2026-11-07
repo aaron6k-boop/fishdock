@@ -633,7 +633,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
   return {
-    group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids,
+    group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids, sun, // (sun: its shadows, set by Settings → Graphics)
     /** The sky (no stars, the sea below the horizon) for world.js's environment map. */
     envSky,
     /** The conditions as shown right now (eased) and their light (skyLook.js lightingFor). */
