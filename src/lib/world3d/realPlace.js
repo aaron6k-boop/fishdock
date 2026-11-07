@@ -72,8 +72,8 @@ function pierConcrete(mat, quality = 1) {
         ${WET_PREP}
         {
           vec2 pu = vMapUv * ${PHOTO_TILE.toFixed(3)};
-          vec3 a = texture2D(pDiff, pu).rgb, b = texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb;
-          float m = ${quality < 1 ? "0.0" : "smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6)"}; // (one sample on Performance)
+          vec3 a = texture2D(pDiff, pu).rgb, b = ${quality < 2 ? "a" : "texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb"};
+          float m = ${quality < 2 ? "0.0" : "smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6)"}; // (the second, turned sample that breaks up the tiling only on High: the deck fills the view while you land a fish, and on a phone those samples halved the frame rate)
           vec3 avg = texture2D(pDiff, vec2(0.5), 12.0).rgb; // its smallest mip: the photograph's own average colour
           vec3 p = mix(a, b, m) / max(avg, vec3(0.02)); // over its average: the drawn colour stays the colour
           p = mix(vec3(dot(p, vec3(0.3, 0.59, 0.11))), p, 0.35);
@@ -83,7 +83,7 @@ function pierConcrete(mat, quality = 1) {
           diffuseColor.rgb *= 0.93 + nA.g * 0.14;
           // worn, smoother concrete where people walk (its own photograph, over its average)
           fdWorn = smoothstep(0.52, 0.74, nB.g * 0.7 + nA.g * 0.5);
-          ${quality < 1 ? "" : `vec3 w = texture2D(pWorn, vMapUv * 2.1).rgb / max(texture2D(pWorn, vec2(0.5), 10.0).rgb, vec3(0.02));
+          ${quality < 2 ? "" : `vec3 w = texture2D(pWorn, vMapUv * 2.1).rgb / max(texture2D(pWorn, vec2(0.5), 10.0).rgb, vec3(0.02));
           diffuseColor.rgb *= mix(vec3(1.0), mix(vec3(dot(w, vec3(0.3, 0.59, 0.11))), w, 0.3), fdWorn * 0.55);`}
           // old stains: a few darker blotches a metre or so across
           float stn = smoothstep(0.74, 0.8, texture2D(pNoise, vMapUv * 1.7 + 0.71).g) * smoothstep(0.4, 0.6, nA.r);
@@ -98,7 +98,7 @@ function pierConcrete(mat, quality = 1) {
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`);
     };
-    mat.customProgramCacheKey = () => "fdpier2" + (quality < 1 ? "p" : "");
+    mat.customProgramCacheKey = () => "fdpier3" + (quality < 1 ? "p" : quality < 2 ? "b" : "");
     mat.needsUpdate = true;
   }).catch(() => {});
   return wet;

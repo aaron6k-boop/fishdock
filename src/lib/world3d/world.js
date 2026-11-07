@@ -23,7 +23,7 @@ import { FILM } from "./film.js";
 // post: post.js level (1 bloom and grade, 2 plus ambient occlusion)
 export const QUALITY3D = {
   performance: { dpr: 1.5, ss: 1, floor: 1, shadows: 0, q: 0.5, post: 0 },
-  balanced: { dpr: 2, ss: 1, floor: 1, shadows: 1, q: 1, post: 1 },
+  balanced: { dpr: 2, ss: 1, floor: 1.25, shadows: 1, q: 1, post: 1, late: 0.025, easy: 10 }, // (steps down when frames run under about 40 a second, as landing a fish with the deck filling the view did on a phone, and back up after 20 s of easy frames; never below 1.25)
   high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2 },
   // a computer with a graphics card: drawn at twice the screen's pixels (or more) and scaled down, finer shade
   // (and kept smooth: a frame slower than about 48 a second counts as late, where the others allow down to 28)
@@ -543,7 +543,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (ts - paceAt < 2000) return; paceAt = ts;
     if (late > 0.4 && dprNow > dprFloor) { dprNow = Math.max(dprFloor, dprNow - 0.25); renderer.setPixelRatio(dprNow); resize(); late = 0.2; easyFor = 0; }
     else if (late > 0.4 && post?.dropAO()) { late = 0.2; easyFor = 0; }
-    else if (late < 0.05 && dprNow < dprMax) { easyFor += 2; if (easyFor >= 20) { dprNow = Math.min(dprMax, dprNow + 0.25); renderer.setPixelRatio(dprNow); resize(); easyFor = 0; } }
+    else if (late < 0.05 && dprNow < dprMax) { easyFor += 2; if (easyFor >= (Q.easy || 20)) { dprNow = Math.min(dprMax, dprNow + 0.25); renderer.setPixelRatio(dprNow); resize(); easyFor = 0; } }
     else easyFor = 0;
   }
   function frame(ts) {

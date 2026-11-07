@@ -3,6 +3,7 @@
 // remote angler animates the same on every phone, and a viewer who joins midway sees the right moment. Timings,
 // bites, fights and landings are the same rules as the photo scene (sceneActors.js): biteTaps, fightProfile,
 // fishLoad, landingTech and landingTimes.
+import { fatLine } from "./fatLine.js";
 import { overRail } from "./netPath.js";
 import * as THREE from "three";
 import { phaseAt, DUR, lineState } from "../liveEvents.js";
@@ -241,7 +242,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   })();
   // the line from the spool up through the rings to the tip
   const guideLinePos = new Float32Array((GUIDES.length + 2) * 3), guideLineGeo = new THREE.BufferGeometry(); guideLineGeo.setAttribute("position", new THREE.BufferAttribute(guideLinePos, 3));
-  const guideLine = new THREE.Line(guideLineGeo, new THREE.LineBasicMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.7 })); guideLine.frustumCulled = false; root.add(guideLine);
+  const guideLine = fatLine(guideLinePos, GUIDES.length + 2, { opacity: 0.75, thick: 0.0005, minPx: 1 }); root.add(guideLine); // (the line up the rod through the rings: a fine soft thread, fatLine.js)
   // the rest: a tripod on the beach, a rest on the bank, the railing on a pier or quay
   const rest = new THREE.Group(); root.add(rest);
   const mMetal = new THREE.MeshStandardMaterial({ color: 0x8c9196, metalness: 0.7, roughness: 0.35 });
@@ -254,6 +255,21 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     for (const p of [restTop, restButt]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), mMetal); between(l, new THREE.Vector3(p.x, 0, p.z), p); rest.add(l); }
   } else {
     restTop = new THREE.Vector3(0.4, 1.12, -0.3); restButt = new THREE.Vector3(0.35, 0.05, 0.4); // leaning on the railing (moved to it once the spot is known)
+  }
+  // ---- the seat box's padded seat (charcoal cloth with a stitched border) and its badge ----
+  function canvasPad() {
+    const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+    g.fillStyle = "#2c2f33"; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 9000; i++) { const v = Math.random(); g.fillStyle = `rgba(${v > 0.5 ? 255 : 0},${v > 0.5 ? 255 : 0},${v > 0.5 ? 255 : 0},${0.035 + Math.random() * 0.04})`; g.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 1.5); }
+    g.strokeStyle = "rgba(160,165,170,.55)"; g.setLineDash([5, 4]); g.lineWidth = 2; g.strokeRect(22, 22, 212, 212);
+    g.strokeStyle = "rgba(0,0,0,.35)"; g.setLineDash([]); g.lineWidth = 3; g.strokeRect(14, 14, 228, 228);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  }
+  function badgeTex() {
+    const c = document.createElement("canvas"); c.width = 256; c.height = 64; const g = c.getContext("2d");
+    g.fillStyle = "#d9dcde"; g.beginPath(); g.roundRect(2, 2, 252, 60, 12); g.fill();
+    g.fillStyle = "#1d2a33"; g.font = "bold 34px Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("SEAFORM 30", 128, 34);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
   }
   // tackle box and bucket beside them
   // (they stay at the spot when you walk off)
@@ -272,11 +288,20 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const box = new THREE.Group(); box.position.set(-0.55, 0, 0.25); kit.add(box);
     const base = new THREE.Mesh(rbox(0.46, 0.27, 0.31, 0.025, 0.05), mBox); base.position.y = 0.135; box.add(base);
     const rimB = new THREE.Mesh(rbox(0.47, 0.022, 0.32, 0.01), mBox); rimB.position.y = 0.268; box.add(rimB);
-    const lidTop = new THREE.Mesh(rbox(0.455, 0.055, 0.305, 0.024), mLid); lidTop.position.y = 0.3; box.add(lidTop);
-    for (const sz of [-1, 1]) { const rib = new THREE.Mesh(rbox(0.4, 0.012, 0.03, 0.005), mLid); rib.position.set(0, 0.33, sz * 0.09); box.add(rib); } // (the moulded grip ribs on the seat)
-    for (const sx of [-1, 1]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.06, 8), mSteel); post.position.set(sx * 0.13, 0.35, 0); box.add(post);
-      const clip = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.012), mSteel); clip.position.set(sx * 0.14, 0.255, -0.158); box.add(clip); }
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.28, 10), mBlack); grip.rotation.z = Math.PI / 2; grip.position.set(0, 0.385, 0); box.add(grip);
+    // (a sea angler's seat box as they're sold: the lid with a padded seat on it, a drawer in the front, moulded handles
+    // at the ends, metal catches, a shoulder strap, the maker's badge; the moulding a little scuffed)
+    const lidTop = new THREE.Mesh(rbox(0.455, 0.035, 0.305, 0.016), mLid); lidTop.position.y = 0.29; box.add(lidTop);
+    const padTex = canvasPad(), mPad = new THREE.MeshStandardMaterial({ map: padTex, roughness: 0.92, color: 0xffffff });
+    const pad = new THREE.Mesh(rbox(0.42, 0.045, 0.27, 0.02), mPad); pad.position.y = 0.327; box.add(pad);
+    // the drawer: a slightly proud panel across the front with a recessed pull
+    const drawer = new THREE.Mesh(rbox(0.38, 0.1, 0.014, 0.006), mLid); drawer.position.set(0, 0.105, -0.152); box.add(drawer);
+    const pull = new THREE.Mesh(rbox(0.12, 0.018, 0.012, 0.005), mBlack); pull.position.set(0, 0.105, -0.161); box.add(pull);
+    // the maker's badge above it (a made-up name: no real brand)
+    const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.11, 0.028), new THREE.MeshStandardMaterial({ map: badgeTex(), roughness: 0.4, metalness: 0.3, transparent: true })); badge.position.set(0, 0.205, -0.1585); badge.rotation.y = Math.PI; box.add(badge);
+    for (const sx of [-1, 1]) {
+      const clip = new THREE.Mesh(rbox(0.032, 0.05, 0.012, 0.004), mSteel); clip.position.set(sx * 0.17, 0.262, -0.159); box.add(clip); // the catches
+      const hnd = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.009, 6, 14, Math.PI), mBlack); hnd.rotation.set(0, Math.PI / 2, 0); hnd.position.set(sx * 0.236, 0.2, 0); hnd.scale.set(1, 0.6, 1); box.add(hnd); // moulded end handles
+    }
     const strap = new THREE.Mesh(new THREE.BoxGeometry(0.47, 0.025, 0.32), mBlack); strap.position.y = 0.06; box.add(strap);
     const mBucket = new THREE.MeshStandardMaterial({ color: 0xe6e3da, roughness: 0.45 }), mBlue = new THREE.MeshStandardMaterial({ color: 0x2e5a8c, roughness: 0.5 });
     const bk = new THREE.Group(); bk.position.set(-0.32, 0, 0.64); kit.add(bk);
@@ -317,7 +342,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // ---- line, rig, fish: in the world ----
   const LN = 28, linePos = new Float32Array(LN * 3);
   const lineGeo = new THREE.BufferGeometry(); lineGeo.setAttribute("position", new THREE.BufferAttribute(linePos, 3));
-  const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xe8eef2, transparent: true, opacity: 0.8 })); line.frustumCulled = false; world.add(line);
+  const line = fatLine(linePos, LN, { opacity: 0.85, thick: 0.0006, minPx: 1.1 }); world.add(line); // (fatLine.js: a fine thread fading with distance, not a hard hairline)
   const floatRig = venue === "river" || venue === "lake";
   const rig = new THREE.Group(); world.add(rig);
   if (floatRig) { part(new THREE.CylinderGeometry(0.012, 0.02, 0.14, 8), new THREE.MeshStandardMaterial({ color: 0xff5a1f, emissive: 0x401000 }), 0, 0.06, 0, rig); part(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffd83a }), 0, 0, 0, rig); }
@@ -1038,7 +1063,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       guideLinePos.set(a.p.clone().add(new THREE.Vector3(0, -(gd.r * 1.35 + 0.006), 0).applyQuaternion(gd.g.quaternion)).toArray(), (i + 1) * 3);
     });
     if (!rodKit) guideLinePos.set(pts[NSEG].toArray(), (GUIDES.length + 1) * 3);
-    guideLineGeo.attributes.position.needsUpdate = true;
+    guideLineGeo.attributes.position.needsUpdate = true; guideLine.userData.sync();
     guideLine.visible = showLine !== false;
     rest.visible = !walking && (!held || venue === "beach");
 
@@ -1300,7 +1325,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         const s = i / (LN - 1), sn = Math.sin(Math.PI * s);
         linePos[i * 3] = lerp(tip.x, end.x, s) + windX * sn * slack + thrum * sn; linePos[i * 3 + 1] = lerp(tip.y, end.y, s) - sag * sn + thrum * sn * Math.sin(s * 9); linePos[i * 3 + 2] = lerp(tip.z, end.z, s) + windZ * sn * slack;
       }
-      lineGeo.attributes.position.needsUpdate = true;
+      lineGeo.attributes.position.needsUpdate = true; line.userData.sync();
       rig.position.copy(end);
       if (floatRig && (ph === "waiting" || ph === "bite" || ph === "missed")) { rig.position.y = wh(end.x, end.z) + (ph === "bite" ? -Math.max(0, Math.sin(age * 6)) * 0.08 : 0); }
       rig.visible = !(ph === "hooked" || ph === "landing");

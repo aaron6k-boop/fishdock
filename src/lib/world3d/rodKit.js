@@ -138,6 +138,27 @@ export function buildRod(scene, R) {
   const RP = zs.map(() => new THREE.Vector3()), RX = zs.map(() => new THREE.Vector3()), RY = zs.map(() => new THREE.Vector3()), RR = zs.map((z) => 0);
   geo.attributes.position.setUsage(THREE.DynamicDrawUsage); geo.attributes.normal.setUsage(THREE.DynamicDrawUsage);
   const mat = M.rod_carbon.clone(); if (mat.normalMap) { mat.normalMap = mat.normalMap.clone(); mat.normalMap.repeat.set(2, R.len / 0.02); mat.normalMap.needsUpdate = true; }
+  // the maker's print on the blank just above the fore grip, as every real rod has: its name and rating in fine pale
+  // letters along the top of the blank (a made-up maker: no real brand). Drawn in the blank's own shader from where each
+  // point of the tube is (how far along, which way round), so it bends with the rod and costs one lookup
+  { const lab = new Float32Array(base.length / 3 * 2); for (let i = 0; i < lab.length / 2; i++) { lab[i * 2] = base[i * 3 + 2]; lab[i * 2 + 1] = Math.atan2(base[i * 3 + 1], base[i * 3]); } geo.setAttribute("aLab", new THREE.BufferAttribute(lab, 2)); }
+  const hEnd = R.handle[R.handle.length - 1][1], S0 = (hEnd + 0.05) / R.len, S1 = (hEnd + 0.26) / R.len;
+  if (typeof document !== "undefined") {
+    const c = document.createElement("canvas"); c.width = 1024; c.height = 96; const g = c.getContext("2d");
+    g.fillStyle = "rgba(0,0,0,0)"; g.fillRect(0, 0, 1024, 96);
+    g.fillStyle = "rgba(49,88,159,0.95)"; g.fillRect(0, 40, 64, 16); // (a band in the rod's trim colour)
+    g.fillStyle = "rgba(225,229,233,0.92)"; g.font = "bold 46px Arial, sans-serif"; g.textBaseline = "middle"; g.fillText("SEAFORM", 86, 50);
+    g.font = "38px Arial, sans-serif"; g.fillStyle = "rgba(200,206,212,0.85)"; g.fillText("SURF PRO  13'0\"  4-6 oz  100-170 g", 330, 50);
+    const lt = new THREE.CanvasTexture(c); lt.colorSpace = THREE.SRGBColorSpace; lt.anisotropy = 8;
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uLab = { value: lt };
+      sh.vertexShader = "attribute vec2 aLab;\nvarying vec2 vLab;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLab = aLab;");
+      sh.fragmentShader = "uniform sampler2D uLab;\nvarying vec2 vLab;\n" + sh.fragmentShader.replace("#include <map_fragment>", `#include <map_fragment>
+        { float u = (vLab.x - ${S0.toFixed(5)})/${(S1 - S0).toFixed(5)}, a = (vLab.y - 1.5708)/0.85;
+          if (u > 0. && u < 1. && abs(a) < 1.) { vec4 t = texture2D(uLab, vec2(u, .5 - a*.5)); diffuseColor.rgb = mix(diffuseColor.rgb, t.rgb, t.a); } }`);
+    };
+    mat.customProgramCacheKey = () => "fdblank1";
+  }
   const blank = new THREE.Mesh(geo, mat); blank.castShadow = true; blank.frustumCulled = false; group.add(blank);
   const radius = (s) => R.r0 + (R.r1 - R.r0) * Math.pow(s, 0.8);
   // guides (and the tip ring) and whippings, instanced: one mesh per material for all of them
