@@ -14,7 +14,10 @@ export function overRail(railPt, ns, a, b, f, n = null) {
   // (m: how far either side of the rail it rises and comes down: the hoop's own half-width and a little, so the hoop
   // never comes down through the rail or a post; 14 cm let it cut through the post it came down beside)
   const cx = a.x + dx * along, cz = a.z + dz * along, m = Math.max(0.14, 0.36 * ns + 0.08) / Math.max(0.3, Math.abs(dn));
-  const pts = [a, { x: cx - dx * m, y: Math.max(top, a.y), z: cz - dz * m }, { x: cx + dx * m, y: Math.max(top, b.y), z: cz + dz * m }, b];
+  // (on the sea side the wall's concrete cap stands out past the rail: the hoop comes up and goes down well clear of it
+  // there, or it went through the concrete)
+  const out = n ? Math.sign(dx * nx + dz * nz) : 0, mA = m + (out < 0 ? 0.35 : 0) / Math.max(0.3, Math.abs(dn)), mB = m + (out > 0 ? 0.35 : 0) / Math.max(0.3, Math.abs(dn));
+  const pts = [a, { x: cx - dx * mA, y: Math.max(top, a.y), z: cz - dz * mA }, { x: cx + dx * mB, y: Math.max(top, b.y), z: cz + dz * mB }, b];
   const seg = []; let D = 0;
   for (let i = 1; i < pts.length; i++) { const p = pts[i - 1], q = pts[i], l = Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z); seg.push(l); D += l; }
   let u = clamp01(f) * D;

@@ -363,6 +363,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // an unhooking mat (a padded, wipe-clean mat: where a fish you'll put back is laid to be looked at and unhooked)
   const mat = new THREE.Group(); world.add(mat); mat.visible = false;
   const MAT_AT = new THREE.Vector3(0.05, 0, -0.62); // (where it's laid: in front of you)
+  // (and always on the deck: its far edge a hand's width inside the rail. At a spot close to the wall, 62 cm out put it
+  // half over the wall's edge and the sea)
+  const matAtL = () => MAT_AT.clone().setZ(Math.max(MAT_AT.z, -Math.max(0.3, edge - 0.22) + 0.34));
   // (a real unhooking mat: a padded, quilted top in wipe-clean green, a printed ruler along the near edge to measure the
   // fish against, and soft rolled bolsters down the long sides so a flapping fish can't slip off. A flat green board
   // with a dark frame read as a tray)
@@ -857,7 +860,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       showFish = true; showLine = false;
       const G = venue === "pier" ? dropGeo(ns) : null;
       // heights it can rest at without going into anything: the deck (or the bank) under you, the mat's top
-      const floorY = toWorld(new THREE.Vector3(0, 0, 0)).y, matAt = toWorld(MAT_AT.clone().setY(0.004)), matTop = matAt.y + 0.042;
+      const floorY = toWorld(new THREE.Vector3(0, 0, 0)).y, matAt = toWorld(matAtL().setY(0.004)), matTop = matAt.y + 0.042;
       const onMat = matAt.clone().setY(matTop + halfThick() + 0.012 + 0.012 * fishLen);
       const netDeck = G ? G.deck : toWorld(new THREE.Vector3(-0.62, 0.06, -0.2));
       const inNetAt = (n) => n.clone().setY(floorY + halfThick() + 0.035); // (lying in the net set down on the deck)
@@ -1231,8 +1234,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (kept?.state === "release" && relStep === "over" && venue === "pier" && netAt) {
       // putting it back: the drop net, the fish in it, lifted over the top rail in both hands
       const net0 = toLocal(netAt);
-      hands[0] = { at: net0.clone().add(V3(-0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
-      hands[1] = { at: net0.clone().add(V3(0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
+      { const rail = { y: 1.12, z: -Math.max(0.3, edge - 0.22) }; // (so the arms come over the top rail lifting it across, not through it)
+        hands[0] = { at: net0.clone().add(V3(-0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop", rail };
+        hands[1] = { at: net0.clone().add(V3(0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop", rail }; }
       crouch = clamp(0.8 - net0.y * 0.6, 0, 0.6); lean = 0.18; brace = 0; lookAtW = netAt.clone();
     }
     if (kept?.state === "release" && releasePole && poleFrom && netAt) { hands[0] = { at: toLocal(poleFrom), axis: toLocal(netAt).sub(toLocal(poleFrom)), palm: V3(0, 1, 0), kind: "pole" }; lean = 0.2; lookAtW = netAt.clone(); }
@@ -1260,8 +1264,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (kept?.state === "release" && relStep === "haul" && releaseInfo?.over && netAt) {
       // the empty net over the rail in both hands and laid back on the deck
       const net0 = toLocal(netAt);
-      hands[0] = { at: net0.clone().add(V3(-0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
-      hands[1] = { at: net0.clone().add(V3(0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
+      { const rail = { y: 1.12, z: -Math.max(0.3, edge - 0.22) }; // (so the arms come over the top rail lifting it across, not through it)
+        hands[0] = { at: net0.clone().add(V3(-0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop", rail };
+        hands[1] = { at: net0.clone().add(V3(0.2, 0.08, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop", rail }; }
       crouch = clamp(0.8 - net0.y * 0.6, 0, 0.6); lean = 0.18; brace = 0; lookAtW = netAt.clone();
     }
     if (kept?.state === "deck" && !walking) lookAtW = fish.visible ? fish.position.clone() : lookAtW;
@@ -1385,7 +1390,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // gone)
     if (matOn) matOut = true;
     mat.visible = matOn || (matOut && !walking);
-    if (mat.visible) { mat.position.copy(toWorld(MAT_AT)); mat.rotation.y = root.rotation.y; }
+    if (mat.visible) { mat.position.copy(toWorld(matAtL())); mat.rotation.y = root.rotation.y; }
     net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r) => (r.visible = net.visible && !netIdle && (tech === "dropnet" || ropesOn)));
     if (net.visible) {
       net.position.copy(netAt);
