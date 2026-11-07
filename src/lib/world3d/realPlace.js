@@ -312,7 +312,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const k = j * n + i; if ((cls[k] !== 1 && cls[k] !== 2) || src[k] < 0 || !local.dunes(xs[i], xs[j])) continue;
       const s0 = src[k], d = Math.hypot(xs[i] - xs[s0 % n], xs[j] - xs[Math.floor(s0 / n)]);
       // up from a few metres in from the edge, a rounded bank about 4 m high, down again behind it
-      const rise = Math.min(4.2, Math.max(0, d - 7) * 0.24) * Math.max(0, Math.min(1, (62 - d) / 16)) * (0.7 + 0.6 * noise2(xs[i] / 17, xs[j] / 17, 1e6, 7));
+      // (a low, lumpy dune, 2.5 m at most: at 4 m and rounded it read from the pier as a smooth hill, which East Anglia
+      // hasn't got, and it hid the port behind it)
+      const hum = 0.55 + 0.45 * noise2(xs[i] / 17, xs[j] / 17, 1e6, 7) + 0.35 * (noise2(xs[i] / 5.5, xs[j] / 5.5, 1e6, 8) - 0.5);
+      const rise = Math.min(2.5, Math.max(0, d - 7) * 0.2) * Math.max(0, Math.min(1, (58 - d) / 18)) * Math.max(0.2, hum);
       h[k] += rise; dune[k] = Math.min(1, rise / 1.1);
     }
   }
@@ -335,7 +338,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const c = COL_OF[solid[k] && cls[k] === 0 ? 1 : cls[k]];
     // large, soft variations (no per-vertex checker), and damp concrete near the edge
     const v = 0.9 + noise2(X[k] / 23, Z[k] / 23, 1e6, 3) * 0.14 + noise2(X[k] / 7, Z[k] / 7, 1e6, 4) * 0.06 - wet[k] * 0.12;
-    const g2 = dune[k] * (0.75 + 0.25 * noise2(X[k] / 5, Z[k] / 5, 1e6, 9)), GR = [0.46, 0.5, 0.3]; // (marram: a dry green)
+    const g2 = Math.min(1, dune[k] * 1.6) * (0.55 + 0.45 * noise2(X[k] / 3.5, Z[k] / 3.5, 1e6, 9)), GR = [0.36, 0.4, 0.22]; // (marram: a dry grey-green in clumps, the sand showing between)
     pos.set([X[k], h[k], Z[k]], k * 3); col.set([(c[0] + (GR[0] - c[0]) * g2) * v, (c[1] + (GR[1] - c[1]) * g2) * v, (c[2] + (GR[2] - c[2]) * g2) * v], k * 3);
     uv.set([X[k] / 8, Z[k] / 8], k * 2); // one concrete tile = 8 m (joints every 4 m)
   }
