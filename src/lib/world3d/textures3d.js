@@ -177,7 +177,7 @@ export function bricks(seed = 17, base = [150, 70, 52]) {
 
 // ---- photographed surfaces (public/textures/, Poly Haven CC0, cut down by source-assets/prepare_textures.py) ----
 // Loaded once each and shared; a material that uses one shows its drawn look until it has arrived (or if it can't).
-export const TEX_BASE = "/textures/";
+export const TEX_BASE = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/";
 const photos = new Map();
 export function photoTex(name, { srgb = true } = {}) {
   if (typeof document === "undefined") return null;

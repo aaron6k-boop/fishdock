@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { weather } from "./textures3d.js";
 
-export const MODELS_BASE = "/models/";
+export const MODELS_BASE = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/models/"; // (__fdAssetBase: set only by a self-contained preview page, its files beside it)
 let loader = null;
 const files = new Map();
 

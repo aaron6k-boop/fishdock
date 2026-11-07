@@ -16,6 +16,7 @@ import { addRipple, stepRipples } from "./waterFx.js";
 import { shotFor } from "./landCam.js";
 import { createPost } from "./post.js";
 import { setPeopleDetail } from "./human3d.js";
+import { FILM } from "./film.js";
 
 // dpr: the most pixels per screen pixel; ss: the least (a computer's 1x screen is drawn sharper than its pixels and
 // scaled down, which smooths the fine edges of railings, rods and lines); floor: the least the frame pacing drops to;
@@ -586,10 +587,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     return s;
   }
 
-  // test hook (never used by the app): a test sets window.__fdFilm before loading, then freezes the clock and steps it
+  // test hook (never used by the app): a test sets FILM before loading, then freezes the clock and steps it
   // a set time per frame, so an animation can be filmed exactly even where frames are slow (software graphics)
   let film = null;
-  if (typeof window !== "undefined" && window.__fdFilm) {
+  if (typeof window !== "undefined" && FILM) {
     window.__fdWorld = {
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),

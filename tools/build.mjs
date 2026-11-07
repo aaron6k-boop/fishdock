@@ -37,7 +37,7 @@ const res = await build({
   outdir: join(out, "assets"), entryNames: "[name]-[hash]", chunkNames: "chunk-[hash]", assetNames: "[name]-[hash]",
   metafile: true, legalComments: "none", logLevel: "warning",
   nodePaths: [join(root, "node_modules"), "/opt/npm-tools/node_modules"],
-  define: { __PREVIEW__: "false", __BUILD_ID__: JSON.stringify(BUILD_ID), __APP_VERSION__: JSON.stringify(pkg.version), "process.env.NODE_ENV": '"production"' },
+  define: { __FD_FILM__: process.env.FISHDOCK_FILM === "1" ? "true" : "false", __PREVIEW__: "false", __BUILD_ID__: JSON.stringify(BUILD_ID), __APP_VERSION__: JSON.stringify(pkg.version), "process.env.NODE_ENV": '"production"' },
 });
 
 const outputs = Object.entries(res.metafile.outputs);

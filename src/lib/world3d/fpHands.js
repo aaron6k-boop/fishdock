@@ -16,6 +16,7 @@ import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { loadPart } from "./glbParts.js";
 import { subdivide } from "./subdivide.js";
+import { FILM } from "./film.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -54,8 +55,8 @@ const channelOf = (kind) => CHANNEL[kind] || CHANNEL.fist;
 // elbow and forearm follow (a real arm winds from the elbow, the wrist taking the rest); ease: how far the fingers
 // loosen a little once the handle's been still a moment
 const CRANK = { roll: -1.1, follow: 0.55, ease: 0.16 };
-const TUNE_ELBOW = (typeof window !== "undefined" && window.__fdElbow) || {};
-if (typeof window !== "undefined" && window.__fdFilm) window.__fdHands = { GRIPS, CHANNEL, CRANK };
+const TUNE_ELBOW = (typeof window !== "undefined" && FILM && window.__fdElbow) || {};
+if (typeof window !== "undefined" && FILM) window.__fdHands = { GRIPS, CHANNEL, CRANK };
 
 // ---- geometry ----
 // a part of the hand: its geometry placed in the hand's rest frame, every vertex on one bone, one colour
@@ -331,7 +332,7 @@ function realArms(scene, { gloves, skinHex }) {
     const M = { y: toH(Yh), n: toH(palmW), x: toH(idxW), palm: toH(palmPt.sub(P)), gap: toH(gapPt.sub(P)), hook: toH(hookPt.sub(P)) };
     return { i, M, hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone(), mid: bone("middle_01_" + sfx), ring: bone("ring_01_" + sfx) };
   });
-  if (typeof window !== "undefined" && window.__fdFilm) window.__fdArms = { sides, root };
+  if (typeof window !== "undefined" && FILM) window.__fdArms = { sides, root };
   const q = new THREE.Quaternion(), qa = new THREE.Quaternion(), gq = new THREE.Quaternion(), qb = new THREE.Quaternion();
   // the thumb from its angles: [base bend, middle, end, base swing across the palm]
   const setThumb = (S, t) => { S.thumb.forEach((j, k) => { j.b.quaternion.copy(j.rest); if (k === 0 && t[3]) j.b.quaternion.multiply(qb.setFromAxisAngle(j.axis2, t[3])); j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, t[k] || 0)); }); S.thumb[0].b.updateMatrixWorld(true); };
@@ -435,7 +436,7 @@ function realArms(scene, { gloves, skinHex }) {
   const GRIP = { rodR: 0.0145, knobR: 0.01, knobLen: 0.026 }; // (the knob as modelled: 2 cm across, 2.6 cm long, rodkit.glb crank_knob)
   // palmTilt: the palm's facing, up (+) or down (-) from level; diag: how far forward the fingers lean (the handle's
   // diagonal across the palm); wristLim: how far the forearm may turn from straight behind the hand
-  const TUNE = (typeof window !== "undefined" && window.__fdGripTune) || { wristLim: 0.6, wristW: 1.6 };
+  const TUNE = (typeof window !== "undefined" && FILM && window.__fdGripTune) || { wristLim: 0.6, wristW: 1.6 };
   const solved = new Map();
   // a circle through points (hand frame) in the plane of u and w (Kasa: x^2 + y^2 + Dx + Ey + F = 0, least squares)
   function circleFit(pts, u, w) {
@@ -522,7 +523,7 @@ function realArms(scene, { gloves, skinHex }) {
       // hand on top with the fingers hooked over and down the far side, which is what reads as a claw)
       const side = kind === "seat" ? Math.max(0, (TUNE.palmX ?? 0.7) - Nt.x * (TUNE.palmSign ?? 1)) * (TUNE.sideW ?? 4) + Math.max(0, (TUNE.palmUpY ?? -1) - Nt.y) * (TUNE.sideW ?? 4) + Math.max(0, Yt.y + (TUNE.fingDown ?? 0.45)) * (TUNE.downW ?? 2) : 0;
       const score = side + (kind === "seat" && wristBend > (TUNE.wristMax ?? 1.0) ? 10 + wristBend : 0) + miss * 0.3 + wristBend * (TUNE.wristW ?? 1.6) + wrongWay + flatF + r.gap * 25 + r.over * 60 + r.thumbLow * 40 + (extra || 0);
-      if (typeof window !== "undefined" && window.__fdFilm && kind === "seat") (window.__fdCand ||= []).push({ th: +CTH.toFixed(2), ps: +CPS.toFixed(2), sy: SY, se: SE, score: +score.toFixed(2), wrist: +wristBend.toFixed(2), over: +r.over.toFixed(3), tl: +r.thumbLow.toFixed(3), gap: +r.gap.toFixed(3), miss: +miss.toFixed(2), ww: +wrongWay.toFixed(2), flat: +flatF.toFixed(2) });
+      if (typeof window !== "undefined" && FILM && kind === "seat") (window.__fdCand ||= []).push({ th: +CTH.toFixed(2), ps: +CPS.toFixed(2), sy: SY, se: SE, score: +score.toFixed(2), wrist: +wristBend.toFixed(2), over: +r.over.toFixed(3), tl: +r.thumbLow.toFixed(3), gap: +r.gap.toFixed(3), miss: +miss.toFixed(2), ww: +wrongWay.toFixed(2), flat: +flatF.toFixed(2) });
       if (!best || score < best.score) best = { score, Qh, Ph, f: r.f.map((x) => [x[0], x[1], x[2]]), t: [r.t[0], r.t[1], r.t[2]], gap: r.gap, hit: r.hit, thit: r.thit, wristBend, ny: Nt.x, al: Yt.y };
     };
     if (kind === "crank" && (TUNE.crankStyle ?? "cup") === "cup") {
@@ -569,7 +570,7 @@ function realArms(scene, { gloves, skinHex }) {
       }
       S.thumb.forEach((j) => j.b.quaternion.copy(j.rest)); S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
       best = { score: 0, Qh, Ph, f, t: tb.ang, gap: 0, hit: [9, 9, 9, 9], thit: tb.e < 0.03 ? 1 : 0, wristBend: yl.clone().applyQuaternion(Qh).negate().angleTo(F), ny: 0, al: KG.al };
-      if (typeof window !== "undefined" && window.__fdFilm) window.__fdKnob = { f: f.map((r) => r.map((v) => +v.toFixed(2))), t: tb.ang.map((v) => +v.toFixed(2)), te: +tb.e.toFixed(3) };
+      if (typeof window !== "undefined" && FILM) window.__fdKnob = { f: f.map((r) => r.map((v) => +v.toFixed(2))), t: tb.ang.map((v) => +v.toFixed(2)), te: +tb.e.toFixed(3) };
     } else if (kind === "seat") {
       // ---- the rod hand, set as a real spinning-rod grip is (not searched for) ----
       // From how anglers are taught to hold one: the hand under the handle, directly behind the reel's foot, the palm
@@ -619,7 +620,7 @@ function realArms(scene, { gloves, skinHex }) {
       const cm = f0[1][0] / TPL[1][0], GR = SG.grade || [0.88, 1, 1.07, 1.14];
       const f = f0.map((r, a) => { const c0 = r[0] / TPL[a][0], c = Math.min(1.55, Math.max(c0, cm * GR[a])); return TPL[a].map((v) => v * c); });
       best = { score: 0, Qh, Ph, f, t: [0.3, 0.2, 0.1], gap: 0, hit: [9, 9, 9, 9], thit: 0, wristBend: yl.clone().applyQuaternion(Qh).negate().angleTo(F), ny: 0, al: 0 };
-      if (typeof window !== "undefined" && window.__fdFilm) window.__fdSeat = { Ph: Ph.toArray().map((v) => +v.toFixed(3)), f: f.map((r) => r.map((v) => +v.toFixed(2))), ix: G0.ix.toArray().map((v) => +v.toFixed(2)) };
+      if (typeof window !== "undefined" && FILM) window.__fdSeat = { Ph: Ph.toArray().map((v) => +v.toFixed(3)), f: f.map((r) => r.map((v) => +v.toFixed(2))), ix: G0.ix.toArray().map((v) => +v.toFixed(2)) };
       S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
     } else {
       // the knob: the index and middle fingers curled into a hook just the knob's size (their joints and tips on a circle
@@ -723,7 +724,7 @@ function realArms(scene, { gloves, skinHex }) {
       best.t = tb.ang;
     }
     const out = { Ph: best.Ph, Qh: best.Qh, f: best.f, t: best.t };
-    if (typeof window !== "undefined" && window.__fdFilm) (window.__fdGrips ||= {})[S.i + key] = { idx: M.x.clone().applyQuaternion(best.Qh).toArray().map((v) => +v.toFixed(2)), hit: best.hit, thit: best.thit, wrist: +best.wristBend.toFixed(2), gap: +best.gap.toFixed(3), score: +best.score.toFixed(2), f: best.f.map((r) => r.map((v) => +v.toFixed(2))), t: best.t.map((v) => +v.toFixed(2)), ny: best.ny, al: best.al };
+    if (typeof window !== "undefined" && FILM) (window.__fdGrips ||= {})[S.i + key] = { idx: M.x.clone().applyQuaternion(best.Qh).toArray().map((v) => +v.toFixed(2)), hit: best.hit, thit: best.thit, wrist: +best.wristBend.toFixed(2), gap: +best.gap.toFixed(3), score: +best.score.toFixed(2), f: best.f.map((r) => r.map((v) => +v.toFixed(2))), t: best.t.map((v) => +v.toFixed(2)), ny: best.ny, al: best.al };
     solved.set(key, out); return out;
   }
   const blend = [null, null];
@@ -770,12 +771,12 @@ function realArms(scene, { gloves, skinHex }) {
       S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, f[a][k]))));
       setThumb(S, t);
       root.updateMatrixWorld(true);
-      if (typeof window !== "undefined" && window.__fdShowSock) {
+      if (typeof window !== "undefined" && FILM && window.__fdShowSock) {
         // (film only: what the grip was worked out round, drawn where it is, to check it against the real knob and handle)
         S.dbg ||= (() => { const g = kind === "seat" ? new THREE.CylinderGeometry(GRIP.rodR, GRIP.rodR, 0.3, 16).rotateX(Math.PI / 2) : new THREE.CylinderGeometry(GRIP.knobR, GRIP.knobR, GRIP.knobLen, 16).rotateZ(Math.PI / 2); const mm = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xff2020, wireframe: true })); group.parent?.parent?.add?.(mm); return mm; })();
         S.dbg.position.copy(sp); S.dbg.quaternion.copy(sq); S.dbg.updateMatrixWorld(true);
       }
-      if (typeof window !== "undefined" && window.__fdFilm) {
+      if (typeof window !== "undefined" && FILM) {
         const ix = S.fingers[0], md = S.fingers[1], hk = wp(ix[0].b).lerp(wp(ix[1].b), 0.5).lerp(wp(md[0].b).lerp(wp(md[1].b), 0.5), 0.5);
         (window.__fdSock ||= {})[i] = { kind, sock: sp.toArray().map((v) => +v.toFixed(3)), hook: hk.toArray().map((v) => +v.toFixed(3)), d: +hk.distanceTo(sp).toFixed(3), tips: [0, 1].map((a) => { const c = S.fingers[a][2]; return +wp(c.b).add(V(0, 1, 0).applyQuaternion(wq(c.b)).multiplyScalar(c.len)).distanceTo(sp).toFixed(3); }),
           // (on the knob: the nearest the index and middle fingers' pads come to its surface; 0 is touching)

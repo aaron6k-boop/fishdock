@@ -8,6 +8,7 @@ import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
 import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
 import { lightingFor, lampPools, poolLight, lookQuality } from "./skyLook.js";
+import { FILM } from "./film.js";
 
 // ---- shared shader pieces: noise and the sky's colour in any direction ----
 export const GLSL_NOISE = /* glsl */`
@@ -557,7 +558,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   let look = lightingFor({ day: 1, dusk: 0, night: 0, cloud: 0.3, rain: 0, moonLight: 0 });
   function apply(st) {
     U.uDay.value = st.day; U.uDusk.value = st.dusk; U.uNight.value = st.night; U.uCloud.value = st.cloud; U.uRain.value = st.rain; U.uMoonLight.value = st.moonLight;
-    U.uSunDir.value.copy(st.sunDir); if (typeof window !== "undefined" && window.__fdFilm && window.__fdSun) U.uSunDir.value.set(...window.__fdSun).normalize(); /* (film only: the sun put where a check needs it) */ U.uMoonDir.value.copy(st.moonDir);
+    U.uSunDir.value.copy(st.sunDir); if (typeof window !== "undefined" && FILM && window.__fdSun) U.uSunDir.value.set(...window.__fdSun).normalize(); /* (film only: the sun put where a check needs it) */ U.uMoonDir.value.copy(st.moonDir);
     wind = st.wind; windDir = [st.windDir.x, st.windDir.y];
     wU.uWind.value = st.wind; wU.uWindDir.value.copy(st.windDir).normalize(); wU.uSwell.value = st.swell;
     // ---- light (skyLook.js): the sun by day, the moon at night, gold and low at dusk; cloud hides it and the sky's

@@ -52,7 +52,7 @@ function segIndex(segs, cell = 8) {
 // and darker concrete, smoother worn concrete (Poly Haven's concrete_floor_worn_001) where feet go, a few old stains,
 // and along the walls a ragged band of damp (darker, a little greener, less rough) with dried salt just inside it.
 // Wet (rain) darkens it and makes it shine. Until the photographs have loaded (or if they can't) the drawn one shows.
-export const PIER_TEX = "/textures/pier_concrete_";
+export const PIER_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/pier_concrete_"; // (__fdAssetBase: only a self-contained preview page sets it, its files beside it; the app leaves it unset)
 const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
 function pierConcrete(mat, quality = 1) {
   const wet = { value: 0 };

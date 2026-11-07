@@ -19,6 +19,7 @@ import { loadPart, fitNet } from "./glbParts.js";
 import { fitRodReel, buildRod } from "./rodKit.js";
 import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
 import { contactShadow } from "./contactShadow.js";
+import { FILM } from "./film.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -998,7 +999,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the reel: the handle at its angle; the rotor geared up from it (about five turns to one, as a sea spinning reel);
     // the spool moving in and out once a turn to lay the line; the drag letting the spool turn back while a fish takes
     // line; the bail open for the cast until the rig's down, then flipped over
-    { const u = reel.userData; if (local && typeof window !== "undefined" && window.__fdFilm && window.__fdSpinRate) u.spin = (u.spin || 0) + window.__fdSpinRate * dt; // (film only: the handle turned steadily, to check the hand on it)
+    { const u = reel.userData; if (local && typeof window !== "undefined" && FILM && window.__fdSpinRate) u.spin = (u.spin || 0) + window.__fdSpinRate * dt; // (film only: the handle turned steadily, to check the hand on it)
       const sp = u.spin || 0;
       handle.rotation.x = -sp; u.rotor.rotation.z = sp * 5.2;
       if (u.spool) { u.spool.position.z = u.spoolZ + 0.0055 * (1 - Math.cos(sp)) - 0.004; u.slip = (u.slip || 0) + (u.slipping ? dt * 9 : 0); u.spool.rotation.z = -u.slip; }
@@ -1308,8 +1309,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       }
     }
     prevAge = age;
-    // test diagnostics only (window.__fdFilm, never in the app): where the reel, its handle and your hands are this frame
-    if (local && typeof window !== "undefined" && window.__fdFilm) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, rod: pts.map((p) => toWorld(p).toArray()), lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2) }; }
+    // test diagnostics only (FILM, never in the app): where the reel, its handle and your hands are this frame
+    if (local && typeof window !== "undefined" && FILM) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, rod: pts.map((p) => toWorld(p).toArray()), lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2) }; }
     const eyeNow = fpEye(); // (the eye the rod and your body were placed from this frame: the camera uses the same one)
     // (letting the drop net down and hauling it up, you lean right out over the rail, your head past the wall's top: from
     // behind the rail the edge hides the foot of the wall, where the net and the fish are)
@@ -1333,7 +1334,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // where the reel sits in your view (right, up, forward of the eye, metres): low and a little right of the middle, far
   // enough out that both hands and the reel's handle going round are in the picture above the controls (it was lower
   // and nearer: the reel hand was half under the Reel button)
-  const FPR = (typeof window !== "undefined" && window.__fdFpr) || { x: 0.07, y: -0.1, z: 0.54 };
+  const FPR = (typeof window !== "undefined" && FILM && window.__fdFpr) || { x: 0.07, y: -0.1, z: 0.54 };
   function fpEye() { return new THREE.Vector3(stepNow + body.x, eyeH - leanNow * 0.25 - stoopNow * 0.55 + Math.sin(tNow * 1.4) * 0.006 + body.y, -0.08 - leanNow * 0.85 - stoopNow * 0.12 + body.z); } // (stooping: down to the net on the deck, rather than an arm stretched a metre to it)
   // the reel's handle for your taps (reelHandle.js)
   // ---- the reel's handle ----
@@ -1350,7 +1351,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (!audible || halfTurnsPassed(a0, a1) < 1) return;
     // (one click however far it went in a frame, quieter as it spins faster: a whirr, not a machine gun)
     onSound?.("reelTap", at, { speed: clamp(Math.abs(reel.userData.hs?.v || 0) / 25, 0, 1) });
-    if (typeof window !== "undefined" && window.__fdSoundLog) window.__fdSoundLog.push({ s: "click", a: +a1.toFixed(3), t: +tNow.toFixed(3) });
+    if (typeof window !== "undefined" && FILM && window.__fdSoundLog) window.__fdSoundLog.push({ s: "click", a: +a1.toFixed(3), t: +tNow.toFixed(3) });
   }
   function tipWorld() { root.updateMatrixWorld(true); return toWorld(pts[NSEG]); }
 
