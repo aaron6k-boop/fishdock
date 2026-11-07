@@ -74,8 +74,11 @@ export function fitNet(net, scene, kind = "drop") {
         // the mesh's cords are in the texture's alpha: seen from both sides, blended (a hard cut-out loses the fine cords
         // at any distance), the cords' cover boosted a little so the bag still reads as netting from across the deck
         const m = o.material = o.material.clone(); m.transparent = true; m.alphaTest = 0.04; m.side = THREE.DoubleSide; m.depthWrite = false;
-        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 4.0, 0.0, 1.0); diffuseColor.rgb *= 0.75;"); };
-        m.customProgramCacheKey = () => "fdnet2"; o.renderOrder = 2;
+        // (green knotted nylon, as pier drop nets are sold, with a bigger mesh than a landing net's: the cords were a fine
+        // black grid that read as a sieve; cut out more firmly so each cord shows)
+        for (const k of ["map", "alphaMap", "normalMap"]) if (m[k]) { m[k] = m[k].clone(); m[k].repeat.multiplyScalar(0.55); m[k].needsUpdate = true; }
+        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 5.0, 0.0, 1.0); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.15, 0.14), 0.85);"); };
+        m.customProgramCacheKey = () => "fdnet3"; o.renderOrder = 2;
       }
     });
   }
