@@ -49,13 +49,15 @@ function rodMaterials() {
   const std = (o) => new THREE.MeshStandardMaterial(o);
   MATS = {
     // (carbon and epoxy are not metals: a satin finish over the weave, not a mirror; the blue accents held back)
-    rod_carbon: std({ color: 0x171a1f, metalness: 0.05, roughness: 0.34, normalMap: scrim, normalScale: new THREE.Vector2(0.18, 0.18) }), // (a gloss finish: a standard material, no clearcoat pass, for phones)
+    // (a lacquered blank: the carbon weave satin under a thin glossy coat, a crisp highlight running along the rod as a
+    // real one shows. One clearcoat lobe on a few small meshes: cheap enough for phones)
+    rod_carbon: new THREE.MeshPhysicalMaterial({ color: 0x171a1f, metalness: 0.05, roughness: 0.42, normalMap: scrim, normalScale: new THREE.Vector2(0.22, 0.22), clearcoat: 0.85, clearcoatRoughness: 0.12 }),
     rod_eva: std({ color: 0x1a1a1b, roughness: 0.94, metalness: 0, normalMap: foam, normalScale: new THREE.Vector2(0.7, 0.7) }),
     gunmetal: std({ color: 0x4a4f56, metalness: 0.9, roughness: 0.34, roughnessMap: brushed }),
     chrome: std({ color: 0xc9ccd0, metalness: 1, roughness: 0.22 }),
-    blue_anodised: std({ color: 0x2b4f96, metalness: 0.8, roughness: 0.36 }),
+    blue_anodised: new THREE.MeshPhysicalMaterial({ color: 0x2b4f96, metalness: 0.8, roughness: 0.36, clearcoat: 0.6, clearcoatRoughness: 0.18 }), // (anodised under a clear lacquer)
     ceramic: std({ color: 0x2b2d31, metalness: 0.1, roughness: 0.18 }),
-    reel_graphite: std({ color: 0x1e2024, metalness: 0.05, roughness: 0.55 }),
+    reel_graphite: new THREE.MeshPhysicalMaterial({ color: 0x1e2024, metalness: 0.05, roughness: 0.5, clearcoat: 0.45, clearcoatRoughness: 0.3 }), // (moulded graphite body, a little gloss)
     reel_brushed: std({ color: 0x9a9fa6, metalness: 1, roughness: 0.3, roughnessMap: brushed }),
     rubber: std({ color: 0x18181a, metalness: 0, roughness: 0.82, normalMap: foam, normalScale: new THREE.Vector2(0.3, 0.3) }),
     braid_blue: std({ color: 0x31589f, metalness: 0, roughness: 0.62, normalMap: braid, normalScale: new THREE.Vector2(0.6, 0.6) }),
