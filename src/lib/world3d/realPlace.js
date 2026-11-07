@@ -322,6 +322,15 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   }
   const X = new Float32Array(n * n), Z = new Float32Array(n * n), wet = new Float32Array(n * n);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; X[k] = xs[i]; Z[k] = xs[j]; }
+  // the town's rising ground (localDetail.js hill): built-up land and grass climb with it; the grassy face of the slope
+  // is drawn as grass, not paving
+  const hill = local?.hill || null, bank = new Uint8Array(n * n);
+  if (hill) for (let k = 0; k < n * n; k++) {
+    if (cls[k] !== 1 && cls[k] !== 3) continue;
+    const up = hill(X[k], Z[k]); if (up <= 0) continue;
+    h[k] += up;
+    if (Math.abs(hill(X[k] - 2, Z[k]) - hill(X[k] + 2, Z[k])) > 0.3) bank[k] = 1;
+  }
   // along every wall: a vertex on the water side within a cell of it moves onto the wall's line, at the deck's height;
   // a land vertex the grid called water is put back. The ground then ends exactly at the wall's top.
   for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
@@ -336,10 +345,15 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     X[k] = w.p[0] - w.s[4] * 0.02; Z[k] = w.p[1] - w.s[5] * 0.02; h[k] = LAND; solid[k] = 1; wet[k] = 1;
   }
   for (let k = 0; k < n * n; k++) {
-    const c = COL_OF[solid[k] && cls[k] === 0 ? 1 : cls[k]];
+    const c = COL_OF[bank[k] ? 3 : solid[k] && cls[k] === 0 ? 1 : cls[k]];
     // large, soft variations (no per-vertex checker), and damp concrete near the edge
     const v = 0.9 + noise2(X[k] / 23, Z[k] / 23, 1e6, 3) * 0.14 + noise2(X[k] / 7, Z[k] / 7, 1e6, 4) * 0.06 - wet[k] * 0.12;
     const g2 = Math.min(1, dune[k] * 1.6) * (0.55 + 0.45 * noise2(X[k] / 3.5, Z[k] / 3.5, 1e6, 9)), GR = [0.36, 0.4, 0.22]; // (marram: a dry grey-green in clumps, the sand showing between)
+    if (bank[k]) { // (the cliff's face: rough grass, darker clumps of scrub and paler worn patches, not a lawn)
+      const s1 = noise2(X[k] / 9, Z[k] / 9, 1e6, 11), s2 = noise2(X[k] / 3, Z[k] / 3, 1e6, 12), sc = Math.max(0, Math.min(1, (s1 - 0.55) * 4)), pale = Math.max(0, Math.min(1, (0.35 - s1) * 4)) * 0.5;
+      const r = 0.29 - sc * 0.1 + pale * 0.12, gg = 0.36 - sc * 0.1 + pale * 0.08, b = 0.19 - sc * 0.05 + pale * 0.07, f = 0.9 + s2 * 0.18;
+      pos.set([X[k], h[k], Z[k]], k * 3); col.set([r * f, gg * f, b * f], k * 3); uv.set([X[k] / 8, Z[k] / 8], k * 2); continue;
+    }
     pos.set([X[k], h[k], Z[k]], k * 3); col.set([(c[0] + (GR[0] - c[0]) * g2) * v, (c[1] + (GR[1] - c[1]) * g2) * v, (c[2] + (GR[2] - c[2]) * g2) * v], k * 3);
     uv.set([X[k] / 8, Z[k] / 8], k * 2); // one concrete tile = 8 m (joints every 4 m)
   }
@@ -347,7 +361,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const addTri = (a, b, c) => {
     const sa = solid[a], sb = solid[b], sc = solid[c];
     if (!sa && !sb && !sc && h[a] < -1 && h[b] < -1 && h[c] < -1) return; // open water: nothing to draw
-    const soft = [a, b, c].some((q) => cls[q] === 2 || cls[q] === 3) || inland;
+    const soft = [a, b, c].some((q) => cls[q] === 2 || cls[q] === 3 || bank[q]) || inland;
     // a triangle reaching from a wall out into the water would stand above the water in front of the wall: only beaches
     // and banks slope into the water
     if (!(sa && sb && sc) && !soft) return;
@@ -372,7 +386,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
   place.deckMat = deckMat; // world.js darkens it in the rain
 
-  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : H_OF[c]; };
+  const hillAt = (x, z, c) => (hill && (c === 1 || c === 3) ? hill(x, z) : 0);
+  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : H_OF[c] + hillAt(x, z, c); };
   // ---- streets: tarmac with a pale pavement and kerb either side (from the map's roads) ----
   {
     const T = { p: [], uv: [], i: [] }, Pv = { p: [], uv: [], i: [] };
@@ -382,6 +397,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         let run = 0;
         for (let k = 0; k < line.length - 1; k++) {
           const [x1, z1] = line[k], [x2, z2] = line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
+          // (on the town's slope: in pieces of 5 m at most, so the street lies on the ground rather than cutting through it)
+          if (hill && len > 6 && (hill(x1, z1) > 0 || hill(x2, z2) > 0)) { const m = Math.ceil(len / 5), sub = []; for (let q = 0; q <= m; q++) sub.push([x1 + ((x2 - x1) * q) / m, z1 + ((z2 - z1) * q) / m]); line = [...line.slice(0, k), ...sub, ...line.slice(k + 2)]; k--; continue; }
           if (groundAt(x1, z1) === 0 && groundAt(x2, z2) === 0) { run += len; continue; }
           const nx = -(z2 - z1) / len, nz = (x2 - x1) / len, a0 = w0 > 0 ? side * w0 : -w1, a1 = w0 > 0 ? side * w1 : w1;
           const ya = groundAt(x1, z1) + y, yb = groundAt(x2, z2) + y, o = Bk.p.length / 3;
@@ -622,7 +639,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // a mark's own landmark buildings, built from photographs (localDetail.js), in place of the generic style
   const marks = Object.fromEntries(Object.entries(local?.landmarks || {}).filter(([, k]) => LANDMARK_BUILDERS[k])), beacons = [];
   for (const b of (place.buildings || []).filter((b) => marks[b.id])) {
-    const lm = LANDMARK_BUILDERS[marks[b.id]](group, b.ring, groundAt(b.ring[0][0], b.ring[0][1]) || LAND);
+    const lm = LANDMARK_BUILDERS[marks[b.id]](group, b.ring, Math.min(...b.ring.map(([x, z]) => groundAt(x, z) || LAND)));
     for (const m of lm.meshes) { m.userData.kind = "a building"; targets.push(m); }
     place.buildingGlow = [...(place.buildingGlow || []), ...lm.glow];
     if (lm.flash) beacons.push(lm.flash);
@@ -758,9 +775,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   place.waterAt = (x, z) => { const q = [x, z]; return !LR.some((bb) => inB(q, bb)) && !PR.some((bb) => inB(q, bb)) && !WR.some((bb) => inB(q, bb)); };
   place.perches = perches;
   // beyond the mapped square: real landmarks where they are, an indicative low town over the land (skyline.js)
-  place.skyline = buildSkyline(group, place, { groundY: LAND, quality, industry: local?.industry || null });
+  place.skyline = buildSkyline(group, place, { groundY: LAND, quality, industry: local?.industry || null, hill: local?.hill || null });
   if (place.skyline?.glow?.length) place.buildingGlow = [...(place.buildingGlow || []), ...place.skyline.glow];
-  return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c]; const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
+  return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c] + (local?.hill && (c === 1 || c === 3) ? local.hill(x, z) : 0); const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
 // ---- the other kinds of fence a photograph shows (localDetail.js): runs of [a, b, deck height] ----
 // timber: heavy square posts every 2.4 m with two rails (instanced: two draw calls). bars: a steel railing of upright

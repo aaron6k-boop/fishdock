@@ -44,7 +44,7 @@ const hazed = (mesh, dist, far) => {
  * Builds the skyline for a real place into `group`. place: the built place (origin, land rings). Returns
  * { turbines, update(t) } (the rotors turn slowly), or null when nothing applies.
  */
-export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industry = null } = {}) {
+export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industry = null, hill = null } = {}) {
   if (!place?.origin) return null;
   const [lat0, lon0] = place.origin, P = projector(lat0, lon0), H = PLACE3D.box;
   const far = 9000, rotors = [];
@@ -105,7 +105,7 @@ export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industr
       if (![[30, 0], [-30, 0], [0, 30], [0, -30]].every(([dx, dz]) => land.some((r) => inside([jx + dx, jz + dz], r)))) continue;
       out.push([jx, jz, d]);
     }
-    if (out.length) town = buildTown(group, out, rnd, { groundY, industry });
+    if (out.length) town = buildTown(group, out, rnd, { groundY, industry, hill });
   }
   return {
     count: rotors.length,
@@ -150,7 +150,7 @@ function townWallMaterial() {
   m.customProgramCacheKey = () => "fdtown1";
   return m;
 }
-function buildTown(group, out, rnd, { groundY, industry }) {
+function buildTown(group, out, rnd, { groundY: gY, industry, hill }) {
   const wall = new THREE.BoxGeometry(1, 1, 1); wall.translate(0, 0.5, 0);
   const hip = new THREE.CylinderGeometry(0, 0.72, 1, 4, 1); hip.rotateY(Math.PI / 4); hip.translate(0, 0.5, 0); // (a low square pyramid)
   const gab = gableGeometry();
@@ -159,6 +159,7 @@ function buildTown(group, out, rnd, { groundY, industry }) {
   // further away: less saturated and flatter in tone (atmospheric perspective); the scene's haze adds the rest
   const air = (hex, d) => { c.setHex(hex); const k = Math.min(0.55, d / 4500), l = c.r * 0.3 + c.g * 0.59 + c.b * 0.11; grey.setRGB(l * 0.9 + 0.06, l * 0.92 + 0.06, l * 0.95 + 0.08); return c.clone().lerp(grey, k); };
   out.forEach(([x, z, d], i) => {
+    const groundY = gY + (hill ? hill(x, z) : 0) - (hill ? 0.6 : 0); // (on the town's rising ground, a little into it)
     if (industry && industry(x, z)) {
       const w = 30 + rnd() * 45, dep = 18 + rnd() * 25, h = 7 + rnd() * 7;
       q.setFromAxisAngle(up, Math.round(rnd() * 3) * (Math.PI / 2) + (rnd() - 0.5) * 0.15);

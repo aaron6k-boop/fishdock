@@ -84,7 +84,11 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     if (area2(ring) > 0) ring.reverse(); // see architecture.js: walk the footprint so faces point outward
     const c = ring.reduce((a, p) => [a[0] + p[0] / ring.length, a[1] + p[1] / ring.length], [0, 0]);
     if (avoid(c[0], c[1]) || ring.some(([x, z]) => avoid(x, z))) continue;
-    const st = styleFor(b), base = groundAt(c[0], c[1]) - 0.2, tint = st.tint;
+    // on a slope: the walls go down to the lowest corner (into the bank uphill), and the building is taller by the fall
+    // across it, so its eaves stay level with where they'd be on the high side (a house on a hill shows more wall below)
+    const gy = ring.map(([x, z]) => groundAt(x, z)), lo = Math.min(groundAt(c[0], c[1]), ...gy), fall = Math.max(...gy) - lo;
+    let st = styleFor(b); const base = lo - 0.2, tint = st.tint;
+    if (fall > 0.6 && st.type !== "lighthouse") st = { ...st, h: st.h + fall, storeys: st.storeys ? st.storeys + Math.round(fall / 3) : st.storeys };
     if (near(c[0], c[1])) colliders.push({ ring, base, top: base + st.h + 4 });
 
     if (st.type === "lighthouse") {
