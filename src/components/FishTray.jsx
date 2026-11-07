@@ -21,7 +21,7 @@ const HOLD_CYCLE = 1150; // ms from no power to full (then back down: let go at 
  * phase: the scene phase; last: the last event type; reel: 0..1; fight: the fight's state while a fish is on
  * (useVirtualFishing); note: a short message; opts: { assisted, advanced }.
  */
-export default function FishTray({ phase, last, reel = 0, fight = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
+export default function FishTray({ phase, last, reel = 0, fight = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onHold, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
   const world = useContext(WorldCtx), { busy: sceneBusy } = useContext(SceneCtx);
   // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
   const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
@@ -125,8 +125,8 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
         {act === "strike" ? <button type="button" className="ft-main ft-strike" onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}><Icon name="hook" /><span>Strike</span></button> : null}
         {act === "land" ? <button type="button" className="ft-main ft-land" onPointerDown={land} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(land)}>{tenRing}<Icon name="fish" /><span>Land</span></button> : null}
         {act === "reel" ? (
-          <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again. ${Math.round(reel * 100)}% of the way in`}
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onTap?.(); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => setPressed(false)} onPointerCancel={() => setPressed(false)} onPointerLeave={() => setPressed(false)} onContextMenu={(e) => e.preventDefault()}
+          <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again, or hold. ${Math.round(reel * 100)}% of the way in`}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ } onTap?.(); onHold?.(true); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => { setPressed(false); onHold?.(false); }} onPointerCancel={() => { setPressed(false); onHold?.(false); }} onPointerLeave={() => { setPressed(false); onHold?.(false); }} onContextMenu={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
             {tenRing}
             {tapFx ? <span key={tapFx} className="ft-tapfx" aria-hidden="true" /> : null}

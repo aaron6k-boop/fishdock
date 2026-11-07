@@ -41,7 +41,9 @@ vec3 skyBase(vec3 d){
   vec3 night = mix(vec3(.050, .060, .088), vec3(.010, .016, .036), t) + vec3(.05, .06, .08)*pow(max(dot(normalize(d), uMoonDir), 0.), 6.)*uMoonLight;
   vec3 c = day*uDay + dusk*uDusk + night*uNight;
   // overcast: a soft grey, a little brighter overhead; darker and cooler in rain
-  vec3 grey = mix(vec3(.60, .63, .66), vec3(.66, .69, .72), t)*(uDay + uDusk*.5 + uNight*.06)*(1. - uRain*.38);
+  // (a coastal overcast is bright: a pale silvery grey, whitest high up and over the sun's side, a little darker and
+  // bluer low down away from it. A mid grey all over read as dusk, and took the whole picture down with it)
+  vec3 grey = mix(vec3(.70, .73, .76), vec3(.82, .84, .86), t)*(.94 + .1*ts)*(uDay + uDusk*.5 + uNight*.06)*(1. - uRain*.38);
   grey *= mix(vec3(1.), vec3(.92, .96, 1.04), uRain);
   return mix(c, grey, smoothstep(.5, 1., uCloud)*.9);
 }
@@ -77,7 +79,7 @@ vec4 cloudAt(vec3 d, float q){
   float sd = max(dot(d, uSunDir), 0.);
   cc += vec3(1., .94, .82)*pow(sd, 7.)*(1. - thick)*(uDay + uDusk*.8)*.55;
   // a grey deck: mottled, darker the thicker; darker still in rain
-  cc *= mix(1., .48 + .55*smoothstep(.25, .75, n1), smoothstep(.55, 1., uCloud))*(1. - uRain*.35);
+  cc *= mix(1., .7 + .34*smoothstep(.25, .75, n1), smoothstep(.55, 1., uCloud))*(1. - uRain*.35); // (the deck's mottling softer: under a full cover it was heavy dark blotches)
   // far off they melt into the haze along the horizon
   cc = mix(cc, skyBase(d), exp(-d.y*9.)*.6);
   return vec4(cc, cover*smoothstep(0., .05, d.y));

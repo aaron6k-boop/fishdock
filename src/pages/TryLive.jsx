@@ -153,7 +153,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
             </div>
             {arrived ? <div className="arrive-label" role="status" onAnimationEnd={() => setArrived(false)}><b>{place.name.replace(/ \(.*\)$/, "")}</b><span>{place.region ? `${place.region} · ` : ""}Virtual fishing: catches are simulated, never logged</span></div> : null}
             <div className="fs-bottom">
-              <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
+              <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onHold={vf.hold} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
     </>
   );
