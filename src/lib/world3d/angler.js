@@ -611,7 +611,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       fpArm = { up: 0.05 * pump - 0.03 * surge * tk + 0.006 * shake * Math.sin(t * 19 + P.s1), right: 0.03 * run * st.runWidth * tk, fwd: -0.05 * pump }; // (and through the rod into your hands; a run drags them its way)
       bodyTo = { x: clamp(run * 0.05 * st.runWidth, -0.05, 0.05), y: -0.012 * tk - 0.025 * surge * tk, z: 0.03 * tk + 0.03 * pump - 0.08 * surge * tk };
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
-      fpE = 0.95 - 0.22 * surge * tk + 0.28 * pump; fpYaw = -0.08 + clamp(run * 0.22 * st.runWidth, -0.3, 0.3); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
+      fpE = 0.95 - 0.22 * surge * tk + 0.28 * pump; fpYaw = -0.08 + clamp(run * 0.15 * st.runWidth, -0.22, 0.22); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
       // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
       pitch += 0.38 * strikeK; fpE += 0.32 * strikeK; bendT += 0.25 * strikeK;
