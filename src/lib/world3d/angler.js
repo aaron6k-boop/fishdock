@@ -607,7 +607,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // the arms take the load: on a surge they're drawn out towards the fish (more for a heavier fish pulling harder);
       // between surges you lean back against it and lift, pumping it in, then drop the rod forwards and wind
       const tk = clamp(tension, 0, 1.4), pump = Math.max(0, Math.sin(age * 0.85 * prof.tempo + P.s1)) ** 2 * clamp((tk - 0.35) / 0.6, 0, 1) * (1 - surge);
-      fpPull = 0.055 * surge * tk;
+      fpPull = 0.055 * surge * tk; P.tk = tk; P.pump = pump; P.surge = surge; // (and for the body, seen from outside)
       fpArm = { up: 0.05 * pump - 0.03 * surge * tk + 0.006 * shake * Math.sin(t * 19 + P.s1), right: 0.03 * run * st.runWidth * tk, fwd: -0.05 * pump }; // (and through the rod into your hands; a run drags them its way)
       bodyTo = { x: clamp(run * 0.05 * st.runWidth, -0.05, 0.05), y: -0.012 * tk - 0.025 * surge * tk, z: 0.03 * tk + 0.03 * pump - 0.08 * surge * tk };
       pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
@@ -1059,7 +1059,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const m = Math.floor(t / 23 + (hashSeed(id) % 7)) % 3; idleMode = ["pockets", "fold", "hang"][m];
     } else if (ph === "idle" || ph === "ended" || ph === "paused") idleMode = (hashSeed(id) % 2) ? "pockets" : "hang";
     if (ph === "cast") { lookAtW = age > 0.7 ? (rigAt || castAt).clone() : null; lean = age > 0.6 && age < 1.1 ? 0.22 : age < 0.6 ? -0.08 : 0; twist = age < 0.6 ? 0.3 * ease(age / 0.6) : 0.3 * (1 - ease(seg(age, 0.6, 0.9))); }
-    if (ph === "hooked") { brace = clamp(0.35 + 0.45 * tension, 0, 1); lean = -0.04 - 0.08 * tension; crouch = 0.08 + 0.08 * tension; twist = yawOff * 0.6; lookAtW = rigAt ? rigAt.clone() : null; }
+    // (seen from outside, the whole body takes the fish: leaning back on the rod and sitting into the knees as the line
+    // tightens, further back as you pump, pulled forwards a little on a surge; it was standing almost upright)
+    if (ph === "hooked") { const tk = P.tk ?? clamp(tension, 0, 1.4), pump = P.pump ?? 0, surge = P.surge ?? 0; brace = clamp(0.4 + 0.5 * tk, 0, 1); lean = -0.05 - 0.14 * tk - 0.1 * pump + 0.12 * surge * tk; crouch = 0.08 + 0.14 * tk + 0.04 * pump; twist = yawOff * 0.6; lookAtW = rigAt ? rigAt.clone() : null; }
     if (ph === "landing") {
       lookAtW = (fish.visible ? fish.position : rigAt)?.clone() || null; brace = age < LT.T1 ? 0.5 : 0.2; lean = 0.08;
       if (tech === "net" && netOn && poleFrom && netAt) { hands[0] = { at: toLocal(poleFrom), axis: toLocal(netAt).sub(toLocal(poleFrom)), palm: V3(0, 1, 0), kind: "pole" }; lean = 0.2; }
