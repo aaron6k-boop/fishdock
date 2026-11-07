@@ -599,7 +599,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // the fight as the tray would send it: progress 0-1, tension 0-1.4, the handle's turns
       fightIn(f) { anglers.get(localId)?.a.setFight(f); },
       keep(state) { anglers.get(localId)?.a.keepFish(state); },
-      step(ms) { if (!film) return; const n = Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
+      // (single: one frame of that length, as a slow phone would draw it, rather than split into short steps)
+      step(ms, single = false) { if (!film) return; const n = single ? 1 : Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
       get mode() { return mode; },
       // for visual checks: the weather and light as given (eased in: step the clock a few seconds after)
       env(light, cond) { return setEnvAll({ light, cond }); },

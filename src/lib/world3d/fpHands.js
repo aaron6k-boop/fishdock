@@ -551,9 +551,11 @@ function realArms(scene, { gloves, skinHex }) {
         const tip = () => wp(ch[2].b).add(V(0, 1, 0).applyQuaternion(wq(ch[2].b)).multiplyScalar(ch[2].len));
         if (tuck) { set(tuck); return tpl.map((v) => v * tuck); }
         for (; c < 1.45; c += 0.025) { set(c); if (dK(tip()) < KR2 + 0.007 || dK(wp(ch[2].b)) < KR2 + 0.0065) break; }
-        const cc = Math.min(1.5, c + KG.press); set(cc); return tpl.map((v) => v * cc); // (no joint past about 100 degrees: bent further, the skin folded into hard lumps)
+        const cc = Math.min(1.5, c + KG.press); const LIM = [1.48, 1.57, 1.1]; const out = tpl.map((v, k) => Math.min(LIM[k], v * cc)); ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, out[k]))); ch[0].b.updateMatrixWorld(true); return out; // (each joint within a real finger's range: about 85, 90 and 63 degrees; bent further, the skin folded into hard lumps)
       };
-      const f = [close(S.fingers[0], [0.95, 1.1, 0.75]), close(S.fingers[1], [1.0, 1.15, 0.78]), close(S.fingers[2], [1, 1.0, 0.7], 1.15), close(S.fingers[3], [1, 0.95, 0.7], 1.22)]; // (folded in, not clenched: tighter, their tips pushed out through the back of the hand)
+      // (round the knob from their roots, the middle joints only part-bent: closing mostly at the middle joints hooked
+      // them over it like a claw)
+      const f = [close(S.fingers[0], [1.2, 0.95, 0.62]), close(S.fingers[1], [1.25, 1.0, 0.65]), close(S.fingers[2], [1, 1.0, 0.7], 1.15), close(S.fingers[3], [1, 0.95, 0.7], 1.22)]; // (folded in, not clenched: tighter, their tips pushed out through the back of the hand)
       // the thumb: its pad on the knob's side across from the fingers' pads
       const fp2 = wp(S.fingers[0][2].b).lerp(wp(S.fingers[1][2].b), 0.5), opp = fp2.clone(); opp.x = 0; opp.normalize().negate();
       const want = opp.multiplyScalar(KR2 + 0.007);
@@ -610,7 +612,12 @@ function realArms(scene, { gloves, skinHex }) {
       // the reel's foot (z 0) between the middle and ring fingers' roots
       { const gz = wp(S.fingers[1][0].b).lerp(wp(S.fingers[2][0].b), 0.5).z; Ph = Ph.clone(); Ph.z -= gz; place(); }
       S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
-      const f = S.fingers.map((ch, a) => close(ch, TPL[a]));
+      const f0 = S.fingers.map((ch, a) => close(ch, TPL[a]));
+      // (a real grip closes more towards the little finger, which takes most of the rod's weight: each finger at least
+      // as closed as that, from the middle finger's; closed only to where each first touched, the little finger stayed
+      // looser than the rest and stood out)
+      const cm = f0[1][0] / TPL[1][0], GR = SG.grade || [0.88, 1, 1.07, 1.14];
+      const f = f0.map((r, a) => { const c0 = r[0] / TPL[a][0], c = Math.min(1.55, Math.max(c0, cm * GR[a])); return TPL[a].map((v) => v * c); });
       best = { score: 0, Qh, Ph, f, t: [0.3, 0.2, 0.1], gap: 0, hit: [9, 9, 9, 9], thit: 0, wristBend: yl.clone().applyQuaternion(Qh).negate().angleTo(F), ny: 0, al: 0 };
       if (typeof window !== "undefined" && window.__fdFilm) window.__fdSeat = { Ph: Ph.toArray().map((v) => +v.toFixed(3)), f: f.map((r) => r.map((v) => +v.toFixed(2))), ix: G0.ix.toArray().map((v) => +v.toFixed(2)) };
       S.fingers.forEach((ch) => ch.forEach((j) => j.b.quaternion.copy(j.rest)));
