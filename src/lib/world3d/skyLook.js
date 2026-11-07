@@ -39,7 +39,7 @@ export function lightingFor(st) {
   // haze (exponential, the same for the land and the water): further in rain, a little at dusk and at night. Even on a
   // clear day sea air softens the far shore (about a tenth hazed at 500 m, two fifths at a kilometre), so the distant
   // piers and dunes sit back instead of looking as sharp as the deck
-  const fogDensity = (0.00068 + 0.0003 * over + 0.00015 * dusk + 0.00025 * night) + rain * 0.0024;
+  const fogDensity = (0.00056 + 0.0001 * over + 0.00015 * dusk + 0.00025 * night) + rain * 0.0024; // (lighter: the far shore and the town across the water stay readable, as in a photo on a grey day)
   // the eye adapts: dusk and night are lifted, a grey day a touch, so nothing is crushed to black
   const exposure = 1 + 0.22 * dusk + 0.5 * night + 0.2 * over * (1 - night) + 0.06 * rain; // (a grey day lifted more: the eye adapts to it, and at a touch it all read dim and murky on a phone)
   // how strongly the sky shows in reflections (wet ground in rain shows more of it)

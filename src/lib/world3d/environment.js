@@ -79,9 +79,14 @@ vec4 cloudAt(vec3 d, float q){
   float sd = max(dot(d, uSunDir), 0.);
   cc += vec3(1., .94, .82)*pow(sd, 7.)*(1. - thick)*(uDay + uDusk*.8)*.55;
   // a grey deck: mottled, darker the thicker; darker still in rain
-  cc *= mix(1., .7 + .34*smoothstep(.25, .75, n1), smoothstep(.55, 1., uCloud))*(1. - uRain*.35); // (the deck's mottling softer: under a full cover it was heavy dark blotches)
+  // a full cover is never a flat grey: stratocumulus in rolls and heaps, dark grey-blue where it's thick, paler where
+  // it thins, brighter towards the sun, as a North Sea overcast looks
+  { float ov = smoothstep(.6, 1., uCloud);
+    float lum = smoothstep(.12, .9, n1*1.15 - .08 + (shade - .6)*.35);
+    vec3 deckC = mix(vec3(.27, .30, .35), vec3(.78, .80, .84), lum)*(1. + .25*pow(max(dot(d, uSunDir), 0.), 4.))*(uDay + uDusk*.6 + uNight*.05);
+    cc = mix(cc, deckC, ov)*(1. - uRain*.35); }
   // far off they melt into the haze along the horizon
-  cc = mix(cc, skyBase(d), exp(-d.y*9.)*.6);
+  cc = mix(cc, skyBase(d), exp(-d.y*16.)*.45); // (only the last few degrees melt into the haze: it washed the whole lower sky out)
   return vec4(cc, cover*smoothstep(0., .05, d.y));
 }
 vec3 skyColour(vec3 d){
@@ -329,6 +334,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // shallows by the land are lighter and greener
         vec3 body = mix(uWater*1.25 + vec3(0., .012, .01), uWater*.72, pow(clamp(v.y, 0., 1.), .6));
         body = mix(body, uWater*1.55 + vec3(.012, .03, .018), shallow*.7)*lit*dim;
+        // under a grey sky the North Sea goes a lighter grey-green (the cloud's light scattered back out of the silty
+        // water), not the dark teal of a clear day
+        { float ovs = smoothstep(.55, 1., uCloud); body = mix(body, vec3(.11, .14, .135)*lit, ovs*.55); }
         // light through the thin water at the crests, more so looking towards the sun
         float crest = smoothstep(-.05, .4, h)*(1. - uNight);
         float toward = pow(max(dot(-v, normalize(vec3(uSunDir.x, 0., uSunDir.z))), 0.), 3.);
@@ -369,9 +377,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // out down wind
         vec2 pf = vec2(dot(p, wd), dot(p, wx));
         float cap = 0., streak = 0.;
-        if (uWind > .35 && sea > .5) {
-          float capPatch = smoothstep(.36, .7, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
-          cap = smoothstep(.22, .55, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.35, .8, uWind)*sea*capPatch*(.35 + .8*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
+        if (uWind > .22 && sea > .5) {
+          // (white horses from about force 4, as a North Sea pier sees most days: they began only in a near gale)
+          float capPatch = smoothstep(.3, .62, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
+          cap = smoothstep(.1, .42, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.22, .62, uWind)*sea*capPatch*(.4 + .9*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
         }
         #if WQ > 0
         if (uWind > .55 && sea > .5)

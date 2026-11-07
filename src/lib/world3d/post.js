@@ -20,7 +20,7 @@ import { OutputPass } from "./vendor/three-post/postprocessing/OutputPass.js";
 // little noise so the sky's long gradients don't band ----
 export const GradeShader = {
   name: "FishDockGrade",
-  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.05 }, uSat: { value: 1.05 }, uVignette: { value: 0.22 }, uSeed: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.22 }, uSat: { value: 0.94 }, uVignette: { value: 0.3 }, uSeed: { value: 0 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed)*43758.5453); }
@@ -29,6 +29,10 @@ export const GradeShader = {
       // contrast round mid grey, kept off the ends so nothing clips
       c = mix(c, smoothstep(0., 1., c), uContrast - 1.);
       float l = dot(c, vec3(.2126, .7152, .0722)); c = max(mix(vec3(l), c, uSat), 0.);
+      // (a photograph's look on a grey coast: the shadows a touch cool, the highlights a touch warm, a little deeper
+      // in the darks; the grade was so gentle the picture read flat and milky next to a real photo)
+      c *= mix(vec3(.95, .99, 1.05), vec3(1.03, 1.01, .97), smoothstep(.15, .8, l));
+      c = pow(c, vec3(1.06));
       vec2 d = vUv - .5; c *= 1. - uVignette*smoothstep(.35, .95, dot(d, d)*2.2);
       c += (h(gl_FragCoord.xy) - .5)/255.;
       gl_FragColor = vec4(c, t.a);
