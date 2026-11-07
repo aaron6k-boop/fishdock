@@ -161,15 +161,23 @@ function gorlestonLighthouse(group, ring, base) {
   for (let k = 0; k < 9; k++) K.box("galv", 0.4, 0.03, 0.05, mX + ex * 0.8, rT + 0.35 * k + 0.2, mZ); // the ladder's rungs
   K.box("galv", 0.08, 1.6, 0.08, mX, rT + mH + 0.8, mZ);
   const lampAt = [mX, rT + mH + 1.75, mZ];
-  // ---- the iron spiral stair at the seaward corner on the river side, up to the balcony ----
-  const sX = ex * (L / 2 + 0.55), sZ = -nzS * (W / 2 + 0.25), steps = 15;
-  K.box("iron", 0.12, G + S1 + 1.1, 0.12, sX, y0 + (G + S1 + 1.1) / 2, sZ);
-  for (let k = 0; k < steps; k++) {
-    const a = (k / steps) * Math.PI * 1.7 * ex, y = y0 + ((k + 1) / (steps + 1)) * (G + S1);
-    K.box("iron", 0.72, 0.04, 0.26, sX + Math.cos(a) * 0.38, y, sZ + Math.sin(a) * 0.38, -a);
-    if (k % 2 === 0) K.box("iron", 0.03, 0.95, 0.03, sX + Math.cos(a) * 0.72, y + 0.48, sZ + Math.sin(a) * 0.72);
+  // ---- the spiral stair at the seaward corner on the river side, up to the balcony ----
+  // Standing clear of the balcony slab (it rose up through it), as photographed: a red steel newel, galvanised steps
+  // fanning round it, a red baluster on every step's outer end, a red outer string and a continuous handrail, the last
+  // step level with the balcony and pointing into it, a short landing across to the slab's edge.
+  const ssR = 0.76, spX = ex * (L / 2 + 0.3), spZ = -nzS * (W / 2 + o1z + ssR + 0.06), rise = G + S1, nS = 17;
+  const aEnd = nzS > 0 ? Math.PI / 2 : -Math.PI / 2, spTurn = Math.PI * 1.75 * ex, aAt = (k) => aEnd - spTurn * (1 - k / nS), yAt = (k) => y0 + rise * (k / nS);
+  K.box("red", 0.11, rise + 1.0, 0.11, spX, y0 + (rise + 1.0) / 2, spZ); // the newel
+  const outer = (k, r, dy = 0) => [spX + Math.cos(aAt(k)) * r, yAt(k) + dy, spZ + Math.sin(aAt(k)) * r];
+  for (let k = 1; k <= nS; k++) {
+    const a = aAt(k), y = yAt(k);
+    K.box("galv", ssR - 0.06, 0.045, 0.2, spX + Math.cos(a) * (ssR / 2 + 0.03), y, spZ + Math.sin(a) * (ssR / 2 + 0.03), -a); // the step (narrow at the newel)
+    K.box("galv", ssR * 0.45, 0.045, 0.16, spX + Math.cos(a - 0.12 * ex) * (ssR * 0.72), y, spZ + Math.sin(a - 0.12 * ex) * (ssR * 0.72), -(a - 0.12 * ex)); // (its wide outer end)
+    const [bx, , bz] = outer(k, ssR); K.box("red", 0.028, 0.92, 0.028, bx, y + 0.46, bz); // the baluster
+    K.bar("red", outer(k - 1, ssR, 0.92), outer(k, ssR, 0.92), 0.042); // the handrail
+    K.bar("red", outer(k - 1, ssR, -0.04), outer(k, ssR, -0.04), 0.05); // the outer string
   }
-  for (let k = 0; k < steps; k++) { const a0 = (k / steps) * Math.PI * 1.7 * ex, a1 = ((k + 1) / steps) * Math.PI * 1.7 * ex, y = (q) => y0 + ((q + 1) / (steps + 1)) * (G + S1) + 0.95; K.bar("iron", [sX + Math.cos(a0) * 0.72, y(k), sZ + Math.sin(a0) * 0.72], [sX + Math.cos(a1) * 0.72, y(k + 1), sZ + Math.sin(a1) * 0.72], 0.035); }
+  { const [lx, , lz] = outer(nS, ssR * 0.5); const toSlab = Math.abs(spZ) - (W / 2 + o1z); K.box("galv", 0.8, 0.05, toSlab + 0.1, lx, y0 + rise, (lz + -nzS * (W / 2 + o1z)) / 2); } // the landing to the balcony
   // ---- a flagpole off the balcony's seaward end ----
   const fX = ex * (b1x - 0.1), fZ = -nzS * (b1z - 0.25); // (at the river-side corner, by the stair)
   K.box("galv", 0.05, 3.2, 0.05, fX, y1 + S1 + 1.6, fZ);

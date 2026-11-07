@@ -123,8 +123,10 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
             <div className="cam-menu w3d-menu" role="menu" aria-label="Menu">
               {pageMenu?.length ? <>
                 {pageMenu.map((it) => <button key={it.key} type="button" role={it.on != null ? "menuitemcheckbox" : "menuitem"} aria-checked={it.on != null ? !!it.on : undefined} className={`ft-pill${it.on ? " on" : ""}`} onClick={() => { setMenu(false); it.onClick(); }}>{it.icon ? <Icon name={it.icon} /> : null}{it.label}</button>)}
-                <hr className="cam-sep" />
               </> : null}
+              {/* (near the top, where it's seen: at the foot of a long menu it had to be scrolled to, and was missed) */}
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); setGfxOpen(true); }} title="Preset, resolution, frame rate, shadows, ambient occlusion and more"><Icon name="gauge" />Graphics: {{ auto: "Auto", performance: "Low", balanced: "Medium", high: "High", ultra: "Ultra" }[view.gfx] || "Auto"}{view.gfxC && Object.keys(view.gfxC).length ? " (custom)" : ""}</button>
+              <hr className="cam-sep" />
               <span className="cam-head">Camera</span>
               {MODES.filter(([m]) => m !== "spectator" || others.length).map(([m, l]) => <button key={m} type="button" role="menuitemradio" aria-checked={mode === m} className={`ft-pill${mode === m ? " on" : ""}`} onClick={() => pick(m)}>{l}</button>)}
               <button type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); w.current?.lookAtRod(); }}><Icon name="rod" />Look at my rod</button>
@@ -150,7 +152,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.assisted} className={`ft-pill${reelOpts.assisted ? " on" : ""}`} onClick={() => onReelOpts?.({ assisted: !reelOpts.assisted })} title="One tap starts winding at a steady rate, another stops it, instead of tapping again and again">Assisted reeling</button>
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.advanced} className={`ft-pill${reelOpts.advanced ? " on" : ""}`} onClick={() => onReelOpts?.({ advanced: !reelOpts.advanced })} title="Set the drag yourself while you fight a fish: too tight and the line can break">Advanced fight</button>
               </> : null}
-              <button type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); setGfxOpen(true); }} title="Preset, resolution, frame rate, shadows, ambient occlusion and more">Graphics: {{ auto: "Auto", performance: "Low", balanced: "Medium", high: "High", ultra: "Ultra" }[view.gfx] || "Auto"}{view.gfxC && Object.keys(view.gfxC).length ? " (custom)" : ""}</button>
+              
               {sound ? <SoundLevels /> : null}
               {sound ? <button type="button" role="menuitemcheckbox" aria-checked={view.spatial} className={`ft-pill${view.spatial ? " on" : ""}`} onClick={() => setOpt("spatial", !view.spatial)} title="Sounds come from where they happen, quieter further away">Spatial sound</button> : null}
             </div>
