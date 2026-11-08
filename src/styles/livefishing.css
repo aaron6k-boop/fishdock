@@ -411,6 +411,8 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .w3d-toast.catch { border-color: #f2b84b88; }
 .stage3d { position: relative; width: 100%; aspect-ratio: 4 / 3.3; max-height: 72vh; border-radius: var(--r-l); overflow: hidden; background: #0b1620; box-shadow: 0 18px 40px #0008; }
 .stage3d .w3d { position: absolute; inset: 0; min-height: 0; }
+/* full screen from the menu (or F): the browser's full screen, or the whole window where there's none */
+.stage3d.is-fs, .stage3d:fullscreen { position: fixed; inset: 0; z-index: 300; width: 100vw; height: 100vh; height: 100dvh; max-height: none; aspect-ratio: auto; border-radius: 0; box-shadow: none; }
 @media not ((min-width: 960px) and (orientation: landscape)) {
   .immersive .watch-stage .stage3d { height: 100%; aspect-ratio: auto; max-height: none; border-radius: 0; box-shadow: none; }
 }

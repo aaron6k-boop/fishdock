@@ -51,6 +51,12 @@ test("putting it back: carried, lowered, then it swims, in that order, at every 
   assert.ok(pier.swim - pier.lower >= 4);
   // nowhere else is there a net to haul up
   for (const v of ["river", "lake", "estuary", "beach"]) assert.equal(releasePlan(v).haul, undefined, v);
+  // a light fish off a pier (one swung up, not netted) goes back by hand: no net, no haul, let go over the rail
+  const light = releasePlan("pier", true);
+  assert.ok(light.drop && !light.net && light.haul === undefined);
+  assert.ok(light.carry <= light.over && light.over < light.lower && light.lower < light.swim);
+  assert.ok(light.swim - light.lower >= 3.5, "still long enough to watch it swim off");
+  assert.ok(light.swim < pier.swim, "quicker than the net");
 });
 
 test("swimming off: away and then down, never backwards or up", () => {

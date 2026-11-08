@@ -54,9 +54,12 @@ export function surfaceSpine(waterY, halfDepth) {
  * edge); off a pier, the drop net lifted over the rail and let down the wall on its rope; from a bank, the landing
  * net held out at the edge; then it swims out of the net, along the surface and down out of sight.
  */
-export function releasePlan(venue) {
+export function releasePlan(venue, light = false) {
   // (off a pier the empty net is then hauled back up the wall and lifted over the rail onto the deck: haul. It used to
   // vanish at the foot of the wall and reappear on the deck)
+  // (a light fish, one that was swung up rather than netted, goes back the way pier anglers put a small fish back:
+  // carried to the rail, held out over the water and let go. drop: it falls to the water, then swims off)
+  if (venue === "pier" && light) return { carry: 1.0, over: 2.2, lower: 3.1, swim: 7.0, net: false, drop: true };
   if (venue === "pier") return { carry: 1.0, over: 2.0, lower: 4.6, swim: 9.0, haul: 12.6, net: true };
   if (venue === "beach") return { carry: 1.0, over: 1.0, lower: 1.6, swim: 5.0, net: false };
   return { carry: 1.0, over: 1.0, lower: 2.2, swim: 5.6, net: true };

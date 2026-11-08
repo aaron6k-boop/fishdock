@@ -44,7 +44,11 @@ vec3 skyBase(vec3 d){
   float sd = max(dot(normalize(d), uSunDir), 0.);
   float ts = dot(normalize(d.xz + vec2(1e-4)), normalize(uSunDir.xz + vec2(1e-4)))*.5 + .5; // 1 towards the sun
   // day: a deep blue overhead, paling to a milky haze at the horizon, brighter round the sun
-  vec3 day = mix(vec3(.68, .78, .87), vec3(.19, .40, .76), t) + vec3(.10, .09, .06)*pow(sd, 4.)*(1. - t*.6);
+  // (and when the sun is low, in the morning and afternoon, the air it shines through warms the sky round it to a pale
+  // gold and takes some of the blue out of the rest: it was the same hard blue and white at 8 degrees as at noon)
+  float low = 1. - smoothstep(.07, .5, max(uSunDir.y, 0.));
+  vec3 day = mix(vec3(.68, .78, .87), mix(vec3(.19, .40, .76), vec3(.36, .50, .76), low*.6), t) + vec3(.10, .09, .06)*pow(sd, 4.)*(1. - t*.6);
+  day += vec3(.30, .18, .02)*low*pow(sd, 3.)*(1. - t*.7)*(1. - hp);
   // dusk: blue overhead, a pale gold glow low towards the sun, lilac-grey away from it (not an orange wash)
   vec3 dusk = mix(mix(vec3(.50, .50, .62), vec3(.96, .70, .48), ts*ts), vec3(.15, .20, .40), pow(hp, .38));
   dusk += vec3(.55, .32, .16)*pow(sd, 8.)*(1. - hp);
@@ -105,9 +109,13 @@ vec3 skyColour(vec3 d){
   float sd = max(dot(d, uSunDir), 0.), md = max(dot(d, uMoonDir), 0.);
   // the sun: a small disc (it was a great white plate, three times the real size, blown out by the bloom), darker and
   // warmer at its edge, inside a soft aureole that fades out into the haze, as it looks through sea air
+  // (a low sun is dimmer and golden, seen through all that air, and its aureole is a few degrees across, not a quarter
+  // of the sky: at 8 degrees it was a white plate in a white blur, as the 8 November evening recording showed)
   { float disc = smoothstep(.99985, .99993, sd), limb = smoothstep(.99985, .99999, sd);
-    c += vec3(1., .93, .8)*disc*(.75 + .25*limb)*(uDay + uDusk)*2.2;
-    c += vec3(1., .9, .74)*(pow(sd, 900.)*.5 + pow(sd, 60.)*.1)*(uDay + uDusk*.8)*(1. - .6*uCloud); }
+    float low = 1. - smoothstep(.07, .5, max(uSunDir.y, 0.));
+    vec3 sunC = mix(vec3(1., .93, .8), vec3(1., .66, .34), low*.85);
+    c += sunC*disc*(.75 + .25*limb)*(uDay + uDusk)*mix(2.2, 1.3, low);
+    c += sunC*(pow(sd, 900.)*.5 + pow(sd, 180.)*.12 + pow(sd, 60.)*.03)*(uDay + uDusk*.8)*(1. - .6*uCloud); }
   c += vec3(.85, .88, .95)*smoothstep(.9996, .99985, md)*uNight*uMoonLight*1.6;
   if (d.y > 0.) {
     #ifndef ENV_PASS
@@ -391,7 +399,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // white blotches the shape of each wave's face, like paper cut-outs on the water)
         float brk = 1.;
         if (sp > .99 && dist < 70.) brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
-        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.14)*sunVis;
+        // (a low sun's reflection is gold, as its disc is)
+        float lowSun = 1. - smoothstep(.07, .5, max(uSunDir.y, 0.));
+        vec3 sunC = mix(mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk), vec3(1., .72, .42), lowSun*.7);
+        col += sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
@@ -399,7 +410,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           if (sunVis > .01 && sp > .85 && dist < 160.) {
             float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
             float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
-            col += mix(vec3(1., .95, .85), vec3(1., .78, .52), uDusk)*glit*(pow(sp, 18.)*1.6 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
+            // (the path is long towards the sun and narrow across it, wider in more wind, as a real glitter path is: it
+            // was a round patch a quarter of the sea wide under a low sun)
+            float az = max(dot(normalize(rd.xz + vec2(1e-5)), normalize(uSunDir.xz + vec2(1e-5))), 0.);
+            float path = pow(az, 90./(.6 + 1.4*uWind + .6*uSwell))*pow(sp, 5.);
+            col += mix(sunC, vec3(1., .95, .85), .3)*glit*(path*1.3 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
           }
         #endif
         float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
