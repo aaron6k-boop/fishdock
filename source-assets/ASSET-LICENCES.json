@@ -692,6 +692,18 @@
    "resolution": "512",
    "use": "the rock armour's boulders (public/textures/rock_granite_*.jpg)",
    "files": []
+  },
+  {
+   "id": "fishdock:fp_hand_relief",
+   "name": "Hand relief (derived)",
+   "source": "high-passed from fp_arms.glb's own skin colour map (MakeHuman, CC0)",
+   "author": "FishDock",
+   "licence": "CC0 1.0 (as its source)",
+   "attribution": "Not required",
+   "type": "textures",
+   "resolution": "2048x512",
+   "use": "the first-person hands' knuckle creases and nail edges as relief (public/textures/fp_hand_relief.jpg)",
+   "files": []
   }
  ]
 }

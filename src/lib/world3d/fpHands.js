@@ -15,6 +15,7 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { loadPart } from "./glbParts.js";
+import { photoTex } from "./textures3d.js";
 import { subdivide } from "./subdivide.js";
 import { FILM } from "./film.js";
 
@@ -257,8 +258,24 @@ function realArms(scene, { gloves, skinHex }) {
     else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); const lum = mt.color.r * 0.3 + mt.color.g * 0.59 + mt.color.b * 0.11; mt.color.lerp(new THREE.Color(lum, lum, lum), 0.14); } // (a touch less saturated: the model's tone read orange under the warm light) // (your skin tone over the model's)
     // light through the skin at its edges (a warm glow where the fingers turn away from you, as real skin does: a cheap
     // stand-in for subsurface scattering); neoprene gloves get a faint cool sheen there instead
+    // the hands' own relief: the skin texture's painted knuckle creases, nail edges and tendons turned into a normal map
+    // (source-assets: high-passed from the model's own colour map; only the strip of the atlas the hands use, its
+    // bottom quarter), so they catch the light as real folds instead of lying flat on the surface as colour
+    const relief = gloves ? null : photoTex("fp_hand_relief", { srgb: false });
+    if (relief) { relief.wrapS = relief.wrapT = THREE.ClampToEdgeWrapping; relief.flipY = false; }
     mt.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, CUT);
+      if (relief) {
+        sh.uniforms.uRelief = { value: relief };
+        sh.fragmentShader = "uniform sampler2D uRelief;\n" + sh.fragmentShader.replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+          #if defined(USE_MAP) && defined(USE_NORMALMAP)
+            if (vMapUv.y > 0.75) {
+              vec3 rl = texture2D(uRelief, vec2(vMapUv.x, (vMapUv.y - 0.75) * 4.0)).xyz * 2.0 - 1.0; rl.y = -rl.y;
+              mat3 tb2 = getTangentFrame(-vViewPosition, normal, vMapUv);
+              normal = normalize(normal + tb2 * vec3(rl.xy * 1.6, 0.0));
+            }
+          #endif`);
+      }
       sh.vertexShader = "attribute float fdCurv; varying float vCurv; varying vec3 vFdW;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvFdW = (modelMatrix * vec4(transformed, 1.0)).xyz; vCurv = fdCurv;");
       sh.fragmentShader = "varying float vCurv; varying vec3 vFdW; uniform vec3 uFdW[2]; uniform vec3 uFdDir[2]; uniform float uFdCut;\n" + sh.fragmentShader
         .replace("#include <color_fragment>", `#include <color_fragment>
@@ -288,7 +305,7 @@ function realArms(scene, { gloves, skinHex }) {
         reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.42, 0.32) * rim * 0.15"};
         ${gloves ? "" : "reflectedLight.directDiffuse *= vec3(1.0, 0.96, 0.93);"} }`);
     };
-    mt.customProgramCacheKey = () => "fdskin5" + (gloves ? "g" : "");
+    mt.customProgramCacheKey = () => "fdskin6" + (gloves ? "g" : "");
   });
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
