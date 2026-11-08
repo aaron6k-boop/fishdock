@@ -22,6 +22,8 @@ source-assets/prepare_textures.py) are also from Poly Haven (https://polyhaven.c
   cap_concrete_*.jpg: "Concrete Wall 004" by Dario Barresi and Charlotte Baglioni (the wall's concrete cap);
   brick_red_*.jpg: "Red Brick 03" from Poly Haven (the coastwatch building's brick);
   plaster_*.jpg: "Painted Plaster Wall" from Poly Haven (the coastwatch building's white paint).
+  ground_rough_*.jpg: "Coast Sand Rocks 02" from Poly Haven (the cliff's face and the dune).
+  rock_granite_*.jpg: made for FishDock from noise (source-assets/make_granite.py), no outside image.
 The weathering on the railings, lamp columns, furniture, timber, drains and stains is drawn on the phone
 (src/lib/world3d/textures3d.js); no third-party assets.
 

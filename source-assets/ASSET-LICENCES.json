@@ -654,6 +654,44 @@
      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_rough_1k.jpg"
     }
    ]
+  },
+  {
+   "id": "polyhaven:coast_sand_rocks_02",
+   "name": "Coast Sand Rocks 02",
+   "source": "https://polyhaven.com/a/coast_sand_rocks_02",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "rough ground on the cliff's face and the dune at Gorleston (public/textures/ground_rough_*.jpg)",
+   "downloaded": "earlier (already in the downloads folder)",
+   "files": [
+    {
+     "file": "downloads/polyhaven/coast_sand_rocks_02/textures/coast_sand_rocks_02_diff_1k.jpg",
+     "bytes": 839184,
+     "sha256": "78eae8ce6209f79417a15ba863fe828f983c22f7e63a9ee3ef504a0062a05ea9",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/coast_sand_rocks_02/coast_sand_rocks_02_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/coast_sand_rocks_02/textures/coast_sand_rocks_02_nor_gl_1k.jpg",
+     "bytes": 1265458,
+     "sha256": "52776374a8f64aaa8334a87ef8484048baa6f689428a9f8b812004871417ef3e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/coast_sand_rocks_02/coast_sand_rocks_02_nor_gl_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "fishdock:rock_granite",
+   "name": "Granite (generated)",
+   "source": "source-assets/make_granite.py",
+   "author": "FishDock (made from seeded noise)",
+   "licence": "Made for FishDock: no outside image",
+   "attribution": "None needed",
+   "type": "textures",
+   "resolution": "512",
+   "use": "the rock armour's boulders (public/textures/rock_granite_*.jpg)",
+   "files": []
   }
  ]
 }

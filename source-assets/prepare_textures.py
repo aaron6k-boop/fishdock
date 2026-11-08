@@ -27,6 +27,8 @@ JOBS = [
   ("plaster_diff", "painted_plaster_wall", "diff_1k", 1024, "rgb-white"),
   ("plaster_nor", "painted_plaster_wall", "nor_gl_1k", 512, "rgb"),
   ("plaster_rough", "painted_plaster_wall", "rough_1k", 256, "grey"),
+  ("ground_rough_diff", "coast_sand_rocks_02", "diff_1k", 1024, "rgb"),
+  ("ground_rough_nor", "coast_sand_rocks_02", "nor_gl_1k", 512, "rgb"),
 ]
 
 for name, folder, part, size, kind in JOBS:
