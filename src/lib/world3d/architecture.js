@@ -25,7 +25,9 @@ export function styleFor(b) {
   const BRICK = [[1, 1, 1], [0.9, 0.86, 0.84], [1.05, 0.95, 0.9], [0.82, 0.78, 0.76]];
   if (b.use === "lighthouse") return { type: "lighthouse", walls: "brick", roof: "dome", storeys: 0, h: b.tall ? Math.max(12, b.h) : 21, tint: [1, 1, 1] };
   if (b.use === "lookout") return { type: "lookout", walls: "render", roof: "flat", roofMat: "felt", storeys: 2, h: 6.4, tint: [1, 1, 1] };
-  if (/^(garage|garages|shed|hut|kiosk|toilets|bandstand|cabin|shelter|roof|carport)$/.test(k) || A < 28) {
+  // (single storey: sheds, huts, kiosks, and anything mapped as public toilets or a shelter whatever its building tag,
+  // such as the Pier Head Public Toilets at Gorleston, which was drawn as a two-storey house)
+  if (/^(garage|garages|shed|hut|kiosk|toilets|bandstand|cabin|shelter|roof|carport)$/.test(k) || b.use === "small" || A < 28) {
     return { type: "small", walls: r < 0.5 ? "brick" : "render", roof: A < 10 || k === "bandstand" ? "hip" : r2 < 0.5 ? "hip" : "gable", roofMat: r < 0.4 ? "clay" : "slate", storeys: 1, h: b.tall ? b.h : 3, tint: r < 0.5 ? tinted(BRICK) : tinted(RENDER) };
   }
   if (/^(church|chapel|cathedral)$/.test(k)) return { type: "church", walls: "stone", roof: "gable", roofMat: "slate", storeys: 0, h: b.tall ? b.h : 12, tint: [1, 1, 1] };
