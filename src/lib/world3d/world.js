@@ -608,7 +608,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // a set time per frame, so an animation can be filmed exactly even where frames are slow (software graphics)
   let film = null;
   if (typeof window !== "undefined" && FILM) {
-    window.__fdWorld = {
+    window.__fdWorld = { Raycaster: THREE.Raycaster,
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),
       // so every phase plays through the real animation code from a known start, frame for frame the same each run:
