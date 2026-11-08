@@ -91,7 +91,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   }
   // (the drawing counts are kept for the whole frame, post-processing passes and all, for the FPS display)
   renderer.info.autoReset = false;
-  function drawFrame() { sharpen(); renderer.info.reset(); if (post) post.render(); else renderer.render(scene, camera); }
+  // (the water's mirror is drawn first, without your own first-person hands: environment.js reflect)
+  let noRefl = [], noReflAt = 0;
+  function drawFrame() {
+    sharpen(); renderer.info.reset();
+    if (env.reflections) { if (!noReflAt--) { noRefl = scene.getObjectsByProperty("name", "fdNoReflect"); noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
+    if (post) post.render(); else renderer.render(scene, camera);
+  }
   const tBuild = performance.now();
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
   const buildMs = Math.round(performance.now() - tBuild);
@@ -718,7 +724,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   function resize() {
     const w = canvas.clientWidth || canvas.parentElement?.clientWidth || 1, h = canvas.clientHeight || canvas.parentElement?.clientHeight || 1;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-    post?.setSize(w, h);
+    post?.setSize(w, h); env?.resizeReflections?.(renderer);
   }
   resize();
   raf = requestAnimationFrame(frame);
@@ -727,7 +733,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // (the scene's own detail, the sea's mesh, the cloud shading and the people's textures come with the preset: those
   // need the place built again)
   const G = { res: 1, fps: 0, shadows: Q.shadows ? (Q.q >= 2 ? 2 : 1) : 0, shadowDist: 30, // (World3D applies the preset's own straight after: Ultra's far shadows)
-    ao: post ? post.aoLevel : 0, bloom: post ? 1 : 0, aa: post ? 4 : 0, sharp: post ? post.sharp : 0, tex: maxAniso };
+    ao: post ? post.aoLevel : 0, bloom: post ? 1 : 0, aa: post ? 4 : 0, sharp: post ? post.sharp : 0, refl: 0, tex: maxAniso };
   function setGfx(o = {}) {
     if (o.res != null) { G.res = Math.max(0.5, Math.min(1, +o.res || 1)); dprMax = Math.max(1, dprTop * G.res); dprFloor = Math.min(dprMax, Q.floor || 1); dprNow = dprMax; renderer.setPixelRatio(dprNow); resize(); late = 0; easyFor = 0; }
     if (o.fps != null) { G.fps = [30, 60].includes(+o.fps) ? +o.fps : 0; fpsCap = G.fps; }
@@ -737,6 +743,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (o.bloom != null) { G.bloom = o.bloom ? 1 : 0; post.setBloom(!!G.bloom); }
       if (o.aa != null) { G.aa = o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(G.aa); }
       if (o.sharp != null) { G.sharp = Math.max(0, Math.min(1, +o.sharp || 0)); post.setSharp(G.sharp); }
+      if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer); }
     }
     const sun = env.sun;
     if (sun && (o.shadows != null || o.shadowDist != null)) {

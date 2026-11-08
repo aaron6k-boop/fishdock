@@ -195,6 +195,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uShore: { value: null }, uShoreOn: { value: 0 }, uShoreHalf: { value: SHORE.half },
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
     uNrm: { value: null }, uNrmOn: { value: 0 },
+    uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() },
   };
   // the sea's fine ripples: a water normal map (three.js's, MIT; source-assets/ASSET-LICENCES.json), until it has
   // loaded the old noise ripples stand in
@@ -247,7 +248,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       }`,
     fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + POST_GLSL + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
-      uniform sampler2D uShore, uShoreF, uNrm; uniform float uShoreFHalf, uNrmOn;
+      uniform sampler2D uShore, uShoreF, uNrm, uRefl; uniform float uShoreFHalf, uNrmOn, uReflOn; uniform mat4 uReflMat;
+      // the scene's own light (linear, before the tone curve) to the display colours the water works in: the same
+      // neutral curve and sRGB the rest of the picture gets at the end (post.js OutputPass), so the mirrored dune and
+      // town match the real ones
+      vec3 toDisplay(vec3 c){ c *= uExpo; float x = min(c.r, min(c.g, c.b)); c -= x < .08 ? x - 6.25*x*x : .04;
+        float pk = max(c.r, max(c.g, c.b)); if (pk > .76) { float d = .24, np = 1. - d*d/(pk + d - .76); c *= np/pk; c = mix(c, vec3(np), 1. - 1./(.15*(pk - np) + 1.)); }
+        c = clamp(c, 0., 1.); return mix(c*12.92, 1.055*pow(c, vec3(1./2.4)) - .055, step(vec3(.0031308), c)); }
       // metres to the nearest land (from the shore maps: the fine one close round the anglers, the coarse one further
       // out), or far when off the map
       float shoreDist(vec2 p){ vec2 uv = p/(2.*uShoreHalf) + .5; if (uShoreOn < .5 || uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return 99.;
@@ -326,6 +333,15 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 rd = reflect(-v, n); rd.y = abs(rd.y);
         float F = .02 + .98*pow(1. - max(dot(n, v), 0.), 5.);
         vec3 refl = skyReflect(normalize(rd));
+        // ---- the scene mirrored (a second, half-size picture from below the water, world.js): the dune, the rocks, the
+        // pier, the town, broken up by the waves (more so close by, where the facets are big on screen); the sky stays
+        // the shader's own, sharper than the picture ----
+        if (uReflOn > .5) {
+          vec4 rc = uReflMat*vec4(vW.x, 0., vW.z, 1.);
+          vec2 ruv = rc.xy/rc.w + n.xz*(.06 + .9/(dist + 6.))*vec2(1., .6);
+          vec4 rs = texture2D(uRefl, clamp(ruv, .002, .998));
+          refl = mix(refl, toDisplay(rs.rgb), rs.a*smoothstep(-.02, .06, rd.y)*.96);
+        }
         // (at dusk the water keeps more of its light: it went near-black under a sky still bright, as on the 6 November
         // recording, where the real sea at that hour mirrors the sky's glow)
         float lit = uDay + uDusk*.75 + uNight*.12, dim = 1. - .25*smoothstep(.5, 1., uCloud) - .15*uRain;
@@ -632,7 +648,54 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain (wetLook.js)
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
+  // ---- reflections of the scene in the water: the scene drawn again from a camera mirrored in the water's surface,
+  // at a fraction of the screen's size, with the sky, the water and anything passed in (your own hands) left out ----
+  const R = { rt: null, cam: new THREE.PerspectiveCamera(), scale: 0.5, every: 1, n: 0,
+    plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), rot: new THREE.Matrix4(), v: new THREE.Vector3(), look: new THREE.Vector3(), tgt: new THREE.Vector3(), cp: new THREE.Vector3() };
+  function reflect(renderer, scene, camera, hide = []) {
+    if (!R.rt) return;
+    if (R.n++ % R.every) return; // (Medium draws it every other frame)
+    const Y = -0.25, N = new THREE.Vector3(0, 1, 0), P = new THREE.Vector3(0, Y, 0);
+    camera.updateMatrixWorld(); R.cp.setFromMatrixPosition(camera.matrixWorld);
+    if (R.cp.y < Y + 0.05) return;
+    const c = R.cam;
+    R.v.copy(R.cp); R.v.y = 2 * Y - R.cp.y;
+    R.rot.extractRotation(camera.matrixWorld);
+    R.look.set(0, 0, -1).applyMatrix4(R.rot).add(R.cp); R.tgt.copy(R.look); R.tgt.y = 2 * Y - R.look.y;
+    c.position.copy(R.v); c.up.set(0, 1, 0).applyMatrix4(R.rot); c.up.y = -c.up.y; c.lookAt(R.tgt);
+    c.far = camera.far; c.near = camera.near; c.updateMatrixWorld(); c.projectionMatrix.copy(camera.projectionMatrix);
+    const tm = wU.uReflMat.value; tm.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1); tm.multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
+    // (an oblique near plane on the water's surface, so nothing under the water shows in the mirror)
+    R.plane.setFromNormalAndCoplanarPoint(N, P).applyMatrix4(c.matrixWorldInverse);
+    R.clip.set(R.plane.normal.x, R.plane.normal.y, R.plane.normal.z, R.plane.constant);
+    const e = c.projectionMatrix.elements;
+    R.q.set((Math.sign(R.clip.x) + e[8]) / e[0], (Math.sign(R.clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+    R.clip.multiplyScalar(2 / R.clip.dot(R.q)); e[2] = R.clip.x; e[6] = R.clip.y; e[10] = R.clip.z + 1; e[14] = R.clip.w;
+    const was = [sky.visible, water.visible, rain.visible, ...hide.map((o) => o && o.visible)];
+    sky.visible = water.visible = rain.visible = false; hide.forEach((o) => { if (o) o.visible = false; });
+    const prevT = renderer.getRenderTarget(), prevC = renderer.getClearAlpha(), prevS = renderer.shadowMap.autoUpdate;
+    renderer.shadowMap.autoUpdate = false; // (the sun's shadows as drawn for the main view: not again from below)
+    renderer.setRenderTarget(R.rt); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, c);
+    renderer.setRenderTarget(prevT); renderer.setClearAlpha(prevC); renderer.shadowMap.autoUpdate = prevS;
+    [sky.visible, water.visible, rain.visible] = was; hide.forEach((o, i) => { if (o) o.visible = was[3 + i]; });
+  }
+  /** Settings → Graphics → Reflections: 0 the sky only, 1 the scene at half size every other frame, 2 every frame */
+  function setReflections(level, renderer) {
+    level = Math.max(0, Math.min(2, level | 0));
+    if (!level) { R.rt?.dispose(); R.rt = null; wU.uRefl.value = null; wU.uReflOn.value = 0; return; }
+    R.every = level >= 2 ? 1 : 2; R.scale = level >= 2 ? 0.5 : 0.4;
+    sizeReflections(renderer);
+  }
+  function sizeReflections(renderer) {
+    if (!R.every || (!R.rt && !wU.uReflOn.value && R.n < 0)) return;
+    const s = renderer.getDrawingBufferSize(new THREE.Vector2()), w = Math.max(64, Math.round(s.x * R.scale)), h = Math.max(64, Math.round(s.y * R.scale));
+    if (R.rt && R.rt.width === w && R.rt.height === h) return;
+    R.rt?.dispose(); R.rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 0 });
+    wU.uRefl.value = R.rt.texture; wU.uReflOn.value = 1;
+  }
   return {
+    reflect, setReflections, resizeReflections: (renderer) => { if (R.rt) sizeReflections(renderer); },
+    get reflections() { return R.rt ? (R.every === 1 ? 2 : 1) : 0; },
     group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids, sun, // (sun: its shadows, set by Settings → Graphics)
     /** The sky (no stars, the sea below the horizon) for world.js's environment map. */
     envSky,
