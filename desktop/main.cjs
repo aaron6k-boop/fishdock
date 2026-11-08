@@ -1,7 +1,7 @@
 // FishDock for Windows: the game in its own window, on the computer's graphics card.
 // A small launch screen (launcher/index.html), then the live game. The game is the same one the website serves, so
 // it stays up to date by itself and plays with phones in Fish Together; nothing here changes how it works.
-const { app, BrowserWindow, shell, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, shell, ipcMain, screen, session } = require("electron");
 const path = require("node:path");
 
 const SITE = "https://fishdock.aaron6k.workers.dev";
@@ -38,5 +38,18 @@ ipcMain.on("fd:play", (e, route) => { if (!win) return; const r = typeof route =
 ipcMain.on("fd:quit", () => app.quit());
 ipcMain.handle("fd:info", () => ({ version: app.getVersion(), electron: process.versions.electron, chrome: process.versions.chrome, gpu: app.getGPUFeatureStatus() }));
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // what the page may ask for: the game's own site may use your location (to fish where you are) and full screen;
+  // nothing else (camera, microphone, notifications, MIDI, clipboard reading) is ever granted, by any site
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb, details) => {
+    const own = (details?.requestingUrl || wc.getURL() || "").startsWith(SITE);
+    cb(own && (permission === "geolocation" || permission === "fullscreen" || permission === "pointerLock"));
+  });
+  session.defaultSession.setPermissionCheckHandler((wc, permission, origin) => origin.startsWith(SITE) && (permission === "geolocation" || permission === "fullscreen" || permission === "pointerLock"));
+  // nothing is ever downloaded through the game's window
+  session.defaultSession.on("will-download", (e) => e.preventDefault());
+  createWindow();
+});
+// no second window of any kind, and no new webviews
+app.on("web-contents-created", (e, wc) => { wc.on("will-attach-webview", (ev) => ev.preventDefault()); });
 app.on("window-all-closed", () => app.quit());
