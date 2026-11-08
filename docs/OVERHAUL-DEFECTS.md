@@ -22,7 +22,7 @@ Nothing here counts as visually fixed until Aaron has seen it on his phone.
 | 11 | Whole recording | - | Picture looked dim and grey, menus included | Not the game: the recordings are HDR (PQ, BT.2020) and the frames were pulled out without converting them, so white came out at 60%. Aaron confirmed Reduce White Point is off | Frames for evidence must be tone-mapped | Not a defect |
 | 12 | Beside the Pier Hotel | P2 | Generic buildings too big next to the hotel | Buildings with no height in the map default to 7 m, including the Pier Head Public Toilets and the sheds on the quay | Open: needs a visual check before changing the defaults | Open |
 | 13 | Pier root photo | P2 | White building with green domes not identified | Needs Aaron | Ask Aaron | Blocked |
-| 15 | Landing, hauling the drop net up (first person) | P2 | While hauling hand over hand, the upper arms come in from the top-left corner of the screen | Likely the same cause as 6: the hauling hands are placed out to the left at eye height while you look down | Open | Open |
+| 15 | Landing, hauling the drop net up (first person) | P2 | While hauling hand over hand, the upper arms came in from the top-left corner of the screen | Same cause as 6: hauling hands out to the left at eye height while you look down | Once the net is past the rail the hands go on your line of sight to it | Fixed (A7) |
 | 14 | Harbour overview, rain | P2 | White streak at top left | Unknown | Open | Open |
 
 ## Measured load per graphics preset

@@ -1181,7 +1181,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (in first person you lean out over the top rail and hold the rope there, one hand above the other on it, the
           // rope running straight down from your hands to the net: looking down you see your hands, the rope, the wall and
           // the net and the fish in the water below. From behind: at your chest just back from the rail)
-          const base = fp ? (() => { const E = fpEye(); return V3(E.x - 0.34, E.y - 0.34, E.z - 0.32); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
+          const base = fp ? (() => { const E = fpEye(), nt = netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
+            // (once the net is past the rail, on your line of sight down to it, as when letting a fish go: out at eye height
+            // the upper arms came in from the top corner of the screen while you looked down)
+            if (nt && (nt.y < -0.3 || nt.z < railZ)) return E.clone().addScaledVector(nt.clone().sub(E).normalize(), 0.72).add(V3(-0.24, 0.04, 0.06));
+            return V3(E.x - 0.34, E.y - 0.34, E.z - 0.32); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
           // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
