@@ -353,7 +353,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // a landing net (rivers, lakes, estuaries) or a drop net with ropes (piers)
   // the net: knotted mesh you can see through (a drawn diamond pattern), hanging as a soft bag under a metal hoop
   const mNet = new THREE.MeshStandardMaterial({ color: 0x23302a, roughness: 1, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide, map: netTexture(), depthWrite: false });
-  const net = new THREE.Group(); world.add(net); net.visible = false;
+  const net = new THREE.Group(); net.name = "fdDropNet"; world.add(net); net.visible = false;
   const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.015, 6, 24), mMetal); hoop.rotation.x = Math.PI / 2; net.add(hoop);
   const bagGeo = new THREE.LatheGeometry(Array.from({ length: 9 }, (_, i) => { const u = i / 8; return new THREE.Vector2(0.35 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.15 * u) + 0.02, -0.5 * u); }), 18);
   let bag = new THREE.Mesh(bagGeo, mNet); net.add(bag);
@@ -578,7 +578,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // above the deck, and a real pier's deck stands metres above the sea. It was the rail's height above the deck,
       // so on a raised deck the rope was far too short: the net hardly rose as it was hauled, then leapt to the rail)
       const bridle = 0.72 * ns, top = toWorld(new THREE.Vector3(0, railY - 0.05, railZ)).y, sink = 0.02 * ns; // (the hoop right at the surface, breaking it: you see the net and the fish go over it)
-      return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(0.55 + 0.35 * ns), 0.05 + 0.18 * ns, Math.max(-Math.min(0.3, Math.max(0.05, railZ * -1 - 0.4 * ns)), railZ + 0.36 * ns + 0.14))), /* (and its hoop clear of the railing: set down right by it, the hoop stood through a post) */ /* (on the deck by your left foot, in front of the tackle box and clear of the mat: within reach as you kneel to lift the fish out. It was 1.65 m off to the side, out of reach, so the fish flew from the net to your hands) */ railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
+      return { railZ, railY, col, waterY, bridle, top, sink, L: Math.max(0.5, top - waterY - bridle + sink), deck: toWorld(new THREE.Vector3(-(0.55 + 0.35 * ns), 0.012 + (net.userData.restDrop ?? 0.18) * ns, /* (set down on the deck itself: its height was for the plain stand-in bag, so the modelled net floated 17 cm up) */ Math.max(-Math.min(0.3, Math.max(0.05, railZ * -1 - 0.4 * ns)), railZ + 0.36 * ns + 0.14))), /* (and its hoop clear of the railing: set down right by it, the hoop stood through a post) */ /* (on the deck by your left foot, in front of the tackle box and clear of the mat: within reach as you kneel to lift the fish out. It was 1.65 m off to the side, out of reach, so the fish flew from the net to your hands) */ railPt: toWorld(new THREE.Vector3(-0.32, railY + 0.02, railZ)), coil: toWorld(new THREE.Vector3(-0.42, 0.02, 0.18)), hangAt: (out) => { const k = col.clone(); k.y = top - out; return k; } };
     };
 
     // ---- what the rod is doing ----
@@ -1335,6 +1335,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const d = bag.morphTargetDictionary, mi = bag.morphTargetInfluences;
       if (d.laden != null) mi[d.laden] = (inNet ? 0.55 + 0.45 * Math.min(1, load) : 0) * (1 - netRest);
       if (d.flat != null) mi[d.flat] = netRest;
+      const wt = net.userData.weight; if (wt) wt.obj.position.y = wt.y0 + wt.lift * netRest; // (the weight ring rests on the slumped bag, not through the deck)
     } else bag.scale.y = lerp(inNet ? 1 + 0.25 * Math.min(1, load) : 1, 0.35, netRest);
     tag.visible = !fp && !tagOff && !(kept && (kept.state === "inspect" || kept.state === "release")); // (no name label in your catch photo)
     talk.visible = speaking && !fp; if (speaking) { const k = 0.3 + Math.abs(Math.sin(t * 6)) * 0.08; talk.scale.set(k, k, 1); }

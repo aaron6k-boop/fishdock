@@ -82,6 +82,19 @@ export function fitNet(net, scene, kind = "drop") {
       }
     });
   }
+  // the weight ring hangs at the bottom of the bag; set down, the bag slumps flat (its "flat" shape) but the weight is a
+  // separate part, so it stayed where the hanging bag's bottom had been: 24 cm down through the pavement. Worked out
+  // here: how far it has to rise to sit on the flattened bag (angler.js lifts it as the net is set down)
+  net.userData.weight = null; net.userData.restDrop = null;
+  const w = net.children.find((c) => /weight/i.test(c.name)) || null;
+  if (w && bag?.morphTargetDictionary?.flat != null) {
+    net.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(net.matrixWorld).invert(), v = new THREE.Vector3();
+    const lowest = (o, dAttr) => { let mn = Infinity; o.updateMatrixWorld(true); const p = o.geometry.attributes.position, rel = o.geometry.morphTargetsRelative; for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); if (dAttr) { if (rel) v.x += dAttr.getX(i), v.y += dAttr.getY(i), v.z += dAttr.getZ(i); else v.fromBufferAttribute(dAttr, i); } v.applyMatrix4(o.matrixWorld).applyMatrix4(inv); mn = Math.min(mn, v.y); } return mn; };
+    const flatMin = lowest(bag, bag.geometry.morphAttributes.position?.[bag.morphTargetDictionary.flat]), wMin = lowest(w, null);
+    const lift = Math.max(0, flatMin - wMin + 0.005); net.userData.restDrop = Math.max(0, -Math.min(flatMin, wMin + lift)) / net.scale.y; // (how far the slumped net reaches below its hoop, at scale 1)
+    if (lift > 0) net.userData.weight = { obj: w, y0: w.position.y, lift: lift / (w.parent === net ? 1 : 1) };
+  }
   return bag;
 }
 

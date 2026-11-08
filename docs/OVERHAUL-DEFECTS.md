@@ -23,6 +23,7 @@ Nothing here counts as visually fixed until Aaron has seen it on his phone.
 | 12 | Beside the Pier Hotel | P2 | Generic buildings too big next to the hotel | Buildings with no height in the map default to 7 m, including the Pier Head Public Toilets and the sheds on the quay | Open: needs a visual check before changing the defaults | Open |
 | 13 | Pier root photo | P2 | White building with green domes not identified | Needs Aaron | Ask Aaron | Blocked |
 | 15 | Landing, hauling the drop net up (first person) | P2 | While hauling hand over hand, the upper arms came in from the top-left corner of the screen | Same cause as 6: hauling hands out to the left at eye height while you look down | Once the net is past the rail the hands go on your line of sight to it | Fixed (A7) |
+| 16 | Drop net set down on the deck | P1 | The net's weight ring went 24 cm down through the pavement, and the rest of the net floated 17 cm above it | The weight is a separate part from the bag: when the bag slumped flat the weight stayed where the hanging bag's bottom had been. The resting height was set for the plain stand-in bag, not the modelled net | The weight rises onto the flattened bag; the net is set down on the deck itself (measured: lowest point 1.2 cm above the pavement through a whole landing and release) | Fixed (A8) |
 | 14 | Harbour overview, rain | P2 | White streak at top left | Unknown | Open | Open |
 
 ## Measured load per graphics preset
