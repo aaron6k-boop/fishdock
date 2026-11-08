@@ -4,3 +4,5 @@ dist-preview/
 dist-e2e/
 .wrangler/
 *.log
+desktop/node_modules
+desktop/out

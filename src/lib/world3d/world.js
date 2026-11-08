@@ -38,6 +38,7 @@ export function autoQuality3d() {
     // Balanced measured a steady 60 with room to spare on an iPhone 17 Pro) starts on High quality, which steps itself
     // down if frames run late; older ones get Balanced
     const ua = navigator.userAgent || "", ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (/FishDockDesktop\//.test(ua)) return "ultra"; // (the Windows launcher: it has asked Windows for the proper graphics card, so the best preset)
     if (ios) { const v = +(ua.match(/Version\/(\d+)/) || ua.match(/OS (\d+)_/) || [0, 0])[1]; return v >= 18 ? "high" : "balanced"; }
     // a computer with its own graphics card (NVIDIA, AMD Radeon, Intel Arc) gets the best, whatever it reports
     if (!/Android|Mobile/.test(ua)) { const g = gpuName(); if (/NVIDIA|GeForce|RTX|Radeon RX|Radeon Pro|Intel\(R\) Arc/i.test(g)) return "ultra"; if (/Apple M\d/i.test(g)) return "high"; } // (a Mac with Apple silicon: High)
