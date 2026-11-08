@@ -17,7 +17,7 @@ import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpHands } from "./fpHands.js";
 import { loadPart, fitNet } from "./glbParts.js";
-import { fitRodReel, buildRod } from "./rodKit.js";
+import { fitRodReel, buildRod, rodWet } from "./rodKit.js";
 import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
 import { contactShadow } from "./contactShadow.js";
 import { FILM } from "./film.js";
@@ -244,7 +244,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // (fishLine.js), in the world's space
   const fLine = fishLine(GUIDES.length); world.add(fLine.mesh);
   const flM = new THREE.Vector3(), flT = new THREE.Vector3(), flE = new THREE.Vector3(), dropAt = new THREE.Vector3(); let spoolInfo = null, spinWas = null, dropHad = false;
-  const flWind = [0, 0], flCur = [0, 0], flO = {};
+  const flWind = [0, 0], flCur = [0, 0], flO = {}; let rodWetK = 0;
   // the rest: a tripod on the beach, a rest on the bank, the railing on a pier or quay
   const rest = new THREE.Group(); root.add(rest);
   const mMetal = new THREE.MeshStandardMaterial({ color: 0x8c9196, metalness: 0.7, roughness: 0.35 });
@@ -1100,6 +1100,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (u.spool) { u.spool.position.z = u.spoolZ + 0.0055 * (1 - Math.cos(sp)) - 0.004; u.slip = (u.slip || 0) + (u.slipping ? dt * 9 : 0); u.spool.rotation.z = -u.slip; }
       if (u.bail) { const open = ph === "cast" && age < 2.25 ? 1 : 0; u.bailK = (u.bailK ?? 0) + (open - (u.bailK ?? 0)) * Math.min(1, dt * (open ? 14 : 22)); u.bail.rotation.x = -1.95 * u.bailK; } }
     if (rodKit) rodKit.update(pts, frame); // (the modelled rod: bent along the same curve, the rings hung from it)
+    if (rodKit && local) { rodWetK += (Math.min(1, (env.rain || 0) * 1.3) - rodWetK) * (1 - Math.exp(-dt * 0.3)); rodWet(rodWetK); } // (soaking through over a few seconds of rain, drying slowly)
     else guides.forEach((gd) => {
       const a = along(gd.s * R.len); gd.g.position.copy(a.p); gd.g.quaternion.copy(frame(a.t));
       const br = rodSegs[Math.min(NSEG - 1, Math.floor(gd.s * NSEG))].r; gd.wrap.scale.set(br * 1.3, 0.024, br * 1.3);

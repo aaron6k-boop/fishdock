@@ -79,12 +79,25 @@ function rodMaterials() {
 // seat; a gloss black reel with polished silver side plates, chrome trim, a chrome crank and a black barrel knob ----
 const FINISH = [
   [/^(guide_frame|guide_foot|guide_leg|tiptop_frame|tiptop_tube)/, "chrome"],
-  [/^(reel_body|reel_back|reel_nose|reel_foot|reel_stem|rotor_cup|spool_body|spool_skirt|drag_knob)/, "reel_black"],
-  [/^reel_cover/, "reel_silver"],
+  [/^(reel_body|reel_back|reel_foot|reel_stem|rotor_cup|spool_body|spool_skirt|drag_knob)/, "reel_black"], // (the stem stays black: it's modelled in steps, which chrome showed up)
+  [/^(reel_cover|reel_nose)/, "reel_silver"], // (the reference's polished front and side plates)
   [/^(reel_trim|rotor_arm|rotor_trim|spool_trim|drag_trim|crank_arm|crank_hub|crank_cap|winding_check)/, "chrome"],
   [/^(seat_barrel|seat_locknut|seat_slot)/, "seat_black"],
 ];
 const finishOf = (node, mat) => { for (const [re, m] of FINISH) if (re.test(node)) return m; return mat; };
+
+// ---- the rod and reel in the rain: the foam grips and rubber darken as they soak, and everything takes a wet sheen
+// (the shared materials, so one call does every rod; w: 0 dry to 1 soaked, eased by the caller) ----
+let wetNow = -1; const DRY = new Map();
+export function rodWet(w) {
+  if (!MATS || Math.abs(w - wetNow) < 0.01) return; wetNow = w;
+  for (const [k, m] of Object.entries(MATS)) {
+    if (!DRY.has(k)) DRY.set(k, { r: m.roughness, c: m.color.clone() });
+    const d = DRY.get(k), soak = k === "rod_eva" || k === "rubber" ? 0.45 : k === "braid_blue" ? 0.25 : 0.06;
+    m.roughness = d.r * (1 - w * (k === "rod_eva" || k === "rubber" ? 0.5 : 0.3));
+    m.color.copy(d.c).multiplyScalar(1 - w * soak);
+  }
+}
 
 // ---- a node's meshes merged, one mesh per material, in the node's own frame (children named in `skip` left out) ----
 function mergeOwn(node, skip = new Set()) {
