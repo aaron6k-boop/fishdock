@@ -573,7 +573,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the column it hangs in (clear of the pier's edge) and the water there, where its rope goes over the top rail, and
     // the knot's height for so much rope out
     const dropGeo = (ns) => {
-      const railZ = -Math.max(0.3, edge - 0.22), railY = 1.12, col = toWorld(new THREE.Vector3(-0.32, 0, -(edge + 0.25))), waterY = wh(col.x, col.z);
+      const railZ = -Math.max(0.3, edge - 0.22), railY = 1.12, col = toWorld(new THREE.Vector3(-0.32, 0, -(edge + 0.36 * ns + 0.1))) /* (the hoop is 36 cm across its radius: hanging 25 cm out from the wall, its near side went 11 cm and more into the concrete as it came up and down, the 8 November afternoon recording) */, waterY = wh(col.x, col.z);
       // (top: the knot's highest, just under the top rail, in the world's heights like the water's: the rail is 1.12 m
       // above the deck, and a real pier's deck stands metres above the sea. It was the rail's height above the deck,
       // so on a raised deck the rope was far too short: the net hardly rose as it was hauled, then leapt to the rail)
