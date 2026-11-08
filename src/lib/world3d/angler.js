@@ -1251,7 +1251,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // forearms hanging in from the top edge, upside down, holding nothing you could see)
       const netTop = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
       const sight = netTop ? netTop.clone().sub(E).normalize() : V3(0, -0.8, -0.6).normalize();
-      const base = fp ? E.clone().addScaledVector(sight, 0.72).add(V3(-0.24, 0.04, 0.06)) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
+      const base = fp ? (netTop && netTop.y < -0.3 ? E.clone().addScaledVector(sight, 0.72).add(V3(-0.24, 0.04, 0.06)) : V3(E.x - 0.5, E.y - 0.3, E.z - 0.36)) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
