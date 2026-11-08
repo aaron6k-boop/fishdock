@@ -352,8 +352,18 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // large, soft variations (no per-vertex checker), and damp concrete near the edge
     const v = 0.9 + noise2(X[k] / 23, Z[k] / 23, 1e6, 3) * 0.14 + noise2(X[k] / 7, Z[k] / 7, 1e6, 4) * 0.06 - wet[k] * 0.12;
     // (the dune: dry, sandy ochre with darker clumps of scrub and marram, the sand showing between, as in the photograph)
+    // (Aaron's photograph from the pier head: the steep face is bare, bright sand, a few clumps clinging to it; the scrub
+    // and marram grow thick along the top. Drawn as one olive tint all over, it read as a grassy hill, not a dune)
     const sc2 = noise2(X[k] / 6, Z[k] / 6, 1e6, 13), g2 = Math.min(1, dune[k] * 2.5);
-    const GR = sc2 > 0.62 ? [0.3, 0.28, 0.15] : [0.58, 0.44, 0.24];
+    let GR = c;
+    if (g2 > 0) {
+      const i = k % n, j = (k - i) / n, i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(n - 1, j + 1);
+      const sx = (h[j * n + i1] - h[j * n + i0]) / Math.max(0.1, xs[i1] - xs[i0]), sz = (h[j1 * n + i] - h[j0 * n + i]) / Math.max(0.1, xs[j1] - xs[j0]);
+      const face = Math.max(0, Math.min(1, (Math.hypot(sx, sz) - 0.18) * 4));
+      const scrub = sc2 > 0.62 - (1 - face) * 0.42 + face * 0.18; // (on the top most of it is scrub; on the face, little)
+      const sand = [0.48, 0.31, 0.14], dry = [0.32, 0.22, 0.1], bush = [0.1, 0.088, 0.036]; // (linear light: on screen a warm ochre, a duller tan and a dark brown-olive)
+      GR = scrub ? bush : face > 0.5 ? sand : dry;
+    }
     if (bank[k]) { // (the cliff's face: rough grass, darker clumps of scrub and paler worn patches, not a lawn)
       const s1 = noise2(X[k] / 9, Z[k] / 9, 1e6, 11), s2 = noise2(X[k] / 3, Z[k] / 3, 1e6, 12), sc = Math.max(0, Math.min(1, (s1 - 0.55) * 4)), pale = Math.max(0, Math.min(1, (0.35 - s1) * 4)) * 0.5;
       const r = 0.29 - sc * 0.1 + pale * 0.12, gg = 0.36 - sc * 0.1 + pale * 0.08, b = 0.19 - sc * 0.05 + pale * 0.07, f = 0.9 + s2 * 0.18;
@@ -366,7 +376,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const addTri = (a, b, c) => {
     const sa = solid[a], sb = solid[b], sc = solid[c];
     if (!sa && !sb && !sc && h[a] < -1 && h[b] < -1 && h[c] < -1) return; // open water: nothing to draw
-    const soft = [a, b, c].some((q) => cls[q] === 2 || cls[q] === 3 || bank[q]) || inland;
+    const soft = [a, b, c].some((q) => cls[q] === 2 || cls[q] === 3 || bank[q] || dune[q] > 0.05) || inland; // (the dune too: on dry land it was drawn with the pier's concrete, its joints and all, never the rough ground)
     // a triangle reaching from a wall out into the water would stand above the water in front of the wall: only beaches
     // and banks slope into the water
     if (!(sa && sb && sc) && !soft) return;
@@ -407,13 +417,16 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             vec3 ph = mix(r1, r2, 0.35);
             float lum = dot(ph, vec3(0.3, 0.55, 0.15));
             // keep the photograph's light and dark (stones, hollows, clumps) but take its colour from the ground's tint
-            vec3 tinted = vColor.rgb * (lum * 2.2) + (ph - lum) * 0.3;
+            // (the photograph is decoded to linear light, where its average brightness is 0.06, not the 0.45 it looks on screen:
+            // scaled by 2.2 the ground came out at an eighth of its colour, and the dune's sand read as dark olive scrub)
+            // (its stones' light and dark softened: at full contrast the sand read as a heap of pebbles)
+            vec3 tinted = vColor.rgb * clamp(pow(lum / 0.06, 0.55), 0.45, 1.7) + (ph - lum) * 0.12;
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
         .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
           if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf)); }`);
     };
-    softMat.customProgramCacheKey = () => "fdruf1";
+    softMat.customProgramCacheKey = () => "fdruf4";
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);

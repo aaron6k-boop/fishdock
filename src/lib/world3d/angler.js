@@ -160,7 +160,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
   // the person (human3d.js: a realistic person, with the simple figure3d.js figure standing in while it loads): their
   // own look if they chose one, otherwise a steady one from their id
-  const fig = createPerson({ id, look: lookFor(id, look), outfit: O, venue }); root.add(fig.group);
+  const fig = createPerson({ id, look: lookFor(id, look), outfit: local ? { ...O, sameTop: true } : O, venue }); root.add(fig.group);
   // the soft dark round your feet where you stand (contactShadow.js; hidden in a jump, and in first person with your body)
   const feetShadow = contactShadow(1.0, 0.85, 0.75); root.add(feetShadow);
   // your forearms and hands in first person (only ever your own angler's are needed: made the first time they're shown)
