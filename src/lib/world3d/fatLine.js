@@ -74,7 +74,7 @@ function readLights(scene) {
  * thick: the real line's diameter in metres. Call mesh.userData.sync() whenever its points change, and set
  * mesh.userData.feed (metres of line wound in) to move the glints with the line.
  */
-export function fatLine(src, count, { color = 0xc3ced6, opacity = 0.68, thick = 0.00035, minPx = 1, fade = 0.24, gloss = 1 } = {}) {
+export function fatLine(src, count, { color = 0xb2bec6, opacity = 0.6, thick = 0.00035, minPx = 1, fade = 0.22, gloss = 1 } = {}) {
   const N = src.length / 3;
   const geo = new THREE.BufferGeometry();
   const P = new Float32Array(N * 2 * 3), Nx = new Float32Array(N * 2 * 3), Vx = new Float32Array(N * 2 * 3), S = new Float32Array(N * 2), U = new Float32Array(N * 2);
