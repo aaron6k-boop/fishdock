@@ -17,6 +17,10 @@ export const LOCAL = {
     // across the harbour mouth: the bank north of the river is a low dune grown over with marram grass (photographs),
     // kept clear of the road and the buildings behind it
     dunes: (x, z) => z < -85 && z > -175 && x > -140 && x < 80,
+    // (Aaron's photograph from the pier head: across the harbour mouth the dune is a tall bank, about 8 m, estimated)
+    duneH: 8,
+    // and along its foot a bank of dark granite boulders in the water, from the end of the north pier round to the sea
+    rocks: (x, z) => z < -70 && z > -190 && x > -40 && x < 90,
     // beyond the mapped square, north of the harbour mouth: the South Denes port and industrial estate (low sheds)
     industry: (x, z) => z < -120 && x > -450,
     // the town round the harbour mouth (photographs from the pier, the harbour and Pier Road): Victorian and Edwardian
@@ -28,7 +32,7 @@ export const LOCAL = {
     hill: gorlestonHill,
     // (landmarks, above, also: the Pier Hotel; Pavilion Theatre: red brick and terracotta, copper roofs, four domed corner towers at its south end;
     // the bandstand in Pier Gardens; the Cliff Hotel on the cliff top)
-    note: "The lighthouse, lamps, fences, the Pier Hotel, Pavilion Theatre, bandstand, Cliff Hotel and the height of the cliff at Gorleston are modelled from photographs and descriptions; their sizes are estimates.",
+    note: "The lighthouse, lamps, fences, the Pier Hotel, Pavilion Theatre, bandstand, Cliff Hotel, the height of the cliff and the dune across the harbour mouth at Gorleston are modelled from photographs and descriptions; their sizes are estimates.",
   },
 };
 export const localFor = (id) => LOCAL[id] || null;
