@@ -115,12 +115,13 @@ function DevDiagnostics({ world, view, setOpts, scene }) {
     const saved = { gfx: view.gfx || "auto", gfxC: view.gfxC && typeof view.gfxC === "object" ? { ...view.gfxC } : {}, battery: !!view.battery, fpsShow: !!view.fpsShow };
     const rows = [];
     try {
-      world.setEnv?.({ light: { sunAlt: 28, sunAz: 200 }, cond: { cloudPct: 30, windKph: 16, precipMm: 0 }, facing: scene?.facing ?? 180 });
-      world.lookAtRod?.();
+      const fixed = () => { world.setEnv?.({ light: { sunAlt: 28, sunAz: 200 }, cond: { cloudPct: 30, windKph: 16, precipMm: 0 }, facing: scene?.facing ?? 180 }); world.lookAtRod?.(); };
+      // a preset change rebuilds the world: wait until it is drawing again (frames ticking), up to 40 s
+      const ready = async () => { let n0 = -1; for (let i = 0; i < 40; i++) { await wait(1000); const f = world.frameTimes?.(); if (f && n0 >= 0 && f.n > n0 + 5) return f.n; n0 = f ? f.n : -1; } return world.frameTimes?.()?.n ?? 0; };
       for (const q of PRESET_ORDER) {
-        setOpts({ gfx: q, gfxC: {}, battery: false }); await wait(6000);
-        world.setGfx?.(effectiveGfx(q, {}, false));
-        const t0 = performance.now(); let since = world.frameTimes?.().n ?? 0; const all = [];
+        setOpts({ gfx: q, gfxC: {}, battery: false }); await wait(500); await ready();
+        world.setGfx?.(effectiveGfx(q, {}, false)); fixed(); await wait(5000);
+        const t0 = performance.now(); let since = world.frameTimes?.()?.n ?? 0; const all = [];
         while (performance.now() - t0 < 8000) { await wait(1000); const f = world.frameTimes?.(since); if (f) { all.push(...f.times); since = f.n; } }
         const last = world.perf?.();
         if (all.length > 10 && last) {

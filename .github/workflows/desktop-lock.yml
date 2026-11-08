@@ -1,0 +1,37 @@
+# FishDock for Windows: pins the launcher's dependencies. Run by hand from the Actions tab on a launcher branch: it
+# resolves desktop/package.json to an exact desktop/package-lock.json, reports the newest Electron and electron-builder
+# releases next to the pinned ones (so a security update is a visible decision, not a surprise), runs npm audit, and
+# commits the lockfile to the branch. The installer build then uses npm ci against that lockfile and nothing else.
+name: Desktop lockfile
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Resolve the lockfile
+        working-directory: desktop
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Pinned against newest
+        working-directory: desktop
+        run: |
+          echo "pinned electron:          $(node -p "require('./package.json').devDependencies.electron")"
+          echo "newest electron:          $(npm view electron version)"
+          echo "newest electron 33.x:     $(npm view electron@33 version | tail -1)"
+          echo "pinned electron-builder:  $(node -p "require('./package.json').devDependencies['electron-builder']")"
+          echo "newest electron-builder:  $(npm view electron-builder version)"
+          echo "lockfile packages:        $(node -p "Object.keys(require('./package-lock.json').packages).length - 1")"
+      - name: Audit
+        working-directory: desktop
+        run: npm audit --audit-level=low || true
+      - name: Commit the lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop/package-lock.json
+          git diff --cached --quiet && echo "lockfile unchanged" || (git commit -m "Pin the launcher's dependencies (desktop/package-lock.json)" && git push)
