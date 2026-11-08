@@ -243,7 +243,9 @@ function realArms(scene, { gloves, skinHex }) {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = false;
     // (one step of subdivision: the model's fingers had a few flat sides each, which read as blocks this close)
-    try { o.geometry = subdivide(o.geometry, { keep: 0.55 }); } catch (e) { console.warn("fp arms: not subdivided", e?.message || e); }
+    // (and a second step on High and Ultra: the knuckles and fingertips were still faceted where a hand fills a third of
+    // the view, as it does holding a fish up or resting on the rail; about 66,000 points, skinned once a frame)
+    try { o.geometry = subdivide(o.geometry, { keep: 0.55 }); if (fine) o.geometry = subdivide(o.geometry, { keep: 0.8 }); } catch (e) { console.warn("fp arms: not subdivided", e?.message || e); }
     // (how the skin curves at each point, worked out once: in the creases of the knuckles and joints and between the
     // tendons it folds in, there it's darker and a little redder; over the knuckles and the tendons it stands out and
     // catches the light. Without it the hand read as one smooth, evenly coloured piece of plastic)
@@ -904,7 +906,7 @@ function cuffGeo() {
   g.computeVertexNormals(); return g;
 }
 
-export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f } = {}) {
+export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, fine = false } = {}) {
   const group = new THREE.Group(); group.name = "fp-hands"; group.visible = false;
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: gloves ? 0.55 : 0.6, metalness: 0 });
   // the jacket's sleeve: a woven softshell (seen from inside too, so its open end never shows a hole) and a ribbed cuff

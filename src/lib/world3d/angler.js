@@ -155,7 +155,7 @@ function genericFishGeometry() {
   return g;
 }
 
-export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, look = null, local = false, real = false, rail = false, onSound, onFeel } = {}) {
+export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, look = null, local = false, real = false, rail = false, fineHands = false, onSound, onFeel } = {}) {
   const root = new THREE.Group(); world.add(root);
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
   // the person (human3d.js: a realistic person, with the simple figure3d.js figure standing in while it loads): their
@@ -857,7 +857,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const ns = Math.max(1, (fishLen * 0.62) / 0.35), kt = t - kept.t0, crossed2 = (k, m) => prevKt < m && k >= m;
       const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]), away = new THREE.Vector3(dirOf(face)[0], 0, dirOf(face)[1]);
       showFish = true; showLine = false;
-      const G = venue === "pier" && tech === "dropnet" ? dropGeo(ns) : null; // (only a fish heavy enough to have been netted goes in and out of the drop net: a light one is lifted, laid on the deck and put back by hand)
+      const G = venue === "pier" && tech === "dropnet" ? dropGeo(ns) : null;
+      if (venue === "pier" && !G) held = false; // (the rod leant on the rail while you deal with the fish: held, your arm lay across the mat and the fish) // (only a fish heavy enough to have been netted goes in and out of the drop net: a light one is lifted, laid on the deck and put back by hand)
       // heights it can rest at without going into anything: the deck (or the bank) under you, the mat's top
       const floorY = toWorld(new THREE.Vector3(0, 0, 0)).y, matAt = toWorld(matAtL().setY(0.004)), matTop = matAt.y + 0.042;
       const onMat = matAt.clone().setY(matTop + halfThick() + 0.012 + 0.012 * fishLen);
@@ -1570,7 +1571,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
     setFirstPerson(on) {
       if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on && !tagOff; feetShadow.visible = !fp && !walking?.air;
-      if (fp && !fpv) { const L = fig.look || {}; fpv = createFpHands({ gloves: !!L.gloves, skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48 }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
+      if (fp && !fpv) { const L = fig.look || {}; fpv = createFpHands({ gloves: !!L.gloves, skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48, fine: !!fineHands }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
       fpv?.show(fp);
     },
     /** the name label over their head (hidden for your own angler in the landing shot) */

@@ -399,7 +399,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // white blotches the shape of each wave's face, like paper cut-outs on the water)
         float brk = 1.;
         if (sp > .99 && dist < 70.) brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
-        col += mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk)*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.14)*sunVis;
+        // (a low sun's reflection is gold, as its disc is)
+        float lowSun = 1. - smoothstep(.07, .5, max(uSunDir.y, 0.));
+        vec3 sunC = mix(mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk), vec3(1., .72, .42), lowSun*.7);
+        col += sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
@@ -407,7 +410,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           if (sunVis > .01 && sp > .85 && dist < 160.) {
             float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
             float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
-            col += mix(vec3(1., .95, .85), vec3(1., .78, .52), uDusk)*glit*(pow(sp, 18.)*1.6 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
+            // (the path is long towards the sun and narrow across it, wider in more wind, as a real glitter path is: it
+            // was a round patch a quarter of the sea wide under a low sun)
+            float az = max(dot(normalize(rd.xz + vec2(1e-5)), normalize(uSunDir.xz + vec2(1e-5))), 0.);
+            float path = pow(az, 90./(.6 + 1.4*uWind + .6*uSwell))*pow(sp, 5.);
+            col += mix(sunC, vec3(1., .95, .85), .3)*glit*(path*1.3 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
           }
         #endif
         float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
