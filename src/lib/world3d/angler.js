@@ -244,7 +244,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // (fishLine.js), in the world's space
   const fLine = fishLine(GUIDES.length); world.add(fLine.mesh);
   const flM = new THREE.Vector3(), flT = new THREE.Vector3(), flE = new THREE.Vector3(), dropAt = new THREE.Vector3(); let spoolInfo = null, spinWas = null, dropHad = false;
-  const flWind = [0, 0], flCur = [0, 0];
+  const flWind = [0, 0], flCur = [0, 0], flO = {};
   // the rest: a tripod on the beach, a rest on the bank, the railing on a pier or quay
   const rest = new THREE.Group(); root.add(rest);
   const mMetal = new THREE.MeshStandardMaterial({ color: 0x8c9196, metalness: 0.7, roughness: 0.35 });
@@ -1427,7 +1427,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       else dropHad = false;
       flWind[0] = (env.windDir?.[0] || 0) * (env.wind || 0) * 2.4; flWind[1] = (env.windDir?.[1] || 0) * (env.wind || 0) * 2.4;
       flCur[0] = (env.windDir?.[0] || 0) * 0.08; flCur[1] = (env.windDir?.[1] || 0) * 0.08;
-      fLine.update({ dt, t, show: showLine, end: freeEnd ? null : end, freeEnd, drop: 1.25, excess, payout, retrieve, give, wound, tension: ph === "hooked" ? tk : ph === "landing" ? 0.6 : 0, wind: flWind, current: flCur, waterY: freeEnd ? null : wh(end.x, end.z), rodSag });
+      const o = flO; o.dt = dt; o.t = t; o.show = showLine; o.end = freeEnd ? null : end; o.freeEnd = freeEnd; o.drop = 1.25; o.excess = excess; o.payout = payout; o.retrieve = retrieve; o.give = give; o.wound = wound;
+      o.tension = ph === "hooked" ? tk : ph === "landing" ? 0.6 : 0; o.wind = flWind; o.current = flCur; o.waterY = freeEnd ? null : wh(end.x, end.z); o.rodSag = rodSag;
+      fLine.update(o); // (one options object, reused: nothing made afresh each frame)
       if (freeEnd) dropAt.copy(fLine.endPos);
       if (showLine) {
         rig.position.copy(freeEnd ? fLine.endPos : end);
