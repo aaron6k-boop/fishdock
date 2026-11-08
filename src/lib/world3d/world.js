@@ -793,6 +793,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     get mySpot() { const me = anglers.get(localId); const s = me?.a.spot; return s ? { id: s.id, name: s.name, at: s.at, face: s.face } : null; },
     setNow(f) { nowFn = f || Date.now; },
     setEnv: setEnvAll,
+    /** Every frame time since frame `since` (ms, oldest first) and the count so far, for percentiles over a whole
+     *  benchmark run rather than the last few seconds: callers keep `n` and ask again. (240 frames are kept: ask at
+     *  least every two seconds at 120 fps.) */
+    frameTimes(since = 0) { const n = ftN, from = Math.max(since, n - 240), out = []; for (let i = from; i < n; i++) out.push(ft[i % 240]); return { n, times: out }; },
     /** For the developer diagnostics panel (dev mode only): where the camera is and looks, the light and weather in
      *  force, how long the place took to build and what has loaded. Numbers only, nothing that identifies a person. */
     diag() {
