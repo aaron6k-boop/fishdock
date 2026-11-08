@@ -247,11 +247,19 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // sleeves you see in first person, and bare hands are bare, as there, not the model's own gardening gloves. Left as the model came, the 8 November recording showed navy sleeves in first
   // person and a white cardigan in third)
   const U = { uTop: { value: tint(COATS[L.coat]?.hex ?? (outfit?.sameTop ? outfit.jacket : null)) }, uLegs: { value: tint(LEGS[L.legs]?.hex) }, uFeet: { value: tint(FOOTWEAR[L.boots]?.hex) }, uHands: { value: tint(L.gloves ? 0x1c1e21 : outfit?.sameTop ? (SKINS[L.skin]?.hex ?? 0xc99a74) : null) }, uMean: { value: new THREE.Vector4(0.2, 0.2, 0.2, 0.2) }, uWet: { value: 0 }, uWind: { value: V() }, uTime: { value: 0 } };
+  // ---- the modelled clothes (people with clothes: their own jacket, trousers and wellies, made in Blender) ----
+  // coloured as the kit, and the body's own clothes underneath the same colours, so anywhere the body shows through a
+  // seam it's the same cloth
+  const worn = skinned.some((m) => /^fd_(jacket|trousers|boots)/.test(m.material?.name || ""));
+  const wornHex = worn ? { jacket: COATS[L.coat]?.hex ?? outfit?.jacket ?? 0x1d3150, trousers: LEGS[L.legs]?.hex ?? 0x3b3e42, boots: FOOTWEAR[L.boots]?.hex ?? 0x2f4a2c } : null;
+  if (worn) { U.uTop.value = tint(wornHex.jacket); U.uLegs.value = tint(wornHex.trousers); U.uFeet.value = tint(wornHex.boots); }
   const mats = [];
   let unit = 1, clothMesh = null; const clothInv = new THREE.Matrix4(); // metres per unit of the meshes' own geometry
   for (const m of skinned) {
     m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false;
     const mat = m.material;
+    { const w = /^fd_(jacket|trousers|boots)/.exec(mat.name || "");
+      if (w) { const c = mat.clone(); c.map = null; c.color = new THREE.Color(wornHex[w[1]]); if (w[1] === "boots") { c.roughness = 0.38; c.metalness = 0; } else if (weave()) { c.normalMap = weave(); c.normalScale = new THREE.Vector2(0.5, 0.5); } m.castShadow = true; m.frustumCulled = false; m.material = c; mats.push(c); continue; } }
     if (/opacity/.test(mat.name)) { const h = mat.clone(); h.transparent = true; h.alphaTest = 0.04; h.depthWrite = false; m.material = h; mats.push(h); m.renderOrder = 1; continue; }
     if (/body/.test(mat.name)) {
       const info = prepGeometry(m.geometry, m.skeleton.bones);
