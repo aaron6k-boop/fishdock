@@ -40,7 +40,14 @@ export const PEOPLE = [
   { file: "f07", sex: "f", name: "Woman, dark hair", skin: 1, hair: 1, beard: 0, hem: 0.52 },
   { file: "f09", sex: "f", name: "Woman, hair tied back", skin: 1, hair: 2, beard: 0, hem: 0.5 },
   { file: "f14", sex: "f", name: "Woman, brown hair", skin: 1, hair: 1, beard: 0, hem: 0.52 },
+  // (last, so the people already chosen and those sent by older copies of the app keep their numbers)
+  // clothes: their own modelled jacket, trousers and wellies (made in Blender on the man with short hair:
+  // source-assets/blender/make_angler_clothes.py), coloured as their kit
+  { file: "angler1", sex: "m", name: "Angler, fishing jacket", skin: 0, hair: 1, beard: 1, hem: 0.475, clothes: true },
 ];
+// who your own angler is until you choose: the angler in their fishing clothes, so the jacket you see on your arms in
+// first person is the one you see them wearing from behind
+export const OWN_DEFAULT = PEOPLE.findIndex((p) => p.file === "angler1");
 // clothing colours: the first keeps the jacket or trousers as they come (the model's own fabric, unrecoloured)
 export const COATS = [
   { hex: null, name: "As they come" }, { hex: 0x1d3150, name: "Navy" }, { hex: 0x3d4a2c, name: "Olive" }, { hex: 0x2e5e4e, name: "Bottle green" },
@@ -84,7 +91,7 @@ export function lookFor(id = "", chosen = null) {
     boots: c?.boots ?? pk(FOOTWEAR.length, 15), life: c?.life ?? 0, gloves: c?.gloves ?? 0,
   };
   const P = PEOPLE[kit.person];
-  return { ...base, ...kit, chosen: !!c, height, seed: h, skinHex: SKINS[base.skin].hex, hairHex: HAIRS[base.hair].hex, file: P.file, sex: P.sex, hem: P.hem };
+  return { ...base, ...kit, chosen: !!c, height, seed: h, skinHex: SKINS[base.skin].hex, hairHex: HAIRS[base.hair].hex, file: P.file, sex: P.sex, hem: P.hem, clothes: !!P.clothes };
 }
 
 /** A person's own look for the simple stand-in figure (their skin, hair and beard), keeping everything else. */

@@ -49,3 +49,7 @@ anims2.glb: kneeling, kneeling to look closely, crouching and a fishing stance, 
 Fishing Idle, Kneeling Idle, Kneeling Inspecting, Crouching Idle), retargeted in Blender from Mixamo's Y Bot rig onto
 the Rocketbox skeleton (source-assets/blender/retarget_mixamo.py). Mixamo's animations may be used royalty-free in
 personal, commercial and non-profit projects under Adobe's terms; the files themselves aren't redistributed as such.
+
+angler1.glb (and angler1_hd.glb): the man with short hair (m05.glb, Microsoft Rocketbox, MIT License, as above) with a
+fishing jacket, trousers and wellies modelled in Blender from his own body (source-assets/blender/make_angler_clothes.py),
+skinned to the same skeleton. The cloth's surface detail is from Poly Haven's fabric_pattern_07 and denim_fabric (CC0).
