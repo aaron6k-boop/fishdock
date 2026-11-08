@@ -1,7 +1,7 @@
 # FishDock on the PC: what draws the picture, and what it can and can't do
 
 Written 8 November 2026 for the PC-first plan. Facts about the code are from reading it; facts about browsers and
-graphics APIs are as of Chromium 142 (the one inside Electron 45). Nothing here is a measurement: measured figures
+graphics APIs are as of the Chromium inside Electron 45 (the launcher reports its exact version on the launch screen). Nothing here is a measurement: measured figures
 come from the benchmark in the Graphics panel (developer diagnostics), run on real hardware.
 
 ## 1. What the launcher is
