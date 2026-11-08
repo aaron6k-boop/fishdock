@@ -531,7 +531,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the fish you've landed, until you decide: lying in the net (deck), held up for a look (inspect), going back in
   // (release), or kept (gone: the catch card shows it)
   let kept = null, matOut = false;
-  let handsNow = [new THREE.Vector3(), new THREE.Vector3()]; // where the hands are (local), for the drop net's rope
+  let ropeHeld = false, handsNow = [new THREE.Vector3(), new THREE.Vector3()]; // where the hands are (local), for the drop net's rope
   let walking = null; // walking about (walker.js): where, which way, how fast, the stride
   let tagOff = false;
   let landStage = null, landWater = null; // the drop net's stage while landing (for the hands): up | rod | pick | lower | lead | haul | in
@@ -1251,7 +1251,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // forearms hanging in from the top edge, upside down, holding nothing you could see)
       const netTop = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
       const sight = netTop ? netTop.clone().sub(E).normalize() : V3(0, -0.8, -0.6).normalize();
-      const base = fp ? (netTop && netTop.y < -0.3 ? E.clone().addScaledVector(sight, 0.72).add(V3(-0.24, 0.04, 0.06)) : V3(E.x - 0.5, E.y - 0.3, E.z - 0.36)) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
+      const base = fp ? (netTop && (netTop.y < -0.3 || netTop.z < -Math.max(0.3, edge - 0.22)) ? E.clone().addScaledVector(sight, 0.72).add(V3(-0.24, 0.04, 0.06)) : V3(E.x - 0.5, E.y - 0.3, E.z - 0.36)) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1277,7 +1277,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       crouch = clamp(0.8 - net0.y * 0.6, 0, 0.6); lean = 0.18; brace = 0; lookAtW = netAt.clone();
     }
     if (kept?.state === "deck" && !walking) lookAtW = fish.visible ? fish.position.clone() : lookAtW;
-    handsNow = hands.map((h, i) => (h ? h.at.clone() : V3(i ? 0.28 : -0.28, 0.85, -0.05)));
+    handsNow = hands.map((h, i) => (h ? h.at.clone() : V3(i ? 0.28 : -0.28, 0.85, -0.05))); ropeHeld = hands.some((h) => h?.kind === "rope");
     if (emoting && emoting.t0 == null) emoting.t0 = t;
     const emote = emoting && t - emoting.t0 < EMOTE_S[emoting.kind] ? { kind: emoting.kind, u: t - emoting.t0, hand: hands[1] ? 0 : 1 } : null;
     if (!emote) emoting = null;
@@ -1303,6 +1303,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (fp && netAt && net.visible) for (const hh of hands) if (hh && hh.kind === "hoop") {
       const c = toLocal(netAt), rr = 0.35 * net.scale.x, rad = hh.at.clone().sub(c); rad.y = 0; if (rad.lengthSq() < 1e-6) rad.set(1, 0, 0); rad.normalize();
       const at = c.clone().addScaledVector(rad, rr), tan = new THREE.Vector3(0, 1, 0).cross(rad).normalize(), z = tan.clone().cross(V3(0, 1, 0));
+      // (when the hoop is further than your arm reaches, as it swings up off the deck and out over the rail, the hand
+      // holds the rope that far along, towards the hoop, and the rope carries the net: holding the rim itself drew arms
+      // up to two metres long, a sleeve across half the screen, as on the 8 November recording)
+      const E = fpEye(), sh = V3(E.x + (hh === hands[1] ? 0.2 : -0.2), E.y - 0.16, E.z + 0.24), toH = at.clone().sub(sh), reach = 0.62; // (the shoulder where fpHands.js draws it)
+      if (toH.length() > reach) at.copy(sh).addScaledVector(toH.normalize(), reach);
       hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
     }
     // first person: your hands (fpHands.js) take hold of the same things, placed from the same eye and view as the rod
@@ -1433,10 +1438,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     leanNow += (leanTo - leanNow) * (1 - Math.exp(-dt * (leanTo < 0 ? 5 : 2.5)));
     { const k = 55, c = 2 * Math.sqrt(k) * 0.75, h = Math.min(dt, 0.05), to = fp ? bodyTo : { x: 0, y: 0, z: 0 };
       for (const a of ["x", "y", "z"]) { const v = "v" + a; body[v] += (k * (to[a] - body[a]) - c * body[v]) * h; body[a] += body[v] * h; } }
-    { const st = fp && ph === "landing" && (landStage === "pick" || landStage === "in") ? fpCrouch : 0; stoopNow += (st - stoopNow) * (1 - Math.exp(-dt * 3));
+    // (first person, picking the fish or the net up off the deck to look at it or put it back: you stoop to the deck and
+    // step towards it, as when landing. Standing still, the hands' targets were a metre and more from the shoulders and
+    // the arms were drawn that long, sleeves straight across the view: the 8 November recording at 48 s)
+    const lowH = fp && (kept?.state === "release" || kept?.state === "inspect") && handsNow ? Math.min(handsNow[0].y, handsNow[1].y) : 9;
+    // (not with the rope in your hands: those are placed from your eye, so stooping lowered them and they the eye, down to the deck)
+    const deckReach = lowH < 0.85 && !ropeHeld, reachX = deckReach ? (handsNow[0].x + handsNow[1].x) / 2 : 0;
+    { const st = deckReach ? clamp((0.85 - lowH) * 1.1, 0, 1) : fp && ph === "landing" && (landStage === "pick" || landStage === "in") ? fpCrouch : 0; stoopNow += (st - stoopNow) * (1 - Math.exp(-dt * 3));
       // (and a step to the side, to the net on the deck by your left foot: you go to it, rather than an arm reaching a
       // metre across to it; back again for the rope)
-      const sx = fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod") && netAt ? clamp(toLocal(netAt).x * 0.4, -0.5, 0) : 0; stepNow += (sx - stepNow) * (1 - Math.exp(-dt * 2.2)); }
+      const sx = deckReach ? clamp(reachX * 0.6, -0.6, 0.6) : fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod") && netAt ? clamp(toLocal(netAt).x * 0.4, -0.5, 0) : 0; stepNow += (sx - stepNow) * (1 - Math.exp(-dt * 2.2)); }
     return { phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
