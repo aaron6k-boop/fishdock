@@ -3,6 +3,7 @@
 // follow the wind and the kind of place; the ground and scenery are built for a pier, beach, estuary quay, river
 // bank or lake. All conditions come in through setEnv, so the sky, light, water, rain and fog agree.
 import * as THREE from "three";
+import { installFogScatter, SCATTER } from "./fogScatter.js";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
@@ -134,6 +135,7 @@ function speckle(g, w, h, base, spread, n = 2600, size = 2) {
 }
 
 export function createEnvironment(scene, { venue = "pier", quality = 1, real = null, pano = null, post = false } = {}) {
+  installFogScatter(); // (before any material is made: the haze glows towards the sun)
   const L = layoutFor(venue);
   const group = new THREE.Group(); scene.add(group);
   const U = {
@@ -195,7 +197,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uShore: { value: null }, uShoreOn: { value: 0 }, uShoreHalf: { value: SHORE.half },
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
     uNrm: { value: null }, uNrmOn: { value: 0 },
-    uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() },
+    uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() }, uFdSun: { value: new THREE.Vector3() },
   };
   // the sea's fine ripples: a water normal map (three.js's, MIT; source-assets/ASSET-LICENCES.json), until it has
   // loaded the old noise ripples stand in
@@ -248,7 +250,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       }`,
     fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + POST_GLSL + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
-      uniform sampler2D uShore, uShoreF, uNrm, uRefl; uniform float uShoreFHalf, uNrmOn, uReflOn; uniform mat4 uReflMat;
+      uniform sampler2D uShore, uShoreF, uNrm, uRefl; uniform float uShoreFHalf, uNrmOn, uReflOn; uniform mat4 uReflMat; uniform vec3 uFdSun;
       // the scene's own light (linear, before the tone curve) to the display colours the water works in: the same
       // neutral curve and sRGB the rest of the picture gets at the end (post.js OutputPass), so the mirrored dune and
       // town match the real ones
@@ -427,7 +429,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         col = mix(col, foamC*(lit*dim + uNight*.05), foam*(.75 + .2*smoothstep(.2, .7, foam)));
         // ---- haze: the same as the land's close in (three's exponential fog), the sky's own horizon far out ----
         float fogK = 1. - exp(-uFogD*uFogD*dist*dist);
-        vec3 hz = mix(uFogC, skyBase(normalize(vec3(-v.x, .02, -v.z))), smoothstep(.5, 1., fogK));
+        float fdC = max(dot(-v, normalize(uSunDir)), 0.);
+        vec3 hz = mix(uFogC + uFdSun*(pow(fdC, 6.)*.55 + pow(fdC, 40.)*.6), skyBase(normalize(vec3(-v.x, .02, -v.z))), smoothstep(.5, 1., fogK));
         col = mix(col, hz, fogK);
         gl_FragColor = vec4(toPost(col), 1.);
       }`,
@@ -637,6 +640,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     // ---- haze: the horizon's colour, the same exponential haze for the land and the water (thicker in rain) ----
     scene.fog.color.setRGB(...look.fogColour); scene.fog.density = look.fogDensity;
     wU.uFogC.value.copy(scene.fog.color); wU.uFogD.value = look.fogDensity;
+    // (the haze's glow towards the sun: warm by day, gold at dusk, gone under thick cloud and at night)
+    { const vis = (st.day + st.dusk * 1.3) * (1 - THREE.MathUtils.smoothstep(st.cloud, 0.55, 0.95)) * (1 - st.rain), sc = look.sunColour;
+      SCATTER.dir.x = st.sunDir.x; SCATTER.dir.y = st.sunDir.y; SCATTER.dir.z = st.sunDir.z;
+      SCATTER.col.x = sc[0] * 0.55 * vis; SCATTER.col.y = sc[1] * 0.5 * vis; SCATTER.col.z = sc[2] * 0.4 * vis; wU.uFdSun.value.set(SCATTER.col.x, SCATTER.col.y, SCATTER.col.z); }
     // (the environment map's lower half: the dark of the sea)
     envSky.uniforms.uEnvGround.value.copy(wU.uWater.value).multiplyScalar(0.8 * (st.day + st.dusk * 0.5 + st.night * 0.08));
     // ---- lamps after dark: the pools by the anglers, the lanterns and windows, their streaks on the water ----
