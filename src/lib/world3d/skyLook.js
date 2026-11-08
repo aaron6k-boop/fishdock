@@ -23,15 +23,20 @@ export function horizonColour({ day = 1, dusk = 0, night = 0, cloud = 0.3, rain 
 export function lightingFor(st) {
   const { day = 1, dusk = 0, night = 0, cloud = 0.3, rain = 0, moonLight = 0 } = st;
   const over = smooth(0.5, 1, cloud); // how overcast
+  // how low the sun is (its height as a sine: sunDir.y), where it's known: a sun a few degrees up comes through much
+  // more air than one overhead, so it's dimmer and warmer, long before dusk proper (an 8 am sun in November is 8 degrees
+  // up and plainly golden; it was lit as white and as hard as noon)
+  const low = st.sunDir ? 1 - smooth(0.07, 0.5, Math.max(0, st.sunDir.y)) : 0;
   // direct light: thick cloud all but hides the sun (rain more so), so there's no hard sun glare on wet ground in rain
   const sunVis = (1 - 0.88 * over) * (1 - 0.5 * rain);
   // warm and low at dusk, but a gold, not an orange: the deck still looks like concrete
   let sunColour = sum3([[1, 0.95, 0.88], day], [[1, 0.8, 0.62], dusk], [[0.62, 0.7, 0.88], night]);
+  sunColour = mix3(sunColour, [1, 0.8, 0.58], low * day * 0.75);
   sunColour = mix3(sunColour, [0.95, 0.95, 0.96], over * 0.6);
-  const sunIntensity = (2.5 * day + 1.45 * dusk + 0.3 * night * moonLight) * sunVis;
+  const sunIntensity = (2.5 * day * (1 - 0.3 * low) + 1.45 * dusk + 0.3 * night * moonLight) * sunVis;
   // the sky's own light: more of it under a bright overcast (the cloud spreads the sun), a blue moonlit fill at night
   // (never so little that the shadows go black)
-  const skyColour = sum3([mix3([0.66, 0.76, 0.92], [0.82, 0.84, 0.86], over), day], [[0.66, 0.62, 0.74], dusk], [[0.42, 0.5, 0.72], night]);
+  const skyColour = sum3([mix3(mix3([0.66, 0.76, 0.92], [0.72, 0.74, 0.84], low * 0.5), [0.82, 0.84, 0.86], over), day], [[0.66, 0.62, 0.74], dusk], [[0.42, 0.5, 0.72], night]); // (a low sun's sky light is a touch greyer: less blue overhead, more haze)
   const groundColour = sum3([[0.32, 0.3, 0.27], day], [[0.3, 0.26, 0.24], dusk], [[0.13, 0.13, 0.15], night]);
   const skyIntensity = (day * (0.72 + 0.7 * over) + dusk * (0.78 + 0.3 * over) + night * (0.34 + 0.22 * moonLight)) * (1 - 0.12 * rain);
   // shadows: crisp in sun, faint under a grey sky, soft by moonlight

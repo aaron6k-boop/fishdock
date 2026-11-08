@@ -44,10 +44,11 @@ const GRIPS = {
   // (the ring and little fingers tucked in under the hand, out of the way of the reel: they were left spread over it)
   crank: { f: [[1.0, 1.1, 0.7], [1.1, 1.2, 0.8], [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0 },
-  fish: { f: [[0.55, 0.5, 0.3], [0.6, 0.55, 0.32], [0.65, 0.58, 0.34], [0.7, 0.6, 0.36]], t: [0.3, 0.25, 0.15], spread: 0.03 }, // (cupped up round its belly, as you support a fish, not flat and stiff under it)
+  fish: { f: [[0.55, 0.5, 0.3], [0.6, 0.55, 0.32], [0.65, 0.58, 0.34], [0.7, 0.6, 0.36]], t: [0.3, 0.25, 0.15], spread: 0.03 },
+  open: { f: [[0.2, 0.25, 0.15], [0.22, 0.28, 0.16], [0.25, 0.3, 0.18], [0.3, 0.32, 0.2]], t: [0.2, 0.15, 0.1], spread: 0.08 }, // (open, fingers loosely apart: the hands that have just let a fish go) // (cupped up round its belly, as you support a fish, not flat and stiff under it)
 };
 let BETA = 1.0; export const _tune = (o) => { if (o.beta != null) BETA = o.beta; };
-const gripOf = (kind) => (kind === "seat" ? GRIPS.seat : kind === "crank" ? GRIPS.crank : kind === "fish" ? GRIPS.fish : kind ? GRIPS.fist : GRIPS.rest);
+const gripOf = (kind) => (kind === "seat" ? GRIPS.seat : kind === "crank" ? GRIPS.crank : kind === "fish" ? GRIPS.fish : kind === "open" ? GRIPS.open : kind ? GRIPS.fist : GRIPS.rest);
 // where what's held runs through the hand (hand frame): in the curl of the fingers, in front of the palm; for the reel's
 // handle, between the thumb and the curled index finger
 const CHANNEL = { seat: V(0.004, 0.102, 0.03), crank: V(0.012, 0.12, 0.025), fish: V(0, 0.06, -0.02), fist: V(0, 0.1, 0.03) };

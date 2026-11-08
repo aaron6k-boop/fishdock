@@ -689,7 +689,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       // (under a fish: the fingers spread and cupped round its belly, the thumb along its side; laid on its flank: the
       // fingers resting on it, curving over a little: it was a fist round a handle, the fish hanging off the knuckles)
       const fishHold = use.kind === "fish", cradle = fishHold && use.palm && use.palm.y > 0.5;
-      const grip = fishHold ? (cradle ? 0.42 : 0.22) : use.axis ? (use.kind === "crank" ? 0.75 : 1) : use.kind === "wave" || use.kind === "cheer" || use.kind === "clap" ? -0.1 : 0.15;
+      const grip = fishHold ? (cradle ? 0.42 : 0.22) : use.kind === "open" ? 0.12 : use.axis ? (use.kind === "crank" ? 0.75 : 1) : use.kind === "wave" || use.kind === "cheer" || use.kind === "clap" ? -0.1 : 0.15;
       for (const [b, f] of FINGERS[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), grip * f * ew));
       for (const b of THUMB[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), (fishHold ? 0.12 : use.axis ? 0.35 : 0) * ew));
       B(s + "_UpperArm").updateMatrixWorld(true);

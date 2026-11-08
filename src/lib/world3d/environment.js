@@ -44,7 +44,11 @@ vec3 skyBase(vec3 d){
   float sd = max(dot(normalize(d), uSunDir), 0.);
   float ts = dot(normalize(d.xz + vec2(1e-4)), normalize(uSunDir.xz + vec2(1e-4)))*.5 + .5; // 1 towards the sun
   // day: a deep blue overhead, paling to a milky haze at the horizon, brighter round the sun
-  vec3 day = mix(vec3(.68, .78, .87), vec3(.19, .40, .76), t) + vec3(.10, .09, .06)*pow(sd, 4.)*(1. - t*.6);
+  // (and when the sun is low, in the morning and afternoon, the air it shines through warms the sky round it to a pale
+  // gold and takes some of the blue out of the rest: it was the same hard blue and white at 8 degrees as at noon)
+  float low = 1. - smoothstep(.07, .5, max(uSunDir.y, 0.));
+  vec3 day = mix(vec3(.68, .78, .87), mix(vec3(.19, .40, .76), vec3(.36, .50, .76), low*.6), t) + vec3(.10, .09, .06)*pow(sd, 4.)*(1. - t*.6);
+  day += vec3(.30, .18, .02)*low*pow(sd, 3.)*(1. - t*.7)*(1. - hp);
   // dusk: blue overhead, a pale gold glow low towards the sun, lilac-grey away from it (not an orange wash)
   vec3 dusk = mix(mix(vec3(.50, .50, .62), vec3(.96, .70, .48), ts*ts), vec3(.15, .20, .40), pow(hp, .38));
   dusk += vec3(.55, .32, .16)*pow(sd, 8.)*(1. - hp);
@@ -105,9 +109,13 @@ vec3 skyColour(vec3 d){
   float sd = max(dot(d, uSunDir), 0.), md = max(dot(d, uMoonDir), 0.);
   // the sun: a small disc (it was a great white plate, three times the real size, blown out by the bloom), darker and
   // warmer at its edge, inside a soft aureole that fades out into the haze, as it looks through sea air
+  // (a low sun is dimmer and golden, seen through all that air, and its aureole is a few degrees across, not a quarter
+  // of the sky: at 8 degrees it was a white plate in a white blur, as the 8 November evening recording showed)
   { float disc = smoothstep(.99985, .99993, sd), limb = smoothstep(.99985, .99999, sd);
-    c += vec3(1., .93, .8)*disc*(.75 + .25*limb)*(uDay + uDusk)*2.2;
-    c += vec3(1., .9, .74)*(pow(sd, 900.)*.5 + pow(sd, 60.)*.1)*(uDay + uDusk*.8)*(1. - .6*uCloud); }
+    float low = 1. - smoothstep(.07, .5, max(uSunDir.y, 0.));
+    vec3 sunC = mix(vec3(1., .93, .8), vec3(1., .66, .34), low*.85);
+    c += sunC*disc*(.75 + .25*limb)*(uDay + uDusk)*mix(2.2, 1.3, low);
+    c += sunC*(pow(sd, 900.)*.5 + pow(sd, 180.)*.12 + pow(sd, 60.)*.03)*(uDay + uDusk*.8)*(1. - .6*uCloud); }
   c += vec3(.85, .88, .95)*smoothstep(.9996, .99985, md)*uNight*uMoonLight*1.6;
   if (d.y > 0.) {
     #ifndef ENV_PASS
