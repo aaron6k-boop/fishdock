@@ -3,7 +3,7 @@
 // remote angler animates the same on every phone, and a viewer who joins midway sees the right moment. Timings,
 // bites, fights and landings are the same rules as the photo scene (sceneActors.js): biteTaps, fightProfile,
 // fishLoad, landingTech and landingTimes.
-import { fatLine } from "./fatLine.js";
+import { fishLine } from "./fishLine.js";
 import { overRail } from "./netPath.js";
 import * as THREE from "three";
 import { phaseAt, DUR, lineState } from "../liveEvents.js";
@@ -45,7 +45,7 @@ export const OUTFITS = [
 const ROD = {
   beach: { name: "Beachcaster", len: 4.2, col: 0xd6a63c, flex: 0.78, r0: 0.0125, r1: 0.0026, seat: 0.68, g0: 0.018, reel: 1.3,
     handle: [[0, 0.03, 0.018, "seat"], [0.03, 0.62, 0.0165, "grip"], [0.62, 0.74, 0.014, "seat"], [0.74, 0.92, 0.0155, "grip"], [0.92, 0.95, 0.013, "seat"]], guides: [0.36, 0.5, 0.62, 0.72, 0.81, 0.88, 0.94, 0.98] },
-  pier: { name: "Pier rod", len: 3.6, col: 0x2870ec, flex: 1, r0: 0.0108, r1: 0.0022, seat: 0.45, g0: 0.0135, reel: 1,
+  pier: { name: "Pier rod", len: 3.66, col: 0x2870ec, flex: 1, r0: 0.0108, r1: 0.0022, seat: 0.45, g0: 0.0135, reel: 1, whiteTip: 0.93, /* (12 ft, as Aaron's rod: its tip painted white with an orange band) */
     handle: [[0, 0.02, 0.016, "seat"], [0.02, 0.4, 0.0152, "grip"], [0.4, 0.5, 0.0128, "seat"], [0.5, 0.66, 0.0142, "grip"], [0.66, 0.69, 0.0122, "seat"]], guides: [0.25, 0.37, 0.49, 0.6, 0.7, 0.8, 0.89, 0.96] },
   estuary: { name: "Spinning rod", len: 3.0, col: 0x2870ec, flex: 1.05, r0: 0.0098, r1: 0.002, seat: 0.35, g0: 0.012, reel: 0.9,
     handle: [[0, 0.02, 0.015, "seat"], [0.02, 0.3, 0.0145, "cork"], [0.3, 0.4, 0.0125, "seat"], [0.4, 0.52, 0.0138, "cork"], [0.52, 0.55, 0.012, "seat"]], guides: [0.2, 0.33, 0.45, 0.57, 0.68, 0.78, 0.87, 0.95] },
@@ -240,9 +240,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     for (let i = 0; i < NSEG; i++) { const s = (i + 0.5) / NSEG, r = (R.r0 + (R.r1 - R.r0) * Math.pow(s, 0.8)) / R.r0; k.push(s < s0 ? 0 : (1.05 - s) / Math.pow(r, 4)); }
     const tot = k.reduce((a, b) => a + b, 0); let c = 0; for (const x of k) { c += x / tot; out.push(c); } return out;
   })();
-  // the line from the spool up through the rings to the tip
-  const guideLinePos = new Float32Array((GUIDES.length + 2) * 3), guideLineGeo = new THREE.BufferGeometry(); guideLineGeo.setAttribute("position", new THREE.BufferAttribute(guideLinePos, 3));
-  const guideLine = fatLine(guideLinePos, GUIDES.length + 2, { opacity: 0.75, thick: 0.0005, minPx: 1 }); root.add(guideLine); // (the line up the rod through the rings: a fine soft thread, fatLine.js)
+  // the line: one thread from the spool, over the line roller, through every ring and out to the rig or the fish
+  // (fishLine.js), in the world's space
+  const fLine = fishLine(GUIDES.length); world.add(fLine.mesh);
+  const flM = new THREE.Vector3(), flT = new THREE.Vector3(), flE = new THREE.Vector3(), dropAt = new THREE.Vector3(); let spoolInfo = null, spinWas = null, dropHad = false;
+  const flWind = [0, 0], flCur = [0, 0], flO = {};
   // the rest: a tripod on the beach, a rest on the bank, the railing on a pier or quay
   const rest = new THREE.Group(); root.add(rest);
   const mMetal = new THREE.MeshStandardMaterial({ color: 0x8c9196, metalness: 0.7, roughness: 0.35 });
@@ -393,9 +395,6 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   });
 
   // ---- line, rig, fish: in the world ----
-  const LN = 28, linePos = new Float32Array(LN * 3);
-  const lineGeo = new THREE.BufferGeometry(); lineGeo.setAttribute("position", new THREE.BufferAttribute(linePos, 3));
-  const line = fatLine(linePos, LN, { opacity: 0.85, thick: 0.0006, minPx: 1.1 }); world.add(line); // (fatLine.js: a fine thread fading with distance, not a hard hairline)
   const floatRig = venue === "river" || venue === "lake";
   const rig = new THREE.Group(); world.add(rig);
   if (floatRig) { part(new THREE.CylinderGeometry(0.012, 0.02, 0.14, 8), new THREE.MeshStandardMaterial({ color: 0xff5a1f, emissive: 0x401000 }), 0, 0.06, 0, rig); part(new THREE.SphereGeometry(0.025, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffd83a }), 0, 0, 0, rig); }
@@ -611,7 +610,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // down through the release, then back up to stand)
         bodyTo = { x: 0.05 * back * (1 - fwd) - 0.02 * drive, y: -0.012 * back * (1 - fwd) - 0.04 * drive * (1 - settle), z: 0.08 * back * (1 - fwd) - 0.12 * drive * (1 - settle) }; }
       bendT = age < 0.6 ? 0.05 : age < 0.9 ? 0.35 : 0.04;
-      if (age < 0.85) showLine = false;
+      if (age < 0.85) { /* (the lead hangs on its drop under the tip and swings with the wind-up: fishLine.js) */ }
       else if (age < 2.15) { const f = (age - 0.85) / 1.3, tip = tipWorld(); rigAt = tip.clone().lerp(castAt, f); rigAt.y = lerp(tip.y, 0, f) + Math.sin(f * Math.PI) * (castAt.distanceTo(at) * 0.35); slack = 0.05; }
       else { rigAt = castAt.clone(); slack = clamp((age - 2.15) / 0.8, 0.05, 0.6); }
       if (crossed(0.75)) { onSound?.("whoosh", at); feel("release"); }
@@ -1100,24 +1099,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       handle.rotation.x = -sp; u.rotor.rotation.z = sp * 5.2;
       if (u.spool) { u.spool.position.z = u.spoolZ + 0.0055 * (1 - Math.cos(sp)) - 0.004; u.slip = (u.slip || 0) + (u.slipping ? dt * 9 : 0); u.spool.rotation.z = -u.slip; }
       if (u.bail) { const open = ph === "cast" && age < 2.25 ? 1 : 0; u.bailK = (u.bailK ?? 0) + (open - (u.bailK ?? 0)) * Math.min(1, dt * (open ? 14 : 22)); u.bail.rotation.x = -1.95 * u.bailK; } }
-    if (rodKit) {
-      // the modelled rod: bent along the same curve; the line from the line roller (going round with the rotor) through
-      // each ring's centre to the tip ring
-      rodKit.update(pts, frame);
-      reel.updateMatrixWorld(true); root.updateMatrixWorld(true);
-      const u = reel.userData, rol = u.bail.localToWorld(u.roller.clone());
-      guideLinePos.set(toLocal(rol).toArray(), 0);
-      rodKit.ringCentres.forEach((c, i) => guideLinePos.set(c.toArray(), (i + 1) * 3));
-      guideLinePos.set(rodKit.tipRing.toArray(), (GUIDES.length + 1) * 3);
-    } else guideLinePos.set(seat.p.clone().add(new THREE.Vector3(0, -0.072, 0.06).multiplyScalar(R.reel).applyQuaternion(reel.quaternion)).toArray(), 0);
-    if (!rodKit) guides.forEach((gd, i) => {
+    if (rodKit) rodKit.update(pts, frame); // (the modelled rod: bent along the same curve, the rings hung from it)
+    else guides.forEach((gd) => {
       const a = along(gd.s * R.len); gd.g.position.copy(a.p); gd.g.quaternion.copy(frame(a.t));
       const br = rodSegs[Math.min(NSEG - 1, Math.floor(gd.s * NSEG))].r; gd.wrap.scale.set(br * 1.3, 0.024, br * 1.3);
-      guideLinePos.set(a.p.clone().add(new THREE.Vector3(0, -(gd.r * 1.35 + 0.006), 0).applyQuaternion(gd.g.quaternion)).toArray(), (i + 1) * 3);
     });
-    if (!rodKit) guideLinePos.set(pts[NSEG].toArray(), (GUIDES.length + 1) * 3);
-    guideLineGeo.attributes.position.needsUpdate = true; guideLine.userData.sync();
-    guideLine.visible = showLine !== false;
     rest.visible = !walking && (!held || venue === "beach");
 
     // ---- the person: hands on the rod, the reel's handle, the drop net's rope or the fish; braced against a fight,
@@ -1384,25 +1370,74 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     }
     if (ph === "landing") fishPrev = rigAt ? rigAt.clone() : null;
     fishShown = fish.visible;
-    // the line: to the fish's own mouth wherever it's been posed (in the net, at the surface), so the two never part
-    line.visible = showLine;
-    if (showLine) {
-      const tip = toWorld(pts[NSEG]);
-      let end = rigAt ? rigAt.clone() : tip.clone().add(new THREE.Vector3(0, -0.6, 0));
-      if (fish.visible && (ph === "hooked" || ph === "landing")) end = fish.position.clone();
-      if (rigAt && (ph === "waiting" || ph === "bite" || ph === "missed" || (ph === "cast" && age > 2.15))) { end.y = wh(end.x, end.z) - (floatRig ? 0.02 : 0); }
-      const dist = tip.distanceTo(end), sag = slack * dist * 0.12, windX = env.windDir[0] * env.wind * 0.6, windZ = env.windDir[1] * env.wind * 0.6;
-      // under a fish's pull the line is straight and thrums; slack it bellies in the wind
-      const thrum = ph === "hooked" ? 0.012 * (P.tension || 1) * Math.sin(t * 47) : 0;
-      for (let i = 0; i < LN; i++) {
-        const s = i / (LN - 1), sn = Math.sin(Math.PI * s);
-        linePos[i * 3] = lerp(tip.x, end.x, s) + windX * sn * slack + thrum * sn; linePos[i * 3 + 1] = lerp(tip.y, end.y, s) - sag * sn + thrum * sn * Math.sin(s * 9); linePos[i * 3 + 2] = lerp(tip.z, end.z, s) + windZ * sn * slack;
-      }
-      lineGeo.attributes.position.needsUpdate = true; line.userData.sync();
-      rig.position.copy(end);
-      if (floatRig && (ph === "waiting" || ph === "bite" || ph === "missed")) { rig.position.y = wh(end.x, end.z) + (ph === "bite" ? -Math.max(0, Math.sin(age * 6)) * 0.08 : 0); }
-      rig.visible = !(ph === "hooked" || ph === "landing");
-    } else rig.visible = false;
+    // the rings, the tip ring and the reel, in the world's space, for the line to run through (fishLine.js): read here,
+    // once you've been put where you stand this frame (read earlier, the line trailed the rod by your last move)
+    root.updateMatrixWorld(true); reel.updateMatrixWorld(true);
+    const RM = root.matrixWorld, rsc = flM.setFromMatrixScale(RM).x;
+    if (rodKit) {
+      for (let i = 0; i < GUIDES.length; i++) { const r = fLine.rings[i]; r.c.copy(rodKit.ringCentres[i]).applyMatrix4(RM); r.ax.copy(rodKit.ringAxes[i]).transformDirection(RM); r.r = rodKit.ringRadii[i] * rsc; }
+      fLine.tip.c.copy(rodKit.tipRing).applyMatrix4(RM); fLine.tip.ax.copy(rodKit.tipAxis).transformDirection(RM); fLine.tip.r = rodKit.tipSize.r * rsc;
+      const u = reel.userData; u.spool.updateMatrixWorld(true);
+      fLine.reel.roller.copy(u.roller); u.bail.localToWorld(fLine.reel.roller);
+      // the line's layer on the spool (measured once from the model): the line goes down from the roller onto it, at
+      // whatever point of its stroke the spool is
+      if (!spoolInfo) { const bm = u.spool.getObjectByName("braid_blue"); if (bm) { bm.geometry.computeBoundingBox(); const bb = bm.geometry.boundingBox; spoolInfo = { r: Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) / 2, cx: (bb.max.x + bb.min.x) / 2, cy: (bb.max.y + bb.min.y) / 2, z0: bb.min.z, z1: bb.max.z, front: null }; } }
+      if (spoolInfo) {
+        const si = spoolInfo, rl = u.spool.worldToLocal(flT.copy(fLine.reel.roller)), ang = Math.atan2(rl.y - si.cy, rl.x - si.cx);
+        fLine.reel.spool.set(si.cx + Math.cos(ang) * si.r, si.cy + Math.sin(ang) * si.r, clamp(rl.z, si.z0 + 0.001, si.z1 - 0.001)); u.spool.localToWorld(fLine.reel.spool);
+        // (the spool's front: the end towards the butt ring)
+        if (si.front == null) { const zA = u.spool.localToWorld(flT.set(si.cx, si.cy, si.z1)).distanceTo(fLine.rings[0].c), zB = u.spool.localToWorld(flT.set(si.cx, si.cy, si.z0)).distanceTo(fLine.rings[0].c); si.front = zA < zB ? si.z1 : si.z0; }
+        fLine.reel.lip.set(si.cx, si.cy, si.front); u.spool.localToWorld(fLine.reel.lip);
+        fLine.reel.lipR = si.r * flT.setFromMatrixScale(u.spool.matrixWorld).x;
+      } else { fLine.reel.spool.copy(fLine.reel.roller); fLine.reel.lip.copy(fLine.reel.roller); }
+      fLine.reel.bail = u.bailK ?? 0;
+    } else {
+      // (the simple rod, until the modelled one has loaded)
+      const lr = seat.p.clone().add(new THREE.Vector3(0, -0.072, 0.06).multiplyScalar(R.reel).applyQuaternion(reel.quaternion)).applyMatrix4(RM);
+      fLine.reel.roller.copy(lr); fLine.reel.spool.copy(lr); fLine.reel.lip.copy(lr); fLine.reel.bail = 0;
+      guides.forEach((gd, i) => {
+        const a = along(gd.s * R.len);
+        const r = fLine.rings[i]; r.c.copy(a.p).add(new THREE.Vector3(0, -(gd.r * 1.35 + 0.006), 0).applyQuaternion(gd.g.quaternion)).applyMatrix4(RM); r.ax.copy(a.t).transformDirection(RM); r.r = gd.r * rsc;
+      });
+      fLine.tip.c.copy(pts[NSEG]).applyMatrix4(RM); fLine.tip.ax.copy(pts[NSEG]).sub(pts[NSEG - 1]).transformDirection(RM); fLine.tip.r = 0.002;
+    }
+    // the line: to the fish's own mouth wherever it's been posed (in the net, at the surface), so the two never part;
+    // to the rig in the cast and while you wait. How much is out, and how slack, follows what you're doing (fishLine.js)
+    {
+      const freeEnd = showLine && !rigAt && ph === "cast" && age < 0.85;
+      const end = flE;
+      if (rigAt) end.copy(rigAt); else end.copy(fLine.tip.c).y -= 1.2;
+      if (fish.visible && (ph === "hooked" || ph === "landing")) end.copy(fish.position);
+      if (rigAt && (ph === "waiting" || ph === "bite" || ph === "missed" || (ph === "cast" && age > 2.15))) end.y = wh(end.x, end.z) - (floatRig ? 0.02 : 0);
+      // the reel's handle: line wound in, for the glints running through the rings (a spool of 54 mm, about 5.2 turns of
+      // the bail arm to one of the handle: 0.9 m a turn)
+      const spNow = reel.userData.spin || 0, dSp = spinWas == null ? 0 : spNow - spinWas; spinWas = spNow;
+      const wound = Math.max(0, dSp) / (Math.PI * 2) * 0.9, windRate = wound / Math.max(1e-3, dt);
+      const tk = clamp(P.tension ?? load, 0, 1.4);
+      let excess = 0.0015, payout = false, retrieve = 2.5, give = 60, rodSag = 0;
+      if (ph === "cast") { if (age < 2.25) { payout = true; excess = age < 2.15 ? 0.015 : 0.02; } else { retrieve = 3.5; } } // (the bail's open until 2.25 s: then the slack's wound in)
+      else if (ph === "waiting" || ph === "missed") { excess = ph === "missed" ? 0.004 : 0.0015; rodSag = 0.6; }
+      else if (ph === "bite") { excess = 0.0005; retrieve = 4; }
+      else if (ph === "hooked") { const sl = 1 - clamp(tk / 0.9, 0, 1); excess = 0.0025 * sl * sl; retrieve = 0.5 + windRate * 1.1; } // (a fish running at you outpaces the reel: the line bellies until you wind down to it)
+      else if (ph === "landing") { excess = 0.0008; retrieve = 8; }
+      else if (ph === "lost") { excess = 0.004; retrieve = 6; } // (the hook out: the line wound back in, slack)
+      // the drop of a cast: the lead swinging under the tip in the wind-up; released, it flies from where it was
+      if (freeEnd) dropHad = true;
+      else if (dropHad && ph === "cast" && age < 1.05 && rigAt) { const k = ease(seg(age, 0.85, 1.05)); rigAt.lerpVectors(dropAt, rigAt, k); end.copy(rigAt); }
+      else dropHad = false;
+      flWind[0] = (env.windDir?.[0] || 0) * (env.wind || 0) * 2.4; flWind[1] = (env.windDir?.[1] || 0) * (env.wind || 0) * 2.4;
+      flCur[0] = (env.windDir?.[0] || 0) * 0.08; flCur[1] = (env.windDir?.[1] || 0) * 0.08;
+      const o = flO; o.dt = dt; o.t = t; o.show = showLine; o.end = freeEnd ? null : end; o.freeEnd = freeEnd; o.drop = 1.25; o.excess = excess; o.payout = payout; o.retrieve = retrieve; o.give = give; o.wound = wound;
+      o.tension = ph === "hooked" ? tk : ph === "landing" ? 0.6 : 0; o.wind = flWind; o.current = flCur; o.waterY = freeEnd ? null : wh(end.x, end.z); o.rodSag = rodSag;
+      fLine.update(o); // (one options object, reused: nothing made afresh each frame)
+      if (freeEnd) dropAt.copy(fLine.endPos);
+      if (showLine) {
+        rig.position.copy(freeEnd ? fLine.endPos : end);
+        if (floatRig && (ph === "waiting" || ph === "bite" || ph === "missed")) { rig.position.y = wh(end.x, end.z) + (ph === "bite" ? -Math.max(0, Math.sin(age * 6)) * 0.08 : 0); }
+        rig.visible = !(ph === "hooked" || ph === "landing");
+      } else rig.visible = false;
+      if (local && typeof window !== "undefined" && FILM) window.__fdLineProbe = { pts: fLine.points(), contacts: fLine.contacts(), rings: fLine.rings.map((r) => [...r.c.toArray(), r.r, ...r.ax.toArray()]), tip: [...fLine.tip.c.toArray(), fLine.tip.r], spool: fLine.reel.spool.toArray(), roller: fLine.reel.roller.toArray(), lip: fLine.reel.lip.toArray(), bail: fLine.reel.bail, seg: fLine.segment(), L: fLine.length, end: end.toArray(), freeEnd, ph, age };
+    }
     // (once it's been laid out the mat stays on the deck until the next cast: it used to vanish the moment the fish was
     // gone)
     if (matOn) matOut = true;
