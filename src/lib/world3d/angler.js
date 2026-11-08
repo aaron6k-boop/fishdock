@@ -1244,7 +1244,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // letting it go from the drop net: both hands on the rope at the rail, watching it swim out; then hauling the empty
       // net back up, a hand over the other (as landing it). In first person as when landing it: leaning out past the
       // wall's top, both hands on the rope one above the other off to your left, watching the fish go below
-      const E = fp ? fpEye() : null, base = fp ? V3(E.x - 0.5, E.y - 0.3, E.z - 0.36) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
+      const E = fp ? fpEye() : null;
+      // (first person: the hands on the rope just below your eye, on your line of sight down to the net and a little to
+      // the left, so looking down at the fish you see your hands and the rope running from them to it. Out at your left
+      // at eye height, looking straight down put them above the top of the picture: the 8 November recording showed both
+      // forearms hanging in from the top edge, upside down, holding nothing you could see)
+      const netTop = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
+      const sight = netTop ? netTop.clone().sub(E).normalize() : V3(0, -0.8, -0.6).normalize();
+      const base = fp ? E.clone().addScaledVector(sight, 0.72).add(V3(-0.24, 0.04, 0.06)) : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
