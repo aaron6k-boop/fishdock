@@ -69,13 +69,13 @@ test("pulled tighter than its length it's straight; a fish running at you outpac
   const free = line.points().slice(line.segment().free[0]), a = free[0], b = free[free.length - 1], d = sub(b, a), dl = len(d);
   const off = Math.max(...free.map((p) => { const w = sub(p, a), t = dot(w, d) / (dl * dl); return len(sub(w, d.map((v) => v * t))); }));
   assert.ok(off < 0.01, "straight under load (only a hum)");
-  // the fish swims 1.2 m closer at once; the reel winds 1 m/s: a second later there's still slack
-  const L0 = line.length; end.z += 1.2;
-  run(line, { end, excess: 0, retrieve: 1, waterY: -3 }, 60);
-  assert.ok(L0 - line.length <= 1.05 && L0 - line.length > 0.9, `wound in ${(L0 - line.length).toFixed(2)} m in a second`);
-  // but metres of slack aren't left out: past 6% of the distance it's wound down quickly
+  // the fish swims 0.6 m closer at once; the reel winds 1 m/s: the slack's gone in about half a second, no faster
+  const L0 = line.length; end.z += 0.6;
+  run(line, { end, excess: 0, retrieve: 1, waterY: -3 }, 15);
+  assert.ok(L0 - line.length <= 0.27 && L0 - line.length > 0.2, `wound in ${(L0 - line.length).toFixed(2)} m in a quarter second`);
+  // but metres of slack aren't left out: past 3% of the distance it's wound down quickly
   end.z += 8; run(line, { end, excess: 0, retrieve: 1, waterY: -3 }, 120);
-  const d2 = line.tip.c.distanceTo(end); assert.ok(line.length <= d2 * 1.061, `slack ${(line.length / d2 - 1).toFixed(3)}`);
+  const d2 = line.tip.c.distanceTo(end); assert.ok(line.length <= d2 * 1.031, `slack ${(line.length / d2 - 1).toFixed(3)}`);
 });
 
 test("in a cast the line pays out freely and only goes out; the drop hangs the lead under the tip", () => {
@@ -88,4 +88,19 @@ test("in a cast the line pays out freely and only goes out; the drop hangs the l
   assert.ok(line.payRate > 10, "line pouring off the spool");
   line.reel.bail = 1; run(line, { end, payout: true, excess: 0.015 }, 1);
   assert.ok(line.points().flat().every(Number.isFinite));
+});
+
+test("slack wound in quickly stays a smooth curve, never zigzags", () => {
+  const line = fishLine(NR); rod(line);
+  const end = new THREE.Vector3(0, -4, -30);
+  run(line, { end, excess: 0.002, waterY: -4 }, 60);
+  // the fish swims straight at you at 4 m/s for a second and a half (the reel can't keep up: slack, then wound down to)
+  let worst = 0;
+  for (let f = 0; f < 150; f++) {
+    if (f < 90) end.z += 4 / 60;
+    line.update({ dt: 1 / 60, t: f / 60, show: true, end, excess: 0.002, retrieve: 3, waterY: -4, wind: [0.8, 0.3] });
+    const fr = line.points().slice(line.segment().free[0]);
+    for (let i = 1; i < fr.length - 1; i++) { const a = sub(fr[i], fr[i - 1]), b = sub(fr[i + 1], fr[i]); const c = dot(a, b) / (len(a) * len(b) || 1); worst = Math.max(worst, Math.acos(Math.min(1, Math.max(-1, c)))); }
+  }
+  assert.ok(worst < 0.75, `sharpest bend ${(worst * 57.3).toFixed(0)} degrees between pieces`);
 });

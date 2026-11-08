@@ -33,13 +33,29 @@ export function fishLine(nRings, opts = {}) {
   const reel = { spool: v3(), roller: v3(), lip: v3(), axis: v3(), lipR: 0.026, bail: 0 };
   // the free line: positions now and a step ago
   const X = new Float32Array(NF * 3), XP = new Float32Array(NF * 3);
+  const X2 = new Float32Array(NF * 3), XP2 = new Float32Array(NF * 3), CUM = new Float32Array(NF); // (for taking line in or letting it out at the tip)
   const Q = Array.from({ length: nRings + 1 }, v3); // where the line bears in each ring, and the tip ring
   const a = v3(), b = v3(), d = v3(), e1 = v3(), e2 = v3(), A = v3(), endV = v3(), dir = v3(), side = v3();
   let L = 0, inited = false, theta = 0, payRate = 0, feed = 0, lastShow = false;
+  const tipWas = v3(), endWas = v3();
   const endPos = v3();
 
   const reset = (from, to) => {
     for (let i = 0; i < NF; i++) { const s = i / (NF - 1); for (let c = 0; c < 3; c++) X[i * 3 + c] = XP[i * 3 + c] = from.getComponent(c) + (to.getComponent(c) - from.getComponent(c)) * s; }
+  };
+  // line wound in or let out goes in or comes out at the tip ring: the line already out keeps its shape and moves
+  // along itself, rather than every piece shrinking or growing at once (which threw the slack into zigzags)
+  const feedAtTip = (L0, L1) => {
+    if (Math.abs(L1 - L0) < 1e-5) return;
+    CUM[0] = 0; for (let i = 1; i < NF; i++) { const j = i * 3; CUM[i] = CUM[i - 1] + Math.hypot(X[j] - X[j - 3], X[j + 1] - X[j - 2], X[j + 2] - X[j - 1]); }
+    const tot = CUM[NF - 1], s1 = L1 / (NF - 1); X2.set(X); XP2.set(XP);
+    let k = 0;
+    for (let i = 1; i < NF - 1; i++) {
+      const at = Math.max(0, tot - (NF - 1 - i) * s1); // (measured from the tip, keeping each point's distance from the far end)
+      while (k < NF - 2 && CUM[k + 1] < at) k++;
+      const sg = CUM[k + 1] - CUM[k], f = sg > 1e-9 ? Math.min(1, (at - CUM[k]) / sg) : 0, a = k * 3, b = a + 3, j = i * 3;
+      for (let c = 0; c < 3; c++) { X[j + c] = X2[a + c] + (X2[b + c] - X2[a + c]) * f; XP[j + c] = XP2[a + c] + (XP2[b + c] - XP2[a + c]) * f; }
+    }
   };
   const getX = (i, out) => out.set(X[i * 3], X[i * 3 + 1], X[i * 3 + 2]);
   const setX = (i, p) => { X[i * 3] = p.x; X[i * 3 + 1] = p.y; X[i * 3 + 2] = p.z; };
@@ -81,10 +97,30 @@ export function fishLine(nRings, opts = {}) {
       else if (want > L) L = Math.min(want, L + (o.give ?? 60) * dt);
       else L = Math.max(want, L - (o.retrieve ?? 2) * dt);
       // (an angler doesn't leave metres of slack out: past a little, they wind down to it quickly)
-      if (!o.payout) { const cap = dist * (1 + (o.maxSlack ?? 0.06)); if (L > cap) L = Math.max(cap, L - 6 * dt); }
+      if (!o.payout) { const cap = dist * (1 + (o.maxSlack ?? 0.03)); if (L > cap) L = Math.max(cap, L - 6 * dt); }
       L = Math.max(L, dist * 0.999, 0.05);
       payRate = (L - L0) / dt;
+      if (inited && lastShow) feedAtTip(L0, L);
     }
+    // the line goes where its ends go: a fish swimming off or the rod swept round drags the line nearest it most, so
+    // nothing is left behind to fold back on itself
+    if (inited && lastShow) {
+      const last0 = NF - 1, tdx = tc.x - tipWas.x, tdy = tc.y - tipWas.y, tdz = tc.z - tipWas.z;
+      const edx = o.freeEnd ? 0 : endV.x - endWas.x, edy = o.freeEnd ? 0 : endV.y - endWas.y, edz = o.freeEnd ? 0 : endV.z - endWas.z;
+      for (let i = 1; i < last0; i++) {
+        const u = i / last0, wt = 1 - u, we = u, j = i * 3; // (spread evenly: dragging only the near end bunched the line there)
+        const dx = tdx * wt + edx * we, dy = tdy * wt + edy * we, dz = tdz * wt + edz * we;
+        X[j] += dx; X[j + 1] += dy; X[j + 2] += dz; XP[j] += dx; XP[j + 1] += dy; XP[j + 2] += dz;
+      }
+    }
+    // (and if that leaves the line shorter than its length, it falls into one smooth belly, as slack line does, rather
+    // than buckling into zigzags as it's pushed apart)
+    if (inited && lastShow && !o.freeEnd) {
+      let lc = 0; for (let i = 1; i < NF; i++) { const j = i * 3; lc += Math.hypot(X[j] - X[j - 3], X[j + 1] - X[j - 2], X[j + 2] - X[j - 1]); }
+      const D = Math.max(0.01, endV.distanceTo(tc));
+      if (lc < L * 0.995) { const h = Math.sqrt((3 * D * (L - lc)) / 8); for (let i = 1; i < NF - 1; i++) { const dy = -h * Math.sin(Math.PI * i / (NF - 1)); X[i * 3 + 1] += dy; XP[i * 3 + 1] += dy; } }
+    }
+    tipWas.copy(tc); if (!o.freeEnd) endWas.copy(endV);
     inited = true; lastShow = true;
     feed += (o.wound || 0) - Math.max(0, payRate) * dt;
     const seg = L / (NF - 1), last = NF - 1;
@@ -126,6 +162,7 @@ export function fishLine(nRings, opts = {}) {
               const i = pass ? last - 1 - k : k, j = i * 3, jn = j + 3;
               const dx = X[jn] - X[j], dy = X[jn + 1] - X[j + 1], dz = X[jn + 2] - X[j + 2], l = Math.hypot(dx, dy, dz) || 1e-9;
               const fixA = i === 0, fixB = i + 1 === last && !o.freeEnd, wA = fixA ? 0 : fixB ? 1 : 0.5, wB = fixB ? 0 : fixA ? 1 : 0.5;
+              if (l <= seg) continue; // (a line can't push: it only stops itself stretching, so slack never buckles)
               const c = (l - seg) / l;
               X[j] += dx * c * wA; X[j + 1] += dy * c * wA; X[j + 2] += dz * c * wA;
               X[jn] -= dx * c * wB; X[jn + 1] -= dy * c * wB; X[jn + 2] -= dz * c * wB;
