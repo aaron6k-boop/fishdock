@@ -376,6 +376,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   g.setAttribute("aDamp", new THREE.BufferAttribute(wet, 1)); // (the deck's shader: damp along the walls)
+  // rough ground (the cliff's face, the dune): how much of the photographed scrubby ground shows there (soft shader)
+  const ruf = new Float32Array(n * n); for (let k = 0; k < n * n; k++) ruf[k] = bank[k] ? 1 : Math.min(1, dune[k] * 1.4);
+  g.setAttribute("aRuf", new THREE.BufferAttribute(ruf, 1));
   const all = idxDeck.concat(idxSoft);
   g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(all, 1) : new THREE.Uint16BufferAttribute(all, 1));
   g.addGroup(0, idxDeck.length, 0); g.addGroup(idxDeck.length, idxSoft.length, 1);
@@ -387,6 +390,31 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   let axis = 0; { let best = 0; for (const e of walls) { const L = Math.hypot(e[2] - e[0], e[3] - e[1]), mx = (e[0] + e[2]) / 2, mz = (e[1] + e[3]) / 2; const near = spots.length ? Math.min(...spots.map((sp) => Math.hypot(mx - sp.at[0], mz - sp.at[2]))) : 0; const w = L / (1 + near / 60); if (w > best) { best = w; axis = Math.atan2(e[3] - e[1], e[2] - e[0]); } } }
   place.deckWet = pierConcrete(deckMat, quality, axis);
   const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
+  // the cliff's face and the dune: a photographed patch of rough coastal ground (Poly Haven coast_sand_rocks_02, CC0:
+  // scrub, bare earth and stones) at about 6 m a tile, coloured by the ground's own tint (green on the cliff, sandy
+  // ochre on the dune), and its bumps in the lighting, in place of the plain speckle
+  const rufMap = photoTex("ground_rough_diff"), rufNor = photoTex("ground_rough_nor", { srgb: false });
+  if (rufMap) {
+    softMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uRuf = { value: rufMap }; sh.uniforms.uRufN = { value: rufNor };
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; varying float vRuf; varying vec2 vRufUv;")
+        .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vRufUv = uv * 1.33;");
+      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D uRuf, uRufN; varying float vRuf; varying vec2 vRufUv;")
+        .replace("#include <color_fragment>", `#include <color_fragment>
+          if (vRuf > 0.01) {
+            // (two scales of the photograph mixed, so its tile doesn't repeat visibly across a 50 m slope)
+            vec3 r1 = texture2D(uRuf, vRufUv).rgb, r2 = texture2D(uRuf, vRufUv * 0.37 + 0.21).rgb;
+            vec3 ph = mix(r1, r2, 0.35);
+            float lum = dot(ph, vec3(0.3, 0.55, 0.15));
+            // keep the photograph's light and dark (stones, hollows, clumps) but take its colour from the ground's tint
+            vec3 tinted = vColor.rgb * (lum * 2.6) + (ph - lum) * 0.35;
+            diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
+          }`)
+        .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+          if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf)); }`);
+    };
+    softMat.customProgramCacheKey = () => "fdruf1";
+  }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
   place.deckMat = deckMat; // world.js darkens it in the rain
@@ -801,8 +829,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
 // timber: heavy square posts every 2.4 m with two rails (instanced: two draw calls). bars: a steel railing of upright
 // bars between a top and bottom rail, drawn as one see-through panel per run (one draw call, cut out of a texture).
 // Each water cell within 7 m of the land (inside the area local.rocks names) gets a few boulders, heaped highest against
-// the wall (about 2.5 m above the water) and thinning out into the sea; each boulder a lumpy, flat-faced block, tilted
-// and sized at random (1 to 2.2 m), in granite greys. One instanced mesh: one draw call for all of them.
+// the wall (up to about 3 m above the water) and thinning out into the sea; each boulder a lumpy, flat-faced block, tilted
+// and sized at random (1 to 2.2 m), in granite greys. Four instanced meshes (four shapes): four draw calls for all of them.
 function buildRocks(group, cls, xs, n, area, quality) {
   // distance from each water cell to the nearest land, by a breadth-first walk carrying the nearest land cell along
   const src = new Int32Array(n * n).fill(-1), queue = [];
@@ -821,24 +849,55 @@ function buildRocks(group, cls, xs, n, area, quality) {
     for (let q = 0; q < per; q++) {
       const x = x0 + rnd() * cw, z = z0 + rnd() * ch, d = Math.hypot(x - lx, z - lz); if (d > 7 + rnd() * 2) continue;
       const t = Math.min(1, d / 8), size = 1.0 + rnd() * 1.2;
-      spots.push([x, 2.3 * (1 - t * t) - 0.6 + rnd() * 0.4 - size * 0.2, z, size]);
+      spots.push([x, 3.0 * (1 - t * t) - 0.7 + rnd() * 0.5 - size * 0.15, z, size]);
     }
   }
   if (!spots.length) return;
-  // a boulder: a low-poly ball pushed about into flat facets and corners, squashed a little
-  const g = new THREE.IcosahedronGeometry(0.5, 1), p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), f = 0.78 + 0.32 * noise2(x * 3 + 11, z * 3 + y * 2, 1e6, 21); p.setXYZ(i, x * f * 1.1, y * f * 0.8, z * f); }
-  g.deleteAttribute("uv"); const gm = mergeVertices(g); gm.computeVertexNormals();
-  const flat = gm.toNonIndexed(); flat.computeVertexNormals(); // (faceted: hard-edged blocks of quarried granite)
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0.02 });
-  weather(mat, { scale: 1.6, mottle: 0.35, grime: [-0.6, 0.9, 0.45] }); // (darker and weedy where the tide wets them)
-  const mesh = new THREE.InstancedMesh(flat, mat, spots.length), m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
-  spots.forEach(([x, y, z, s], i) => {
-    e.set(rnd() * 6.28, rnd() * 6.28, rnd() * 6.28); q4.setFromEuler(e);
-    m4.compose(new THREE.Vector3(x, y, z), q4, new THREE.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.4), s)); mesh.setMatrixAt(i, m4);
-    const v = 0.1 + rnd() * 0.08; c.setRGB(v, v * 1.01, v * 1.05); mesh.setColorAt(i, c);
+  // four boulder shapes: a ball pushed about at two scales, then split flat on a few planes, as quarried armour stone
+  // is (angular blocks with broken faces, never round pebbles). Each face gets its own projection of the photographed-
+  // style granite (made in source-assets/make_granite.py) at about 1.4 m a tile, so nothing stretches
+  const shapes = [];
+  for (let v = 0; v < 4; v++) {
+    const g = new THREE.IcosahedronGeometry(0.5, 3), p = g.attributes.position, P = new THREE.Vector3();
+    const cuts = Array.from({ length: 4 + v }, () => { const d = new THREE.Vector3(rnd() - 0.5, (rnd() - 0.5) * 1.4, rnd() - 0.5).normalize(); return [d, 0.3 + rnd() * 0.14]; });
+    for (let i = 0; i < p.count; i++) {
+      P.fromBufferAttribute(p, i);
+      const f = 1 + 0.22 * (noise2(P.x * 2.1 + v * 7, P.z * 2.1 + P.y * 1.7, 1e6, 21) - 0.5) + 0.07 * (noise2(P.x * 7 + v, P.y * 7 - P.z * 3, 1e6, 22) - 0.5);
+      P.multiplyScalar(f);
+      for (const [d, k] of cuts) { const t = P.dot(d); if (t > k) P.addScaledVector(d, k - t); }
+      p.setXYZ(i, P.x * 1.15, P.y * 0.82, P.z);
+    }
+    g.deleteAttribute("uv"); g.deleteAttribute("normal");
+    const flat = mergeVertices(g).toNonIndexed(); flat.computeVertexNormals();
+    const fp = flat.attributes.position, fn = flat.attributes.normal, uvs = new Float32Array(fp.count * 2);
+    for (let t = 0; t < fp.count; t += 3) {
+      const nx = Math.abs(fn.getX(t)), ny = Math.abs(fn.getY(t)), nz = Math.abs(fn.getZ(t));
+      for (let q = t; q < t + 3; q++) { const [u, w] = ny > nx && ny > nz ? [fp.getX(q), fp.getZ(q)] : nx > nz ? [fp.getZ(q), fp.getY(q)] : [fp.getX(q), fp.getY(q)]; uvs[q * 2] = u / 1.4 + v * 0.31; uvs[q * 2 + 1] = w / 1.4 + v * 0.17; }
+    }
+    flat.setAttribute("uv", new THREE.BufferAttribute(uvs, 2)); shapes.push(flat);
+  }
+  const map = photoTex("rock_granite_diff"), nor = photoTex("rock_granite_nor", { srgb: false }), rough = photoTex("rock_granite_rough", { srgb: false });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap: nor, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: rough, roughness: 1, metalness: 0 });
+  // wet and darker below the tide line, a band of green-black weed at the water, dry and paler above (world height)
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying float vWY;").replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvWY = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vWY;")
+      .replace("#include <color_fragment>", "#include <color_fragment>\n float wetK = 1.0 - smoothstep(0.1, 1.1, vWY); diffuseColor.rgb *= mix(1.0, 0.45, wetK); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.07, 0.04), (1.0 - smoothstep(-0.4, 0.35, vWY)) * 0.7);")
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.35, 1.0 - smoothstep(0.1, 1.1, vWY));");
+  };
+  mat.customProgramCacheKey = () => "fdrock1";
+  const per = [[], [], [], []]; spots.forEach((sp) => per[Math.floor(rnd() * 4)].push(sp));
+  const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
+  per.forEach((list, v) => {
+    if (!list.length) return;
+    const mesh = new THREE.InstancedMesh(shapes[v], mat, list.length);
+    list.forEach(([x, y, z, s], i) => {
+      e.set((rnd() - 0.5) * 1.2, rnd() * 6.28, (rnd() - 0.5) * 1.2); q4.setFromEuler(e); // (lying roughly flat, as placed stone settles)
+      m4.compose(new THREE.Vector3(x, y, z), q4, new THREE.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.35), s)); mesh.setMatrixAt(i, m4);
+      const t = 0.82 + rnd() * 0.3; c.setRGB(t * (0.98 + rnd() * 0.06), t, t * (0.97 + rnd() * 0.06)); mesh.setColorAt(i, c);
+    });
+    mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
   });
-  mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
 }
 
 function buildFences(group, timber, bars, dTex, wet) {
