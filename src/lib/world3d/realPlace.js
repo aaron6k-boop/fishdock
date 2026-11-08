@@ -312,14 +312,17 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i; if ((cls[k] !== 1 && cls[k] !== 2) || src[k] < 0 || !local.dunes(xs[i], xs[j])) continue;
       const s0 = src[k], d = Math.hypot(xs[i] - xs[s0 % n], xs[j] - xs[Math.floor(s0 / n)]);
-      // up from a few metres in from the edge, a rounded bank about 4 m high, down again behind it
-      // (a low, lumpy dune, 2.5 m at most: at 4 m and rounded it read from the pier as a smooth hill, which East Anglia
-      // hasn't got, and it hid the port behind it)
-      const hum = 0.55 + 0.45 * noise2(xs[i] / 17, xs[j] / 17, 1e6, 7) + 0.35 * (noise2(xs[i] / 5.5, xs[j] / 5.5, 1e6, 8) - 0.5);
-      const rise = Math.min(2.5, Math.max(0, d - 7) * 0.2) * Math.max(0, Math.min(1, (58 - d) / 18)) * Math.max(0.2, hum);
+      // behind the sea wall a steep sandy face climbs to a broad, lumpy top about 8 m up, then falls away behind (Aaron's
+      // photograph from the pier head, April 2018: a tall bank of sand and dry scrub across the harbour mouth, over the
+      // boulders and the white wall; local.duneH sets the height)
+      const top = local.duneH || 2.5;
+      const hum = 0.8 + 0.2 * noise2(xs[i] / 17, xs[j] / 17, 1e6, 7) + 0.18 * (noise2(xs[i] / 5.5, xs[j] / 5.5, 1e6, 8) - 0.5);
+      const rise = Math.min(top, Math.max(0, d - 8) * 0.55) * Math.max(0, Math.min(1, (100 - d) / 26)) * Math.max(0.2, hum);
       h[k] += rise; dune[k] = Math.min(1, rise / 1.1);
     }
   }
+  // ---- rock armour (localDetail.js rocks): dark granite boulders heaped in the water along the foot of a sea wall ----
+  if (local?.rocks) buildRocks(group, cls, xs, n, local.rocks, quality);
   const X = new Float32Array(n * n), Z = new Float32Array(n * n), wet = new Float32Array(n * n);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; X[k] = xs[i]; Z[k] = xs[j]; }
   // the town's rising ground (localDetail.js hill): built-up land and grass climb with it; the grassy face of the slope
@@ -348,7 +351,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const c = COL_OF[bank[k] ? 3 : solid[k] && cls[k] === 0 ? 1 : cls[k]];
     // large, soft variations (no per-vertex checker), and damp concrete near the edge
     const v = 0.9 + noise2(X[k] / 23, Z[k] / 23, 1e6, 3) * 0.14 + noise2(X[k] / 7, Z[k] / 7, 1e6, 4) * 0.06 - wet[k] * 0.12;
-    const g2 = Math.min(1, dune[k] * 1.6) * (0.55 + 0.45 * noise2(X[k] / 3.5, Z[k] / 3.5, 1e6, 9)), GR = [0.36, 0.4, 0.22]; // (marram: a dry grey-green in clumps, the sand showing between)
+    // (the dune: dry, sandy ochre with darker clumps of scrub and marram, the sand showing between, as in the photograph)
+    const sc2 = noise2(X[k] / 6, Z[k] / 6, 1e6, 13), g2 = Math.min(1, dune[k] * 1.6) * (0.6 + 0.4 * noise2(X[k] / 3.5, Z[k] / 3.5, 1e6, 9));
+    const GR = sc2 > 0.62 ? [0.27, 0.27, 0.16] : [0.55, 0.45, 0.28];
     if (bank[k]) { // (the cliff's face: rough grass, darker clumps of scrub and paler worn patches, not a lawn)
       const s1 = noise2(X[k] / 9, Z[k] / 9, 1e6, 11), s2 = noise2(X[k] / 3, Z[k] / 3, 1e6, 12), sc = Math.max(0, Math.min(1, (s1 - 0.55) * 4)), pale = Math.max(0, Math.min(1, (0.35 - s1) * 4)) * 0.5;
       const r = 0.29 - sc * 0.1 + pale * 0.12, gg = 0.36 - sc * 0.1 + pale * 0.08, b = 0.19 - sc * 0.05 + pale * 0.07, f = 0.9 + s2 * 0.18;
@@ -430,6 +435,19 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // face the water: (b - a) turned left is the face's normal; swap the ends if that points at the land
     if ((-(z2 - z1)) * nx + (x2 - x1) * nz < 0) { [x1, z1, x2, z2] = [x2, z2, x1, z1]; }
     const o = wp.length / 3, u0 = run / 2.4, u1 = (run + len) / 2.4; run += len;
+    // (behind the rock armour the sea wall is pale concrete, not steel piling: the white wall in Aaron's photograph)
+    if (local?.rocks && local.rocks((x1 + x2) / 2, (z1 + z2) / 2)) {
+      const c0 = cp.length / 3, T = 2.4, U0 = run / T - len / T, U1 = run / T, vb = (LAND - WALL_BOTTOM) / T;
+      cp.push(x1, WALL_BOTTOM, z1, x2, WALL_BOTTOM, z2, x2, LAND + 0.03, z2, x1, LAND + 0.03, z1);
+      cuv.push(U0, 0, U1, 0, U1, vb, U0, vb); ccol.push(0.62, 0.62, 0.6, 0.62, 0.62, 0.6, 1.02, 1.02, 1, 1.02, 1.02, 1);
+      ci.push(c0, c0 + 1, c0 + 2, c0, c0 + 2, c0 + 3);
+      // and a low white parapet along its top
+      const pc = cp.length / 3, px = nx * 0.1, pz = nz * 0.1;
+      cp.push(x1 + px, LAND, z1 + pz, x2 + px, LAND, z2 + pz, x2 + px, LAND + 0.9, z2 + pz, x1 + px, LAND + 0.9, z1 + pz, x1 - px * 2, LAND + 0.9, z1 - pz * 2, x2 - px * 2, LAND + 0.9, z2 - pz * 2);
+      cuv.push(U0, 0.4, U1, 0.4, U1, 0.4 + 0.9 / T, U0, 0.4 + 0.9 / T, U0, 0.8, U1, 0.8); ccol.push(1.05, 1.05, 1.03, 1.05, 1.05, 1.03, 1.12, 1.12, 1.1, 1.12, 1.12, 1.1, 1.08, 1.08, 1.06, 1.08, 1.08, 1.06);
+      ci.push(pc, pc + 1, pc + 2, pc, pc + 2, pc + 3, pc + 3, pc + 2, pc + 5, pc + 3, pc + 5, pc + 4);
+      continue;
+    }
     // in rows up the wall, so the tide line shows: dark weed and wet piling up to about a metre above the water, then
     // the dry, paler steel
     WALL_ROWS.forEach(([y, c]) => { const v = (y - WALL_BOTTOM) / (LAND - WALL_BOTTOM); wp.push(x1, y, z1, x2, y, z2); wuv.push(u0, v, u1, v); wcol.push(...c, ...c); });
@@ -782,6 +800,47 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
 // ---- the other kinds of fence a photograph shows (localDetail.js): runs of [a, b, deck height] ----
 // timber: heavy square posts every 2.4 m with two rails (instanced: two draw calls). bars: a steel railing of upright
 // bars between a top and bottom rail, drawn as one see-through panel per run (one draw call, cut out of a texture).
+// Each water cell within 7 m of the land (inside the area local.rocks names) gets a few boulders, heaped highest against
+// the wall (about 2.5 m above the water) and thinning out into the sea; each boulder a lumpy, flat-faced block, tilted
+// and sized at random (1 to 2.2 m), in granite greys. One instanced mesh: one draw call for all of them.
+function buildRocks(group, cls, xs, n, area, quality) {
+  // distance from each water cell to the nearest land, by a breadth-first walk carrying the nearest land cell along
+  const src = new Int32Array(n * n).fill(-1), queue = [];
+  for (let k = 0; k < n * n; k++) if (cls[k] !== 0) { src[k] = k; queue.push(k); }
+  for (let qi = 0; qi < queue.length; qi++) {
+    const k = queue[qi], i = k % n, j = (k - i) / n;
+    for (const [ii, jj] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; const q = jj * n + ii; if (src[q] < 0) { src[q] = src[k]; queue.push(q); } }
+  }
+  let seed = 1234567; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const spots = [];
+  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
+    const k = j * n + i; if (cls[k] !== 0 || src[k] < 0) continue;
+    const x0 = xs[i], z0 = xs[j], cw = xs[i + 1] - x0, ch = xs[j + 1] - z0; if (cw > 8 || !area(x0, z0)) continue;
+    const s0 = src[k], lx = xs[s0 % n], lz = xs[Math.floor(s0 / n)];
+    const per = Math.ceil((cw * ch) / 1.3 * (quality < 1 ? 0.5 : 1));
+    for (let q = 0; q < per; q++) {
+      const x = x0 + rnd() * cw, z = z0 + rnd() * ch, d = Math.hypot(x - lx, z - lz); if (d > 7 + rnd() * 2) continue;
+      const t = Math.min(1, d / 8), size = 1.0 + rnd() * 1.2;
+      spots.push([x, 2.3 * (1 - t * t) - 0.6 + rnd() * 0.4 - size * 0.2, z, size]);
+    }
+  }
+  if (!spots.length) return;
+  // a boulder: a low-poly ball pushed about into flat facets and corners, squashed a little
+  const g = new THREE.IcosahedronGeometry(0.5, 1), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), f = 0.78 + 0.32 * noise2(x * 3 + 11, z * 3 + y * 2, 1e6, 21); p.setXYZ(i, x * f * 1.1, y * f * 0.8, z * f); }
+  g.deleteAttribute("uv"); const gm = mergeVertices(g); gm.computeVertexNormals();
+  const flat = gm.toNonIndexed(); flat.computeVertexNormals(); // (faceted: hard-edged blocks of quarried granite)
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0.02 });
+  weather(mat, { scale: 1.6, mottle: 0.35, grime: [-0.6, 0.9, 0.45] }); // (darker and weedy where the tide wets them)
+  const mesh = new THREE.InstancedMesh(flat, mat, spots.length), m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
+  spots.forEach(([x, y, z, s], i) => {
+    e.set(rnd() * 6.28, rnd() * 6.28, rnd() * 6.28); q4.setFromEuler(e);
+    m4.compose(new THREE.Vector3(x, y, z), q4, new THREE.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.4), s)); mesh.setMatrixAt(i, m4);
+    const v = 0.1 + rnd() * 0.08; c.setRGB(v, v * 1.01, v * 1.05); mesh.setColorAt(i, c);
+  });
+  mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
+}
+
 function buildFences(group, timber, bars, dTex, wet) {
   const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
   if (timber.length) {
