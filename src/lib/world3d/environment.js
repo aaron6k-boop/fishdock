@@ -216,7 +216,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   });
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
   wU.uKind.value = kind;
-  wU.uWater.value.set([0x21433f, 0x21433f, 0x34463a, 0x2b3d33, 0x17302c][[0, 0, 1, 2, 3][kind] ?? 0]); // (the sea: the grey-green of British coastal water, carrying silt, not a clear tropical teal)
+  // (the sea: the grey-green of British coastal water, carrying silt, not a clear tropical teal. The water's shader
+  // works in display colours, so the colour goes in as written: set as an sRGB colour it was decoded to linear light
+  // first, about a quarter as bright, and the sea read near-black under a bright sky)
+  wU.uWater.value.setHex([0x2a3a34, 0x2a3a34, 0x3a4234, 0x323a30, 0x22302b][[0, 0, 1, 2, 3][kind] ?? 0], THREE.LinearSRGBColorSpace);
   const wGeo = new THREE.PlaneGeometry(1600, 1600, LQ.waterGrid, LQ.waterGrid);
   wGeo.rotateX(-Math.PI / 2);
   // denser near the middle (the camera), so near waves are smooth and far ones cheap
@@ -362,19 +365,19 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // shallows by the land are lighter and greener
         // (looking straight down it's the water's own colour lit through the silt, a murky grey-green you can see into,
         // not near-black: at .72 of the base the sea under the railing read as a black hole on a phone)
-        vec3 body = mix(uWater*1.25 + vec3(0., .012, .01), uWater*1.02 + vec3(.022, .026, .018), pow(clamp(v.y, 0., 1.), .6));
+        vec3 body = mix(uWater*1.08, uWater*.6 + vec3(.014, .01, .002), pow(clamp(v.y, 0., 1.), .6));
         // and the turbidity's own soft light, varying slowly (silt clouds and the swell's shade), more of it close by
-        body += vec3(.016, .020, .014)*(.6 + .8*noise(p*.07 + uTime*.02))*(1. - smoothstep(4., 60., dist));
-        body = mix(body, uWater*1.55 + vec3(.012, .03, .018), shallow*.7)*lit*dim;
+        body += vec3(.016, .017, .012)*(.4 + .8*noise(p*.07 + uTime*.02))*(1. - smoothstep(4., 60., dist));
+        body = mix(body, uWater*1.3 + vec3(.01, .03, .015), shallow*.7)*lit*dim;
         // under a grey sky the North Sea goes a lighter grey-green (the cloud's light scattered back out of the silty
         // water), not the dark teal of a clear day
-        { float ovs = smoothstep(.55, 1., uCloud); body = mix(body, vec3(.11, .14, .135)*lit, ovs*.55); }
+        { float ovs = smoothstep(.55, 1., uCloud); body = mix(body, vec3(.2, .235, .22)*lit, ovs*.5); }
         // light through the thin water at the crests, more so looking towards the sun
         float crest = smoothstep(-.05, .4, h)*(1. - uNight);
         float toward = pow(max(dot(-v, normalize(vec3(uSunDir.x, 0., uSunDir.z))), 0.), 3.);
         body += vec3(.010, .042, .036)*crest*(.5 + 1.1*toward)*lit*dim;
         // close below you, light comes back up out of the water: the foreground isn't a black pool
-        body *= 1. + .35*(1. - smoothstep(3., 26., dist));
+        body *= 1. + .15*(1. - smoothstep(3., 26., dist));
         body += vec3(.004, .008, .014)*uNight;
         // the dark of a wall or bank mirrored close to it
         refl = mix(refl, vec3(.16, .15, .13)*lit, (1. - smoothstep(0., 7., sd))*.45*(1. - rd.y));
@@ -663,7 +666,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       SCATTER.dir.x = st.sunDir.x; SCATTER.dir.y = st.sunDir.y; SCATTER.dir.z = st.sunDir.z;
       SCATTER.col.x = sc[0] * 0.55 * vis; SCATTER.col.y = sc[1] * 0.5 * vis; SCATTER.col.z = sc[2] * 0.4 * vis; wU.uFdSun.value.set(SCATTER.col.x, SCATTER.col.y, SCATTER.col.z); }
     // (the environment map's lower half: the dark of the sea)
-    envSky.uniforms.uEnvGround.value.copy(wU.uWater.value).multiplyScalar(0.8 * (st.day + st.dusk * 0.5 + st.night * 0.08));
+    envSky.uniforms.uEnvGround.value.copy(wU.uWater.value).convertSRGBToLinear().multiplyScalar(0.8 * (st.day + st.dusk * 0.5 + st.night * 0.08));
     // ---- lamps after dark: the pools by the anglers, the lanterns and windows, their streaks on the water ----
     const lampOn = look.lampOn;
     // (switched off altogether by day: an unlit light still costs every pixel it might reach)
