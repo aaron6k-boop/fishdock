@@ -17,7 +17,7 @@ export const LOCAL = {
     // across the harbour mouth: the bank north of the river is a low dune grown over with marram grass (photographs),
     // kept clear of the road and the buildings behind it
     dunes: (x, z) => z < -85 && z > -175 && x > -140 && x < 80,
-    // (Aaron's photograph from the pier head: across the harbour mouth the dune is a tall bank, about 8 m, estimated)
+    // (the pier-head photograph Aaron shared, John Ellis, April 2018: across the harbour mouth the dune is a tall bank, about 8 m, estimated)
     duneH: 8,
     // and along its foot a bank of dark granite boulders in the water, from the end of the north pier round to the sea
     rocks: (x, z) => z < -70 && z > -190 && x > -40 && x < 90,

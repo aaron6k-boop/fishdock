@@ -312,8 +312,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
       const k = j * n + i; if ((cls[k] !== 1 && cls[k] !== 2) || src[k] < 0 || !local.dunes(xs[i], xs[j])) continue;
       const s0 = src[k], d = Math.hypot(xs[i] - xs[s0 % n], xs[j] - xs[Math.floor(s0 / n)]);
-      // behind the sea wall a steep sandy face climbs to a broad, lumpy top about 8 m up, then falls away behind (Aaron's
-      // photograph from the pier head, April 2018: a tall bank of sand and dry scrub across the harbour mouth, over the
+      // behind the sea wall a steep sandy face climbs to a broad, lumpy top about 8 m up, then falls away behind (the pier-head
+      // photograph Aaron shared, John Ellis, April 2018, on Google Maps: a tall bank of sand and dry scrub across the harbour mouth, over the
       // boulders and the white wall; local.duneH sets the height)
       const top = local.duneH || 2.5;
       const hum = 0.8 + 0.2 * noise2(xs[i] / 17, xs[j] / 17, 1e6, 7) + 0.18 * (noise2(xs[i] / 5.5, xs[j] / 5.5, 1e6, 8) - 0.5);
@@ -352,7 +352,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // large, soft variations (no per-vertex checker), and damp concrete near the edge
     const v = 0.9 + noise2(X[k] / 23, Z[k] / 23, 1e6, 3) * 0.14 + noise2(X[k] / 7, Z[k] / 7, 1e6, 4) * 0.06 - wet[k] * 0.12;
     // (the dune: dry, sandy ochre with darker clumps of scrub and marram, the sand showing between, as in the photograph)
-    // (Aaron's photograph from the pier head: the steep face is bare, bright sand, a few clumps clinging to it; the scrub
+    // (the April 2018 photograph from the pier head that Aaron shared: the steep face is bare, bright sand, a few clumps clinging to it; the scrub
     // and marram grow thick along the top. Drawn as one olive tint all over, it read as a grassy hill, not a dune)
     const sc2 = noise2(X[k] / 6, Z[k] / 6, 1e6, 13), g2 = Math.min(1, dune[k] * 2.5);
     let GR = c;
@@ -476,7 +476,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // face the water: (b - a) turned left is the face's normal; swap the ends if that points at the land
     if ((-(z2 - z1)) * nx + (x2 - x1) * nz < 0) { [x1, z1, x2, z2] = [x2, z2, x1, z1]; }
     const o = wp.length / 3, u0 = run / 2.4, u1 = (run + len) / 2.4; run += len;
-    // (behind the rock armour the sea wall is pale concrete, not steel piling: the white wall in Aaron's photograph)
+    // (behind the rock armour the sea wall is pale concrete, not steel piling: the white wall in the pier-head photograph)
     if (local?.rocks && local.rocks((x1 + x2) / 2, (z1 + z2) / 2)) {
       const c0 = cp.length / 3, T = 2.4, U0 = run / T - len / T, U1 = run / T, vb = (LAND - WALL_BOTTOM) / T;
       cp.push(x1, WALL_BOTTOM, z1, x2, WALL_BOTTOM, z2, x2, LAND + 0.03, z2, x1, LAND + 0.03, z1);
