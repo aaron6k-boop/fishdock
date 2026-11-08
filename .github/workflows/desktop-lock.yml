@@ -25,7 +25,7 @@ jobs:
         run: |
           echo "pinned electron:          $(node -p "require('./package.json').devDependencies.electron")"
           echo "newest electron:          $(npm view electron version)"
-          echo "newest electron 33.x:     $(npm view electron@33 version | tail -1)"
+          echo "newest electron 45.x:     $(npm view electron@45 version | tail -1)"
           echo "pinned electron-builder:  $(node -p "require('./package.json').devDependencies['electron-builder']")"
           echo "newest electron-builder:  $(npm view electron-builder version)"
           echo "lockfile packages:        $(node -p "Object.keys(require('./package-lock.json').packages).length - 1")"

@@ -15,5 +15,5 @@ window, asking Windows for the high-performance graphics card.
   it chose), not a promise.
 - The website shows its developer diagnostics (frame times, draw calls, memory, a benchmark of every preset) when
   it is running inside the launcher.
-- Dependencies pinned by lockfile; the installer is unsigned (SmartScreen warns on first run) and its SHA-256 is
+- Electron 45 (current, with all published security fixes) and electron-builder 26, pinned by lockfile; the installer is unsigned (SmartScreen warns on first run) and its SHA-256 is
   published next to it.
