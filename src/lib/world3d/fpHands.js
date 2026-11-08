@@ -189,7 +189,16 @@ function detailMaps() {
     return { normal: T(c), rough: T(r) };
   };
   // skin: small pores, a soft grain and fine creases running across (oilier, shinier between them)
-  const skin = make(256, (x, y) => 0.5 + (hsh(x >> 1, y >> 1) > 0.93 ? -0.35 : 0) + 0.06 * hsh(x, y) + 0.12 * Math.sin((y + Math.sin(x * 0.07) * 6) * 0.42) * (hsh(x >> 4, y >> 3) > 0.5 ? 1 : 0.3), 2.2, (x, y, h) => 0.62 + 0.06 * (h - 0.5) + 0.06 * hsh(x >> 4, y >> 4));
+  // (512 px, finer and more varied: round pores of two sizes in clusters, a soft cellular grain, and fine crossing
+  // creases in two directions as the back of a hand has them, broken into short lengths; at 256 with one set of
+  // straight creases it read as a stamped pattern, and the hand as smooth plastic)
+  const vn = (x, y, s) => { const xi = Math.floor(x / s), yi = Math.floor(y / s), fx = x / s - xi, fy = y / s - yi, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy), w = 512 / s, a = hsh(xi % w, yi % w), b = hsh((xi + 1) % w, yi % w), c = hsh(xi % w, (yi + 1) % w), d = hsh((xi + 1) % w, (yi + 1) % w); return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy; };
+  const skin = make(512, (x, y) => {
+    const pore = hsh(x >> 1, y >> 1) > 0.94 - 0.05 * vn(x, y, 32) ? -0.3 : 0, pore2 = hsh(x >> 2, y >> 2) > 0.985 ? -0.25 : 0;
+    const grain = 0.08 * vn(x, y, 4) + 0.05 * vn(x, y, 8);
+    const c1 = Math.sin((y + 5 * vn(x, y, 64)) * 0.36) * (vn(x, y, 24) > 0.5 ? 1 : 0.25), c2 = Math.sin((x * 0.7 + y * 0.7 + 7 * vn(x + 99, y, 64)) * 0.29) * (vn(x + 50, y, 20) > 0.6 ? 1 : 0.2);
+    return 0.5 + pore + pore2 + grain - 0.09 * Math.max(0, -c1) ** 0.5 - 0.06 * Math.max(0, -c2) ** 0.5;
+  }, 2.6, (x, y, h) => 0.58 + 0.12 * (0.5 - h) + 0.08 * vn(x, y, 48));
   // softshell fabric: a fine twill
   const cloth = make(64, (x, y) => 0.5 + 0.35 * Math.sin(((x + y) % 8) / 8 * Math.PI * 2) * ((x >> 2) % 2 ? 1 : 0.6), 1.6, (x, y, h) => 0.72 + 0.12 * h);
   DETAIL = { skin, cloth };
@@ -242,8 +251,8 @@ function realArms(scene, { gloves, skinHex }) {
     // skin: the model's colour with fine pores and creases over it (a normal and a roughness map, tiled), a little oilier
     // than before (real skin has a soft sheen, not a matte plastic look)
     // (a little less shine than before, and that shine broken up: the even waxy sheen was much of the plastic look)
-    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 0.66, metalness: 0, specularIntensity: 0.5, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.3, 0.3) }); // (a soft sheen broken up by the pores, and the pores and creases visible: fully matte, it read as clay)
-    if (D && !gloves) { D.skin.normal.repeat.set(30, 30); D.skin.rough.repeat.set(9, 9); }
+    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 0.62, metalness: 0, specularIntensity: 0.45, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.5, 0.5), sheen: 0, sheenRoughness: 0.55, sheenColor: new THREE.Color(0.9, 0.55, 0.45) }); // (sheen: the soft, slightly velvety edge light of skin, with the fine hairs and the outer layer scattering it) // (a soft sheen broken up by the pores, and the pores and creases visible: fully matte, it read as clay)
+    if (D && !gloves) { D.skin.normal.repeat.set(26, 26); D.skin.rough.repeat.set(11, 11); }
     if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
     else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); const lum = mt.color.r * 0.3 + mt.color.g * 0.59 + mt.color.b * 0.11; mt.color.lerp(new THREE.Color(lum, lum, lum), 0.14); } // (a touch less saturated: the model's tone read orange under the warm light) // (your skin tone over the model's)
     // light through the skin at its edges (a warm glow where the fingers turn away from you, as real skin does: a cheap
@@ -262,7 +271,11 @@ function realArms(scene, { gloves, skinHex }) {
               vec2 bq = vMapUv * 38.0; float bn = fract(sin(dot(floor(bq), vec2(12.9898, 78.233))) * 43758.5453);
               vec2 bf = fract(bq); bf = bf * bf * (3.0 - 2.0 * bf);
               float b2 = mix(mix(bn, fract(sin(dot(floor(bq) + vec2(1, 0), vec2(12.9898, 78.233))) * 43758.5453), bf.x), mix(fract(sin(dot(floor(bq) + vec2(0, 1), vec2(12.9898, 78.233))) * 43758.5453), fract(sin(dot(floor(bq) + vec2(1, 1), vec2(12.9898, 78.233))) * 43758.5453), bf.x), bf.y);
-              diffuseColor.rgb *= mix(vec3(1.0), vec3(1.04, 0.95, 0.94), (b2 - 0.5) * 0.9);
+              diffuseColor.rgb *= mix(vec3(1.0), vec3(1.05, 0.94, 0.93), (b2 - 0.5) * 1.1);
+              // (fine freckling and the faint blue-green of veins under thin skin, in soft, broken lines)
+              vec2 vq = vMapUv * vec2(90.0, 30.0); float vv = abs(sin(vq.x + sin(vq.y * 1.7) * 1.3 + b2 * 3.0));
+              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.92, 1.02), smoothstep(0.12, 0.0, vv) * 0.35 * (1.0 - cr));
+              float fr = fract(sin(dot(floor(vMapUv * 700.0), vec2(41.3, 289.1))) * 9137.7); diffuseColor.rgb *= 1.0 - step(0.985, fr) * 0.12;
             #endif
           }`}`)
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
@@ -275,7 +288,7 @@ function realArms(scene, { gloves, skinHex }) {
         reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.42, 0.32) * rim * 0.15"};
         ${gloves ? "" : "reflectedLight.directDiffuse *= vec3(1.0, 0.96, 0.93);"} }`);
     };
-    mt.customProgramCacheKey = () => "fdskin4" + (gloves ? "g" : "");
+    mt.customProgramCacheKey = () => "fdskin5" + (gloves ? "g" : "");
   });
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);

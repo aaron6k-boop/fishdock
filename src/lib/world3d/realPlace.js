@@ -352,8 +352,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // large, soft variations (no per-vertex checker), and damp concrete near the edge
     const v = 0.9 + noise2(X[k] / 23, Z[k] / 23, 1e6, 3) * 0.14 + noise2(X[k] / 7, Z[k] / 7, 1e6, 4) * 0.06 - wet[k] * 0.12;
     // (the dune: dry, sandy ochre with darker clumps of scrub and marram, the sand showing between, as in the photograph)
-    const sc2 = noise2(X[k] / 6, Z[k] / 6, 1e6, 13), g2 = Math.min(1, dune[k] * 1.6) * (0.6 + 0.4 * noise2(X[k] / 3.5, Z[k] / 3.5, 1e6, 9));
-    const GR = sc2 > 0.62 ? [0.27, 0.27, 0.16] : [0.55, 0.45, 0.28];
+    const sc2 = noise2(X[k] / 6, Z[k] / 6, 1e6, 13), g2 = Math.min(1, dune[k] * 2.5);
+    const GR = sc2 > 0.62 ? [0.3, 0.28, 0.15] : [0.58, 0.44, 0.24];
     if (bank[k]) { // (the cliff's face: rough grass, darker clumps of scrub and paler worn patches, not a lawn)
       const s1 = noise2(X[k] / 9, Z[k] / 9, 1e6, 11), s2 = noise2(X[k] / 3, Z[k] / 3, 1e6, 12), sc = Math.max(0, Math.min(1, (s1 - 0.55) * 4)), pale = Math.max(0, Math.min(1, (0.35 - s1) * 4)) * 0.5;
       const r = 0.29 - sc * 0.1 + pale * 0.12, gg = 0.36 - sc * 0.1 + pale * 0.08, b = 0.19 - sc * 0.05 + pale * 0.07, f = 0.9 + s2 * 0.18;
@@ -407,7 +407,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             vec3 ph = mix(r1, r2, 0.35);
             float lum = dot(ph, vec3(0.3, 0.55, 0.15));
             // keep the photograph's light and dark (stones, hollows, clumps) but take its colour from the ground's tint
-            vec3 tinted = vColor.rgb * (lum * 2.6) + (ph - lum) * 0.35;
+            vec3 tinted = vColor.rgb * (lum * 2.2) + (ph - lum) * 0.3;
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
         .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>

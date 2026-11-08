@@ -20,12 +20,23 @@ import { OutputPass } from "./vendor/three-post/postprocessing/OutputPass.js";
 // little noise so the sky's long gradients don't band ----
 export const GradeShader = {
   name: "FishDockGrade",
-  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.22 }, uSat: { value: 0.94 }, uVignette: { value: 0.3 }, uSeed: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.22 }, uSat: { value: 0.94 }, uVignette: { value: 0.3 }, uSeed: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 1024) }, uSharp: { value: 0.5 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed, uSharp; uniform vec2 uTexel; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed)*43758.5453); }
     void main(){
       vec4 t = texture2D(tDiffuse, vUv); vec3 c = t.rgb;
+      // contrast-adaptive sharpening (after AMD's CAS): each pixel pushed away from its four neighbours, less where
+      // they already differ a lot (edges stay clean, no halos) and more on soft detail: textures, the town, the rigging,
+      // read crisp rather than slightly blurred by the antialiasing and the texture filtering
+      if (uSharp > 0.) {
+        vec3 a = texture2D(tDiffuse, vUv + vec2(0., -uTexel.y)).rgb, b = texture2D(tDiffuse, vUv + vec2(-uTexel.x, 0.)).rgb;
+        vec3 d2 = texture2D(tDiffuse, vUv + vec2(uTexel.x, 0.)).rgb, e = texture2D(tDiffuse, vUv + vec2(0., uTexel.y)).rgb;
+        vec3 mn = min(c, min(min(a, b), min(d2, e))), mx = max(c, max(max(a, b), max(d2, e)));
+        vec3 amp = sqrt(clamp(min(mn, 1. - mx)/max(mx, 1e-4), 0., 1.));
+        vec3 w = -amp*mix(.125, .2, uSharp);
+        c = clamp((c + (a + b + d2 + e)*w)/(1. + 4.*w), 0., 1.);
+      }
       // contrast round mid grey, kept off the ends so nothing clips
       c = mix(c, smoothstep(0., 1., c), uContrast - 1.);
       float l = dot(c, vec3(.2126, .7152, .0722)); c = max(mix(vec3(l), c, uSat), 0.);
@@ -92,6 +103,7 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   const grade = new ShaderPass(GradeShader);
   composer.addPass(grade);
   setAO(level >= 3 ? 2 : level >= 2 ? 1 : 0);
+  grade.uniforms.uTexel.value.set(1 / (size.x * pr), 1 / (size.y * pr));
   let seed = 0, samples = 4;
   return {
     level,
@@ -109,7 +121,10 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
       for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = n; t.dispose(); }
     },
     render() { grade.uniforms.uSeed.value = (seed = (seed + 1) % 97); composer.render(); },
-    setSize(w, h) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); },
+    setSize(w, h) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); const r = renderer.getPixelRatio(); grade.uniforms.uTexel.value.set(1 / (w * r), 1 / (h * r)); },
+    /** sharpening, 0..1 (Settings → Graphics) */
+    setSharp(v) { grade.uniforms.uSharp.value = Math.max(0, Math.min(1, +v || 0)); },
+    get sharp() { return grade.uniforms.uSharp.value; },
     /** frames running late even at the lowest sharpness: drop the ambient occlusion first */
     dropAO() { if (ao?.enabled) { ao.enabled = false; aoLevel = 0; return true; } return false; },
     dispose() { composer.passes.forEach((p) => p.dispose?.()); composer.dispose(); },
