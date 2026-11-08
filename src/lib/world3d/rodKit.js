@@ -6,7 +6,8 @@
 //   - hangs a guide at each ring position under the bending blank, square to it, with its thread whippings either side,
 //     and the tip ring on the tip (instanced: one draw per material however many guides);
 //   - fits the reel's moving parts: the rotor and its bail, the spool, the handle on its axle.
-// The line then runs from the reel's line roller through each guide's ring centre to the tip ring (lineThrough).
+// The line (fishLine.js) runs from the spool over the line roller and through each ring (ringCentres, ringAxes,
+// ringRadii: it bears on whichever side of a ring the bent rod pulls it to) and the tip ring.
 // Materials are physically based, with small drawn maps (a fine carbon scrim, EVA foam, brushed metal, braid), and take
 // the scene's environment map for their reflections, so they follow the light, rain, dusk and night like everything else.
 import * as THREE from "three";
@@ -60,12 +61,30 @@ function rodMaterials() {
     reel_graphite: new THREE.MeshPhysicalMaterial({ color: 0x1e2024, metalness: 0.05, roughness: 0.5, clearcoat: 0.45, clearcoatRoughness: 0.3 }), // (moulded graphite body, a little gloss)
     reel_brushed: std({ color: 0x9a9fa6, metalness: 1, roughness: 0.3, roughnessMap: brushed }),
     rubber: std({ color: 0x18181a, metalness: 0, roughness: 0.82, normalMap: foam, normalScale: new THREE.Vector2(0.3, 0.3) }),
-    braid_blue: std({ color: 0x31589f, metalness: 0, roughness: 0.62, normalMap: braid, normalScale: new THREE.Vector2(0.6, 0.6) }),
+    // (the spool full of blue line: many turns of it read a deep blue, though a single strand in the air is pale)
+    braid_blue: std({ color: 0x2a63c4, metalness: 0, roughness: 0.42, normalMap: braid, normalScale: new THREE.Vector2(0.5, 0.5) }),
     thread_blue: std({ color: 0x24499a, metalness: 0.1, roughness: 0.28 }),
+    // (the reel as Aaron's reference: piano-black body, polished silver side plates, chrome trim)
+    reel_black: new THREE.MeshPhysicalMaterial({ color: 0x0d0e10, metalness: 0.1, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08 }),
+    reel_silver: std({ color: 0xc0c5cb, metalness: 1, roughness: 0.2, roughnessMap: brushed }),
+    // (the reel seat's threaded barrel and lock nut: black, a little sheen)
+    seat_black: std({ color: 0x141517, metalness: 0.35, roughness: 0.42, roughnessMap: brushed }),
   };
   if (scrim) { MATS.rod_carbon.normalMap.repeat.set(2, 1); }
   return MATS;
 }
+
+// ---- which finish each modelled part takes (by its name in rodkit.glb), where it isn't the model's own: the rod and
+// reel as Aaron's reference photo has them. Silver guide frames round dark ceramic rings; a chrome-hooded black screw
+// seat; a gloss black reel with polished silver side plates, chrome trim, a chrome crank and a black barrel knob ----
+const FINISH = [
+  [/^(guide_frame|guide_foot|guide_leg|tiptop_frame|tiptop_tube)/, "chrome"],
+  [/^(reel_body|reel_back|reel_nose|reel_foot|reel_stem|rotor_cup|spool_body|spool_skirt|drag_knob)/, "reel_black"],
+  [/^reel_cover/, "reel_silver"],
+  [/^(reel_trim|rotor_arm|rotor_trim|spool_trim|drag_trim|crank_arm|crank_hub|crank_cap|winding_check)/, "chrome"],
+  [/^(seat_barrel|seat_locknut|seat_slot)/, "seat_black"],
+];
+const finishOf = (node, mat) => { for (const [re, m] of FINISH) if (re.test(node)) return m; return mat; };
 
 // ---- a node's meshes merged, one mesh per material, in the node's own frame (children named in `skip` left out) ----
 function mergeOwn(node, skip = new Set()) {
@@ -83,7 +102,7 @@ function mergeOwn(node, skip = new Set()) {
       // texture coordinates round the part's own axis where the model has none (for the foam and the brushing)
       if (src.attributes.uv) g.setAttribute("uv", src.attributes.uv);
       else { const p = g.attributes.position, uv = new Float32Array(p.count * 2); for (let i = 0; i < p.count; i++) { uv[i * 2] = Math.atan2(p.getY(i), p.getX(i)) / (Math.PI * 2) + 0.5; uv[i * 2 + 1] = p.getZ(i) * 25; } g.setAttribute("uv", new THREE.BufferAttribute(uv, 2)); }
-      const name = (o.material?.name || "chrome").replace(/\.\d+$/, "");
+      const name = finishOf(o.name || "", (o.material?.name || "chrome").replace(/\.\d+$/, ""));
       if (!by.has(name)) by.set(name, []); by.get(name).push(g);
     }
     for (const c of o.children) visit(c);
@@ -142,22 +161,26 @@ export function buildRod(scene, R) {
   // letters along the top of the blank (a made-up maker: no real brand). Drawn in the blank's own shader from where each
   // point of the tube is (how far along, which way round), so it bends with the rod and costs one lookup
   { const lab = new Float32Array(base.length / 3 * 2); for (let i = 0; i < lab.length / 2; i++) { lab[i * 2] = base[i * 3 + 2]; lab[i * 2 + 1] = Math.atan2(base[i * 3 + 1], base[i * 3]); } geo.setAttribute("aLab", new THREE.BufferAttribute(lab, 2)); }
-  const hEnd = R.handle[R.handle.length - 1][1], S0 = (hEnd + 0.05) / R.len, S1 = (hEnd + 0.26) / R.len;
+  const hEnd = R.handle[R.handle.length - 1][1], S0 = (hEnd + 0.05) / R.len, S1 = (hEnd + 0.26) / R.len, TW0 = R.whiteTip ?? 2;
   if (typeof document !== "undefined") {
     const c = document.createElement("canvas"); c.width = 1024; c.height = 96; const g = c.getContext("2d");
     g.fillStyle = "rgba(0,0,0,0)"; g.fillRect(0, 0, 1024, 96);
     g.fillStyle = "rgba(49,88,159,0.95)"; g.fillRect(0, 40, 64, 16); // (a band in the rod's trim colour)
     g.fillStyle = "rgba(225,229,233,0.92)"; g.font = "bold 46px Arial, sans-serif"; g.textBaseline = "middle"; g.fillText("SEAFORM", 86, 50);
-    g.font = "38px Arial, sans-serif"; g.fillStyle = "rgba(200,206,212,0.85)"; g.fillText("SURF PRO  13'0\"  4-6 oz  100-170 g", 330, 50);
+    g.font = "38px Arial, sans-serif"; g.fillStyle = "rgba(200,206,212,0.85)"; g.fillText("PIER PRO  12'0\"  4-8 oz  113-227 g", 330, 50);
     const lt = new THREE.CanvasTexture(c); lt.colorSpace = THREE.SRGBColorSpace; lt.anisotropy = 8;
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.uLab = { value: lt };
       sh.vertexShader = "attribute vec2 aLab;\nvarying vec2 vLab;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLab = aLab;");
       sh.fragmentShader = "uniform sampler2D uLab;\nvarying vec2 vLab;\n" + sh.fragmentShader.replace("#include <map_fragment>", `#include <map_fragment>
         { float u = (vLab.x - ${S0.toFixed(5)})/${(S1 - S0).toFixed(5)}, a = (vLab.y - 1.5708)/0.85;
-          if (u > 0. && u < 1. && abs(a) < 1.) { vec4 t = texture2D(uLab, vec2(u, .5 - a*.5)); diffuseColor.rgb = mix(diffuseColor.rgb, t.rgb, t.a); } }`);
+          if (u > 0. && u < 1. && abs(a) < 1.) { vec4 t = texture2D(uLab, vec2(u, .5 - a*.5)); diffuseColor.rgb = mix(diffuseColor.rgb, t.rgb, t.a); } }
+        // the top of the tip painted white, with an orange band just under the tip ring (to see bites against the sea
+        // or the sky, as Aaron's rod has)
+        { float s = vLab.x, w = smoothstep(${TW0.toFixed(4)}, ${(TW0 + 0.003).toFixed(4)}, s)*(1. - smoothstep(.9955, .9975, s)), o = smoothstep(.976, .978, s)*(1. - smoothstep(.991, .993, s))*${TW0 < 1 ? "1." : "0."};
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.62, .64, .66), w); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.95, .16, .02), o); }`);
     };
-    mat.customProgramCacheKey = () => "fdblank1";
+    mat.customProgramCacheKey = () => "fdblank2";
   }
   const blank = new THREE.Mesh(geo, mat); blank.castShadow = true; blank.frustumCulled = false; group.add(blank);
   const radius = (s) => R.r0 + (R.r1 - R.r0) * Math.pow(s, 0.8);
@@ -172,6 +195,8 @@ export function buildRod(scene, R) {
   // half as big again, and the first rings looked like hoops in first person)
   const gMin = Math.min(R.g0, 0.003), ringSize = R.guides.map((s, i) => R.g0 * (gMin / R.g0) ** (i / Math.max(1, nG - 1)) ** 0.8);
   const ringCentres = R.guides.map(() => new THREE.Vector3()), tipRing = new THREE.Vector3();
+  // (for the line: which way each ring faces, square to the blank, and its size; the line passes inside the ceramic)
+  const ringAxes = R.guides.map(() => new THREE.Vector3()), tipAxis = new THREE.Vector3(), ringRadii = ringSize.slice(), tipSize = { r: 0.002 };
   const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), Y = new THREE.Vector3(), Xv = new THREE.Vector3();
   const n = pts0 => pts0.length - 1;
   // a point and tangent at s (0..1) along the curve
@@ -180,7 +205,7 @@ export function buildRod(scene, R) {
   const ringPos = [], ringN = [];
   return {
     group, blank, handle,
-    ringCentres, tipRing,
+    ringCentres, tipRing, ringAxes, ringRadii, tipAxis, tipSize,
     update(pts, frameOf) {
       // the handle: on the butt, square to the first stretch of the rod (the stiff section: the bend starts above it)
       at(pts, 0); handle.position.copy(P); handle.quaternion.copy(frameOf(Tn));
@@ -198,7 +223,7 @@ export function buildRod(scene, R) {
         const s = R.guides[i], g = ringSize[i]; at(pts, s); const fq = frameOf(Tn), down = Y.set(0, -1, 0).applyQuaternion(fq), rb = radius(s);
         v.copy(P).addScaledVector(down, rb);
         mx.compose(v, fq, sc.set(g, g, g)); for (const im of guides) im.setMatrixAt(i, mx);
-        ringCentres[i].copy(v).addScaledVector(down, GUIDE_DROP * g);
+        ringCentres[i].copy(v).addScaledVector(down, GUIDE_DROP * g); ringAxes[i].copy(Tn);
         // its whippings: over each foot, a little thicker than the blank
         const along = Xv.copy(Tn);
         for (const side of [-1, 1]) {
@@ -210,6 +235,7 @@ export function buildRod(scene, R) {
       // the tip ring, square to the tip
       at(pts, 1); const tq = frameOf(Tn), ts = Math.max(R.r1, 0.0018) * 1.1; tip.position.copy(P); tip.quaternion.copy(tq); tip.scale.setScalar(ts);
       tipRing.copy(P).addScaledVector(Y.set(0, -1, 0).applyQuaternion(tq), 1.6 * ts).addScaledVector(Tn, 0.3 * ts);
+      tipAxis.copy(Tn); tipSize.r = 0.95 * ts; // (its ceramic: 0.8 of the frame's size across inside)
       void ringPos; void ringN;
     },
   };
