@@ -54,6 +54,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
         if (btn) { keyState.current.space = btn; press(btn, "pointerdown"); }
         return;
       }
+      if (c === "KeyF" && !e.repeat) { e.preventDefault(); toggleFs(); return; } // (F: full screen, as video players)
       if (c === "KeyE") {
         e.preventDefault(); if (e.repeat) return;
         const b = R.querySelector(".ft-land") || R.querySelector(".walk-fish") || (walkRef.current ? R.querySelector(".walk-pill[aria-label='Stop walking']") : null);
@@ -121,8 +122,24 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   const sceneState = useMemo(() => ({ busy }), [busy]);
   const [alert, setAlert] = useState(null);
   useEffect(() => { if (!alert) return undefined; const t = setTimeout(() => setAlert(null), 14000); return () => clearTimeout(t); }, [alert]);
+  // ---- full screen (a PC, mostly: on a phone the view already fills the screen): the browser's own full screen where
+  // it has one, the whole window otherwise; Escape or the same option leaves it ----
+  const stageEl = useRef(null); const [fs, setFs] = useState(false); const fsRef = useRef(false); fsRef.current = fs;
+  useEffect(() => {
+    const on = () => { const el = document.fullscreenElement || document.webkitFullscreenElement; if (!el) setFs(false); else if (el === stageEl.current) setFs(true); };
+    document.addEventListener("fullscreenchange", on); document.addEventListener("webkitfullscreenchange", on);
+    const k = (e) => { if (e.key === "Escape" && fsRef.current && !(document.fullscreenElement || document.webkitFullscreenElement)) setFs(false); };
+    addEventListener("keydown", k);
+    return () => { document.removeEventListener("fullscreenchange", on); document.removeEventListener("webkitfullscreenchange", on); removeEventListener("keydown", k); };
+  }, []);
+  async function toggleFs() {
+    const el = stageEl.current; if (!el) return;
+    if (fsRef.current) { try { if (document.fullscreenElement || document.webkitFullscreenElement) await (document.exitFullscreen?.() || document.webkitExitFullscreen?.()); } catch { /* fine */ } setFs(false); return; }
+    try { if (el.requestFullscreen) { await el.requestFullscreen({ navigationUI: "hide" }); setFs(true); return; } if (el.webkitRequestFullscreen) { el.webkitRequestFullscreen(); setFs(true); return; } } catch { /* fall back to the window */ }
+    setFs(true);
+  }
   return (
-    <div className={`stage3d${walk ? " walking" : ""}${menu ? " menu-open" : ""}`}>
+    <div ref={stageEl} className={`stage3d${walk ? " walking" : ""}${menu ? " menu-open" : ""}${fs ? " is-fs" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
       <World3D ref={w} fight={fight} startMode={view.fishCam === "third" ? "third" : "first"} feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} sound={sound} now={now} quality={view.gfx && view.gfx !== "auto" ? view.gfx : quality}
         onPhase={(id, phase, info) => {
@@ -168,6 +185,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
               {pageMenu?.length ? <>
                 {pageMenu.map((it) => <button key={it.key} type="button" role={it.on != null ? "menuitemcheckbox" : "menuitem"} aria-checked={it.on != null ? !!it.on : undefined} className={`ft-pill${it.on ? " on" : ""}`} onClick={() => { setMenu(false); it.onClick(); }}>{it.icon ? <Icon name={it.icon} /> : null}{it.label}</button>)}
               </> : null}
+              <button type="button" role="menuitemcheckbox" aria-checked={fs} className={`ft-pill${fs ? " on" : ""}`} onClick={() => { setMenu(false); toggleFs(); }} title="The view fills the whole screen (F on a keyboard; Escape to leave)"><Icon name={fs ? "close" : "expand"} />{fs ? "Leave full screen" : "Full screen"}</button>
               {/* (near the top, where it's seen: at the foot of a long menu it had to be scrolled to, and was missed) */}
               <button type="button" role="menuitem" className="ft-pill" onClick={() => { setMenu(false); setGfxOpen(true); }} title="Preset, resolution, frame rate, shadows, ambient occlusion and more"><Icon name="gauge" />Graphics: {{ auto: "Auto", performance: "Low", balanced: "Medium", high: "High", ultra: "Ultra" }[view.gfx] || "Auto"}{view.gfxC && Object.keys(view.gfxC).length ? " (custom)" : ""}</button>
               <hr className="cam-sep" />
