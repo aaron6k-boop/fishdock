@@ -87,6 +87,48 @@ export default function GraphicsPanel({ view, setOpts, world, onClose }) {
       })}
       <button type="button" role="switch" aria-checked={!!view.fpsShow} className={`ft-pill${view.fpsShow ? " on" : ""}`} onClick={() => setOpts({ fpsShow: !view.fpsShow })}>Show FPS</button>
       <button type="button" className="ft-pill" onClick={reset}>Reset to recommended</button>
+      {devMode() ? <DevDiagnostics world={world} preset={preset} pickPreset={pickPreset} /> : null}
+    </div>
+  );
+}
+
+// ---- developer diagnostics: only with ?dev=1 on the address, or inside the Windows launcher; never in a normal release ----
+export const devMode = () => { try { return /[?&]dev=1/.test(location.search) || /[?&#]dev=1/.test(location.hash) || /FishDockDesktop\//.test(navigator.userAgent); } catch { return false; } };
+const PRESET_ORDER = ["performance", "balanced", "high", "ultra"];
+function DevDiagnostics({ world, preset, pickPreset }) {
+  const [p, setP] = useState(null), [d, setD] = useState(null), [bench, setBench] = useState(null), [running, setRunning] = useState(false);
+  useEffect(() => { const t = setInterval(() => { setP(world?.perf?.() || null); setD(world?.diag?.() || null); }, 1000); return () => clearInterval(t); }, [world]);
+  // the benchmark: each preset in turn, 6 s to build and settle, then 8 s measured; your own preset put back after
+  const run = async () => {
+    if (running || !world) return; setRunning(true); const rows = [], was = preset;
+    for (const q of PRESET_ORDER) {
+      pickPreset(q); await new Promise((r) => setTimeout(r, 6000));
+      const samples = []; for (let i = 0; i < 8; i++) { await new Promise((r) => setTimeout(r, 1000)); const x = world.perf?.(); if (x) samples.push(x); }
+      if (samples.length) { const last = samples[samples.length - 1], fps = Math.round(samples.reduce((a, x) => a + x.fps, 0) / samples.length), low = Math.min(...samples.map((x) => x.low)), gpu = samples.some((x) => x.gpu != null) ? +(samples.filter((x) => x.gpu != null).reduce((a, x) => a + x.gpu, 0) / samples.filter((x) => x.gpu != null).length).toFixed(1) : null; rows.push({ q, fps, low, ms: last.ms, gpu, calls: last.calls, tris: last.tris, texMB: last.texMB, res: last.res }); setBench([...rows]); }
+    }
+    pickPreset(was); setRunning(false);
+  };
+  const text = () => {
+    const head = `FishDock benchmark · ${p?.gpuName || "unknown GPU"} · ${navigator.userAgent.match(/FishDockDesktop\/[\d.]+/)?.[0] || "browser"} · window ${innerWidth}x${innerHeight} @${devicePixelRatio}x\npreset | fps | 1% low | frame ms | GPU ms | draws | tris | tex MB | drawn at`;
+    return [head, ...(bench || []).map((r) => `${NAME[r.q]} | ${r.fps} | ${r.low} | ${r.ms} | ${r.gpu ?? "n/a"} | ${r.calls} | ${r.tris} | ${r.texMB} | ${r.res?.join("x")}`)].join("\n");
+  };
+  return (
+    <div className="gfx-dev">
+      <span className="cam-head">Developer diagnostics</span>
+      {p ? <pre className="gfx-pre">{`${p.fps} fps · 1% low ${p.low} · ${p.ms} ms/frame${p.gpu != null ? ` · GPU ${p.gpu} ms` : " · GPU time n/a"}
+${p.calls} draw calls · ${Math.round(p.tris / 1000)}k triangles · ${p.geometries} geometries · ${p.textures} textures (~${p.texMB} MB)
+drawn at ${p.res?.join(" x ")} (${p.dpr.toFixed(2)}x) · preset ${NAME[p.preset] || p.preset}
+GPU: ${p.gpuName || "not reported"}`}</pre> : null}
+      {d ? <pre className="gfx-pre">{`camera ${d.cam.join(", ")} · yaw ${d.yawDeg}° pitch ${d.pitchDeg}° fov ${d.fov} · ${d.mode}
+light day ${d.light.day} dusk ${d.light.dusk} night ${d.light.night} cloud ${d.light.cloud} rain ${d.light.rain} · exposure ${d.light.exposure}
+sea swell ${d.sea.swell} wind ${d.sea.wind} from ${d.sea.windDir.join(", ")} · built in ${d.buildMs} ms · ${d.programs} shaders
+you at ${d.at ? d.at.join(", ") : "-"} · ${d.phase || "-"}`}</pre> : null}
+      <div className="cam-row">
+        <button type="button" className="ft-pill" disabled={running} onClick={run}>{running ? "Benchmarking… (about a minute)" : "Run benchmark: every preset"}</button>
+        {bench?.length ? <button type="button" className="ft-pill" onClick={() => navigator.clipboard?.writeText(text()).catch(() => {})}>Copy results</button> : null}
+      </div>
+      {bench?.length ? <pre className="gfx-pre">{text()}</pre> : null}
+      <span className="gfx-why">Measured on this machine, in this window. GPU time needs a browser that offers the timer (Chrome and the launcher do; Safari doesn't).</span>
     </div>
   );
 }

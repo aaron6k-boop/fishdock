@@ -793,6 +793,20 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     get mySpot() { const me = anglers.get(localId); const s = me?.a.spot; return s ? { id: s.id, name: s.name, at: s.at, face: s.face } : null; },
     setNow(f) { nowFn = f || Date.now; },
     setEnv: setEnvAll,
+    /** For the developer diagnostics panel (dev mode only): where the camera is and looks, the light and weather in
+     *  force, how long the place took to build and what has loaded. Numbers only, nothing that identifies a person. */
+    diag() {
+      const d = new THREE.Vector3(); camera.getWorldDirection(d);
+      const yaw = Math.atan2(d.x, -d.z), pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
+      const L2 = env.current || {}, me = anglers.get(localId)?.out;
+      return {
+        cam: camera.position.toArray().map((v) => +v.toFixed(2)), yawDeg: Math.round((yaw * 180) / Math.PI), pitchDeg: Math.round((pitch * 180) / Math.PI), fov: +camera.fov.toFixed(1), mode,
+        light: { day: +((L2.day ?? 0).toFixed(2)), dusk: +((L2.dusk ?? 0).toFixed(2)), night: +((L2.night ?? 0).toFixed(2)), cloud: +((L2.cloud ?? 0).toFixed(2)), rain: +((L2.rain ?? 0).toFixed(2)), exposure: +renderer.toneMappingExposure.toFixed(2) },
+        sea: { swell: +envState.swell.toFixed(2), wind: +envState.wind.toFixed(2), windDir: envState.windDir.map((v) => +v.toFixed(2)) },
+        buildMs, phase: me?.phase || null, at: me ? me.at.toArray().map((v) => +v.toFixed(1)) : null,
+        programs: renderer.info.programs?.length || 0,
+      };
+    },
     /** Walk about (true) or stand at your spot again (false). Returns null when it worked, or why not. */
     walk(on, { dist = "normal" } = {}) {
       const me = anglers.get(localId);
