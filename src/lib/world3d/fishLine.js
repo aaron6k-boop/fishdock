@@ -80,6 +80,8 @@ export function fishLine(nRings, opts = {}) {
       if (o.payout) L = Math.max(L, want);
       else if (want > L) L = Math.min(want, L + (o.give ?? 60) * dt);
       else L = Math.max(want, L - (o.retrieve ?? 2) * dt);
+      // (an angler doesn't leave metres of slack out: past a little, they wind down to it quickly)
+      if (!o.payout) { const cap = dist * (1 + (o.maxSlack ?? 0.06)); if (L > cap) L = Math.max(cap, L - 6 * dt); }
       L = Math.max(L, dist * 0.999, 0.05);
       payRate = (L - L0) / dt;
     }

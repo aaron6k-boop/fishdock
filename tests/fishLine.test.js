@@ -69,10 +69,13 @@ test("pulled tighter than its length it's straight; a fish running at you outpac
   const free = line.points().slice(line.segment().free[0]), a = free[0], b = free[free.length - 1], d = sub(b, a), dl = len(d);
   const off = Math.max(...free.map((p) => { const w = sub(p, a), t = dot(w, d) / (dl * dl); return len(sub(w, d.map((v) => v * t))); }));
   assert.ok(off < 0.01, "straight under load (only a hum)");
-  // the fish swims 5 m closer at once; the reel winds 1 m/s
-  const L0 = line.length; end.z += 5;
+  // the fish swims 1.2 m closer at once; the reel winds 1 m/s: a second later there's still slack
+  const L0 = line.length; end.z += 1.2;
   run(line, { end, excess: 0, retrieve: 1, waterY: -3 }, 60);
   assert.ok(L0 - line.length <= 1.05 && L0 - line.length > 0.9, `wound in ${(L0 - line.length).toFixed(2)} m in a second`);
+  // but metres of slack aren't left out: past 6% of the distance it's wound down quickly
+  end.z += 8; run(line, { end, excess: 0, retrieve: 1, waterY: -3 }, 120);
+  const d2 = line.tip.c.distanceTo(end); assert.ok(line.length <= d2 * 1.061, `slack ${(line.length / d2 - 1).toFixed(3)}`);
 });
 
 test("in a cast the line pays out freely and only goes out; the drop hangs the lead under the tip", () => {
