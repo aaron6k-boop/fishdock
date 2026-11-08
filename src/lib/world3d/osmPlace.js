@@ -187,9 +187,9 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
     else if (isClosed && (t.leisure === "park" || t.landuse === "grass" || t.leisure === "pitch" || t.landuse === "recreation_ground" || t.leisure === "golf_course" || t.landuse === "meadow")) out.green.push(ring.slice(0, -1));
     else if (isClosed && t.building) {
       const lv = parseFloat(t["building:levels"]), hh = parseFloat(t.height);
-      const h = Number.isFinite(hh) && hh > 2 && hh < 200 ? hh : Number.isFinite(lv) && lv > 0 && lv < 60 ? lv * 3 + 1 : /^(garage|shed|hut|kiosk|toilets)$/.test(t.building) ? 3 : /^(church|cathedral)$/.test(t.building) ? 14 : 7;
+      const h = Number.isFinite(hh) && hh > 2 && hh < 200 ? hh : Number.isFinite(lv) && lv > 0 && lv < 60 ? lv * 3 + 1 : /^(garage|shed|hut|kiosk|toilets)$/.test(t.building) || /^(toilets|shelter)$/.test(t.amenity || "") ? 3 : /^(church|cathedral)$/.test(t.building) ? 14 : 7;
       const ring2 = ring.slice(0, -1), c = ring2.reduce((a, p) => [a[0] + p[0] / ring2.length, a[1] + p[1] / ring2.length], [0, 0]);
-      out.buildings.push({ id: w.id, ring: ring2, h: r1(h), tall: Number.isFinite(hh) || Number.isFinite(lv), levels: Number.isFinite(lv) ? lv : null, d: r1(Math.hypot(c[0], c[1])), kind: t.building, roof: t["roof:shape"] || null, use: t.man_made === "lighthouse" || t.building === "lighthouse" ? "lighthouse" : /lookout|coastwatch|coastguard/i.test(`${t.name || ""} ${t["seamark:building:function"] || ""}`) ? "lookout" : t.shop || t.amenity === "cafe" || t.amenity === "restaurant" || t.amenity === "pub" ? "shop" : null, name: t.name || null });
+      out.buildings.push({ id: w.id, ring: ring2, h: r1(h), tall: Number.isFinite(hh) || Number.isFinite(lv), levels: Number.isFinite(lv) ? lv : null, d: r1(Math.hypot(c[0], c[1])), kind: t.building, roof: t["roof:shape"] || null, use: t.man_made === "lighthouse" || t.building === "lighthouse" ? "lighthouse" : /lookout|coastwatch|coastguard/i.test(`${t.name || ""} ${t["seamark:building:function"] || ""}`) ? "lookout" : t.shop || t.amenity === "cafe" || t.amenity === "restaurant" || t.amenity === "pub" ? "shop" : /^(toilets|shelter)$/.test(t.amenity || "") ? "small" : null, name: t.name || null });
     }
   }
   // multipolygons (a river or lake drawn in pieces): their outer rings
