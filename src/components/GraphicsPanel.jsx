@@ -9,9 +9,9 @@ const NAME = Object.fromEntries(PRESETS);
 // what each preset starts from (world.js QUALITY3D sets the rest)
 export const PRESET_GFX = {
   performance: { res: 1, fps: 0, shadows: 0, shadowDist: 30, ao: 0, bloom: 0, aa: 0, tex: 4 },
-  balanced: { res: 1, fps: 0, shadows: 1, shadowDist: 30, ao: 0, bloom: 1, aa: 4, tex: 16 },
-  high: { res: 1, fps: 0, shadows: 2, shadowDist: 30, ao: 1, bloom: 1, aa: 4, tex: 16 },
-  ultra: { res: 1, fps: 0, shadows: 2, shadowDist: 45, ao: 2, bloom: 1, aa: 4, tex: 16 },
+  balanced: { res: 1, fps: 0, shadows: 1, shadowDist: 30, ao: 0, bloom: 1, aa: 4, sharp: 0.5, tex: 16 },
+  high: { res: 1, fps: 0, shadows: 2, shadowDist: 30, ao: 1, bloom: 1, aa: 4, sharp: 0.5, tex: 16 },
+  ultra: { res: 1, fps: 0, shadows: 2, shadowDist: 45, ao: 2, bloom: 1, aa: 4, sharp: 0.5, tex: 16 },
 };
 // Battery saver: 30 frames a second, three quarters of the pixels, no contact shade or glow
 export const BATTERY = { fps: 30, res: 0.75, ao: 0, bloom: 0 };
@@ -27,6 +27,7 @@ const CONTROLS = [
   { k: "shadowDist", label: "Shadow distance", opts: [[20, "Near"], [30, "Normal"], [45, "Far"]], why: "How far round you things cast shadows. Further spreads the same detail wider.", needs: "shadows" },
   { k: "ao", label: "Ambient occlusion", opts: [[0, "Off"], [1, "On"], [2, "Fine"]], why: "The soft shade where things meet: under benches, along walls, round your kit.", post: true },
   { k: "bloom", label: "Glow", opts: [[0, "Off"], [1, "On"]], why: "A soft glow on the brightest light: the sun on the sea, lamps after dark.", post: true },
+  { k: "sharp", label: "Sharpening", opts: [[0, "Off"], [0.5, "On"], [1, "Strong"]], why: "Crisper textures and edges after anti-aliasing, without bright halos round them.", post: true },
   { k: "aa", label: "Anti-aliasing", opts: [[0, "Off"], [2, "2x"], [4, "4x"]], why: "Smooths jagged edges on railings, rods and the line.", post: true },
   { k: "tex", label: "Texture sharpness", opts: [[2, "Low"], [4, "Medium"], [8, "High"], [16, "Highest"]], why: "How clear the deck, brick and sea stay when seen at a low angle." },
 ];
