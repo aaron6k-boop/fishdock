@@ -1,7 +1,7 @@
 /* ---- Live Fishing View: the scene, the fishing screen, the share sheet and the viewer page ---- */
 
 /* the scene */
-.fscene { position: relative; width: 100%; aspect-ratio: 4 / 3.3; max-height: 60vh; border-radius: var(--r-l); overflow: hidden; background: #0b1620; isolation: isolate; box-shadow: 0 18px 40px #0008; touch-action: manipulation; }
+.fscene { position: relative; width: 100%; aspect-ratio: 4 / 3.3; max-height: 60vh; border-radius: var(--r-l); overflow: hidden; background: #0b1620; isolation: isolate; box-shadow: 0 18px 40px #0008; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .fscene canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .fs-fx { pointer-events: none; }
 .fs-cam { position: absolute; inset: 0; will-change: transform; }
@@ -276,7 +276,7 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 /* ---- the fishing tray: one round button in the thumb's corner for the step that makes sense now, and above it one
    small panel to read (how far out, the tension, what's going on), never beside the button or under the thumb.
    Nothing shows while the cast flies or a fish is landed ---- */
-.fish-tray { pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; transition: opacity .25s, transform .25s; touch-action: manipulation; }
+.fish-tray { pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; transition: opacity .25s, transform .25s; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .fish-tray.is-busy { opacity: 0; transform: translateY(12px); }
 .fish-tray.is-busy * { pointer-events: none !important; }
 .ft-row { display: flex; align-items: center; gap: 12px; flex-direction: row-reverse; }
@@ -346,7 +346,8 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .test-panel .chip[disabled] { opacity: .4; }
 
 /* ---- the 3D view (Beta) ---- */
-.w3d { position: relative; width: 100%; height: 100%; min-height: 320px; overflow: hidden; background: linear-gradient(180deg, #8a93a3 0%, #6f7d8c 46%, #2a3a48 54%, #16232e 100%); touch-action: none; }
+/* (nothing in the game selects as text: holding Reel with a thumb that strayed onto the words beside it brought up the iPhone's text magnifier, a second, enlarged Reel button over the real one) */
+.w3d { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; position: relative; width: 100%; height: 100%; min-height: 320px; overflow: hidden; background: linear-gradient(180deg, #8a93a3 0%, #6f7d8c 46%, #2a3a48 54%, #16232e 100%); touch-action: none; }
 /* while the scene is being set up (or restored) the sky-and-sea backdrop shows, never black, and the fishing controls wait */
 .w3d-canvas { transition: opacity .35s ease; }
 .w3d.is-waiting .w3d-canvas { opacity: 0; }
