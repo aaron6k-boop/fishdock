@@ -11,6 +11,16 @@ import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand } from "./shor
 import { lightingFor, lampPools, poolLight, lookQuality } from "./skyLook.js";
 import { FILM } from "./film.js";
 
+// ---- a display colour back to the linear light that comes out as it after the tone curve (post.js) and exposure:
+// the same as the shaders' toPost (Khronos PBR Neutral inverted, sRGB decoded) ----
+export function displayToScene(rgb, expo = 1) {
+  let c = rgb.map((v) => { v = Math.max(0, Math.min(1, v)); return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  const S = 0.76, D = 0.24; let np = Math.max(...c);
+  if (np > S) { np = Math.min(np, 0.92); const pk = (D * D) / (1 - np) - D + S; c = c.map((v) => (v * pk) / np); }
+  const m = Math.min(...c); c = c.map((v) => v + (m < 0.04 ? Math.sqrt(m / 6.25) - m : 0.04));
+  return c.map((v) => v / Math.max(expo, 0.05));
+}
+
 // ---- shared shader pieces: noise and the sky's colour in any direction ----
 export const GLSL_NOISE = /* glsl */`
 float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x*p.y); }
@@ -350,7 +360,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float sd = shoreDist(p), shallow = 1. - smoothstep(0., 16., sd);
         // looking down into it you see the deep colour; at a low angle more of the light scattered back out; the
         // shallows by the land are lighter and greener
-        vec3 body = mix(uWater*1.25 + vec3(0., .012, .01), uWater*.72, pow(clamp(v.y, 0., 1.), .6));
+        // (looking straight down it's the water's own colour lit through the silt, a murky grey-green you can see into,
+        // not near-black: at .72 of the base the sea under the railing read as a black hole on a phone)
+        vec3 body = mix(uWater*1.25 + vec3(0., .012, .01), uWater*1.02 + vec3(.022, .026, .018), pow(clamp(v.y, 0., 1.), .6));
+        // and the turbidity's own soft light, varying slowly (silt clouds and the swell's shade), more of it close by
+        body += vec3(.016, .020, .014)*(.6 + .8*noise(p*.07 + uTime*.02))*(1. - smoothstep(4., 60., dist));
         body = mix(body, uWater*1.55 + vec3(.012, .03, .018), shallow*.7)*lit*dim;
         // under a grey sky the North Sea goes a lighter grey-green (the cloud's light scattered back out of the silty
         // water), not the dark teal of a clear day
@@ -638,8 +652,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     if (sun.castShadow) sun.shadow.intensity = look.shadow;
     hemi.color.setRGB(...look.skyColour); hemi.groundColor.setRGB(...look.groundColour); hemi.intensity = look.skyIntensity;
     // ---- haze: the horizon's colour, the same exponential haze for the land and the water (thicker in rain) ----
-    scene.fog.color.setRGB(...look.fogColour); scene.fog.density = look.fogDensity;
-    wU.uFogC.value.copy(scene.fog.color); wU.uFogD.value = look.fogDensity;
+    // (the haze colour is the sky's horizon as you see it, a display colour. The water works in display colours and
+    // takes it as it is; the land's fog is mixed in linear light before the tone curve and the exposure, so it gets the
+    // same colour taken back through them (as the sky's own toPost does). Given the display colour straight, distant
+    // buildings came out brighter than the sky behind them: white cut-outs along the horizon in rain)
+    wU.uFogC.value.setRGB(...look.fogColour, THREE.LinearSRGBColorSpace); wU.uFogD.value = look.fogDensity;
+    scene.fog.color.setRGB(...displayToScene(look.fogColour, look.exposure || 1), THREE.LinearSRGBColorSpace); scene.fog.density = look.fogDensity;
     // (the haze's glow towards the sun: warm by day, gold at dusk, gone under thick cloud and at night)
     { const vis = (st.day + st.dusk * 1.3) * (1 - THREE.MathUtils.smoothstep(st.cloud, 0.55, 0.95)) * (1 - st.rain), sc = look.sunColour;
       SCATTER.dir.x = st.sunDir.x; SCATTER.dir.y = st.sunDir.y; SCATTER.dir.z = st.sunDir.z;
