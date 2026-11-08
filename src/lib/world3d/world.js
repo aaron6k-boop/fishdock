@@ -38,7 +38,6 @@ export function autoQuality3d() {
     // Balanced measured a steady 60 with room to spare on an iPhone 17 Pro) starts on High quality, which steps itself
     // down if frames run late; older ones get Balanced
     const ua = navigator.userAgent || "", ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-    if (/FishDockDesktop\//.test(ua)) return "ultra"; // (the Windows launcher: it has asked Windows for the proper graphics card, so the best preset)
     if (ios) { const v = +(ua.match(/Version\/(\d+)/) || ua.match(/OS (\d+)_/) || [0, 0])[1]; return v >= 18 ? "high" : "balanced"; }
     // a computer with its own graphics card (NVIDIA, AMD Radeon, Intel Arc) gets the best, whatever it reports
     if (!/Android|Mobile/.test(ua)) { const g = gpuName(); if (/NVIDIA|GeForce|RTX|Radeon RX|Radeon Pro|Intel\(R\) Arc/i.test(g)) return "ultra"; if (/Apple M\d/i.test(g)) return "high"; } // (a Mac with Apple silicon: High)
@@ -94,10 +93,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   renderer.info.autoReset = false;
   // (the water's mirror is drawn first, without your own first-person hands: environment.js reflect)
   let noRefl = [], noReflAt = 0;
+  // the graphics card's own time per frame (what it spends drawing, apart from everything the page does around it):
+  // a GPU timer query round each frame where the browser offers one (Chromium on a PC; not Safari). The answer comes
+  // back a few frames later; the last 60 are kept for perf()
+  const gl = renderer.getContext(), tq = gl.getExtension("EXT_disjoint_timer_query_webgl2"), gpuT = new Float32Array(60); let gpuN = 0, qs = [];
   function drawFrame() {
     sharpen(); renderer.info.reset();
+    let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
     if (env.reflections) { if (!noReflAt--) { noRefl = scene.getObjectsByProperty("name", "fdNoReflect"); noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
     if (post) post.render(); else renderer.render(scene, camera);
+    if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); qs.push(q); }
+    // (collect the answers that are ready, oldest first; a disjoint event, as a change of GPU clock, throws them away)
+    while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) { const d = gl.getParameter(tq.GPU_DISJOINT_EXT); const ns = gl.getQueryParameter(qs[0], gl.QUERY_RESULT); gl.deleteQuery(qs.shift()); if (!d) gpuT[gpuN++ % 60] = ns / 1e6; }
   }
   const tBuild = performance.now();
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
@@ -773,7 +780,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const n = Math.min(ftN, 240); if (!n) return null;
       const a = Array.from(ft.subarray(0, n)).sort((x, y) => x - y), mean = a.reduce((s2, v) => s2 + v, 0) / n, worst = a[Math.min(n - 1, Math.floor(n * 0.99))];
       const r = renderer.info.render;
-      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures };
+      let gpu = null; if (gpuN) { const m = Math.min(gpuN, 60); let s2 = 0; for (let i = 0; i < m; i++) s2 += gpuT[i]; gpu = +(s2 / m).toFixed(1); }
+      // texture memory, estimated from each texture's size (with its mip chain): what the card holds for this scene
+      let texMB = 0; try { const seen = new Set(); scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) for (const k in m) { const t = m[k]; if (t && t.isTexture && !seen.has(t)) { seen.add(t); const im = t.image; const w = im?.width || im?.videoWidth || 0, h = im?.height || im?.videoHeight || 0; texMB += (w * h * 4 * (t.generateMipmaps ? 1.333 : 1)) / 1048576; } } }); } catch { texMB = 0; }
+      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), gpu, calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, texMB: Math.round(texMB), gpuName: gpuName(), preset: Q === QUALITY3D.ultra ? "ultra" : Q === QUALITY3D.high ? "high" : Q === QUALITY3D.performance ? "performance" : "balanced", res: [renderer.domElement.width, renderer.domElement.height] };
     },
     setAnglers,
     realCheck,
