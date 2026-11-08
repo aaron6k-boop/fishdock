@@ -1,10 +1,13 @@
-# FishDock for Windows: pins the launcher's dependencies. Run by hand from the Actions tab on a launcher branch: it
+# FishDock for Windows: pins the launcher's dependencies. Runs when desktop/package.json changes on a launcher branch (or by hand): it
 # resolves desktop/package.json to an exact desktop/package-lock.json, reports the newest Electron and electron-builder
 # releases next to the pinned ones (so a security update is a visible decision, not a surprise), runs npm audit, and
 # commits the lockfile to the branch. The installer build then uses npm ci against that lockfile and nothing else.
 name: Desktop lockfile
 on:
   workflow_dispatch:
+  push:
+    branches: ["desktop-*"]
+    paths: ["desktop/package.json", ".github/workflows/desktop-lock.yml"]
 permissions:
   contents: write
 jobs:
