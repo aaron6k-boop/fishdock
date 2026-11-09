@@ -42,3 +42,40 @@ foam steepness factor 2.6) reads 0.5%, 4% and 5.6% at the same winds; the wind g
 noise bring the drawn cover to roughly a third of that, so the drawn whitecaps are in the right order at a fresh
 breeze and a little generous at a light one. Tuned by eye beyond that; no photograph of the real sea at Gorleston
 at a known wind was available to compare against.
+
+## Stage 3 (9 November 2026, branch `overhaul-3`)
+
+**Survey.** The ten scenes and six close views of the town from the pier and the gardens, against photographs of
+Marine Parade and Pier Gardens. The largest visual gap after the sea was the town itself: every building a flat box
+with a painted window pattern, roofs a single flat colour, no trees anywhere on 30 ha of parks and lawns.
+
+**Facades** (`textures3d.js: facade()`). Each wall kind drawn at 85 px a metre, with a
+height field beside the colour so the normal map and the roughness map come from the same drawing: brick in 65 mm
+courses, stretcher bond with dark headers; ashlar; cladding; render with trowel sweeps. Five bays a strip (window,
+wide window, door, shop, plain) picked per storey and bay by the building's style and a seeded choice. Windows are
+sashes set back 12 mm into a reveal, with a box frame, a sill that stands out, a soldier arch or lintel, and glass
+that is smooth (roughness 0.06, metalness up) under a sky gradient and curtains, so it reflects the sky and the sun
+where the wall around it does not. Doors have a case, fanlight, panels, step and number plate. Shops a fascia,
+pilasters and a stall riser. Plain bays carry a downpipe and an air brick. Weathering: streaks under sills and from
+the eaves, dirt at the foot, lighter on render.
+
+**Roofs** (`textures3d.js: roof()`). Slates in 0.5 × 0.25 m courses with tone and twist, a lap shadow and moss;
+pantiles in an S-profile at 0.34 m, 0.3 m courses; felt. Normal and roughness maps as the facades. Ridge tiles along
+each ridge line.
+
+**Trees** (`trees3d.js`). Placed on the map's grass cells (parks and verges from OpenStreetMap landuse) and on the
+cliff's grassy bank, never on a road, a building, the pier or within 20 m of a fishing spot; 7 to 12 m in the parks,
+3 to 5.5 m on verges and the bank; three crossed planes with a drawn canopy, normals up so they light as a mass,
+instanced, casting shadows. Count by quality (Ultra all, Balanced three quarters, Performance under half).
+
+**Sea colour.** The sunny shallows moved off teal: shallow tint and crest light toward grey-green.
+
+**Checked.** `node --test` 313 passing; the ten scenes before (main 65d3fb4) and after, and close town views, sent
+with the PR. Nothing here was measured on a graphics card: the trees are one instanced draw and the facades are the
+same draw count as before with two more texture reads a pixel, so the cost should be small, but that is a claim to
+test on the PC, not a number.
+
+**Left.** The buildings are still generic Gorleston (the right heights, footprints and roof shapes from the map and
+the right materials for the street, not the actual elevations); the Coastwatch building is already photograph-based.
+Chimneys stand but have no pots. Shop fronts have no signs. Trees are cards, not models. Lighting audit, weather,
+hands and rig, animations, equipment and the PC measurements are the following stages.
