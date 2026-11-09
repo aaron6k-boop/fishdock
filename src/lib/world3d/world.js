@@ -113,6 +113,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
   const buildMs = Math.round(performance.now() - tBuild);
   if (Q.sea) env.setFftSea(true, renderer);
+  // (every material's shader compiled now, in parallel where the driver allows, rather than the first time its object
+  // comes into view: the first look round used to stall on each new shader)
+  try { const pc = renderer.compileAsync?.(scene, camera); pc?.catch?.(() => {}); } catch { /* (a driver that can't: the shaders compile as they are met) */ }
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
