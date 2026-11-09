@@ -573,7 +573,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // (the water's shader heaves the surface at a wall as a reflected wave does; here, when that heave tops a mark, a
     // burst of drops over the wall's face, at most every couple of seconds at each of three points along it; only for
     // your own angler on a pier, where you can see it, and only once the sea is up)
-    if (local && venue === "pier" && rail && sea.swell + sea.wind * 0.5 > 0.5) {
+    if (local && venue === "pier" && rail && sea.swell + sea.wind * 0.5 > 0.7) { // (from a fresh breeze, about 24 kph, up: at 16 kph drops flew round the angler on a near-calm day)
       const sw = P.spray || (P.spray = { last: [-9, -9, -9], was: [0, 0, 0] });
       const wz = -(edge + 0.25), lim = 0.22 + 0.26 * sea.swell;
       for (let k = 0; k < 3; k++) {
