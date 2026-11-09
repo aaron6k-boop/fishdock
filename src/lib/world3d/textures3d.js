@@ -175,6 +175,57 @@ export function bricks(seed = 17, base = [150, 70, 52]) {
   return { map: toTex(c), normalMap: normalFrom(hf, n, n, 1.5) };
 }
 
+// ---- asphalt: one tile covers 6 m. Aggregate (the stone chips in the bitumen, paler where traffic has worn the
+// binder off them), a soft unevenness in the tone, hairline cracks that wander and branch, a repair or two (a patch
+// of darker, newer tarmac with a slightly raised edge). Colour, relief and roughness (the worn stone smoother than the
+// binder round it). Tiling is broken by the material's own large-scale mottle (weather()), not here. ----
+export function asphalt({ size = 512, seed = 23, tint = [122, 122, 118] } = {}) {
+  const n = size, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n), ro = new Float32Array(n * n);
+  let st = seed * 2654435761 >>> 0; const rnd = () => ((st = (st * 1664525 + 1013904223) >>> 0) / 4294967296);
+  // repairs: one or two patches a tile, darker and slightly raised (their position hashed by seed)
+  const patches = []; for (let k = 0; k < 2; k++) if (rnd() < 0.7) patches.push([rnd() * n, rnd() * n, (0.12 + rnd() * 0.2) * n, (0.08 + rnd() * 0.15) * n]);
+  const inPatch = (x, y) => { let v = 0; for (const [px, py, pw, ph] of patches) { const dx = Math.abs(((x - px + n * 1.5) % n) - n / 2) - pw / 2, dy = Math.abs(((y - py + n * 1.5) % n) - n / 2) - ph / 2; const d = Math.max(dx, dy); v = Math.max(v, 1 - Math.max(0, Math.min(1, (d + 3) / 4))); } return v; };
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const k = y * n + x;
+    const agg = hash(x, y, seed), agg2 = hash(x >> 1, y >> 1, seed + 1), tone = fbm(x / 64, y / 64, n / 64, seed + 2, 3), wear = fbm(x / 160, y / 160, n / 160, seed + 3, 2);
+    // a chip shows pale where the binder is worn: more of them where the wear noise is high (wheel tracks, roughly)
+    const chip = agg2 > 0.72 && agg > 0.35 ? 0.35 + 0.45 * Math.max(0, wear - 0.35) * 2 : 0;
+    const patch = inPatch(x, y);
+    let L = 0.8 + (tone - 0.5) * 0.3 + (agg - 0.5) * 0.18 + chip;
+    L = L * (1 - patch * 0.16); // (a repair is darker: newer bitumen)
+    img.data.set([Math.min(255, tint[0] * L), Math.min(255, tint[1] * L), Math.min(255, tint[2] * L * 0.98), 255], k * 4);
+    hf[k] = 0.5 + (agg - 0.5) * 0.25 + (chip ? 0.12 : 0) + patch * 0.08; ro[k] = 0.9 - chip * 0.35 - patch * 0.08 + (agg - 0.5) * 0.08;
+  }
+  // cracks: wandering dark lines, a branch or two, darker and lower
+  const crack = (x, y, a, len, w) => { for (let i = 0; i < len; i++) { a += (rnd() - 0.5) * 0.5; x += Math.cos(a); y += Math.sin(a); const xi = ((Math.round(x) % n) + n) % n, yi = ((Math.round(y) % n) + n) % n; for (let d = -w; d <= w; d++) for (let e = -w; e <= w; e++) { const q = (((yi + e) % n + n) % n) * n + ((xi + d) % n + n) % n, f = 1 - Math.hypot(d, e) / (w + 1); if (f <= 0) continue; img.data[q * 4] *= 1 - 0.32 * f; img.data[q * 4 + 1] *= 1 - 0.32 * f; img.data[q * 4 + 2] *= 1 - 0.32 * f; hf[q] -= 0.15 * f; } if (i > 20 && rnd() < 0.015) crack(x, y, a + (rnd() < 0.5 ? 0.9 : -0.9), len * 0.4, Math.max(1, w - 1)); } };
+  for (let k = 0; k < 3; k++) crack(rnd() * n, rnd() * n, rnd() * Math.PI * 2, 100 + rnd() * 180, 1);
+  g.putImageData(img, 0, 0);
+  return { map: toTex(c), normalMap: normalFrom(hf, n, n, 1.6), roughnessMap: greyTex(ro, n, n) };
+}
+
+// ---- turf: one tile covers 2 m. Short grass as a fine grain of blades (strokes a little lighter and darker than the
+// ground), worn patches where the grass thins to earth, clover and daisies as the odd speck; the blades' relief for
+// the normal map. Drawn near mid-grey so the ground's own tint (vertex colour) decides the green. ----
+export function turf({ size = 256, seed = 29 } = {}) {
+  const n = size, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n);
+  let st = seed * 2654435761 >>> 0; const rnd = () => ((st = (st * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const k = y * n + x, wear = fbm(x / 90, y / 90, n / 90, seed, 3), fine = fbm(x / 6, y / 6, n / 6, seed + 1, 2), grain = hash(x, y, seed + 2);
+    const bare = Math.max(0, Math.min(1, (wear - 0.62) * 5)); // (earth showing through)
+    let L = 0.48 + (fine - 0.5) * 0.3 + (grain - 0.5) * 0.22;
+    // colour: the tint comes later; here a touch of yellow in the lit blades and brown in the bare patches
+    let r = L * (1 + bare * 0.35), gg = L * (1 - bare * 0.15), b = L * (0.9 - bare * 0.25);
+    img.data.set([Math.min(255, r * 255), Math.min(255, gg * 255), Math.min(255, b * 255), 255], k * 4);
+    hf[k] = 0.5 + (fine - 0.5) * 0.3 + (grain - 0.5) * 0.3 - bare * 0.15;
+  }
+  // blades: short strokes
+  g.putImageData(img, 0, 0);
+  for (let i = 0; i < 2600; i++) { const x = rnd() * n, y = rnd() * n, a = -Math.PI / 2 + (rnd() - 0.5) * 1.2, L = 3 + rnd() * 6, lit = rnd() < 0.5; g.strokeStyle = lit ? "rgba(170,180,120,0.45)" : "rgba(60,70,40,0.45)"; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); for (let t = 0; t < L; t++) { const q = (((y + Math.sin(a) * t) | 0) % n + n) % n * n + (((x + Math.cos(a) * t) | 0) % n + n) % n; hf[q] += lit ? 0.08 : -0.05; } }
+  // the odd daisy and clover leaf
+  for (let i = 0; i < 40; i++) { const x = rnd() * n, y = rnd() * n; g.fillStyle = rnd() < 0.4 ? "rgba(235,235,225,0.9)" : "rgba(70,110,60,0.8)"; g.beginPath(); g.arc(x, y, 1 + rnd() * 1.2, 0, Math.PI * 2); g.fill(); }
+  return { map: toTex(c), normalMap: normalFrom(hf, n, n, 1.2) };
+}
+
 // ---- photographed surfaces (public/textures/, Poly Haven CC0, cut down by source-assets/prepare_textures.py) ----
 // Loaded once each and shared; a material that uses one shows its drawn look until it has arrived (or if it can't).
 export const TEX_BASE = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/";

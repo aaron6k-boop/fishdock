@@ -155,7 +155,7 @@ function bandAround(line, half) {
 }
 
 export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box, approx = false } = {}) {
-  const P = projector(lat0, lon0), nodes = new Map(), ways = new Map(), out = { origin: [lat0, lon0], venue, land: [], water: [], piers: [], beaches: [], green: [], woods: [], parking: [], barriers: [], buildings: [], roads: [], spots: [], attribution: "Map data © OpenStreetMap contributors (ODbL)" };
+  const P = projector(lat0, lon0), nodes = new Map(), ways = new Map(), out = { origin: [lat0, lon0], venue, land: [], water: [], piers: [], beaches: [], green: [], woods: [], parking: [], barriers: [], steps: [], buildings: [], roads: [], spots: [], attribution: "Map data © OpenStreetMap contributors (ODbL)" };
   const rels = [];
   for (const e of osm?.elements || []) {
     if (e.type === "node") nodes.set(e.id, P(e.lat, e.lon));
@@ -175,6 +175,10 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
       // streets, drawn as tarmac with pavements so a town isn't one sheet of concrete
       const w = { primary: 9, trunk: 10, secondary: 8, tertiary: 7, unclassified: 6, residential: 6, living_street: 5, service: 4, pedestrian: 5 }[t.highway.replace("_link", "")] || 5;
       if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.roads.push({ line: ring, w, kind: t.highway === "pedestrian" ? "paved" : "tarmac" });
+    }
+    // flights of steps (the cliff's gardens are full of them): drawn as treads where the ground falls
+    else if (t.highway === "steps" && !isClosed) {
+      if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.steps.push({ line: ring, w: Math.max(1, Math.min(4, parseFloat(t.width) || 1.8)) });
     }
     // footpaths (through the gardens, along the front): a narrow paved path, no pavements of its own
     else if (/^(footway|path|cycleway)$/.test(t.highway || "") && !isClosed && t.tunnel !== "yes" && t.bridge !== "yes") {

@@ -77,7 +77,17 @@ with (a player walks through a hedge rather than being caught in a garden). Tarm
 black diffuse, where dry asphalt is a mid grey; now (84, 92, 104). Woods, gardens and allotments count as green
 ground (the trees of stage 3 will stand close together in a wood once #74 is in; the hook is parsed here).
 
-**Checked.** Four views (`stage6-map-before-after.jpg`), `node --test` 313 pass. The tarmac's texture is the deck's
-concrete map at 6 m a tile and shows a repeat on the car park close to; a tarmac drawing of its own is left to do.
+**Second pass (after review).** Asphalt of its own (`textures3d.js: asphalt()`): aggregate, worn chips, hairline
+cracks, a repair patch, as colour, relief and roughness at 6 m a tile, its repeat broken by a 9 m mottle in the
+material; the deck's concrete map is no longer used for tarmac. Kerbs have a face (road level up to the pavement's)
+and a gully every 20 to 30 m against them. Garden walls are brick with a coping; fences are close-boarded panels
+between posts. Steps are drawn from the map's `highway=steps` where the ground falls (17 cm risers), but the ground
+model has no survey heights, only the town's modelled slope, so of 28 flights only one has a drop to draw: the rest
+are flat on our ground and are left out rather than drawn as a ramp of fake risers. Lawns and the town's ground are
+drawn turf (`turf()`: blades, worn patches, the odd daisy), the deck's relief taken out from under them (it read as a
+weave).
 
-**Left.** Steps (37 flights) are not drawn; walls are plain boxes in one tone; car park bays; a tarmac texture.
+**Checked.** Views of the car park, the street through it, the lawns (`stage6-roads-after.jpg`); `node --test`
+313 pass.
+
+**Left.** Car park bays (direction unknown); survey heights for the cliff's steps; walls in one brick.
