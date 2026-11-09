@@ -52,7 +52,7 @@ export function lightingFor(st) {
   // the eye adapts: dusk and night are lifted, a grey day a touch, so nothing is crushed to black
   const exposure = 1 + 0.22 * dusk + 0.5 * night + 0.2 * over * (1 - night) + 0.06 * rain + 0.25 * low * day * (1 - over); // (a grey day lifted more: the eye adapts to it, and at a touch it all read dim and murky on a phone)
   // how strongly the sky shows in reflections (wet ground in rain shows more of it)
-  const envIntensity = (0.42 + 0.18 * over) * (1 - 0.3 * low * (1 - over)) + 0.15 * rain - 0.1 * night; // (the sky in reflections and as fill: less on a clear day, as the sky light above)
+  const envIntensity = day * (0.42 + 0.18 * over) * (1 - 0.3 * low * (1 - over)) + (dusk + night) * 0.6 + 0.15 * rain - 0.1 * night; // (the sky in reflections and as fill: less on a clear day, as the sky light above)
   const lampOn = clamp01(night + dusk * 0.35);
   return { sunColour, sunIntensity, sunVis, skyColour, groundColour, skyIntensity, shadow, fogDensity, fogColour: horizonColour(st), exposure, envIntensity, lampOn };
 }
