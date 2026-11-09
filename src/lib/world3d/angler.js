@@ -1579,6 +1579,6 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     onSplash(f) { splashCb = f; }, onRipple(f) { rippleCb = f; },
     frame,
     real,
-    dispose() { world.remove(root, kit, line, rig, fish, net, pole, mat, ...ropes); mat.traverse((o) => o.geometry?.dispose?.()); fig.dispose(); fpv?.dispose(); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },
+    dispose() { world.remove(root, kit, fLine.mesh, rig, fish, net, pole, mat, ...ropes); fLine.mesh.geometry.dispose(); fLine.mesh.material.dispose(); mat.traverse((o) => o.geometry?.dispose?.()); fig.dispose(); fpv?.dispose(); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },
   };
 }
