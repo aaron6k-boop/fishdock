@@ -81,6 +81,20 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     for (const [dx, dz] of [[-0.12, 0], [0.12, 0]]) { const q = [[x + dx - 0.07, z - 0.07], [x + dx - 0.07, z + 0.07], [x + dx + 0.07, z + 0.07], [x + dx + 0.07, z - 0.07]]; for (let k = 0; k < 4; k++) { const [x1, z1] = q[k], [x2, z2] = q[(k + 1) % 4]; quad(B.roof_clay, [x1, y0 + h, z1], [x2, y0 + h, z2], [x2, y0 + h + 0.35, z2], [x1, y0 + h + 0.35, z1], [0, 0, 0.1, 0, 0.1, 0.1, 0, 0.1], [1.1, 0.8, 0.7]); } } // pots
   };
 
+  // a box standing out from a wall: a along the wall (from A, unit u), y up, d outward (unit n); five faces (not the back)
+  const wallBox = (Bk, A, u, nrm, a0, a1, y0, y1, d0, d1, col) => {
+    const P = (a, y, d) => [A[0] + u[0] * a + nrm[0] * d, y, A[2] + u[1] * a + nrm[1] * d];
+    const U = [0, 0, 1, 0, 1, 1, 0, 1];
+    quad(Bk, P(a0, y0, d1), P(a1, y0, d1), P(a1, y1, d1), P(a0, y1, d1), U, col); // front
+    quad(Bk, P(a0, y1, d0), P(a1, y1, d0), P(a1, y1, d1), P(a0, y1, d1), U, col); // top
+    quad(Bk, P(a1, y0, d0), P(a0, y0, d0), P(a0, y0, d1), P(a1, y0, d1), U, col); // underside
+    quad(Bk, P(a0, y0, d0), P(a0, y0, d1), P(a0, y1, d1), P(a0, y1, d0), U, col); // left end
+    quad(Bk, P(a1, y0, d1), P(a1, y0, d0), P(a1, y1, d0), P(a1, y1, d1), U, col); // right end
+  };
+  // the trim's colour per house: most white, some cream, the odd sage, grey or dark green
+  const TRIMS = [[1, 1, 1], [1, 1, 1], [1, 1, 1], [0.95, 0.9, 0.8], [0.95, 0.9, 0.8], [0.62, 0.7, 0.6], [0.62, 0.64, 0.66], [0.22, 0.34, 0.26]];
+  const detailed = (x, z) => Math.hypot(x, z) < 260; // (built detail on the houses near enough to see it: frames, sills, steps, gutters, pipes)
+
   for (const b of buildings) {
     let ring = b.ring.slice(); if (ring.length < 3) continue;
     if (area2(ring) > 0) ring.reverse(); // see architecture.js: walk the footprint so faces point outward
@@ -90,6 +104,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     // across it, so its eaves stay level with where they'd be on the high side (a house on a hill shows more wall below)
     const gy = ring.map(([x, z]) => groundAt(x, z)), lo = Math.min(groundAt(c[0], c[1]), ...gy), fall = Math.max(...gy) - lo;
     let st = styleFor(b); const base = lo - 0.2, tint = st.tint;
+    const trimCol = TRIMS[Math.abs((b.id | 0) * 7 + ring.length) % TRIMS.length], fine = detailed(c[0], c[1]);
     if (fall > 0.6 && st.type !== "lighthouse") st = { ...st, h: st.h + fall, storeys: st.storeys ? st.storeys + Math.round(fall / 3) : st.storeys };
     if (near(c[0], c[1])) colliders.push({ ring, base, top: base + st.h + 4 });
 
@@ -141,6 +156,26 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
             continue;
           }
           quad(wallB, A, Bp, [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], tileUV(t), tint);
+          // ---- built detail on the near houses: the drawn facade's frames, sills, lintels, door cases and steps stand out
+          // from the wall as geometry too, so they catch the sun and throw shadows close to ----
+          if (fine && (t === FACADE_TILE.window || t === FACADE_TILE.window2 || t === FACADE_TILE.door) && st.walls !== "cladding") {
+            const bw = len / nb, ux = (x2 - x1) / len, uz = (z2 - z1) / len, u = [ux, uz], nrm = [-uz, ux], tileM = 3; // (the tile is 3 m across; the bay is stretched to its width)
+            const kx = bw / tileM; // metres in the world per metre of the drawn tile, along the wall
+            if (t === FACADE_TILE.door) {
+              const w = 0.95 * kx, x = (bw - w) / 2, hD = 2.1, yTop = y1 - 0.04 - 0.0, yBot = Math.max(y0, yTop - hD);
+              wallBox(B.trim, A, u, nrm, x - 0.06 * kx, x, yBot, yTop + 0.36, 0, 0.06, trimCol); wallBox(B.trim, A, u, nrm, x + w, x + w + 0.06 * kx, yBot, yTop + 0.36, 0, 0.06, trimCol); // the case
+              wallBox(B.trim, A, u, nrm, x - 0.06 * kx, x + w + 0.06 * kx, yTop + 0.3, yTop + 0.36, 0, 0.06, trimCol); // its head
+              wallBox(B.trim, A, u, nrm, x - 0.1 * kx, x + w + 0.1 * kx, y0 - 0.02, y0 + 0.14, 0, 0.32, [0.74, 0.72, 0.68]); // the step
+            } else {
+              const wide = t === FACADE_TILE.window2, w = (wide ? 1.7 : 1.05) * kx, h = 1.55, x = (bw - w) / 2, yTop = y1 - 0.55, yBot = yTop - h;
+              const f = 0.05 * kx;
+              wallBox(B.trim, A, u, nrm, x - f, x, yBot, yTop, 0, 0.045, trimCol); wallBox(B.trim, A, u, nrm, x + w, x + w + f, yBot, yTop, 0, 0.045, trimCol); // the box frame's sides
+              wallBox(B.trim, A, u, nrm, x - f, x + w + f, yTop, yTop + 0.05, 0, 0.045, trimCol); // its head
+              wallBox(B.trim, A, u, nrm, x, x + w, yTop - h * 0.47 - 0.03, yTop - h * 0.47 + 0.03, 0, 0.035, trimCol); // the meeting rail
+              wallBox(B.trim, A, u, nrm, x - 0.12 * kx, x + w + 0.12 * kx, yBot - 0.11, yBot - 0.02, 0, 0.1, st.walls === "brick" ? [0.84, 0.82, 0.76] : [0.9, 0.88, 0.84]); // the sill
+              if (st.walls !== "brick") wallBox(B.trim, A, u, nrm, x - 0.14 * kx, x + w + 0.14 * kx, yTop + 0.1, yTop + 0.3, 0, 0.04, [0.89, 0.87, 0.81]); // a stone lintel
+            }
+          }
         }
       }
       if (front) doorDone = true;
@@ -157,7 +192,13 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
         for (let q = 0; q <= n; q++) { const f = q / n, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f, ux = (x2 - x1) / len * 0.025, uz = (z2 - z1) / len * 0.025; quad(B.dark, [px - ux, rh, pz - uz], [px + ux, rh, pz + uz], [px + ux, rh + 1.0, pz + uz], [px - ux, rh + 1.0, pz - uz], [0, 0, 1, 0, 1, 1, 0, 1], W1); }
       }
       // the gutter: a dark strip just under the eaves
-      if (st.roof !== "flat") quad(B.dark, [x1, top - 0.12, z1], [x2, top - 0.12, z2], [x2, top + 0.02, z2], [x1, top + 0.02, z1], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+      if (st.roof !== "flat") {
+        if (fine) { // a half-round gutter standing out under the eaves, a downpipe near one end of a wall over 6 m
+          const ux = (x2 - x1) / len, uz = (z2 - z1) / len, u = [ux, uz], nrm = [-uz, ux], A0 = [x1, 0, z1], gc = [0.33, 0.34, 0.36];
+          wallBox(B.dark, A0, u, nrm, 0, len, top - 0.1, top + 0.02, 0.02, 0.14, gc);
+          if (len > 6) { const px = 0.45 + ((k * 3) % 2) * 0.3; wallBox(B.dark, A0, u, nrm, px, px + 0.1, base + 0.42, top - 0.1, 0.03, 0.13, gc); wallBox(B.dark, A0, u, nrm, px - 0.02, px + 0.12, top - 0.3, top - 0.1, 0.03, 0.16, gc); }
+        } else quad(B.dark, [x1, top - 0.12, z1], [x2, top - 0.12, z2], [x2, top + 0.02, z2], [x1, top + 0.02, z1], [0, 0, 1, 0, 1, 1, 0, 1], W1);
+      }
       else { // a parapet coping on a flat roof
         quad(B.trim, [x1, top, z1], [x2, top, z2], [x2, top + 0.35, z2], [x1, top + 0.35, z1], [0, 0, 1, 0, 1, 1, 0, 1], st.type === "lookout" ? W1 : [0.85, 0.85, 0.85]);
       }
