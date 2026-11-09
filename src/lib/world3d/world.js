@@ -104,6 +104,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
     if (env.fftSea) env.simulate(simT); // (the spectrum sea's passes count in the frame's GPU time)
     if (env.reflections) { if (!noReflAt--) { noRefl = [...scene.getObjectsByProperty("name", "fdNoReflect"), ...scene.getObjectsByProperty("noReflect", true)]; noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
+    if (post) { post.setFade(dipAt == null ? 1 : Math.min(1, Math.max(0.02, (clockT - dipAt) / 0.35))); if (dipAt != null && clockT - dipAt > 0.35) dipAt = null; }
     if (post) post.render(); else renderer.render(scene, camera);
     if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); qs.push(q); }
     // (collect the answers that are ready, oldest first; a disjoint event, as a change of GPU clock, throws them away)
@@ -137,7 +138,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const look = createLook({ pitch: -0.12 });
   let homeFor = null;
   let mode = "first", focusId = null, localId = null, anglers = new Map(), envState = { swell: 0.3, wind: 0.3, windDir: [0.3, -1], kind: 0 };
-  let landShot = null, landShotOn = true, lastFight = null; // the landing shot (see updateCamera); turned to watch your fish go back
+  let landShot = null, landShotOn = true, lastFight = null, dipAt = null; // (dipAt: a cut in the landing shot comes up from black over a third of a second, rather than jumping) // the landing shot (see updateCamera); turned to watch your fish go back
   let followId = null, followUntil = 0, steering = false; // watching another angler's catch; the camera steering itself
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
 
@@ -451,6 +452,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
         landShot.pos = unblocked(out.at.clone().add(new THREE.Vector3(0, 1.6, 0)), shot); if (landing.water != null) landShot.pos.y = Math.max(landShot.pos.y, landing.water + 0.45); /* (never under the surface as the fish swims off) */ landShot.focus = focusAt; landShot.until = t; landShot.wide = framed ? framed.wide : st === "lower" || st === "haul" || st === "swim";
         anglers.get(localId)?.a.showTag(false);
         if (cutTo) {
+          dipAt = t;
           camPos.copy(landShot.pos); landShot.up = true; landShot.clear = true; const l = lookAt(camPos.toArray(), focusAt.toArray()); look.aim(l.yaw, Math.max(-1.15, Math.min(0.2, l.pitch))); for (let i = 0; i < 40; i++) look.step(0.1);
           if (framed) { landShot.fs = focusAt.clone(); landShot.fs0 = focusAt.clone(); landShot.p = 1; landShot.d0 = 0.5; landShot.fov = (framed.wide ? 60 : 52) * (camera.aspect < 0.8 ? 1.12 : 1); }
         }

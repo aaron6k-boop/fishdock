@@ -1056,7 +1056,13 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           want = { pos, quat: new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(X, Y, Z)), kind: null };
         }
         // easing to something new (a short blend whenever what the hand holds changes); then following it exactly
-        if (want.kind !== h.kind || !h.cur) { h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone(), curl: h.curlNow } : null; h.kind = want.kind; h.u = h.from ? 0 : 1; h.curlTo = gripOf(want.kind); }
+        // (from nothing in the hand to a grip, the blend starts just under the grip, not from the hand's place away below
+        // the view: eased up from there, the rod stood with no hand on it for the first frames of a cast)
+        if (want.kind !== h.kind || !h.cur) {
+          const fromAway = h.kind == null && want.kind != null;
+          h.from = h.cur ? { pos: fromAway ? want.pos.clone().addScaledVector(vu, -0.12) : h.cur.pos.clone(), quat: fromAway ? want.quat.clone() : h.cur.quat.clone(), curl: h.curlNow } : null;
+          h.kind = want.kind; h.u = h.from ? 0 : 1; h.curlTo = gripOf(want.kind);
+        }
         h.u = Math.min(1, h.u + dt / 0.3);
         const e = ease(h.u);
         const pos = h.from ? h.from.pos.clone().lerp(want.pos, e) : want.pos;
