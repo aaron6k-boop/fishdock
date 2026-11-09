@@ -175,3 +175,23 @@ weave).
 313 pass.
 
 **Left.** Car park bays (direction unknown); survey heights for the cliff's steps; walls in one brick.
+
+## Integration (9 November 2026, branch `overhaul-all`, PR #78): the cost
+
+Draw calls read from `renderer.info` for one frame of the pier-head view at Ultra, 1280 x 720, same procedure on
+both builds (the sun and weather set, the camera placed, 600 ms stepped, one frame counted); shadows on, then off.
+
+| build | calls | without the shadow pass | meshes drawn | shadow casters |
+|---|---|---|---|---|
+| production main | 1025 | 704 | 370 | 252 |
+| integration, first cut | 1169 | 787 | 403 | 282 |
+| integration, trees merged | 908 | 607 | 364 | 244 |
+
+The first cut's increase was the trees: four species by three variants, wood and leaves apart, twenty-four meshes,
+each drawn in the shadow, reflection, occlusion and main passes. Now the near trees' wood is one merged mesh (built
+again only when the near set changes, at most twice a second) and every leaf cluster in the town is one instanced
+mesh; both are culled by their own bounds and left out of the water's reflection pass (trees 200 m off add nothing a
+player sees in the water), and a tree changes level with 12 m of hysteresis. The walls, fences, hedges, copings,
+posts and steps are one mesh each. Geometry in memory 27.9 MB against 28.8; texture pixels 13.2 M against 24.0 M.
+Frame times are not claimed: they need the PC (Settings, Graphics, Benchmark at 1080p, 1440p and 4K, Ultra and High),
+and the numbers above are counts, not speed.
