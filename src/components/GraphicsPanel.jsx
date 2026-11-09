@@ -101,7 +101,10 @@ export default function GraphicsPanel({ view, setOpts, world, onClose, scene = n
 // already offers. The launcher is recognised by its user agent, which a browser can imitate; that gains it only
 // these figures about itself.
 /* global __FD_FILM__ */
-export const devMode = () => { try { return (typeof __FD_FILM__ !== "undefined" && __FD_FILM__ === true) || /FishDockDesktop\/\d/.test(navigator.userAgent); } catch { return false; } };
+// (the developer diagnostics and the benchmark: in the film build, the desktop launcher, or any browser once
+// fishdock.dev is set to 1 in its storage or the address carries "dev=1": so a benchmark can be run and copied from the
+// live site and a PR preview alike, on the same PC)
+export const devMode = () => { try { if (/\bdev=1\b/.test(location.hash + location.search)) localStorage.setItem("fishdock.dev", "1"); return (typeof __FD_FILM__ !== "undefined" && __FD_FILM__ === true) || /FishDockDesktop\/\d/.test(navigator.userAgent) || localStorage.getItem("fishdock.dev") === "1"; } catch { return false; } };
 const PRESET_ORDER = ["performance", "balanced", "high", "ultra"];
 function DevDiagnostics({ world, view, setOpts, scene }) {
   const [p, setP] = useState(null), [d, setD] = useState(null), [bench, setBench] = useState(null), [running, setRunning] = useState(false);
