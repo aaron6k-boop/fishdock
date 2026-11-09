@@ -42,3 +42,22 @@ foam steepness factor 2.6) reads 0.5%, 4% and 5.6% at the same winds; the wind g
 noise bring the drawn cover to roughly a third of that, so the drawn whitecaps are in the right order at a fresh
 breeze and a little generous at a light one. Tuned by eye beyond that; no photograph of the real sea at Gorleston
 at a known wind was available to compare against.
+
+## Stage 5 (9 November 2026, branch `overhaul-5`): the land
+
+**Finding.** Every piece of land the map did not mark as beach, grass, bank or dune was drawn as the pier's concrete,
+slab joints and yellow lines included, from the quay out to the horizon: the town stood on one grey slab.
+
+**Change** (`realPlace.js`). Land more than 26 m from a harbour wall and outside every pier and quay footprint is the
+town's ground: worn grass over earth, duller and browner than a park's lawn, bare in patches, with a little of the
+rough-ground photograph in it. The streets lay their own tarmac and pavements over it as before. Edge triangles stay
+on the concrete side, tinted, so the join is a short fade and not a pale saw-edge (the first attempt had one).
+Pavements: their end overlaps cut from 1.5 m to 0.6 m (they stuck out as teeth along a bending street) and a duller
+tone.
+
+**Checked.** Four views before and after from main 65d3fb4 (`stage5-land-before-after.jpg`); `node --test` 313 pass.
+No unit test: the ground is built with the DOM and the map together.
+
+**Left.** The large quay apron at the pier root is still one concrete sheet (it is a car park and a quay in reality,
+but with no kerbs, bays or the Pavilion). The town ground is one tone everywhere: no hedges or garden walls between
+plots, and it rises with the hill but has no banks between streets.
