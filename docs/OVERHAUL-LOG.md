@@ -195,3 +195,30 @@ player sees in the water), and a tree changes level with 12 m of hysteresis. The
 posts and steps are one mesh each. Geometry in memory 27.9 MB against 28.8; texture pixels 13.2 M against 24.0 M.
 Frame times are not claimed: they need the PC (Settings, Graphics, Benchmark at 1080p, 1440p and 4K, Ultra and High),
 and the numbers above are counts, not speed.
+
+## Integration, second pass (9 November 2026): what the walkthrough recording showed
+
+The first normal-speed recording (third person along the pier, then a cast, a fight, the landing, the fish held up
+and put back, all in first person) was looked through frame by frame. What it showed, and what was done:
+
+- **The rod stood with no hands on it for the first frames of a cast.** Taking a grip from nothing, the hands eased
+  up from where they hang out of sight below the view, over 0.3 s. Now a grip taken from nothing starts its blend
+  just under the grip, in both the simple and the real (MPFB) arms.
+- **The forearm filled the right half of the picture at the top of the wind-up.** The rod went back to 2.05 rad,
+  past upright, with the reel in front of the eye, so the butt, and the forearm along it, pointed down across the
+  middle of the view. The wind-up now stops at 1.55 rad, the hands go out to the right rather than back towards
+  the eye, the seat grip's wrist can bend 0.95 rad (was 0.6) so the forearm comes from the elbow out at the side,
+  and the elbow is placed as if the rod pointed at least a little forward.
+- **Both hands ran off the top of the picture when the drop net's rope was first taken.** Before the net is over
+  the wall the hands were placed at a fixed offset below and ahead of the eye; looking steeply down at the net on
+  the deck put that point at the top edge. They are now placed from the view's own axes: low and to the left of
+  wherever you look.
+- **Straight arms on the rope.** Once the net is over the wall the hands sat 0.72 m along the line of sight, at
+  the arm's full reach; now 0.52 m, so the elbows bend.
+- **Hard cuts into the landing shot.** The cut itself is kept (gliding there from your own eyes looked into dark
+  water for two seconds), but the picture now comes up from black over 0.35 s on each cut (`uFade` on the grade
+  pass), so it reads as a cut rather than a jump.
+- **The third-person segment walked into the railing.** A fault of the filming script, not the game: it walked
+  the way the angler faced, at the sea. It now turns west along the pier first.
+
+Frame-by-frame checks of the cast's first 1.2 s and the landing are in the PR. Frame times are still not claimed.
