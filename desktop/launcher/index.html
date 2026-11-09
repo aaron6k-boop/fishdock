@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'; img-src 'self' data:">
+<title>FishDock</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 16px/1.4 "Segoe UI", system-ui, sans-serif; color: #e6eef2; background: #070c10; overflow: hidden; display: grid; place-items: center; }
+  /* a quiet North Sea evening: a slow swell of light across the bottom, nothing that needs an image */
+  .sea { position: fixed; inset: 0; background: radial-gradient(120% 70% at 50% 115%, #1b4a56 0%, #0c2730 35%, #070c10 70%); }
+  .sea::after { content: ""; position: absolute; left: -20%; right: -20%; bottom: 18%; height: 2px; background: linear-gradient(90deg, transparent, #45d3cb66 30%, #45d3cbaa 50%, #45d3cb66 70%, transparent); filter: blur(1px); animation: swell 9s ease-in-out infinite alternate; }
+  @keyframes swell { from { transform: translateX(-3%) scaleX(.9); opacity: .5; } to { transform: translateX(3%) scaleX(1.05); opacity: .9; } }
+  .card { position: relative; width: min(560px, 92vw); padding: 36px 40px 30px; border-radius: 24px; background: #0b161dd9; border: 1px solid #ffffff1a; box-shadow: 0 30px 80px #0009; backdrop-filter: blur(14px); }
+  .head { display: flex; align-items: center; gap: 18px; }
+  .head img { width: 72px; height: 72px; border-radius: 18px; }
+  h1 { margin: 0; font-size: 34px; letter-spacing: .3px; }
+  .sub { margin: 2px 0 0; color: #9fb4bd; font-size: 15px; }
+  .play { display: block; width: 100%; margin: 28px 0 14px; padding: 18px; border: 0; border-radius: 16px; font: inherit; font-size: 22px; font-weight: 700; color: #06201f; background: #45d3cb; cursor: pointer; box-shadow: 0 10px 30px #45d3cb44; }
+  .play:hover { background: #5be0d8; } .play:active { transform: translateY(1px); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .alt { flex: 1 1 150px; padding: 12px 14px; border-radius: 12px; border: 1px solid #ffffff26; background: #ffffff10; color: #e6eef2; font: inherit; font-size: 15px; cursor: pointer; text-align: left; }
+  .alt:hover { background: #ffffff1c; }
+  .alt small { display: block; color: #9fb4bd; font-size: 13px; margin-top: 2px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; color: #7f949c; font-size: 13px; }
+  .foot button { background: none; border: 0; color: #9fb4bd; font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
+  .note { margin-top: 14px; color: #9fb4bd; font-size: 13px; }
+  kbd { padding: 1px 6px; border-radius: 5px; border: 1px solid #ffffff33; background: #ffffff14; font: 12px/1 monospace; }
+</style>
+</head>
+<body>
+<div class="sea" aria-hidden="true"></div>
+<main class="card">
+  <div class="head">
+    <img src="../build/icon.png" alt="">
+    <div>
+      <h1>FishDock</h1>
+      <p class="sub">Fish the UK coast, rivers and lakes</p>
+    </div>
+  </div>
+  <button class="play" id="play">Play</button>
+  <div class="row">
+    <button class="alt" data-route="#try/gorleston-south-pier/cod/3d">Gorleston South Pier<small>Straight to the 3D pier</small></button>
+    <button class="alt" data-route="#together">Fish Together<small>Start or join a party</small></button>
+    <button class="alt" data-route="#live">Live Fishing<small>A real session, catches logged</small></button>
+  </div>
+  <p class="note">Opens full screen. <kbd>F11</kbd> or <kbd>F</kbd> toggles it; <kbd>Esc</kbd> leaves it. Needs the internet: the places, weather and friends are live.</p>
+  <div class="foot">
+    <span id="info">FishDock for Windows</span>
+    <button id="quit">Quit</button>
+  </div>
+  <div class="foot">
+    <span id="loc">Location: ask each time</span>
+    <button id="locbtn">Allow</button>
+  </div>
+</main>
+<script src="launcher.js"></script>
+</body>
+</html>

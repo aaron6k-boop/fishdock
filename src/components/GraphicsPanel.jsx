@@ -34,7 +34,7 @@ const CONTROLS = [
   { k: "tex", label: "Texture sharpness", opts: [[2, "Low"], [4, "Medium"], [8, "High"], [16, "Highest"]], why: "How clear the deck, brick and sea stay when seen at a low angle." },
 ];
 
-export default function GraphicsPanel({ view, setOpts, world, onClose }) {
+export default function GraphicsPanel({ view, setOpts, world, onClose, scene = null }) {
   const preset = view.gfx || "auto", custom = view.gfxC && typeof view.gfxC === "object" ? view.gfxC : {}, battery = !!view.battery;
   const info = world?.gfx || null, built = info?.preset || (preset === "auto" ? "balanced" : preset);
   const eff = effectiveGfx(built, custom, battery);
@@ -88,6 +88,76 @@ export default function GraphicsPanel({ view, setOpts, world, onClose }) {
       })}
       <button type="button" role="switch" aria-checked={!!view.fpsShow} className={`ft-pill${view.fpsShow ? " on" : ""}`} onClick={() => setOpts({ fpsShow: !view.fpsShow })}>Show FPS</button>
       <button type="button" className="ft-pill" onClick={reset}>Reset to recommended</button>
+      {devMode() ? <DevDiagnostics world={world} view={view} setOpts={setOpts} scene={scene} /> : null}
+    </div>
+  );
+}
+
+// ---- developer diagnostics ----
+// Shown in a development build (__FD_FILM__, which production never sets) and in the Windows launcher, where the
+// player is testing on their own machine. It is read-only about this machine's own drawing (frame times, draw
+// calls, the graphics card's name, which any website can read, the camera's place in the scene): nothing about the
+// person, their catches, their location or their account, and no action beyond the graphics presets the panel
+// already offers. The launcher is recognised by its user agent, which a browser can imitate; that gains it only
+// these figures about itself.
+/* global __FD_FILM__ */
+export const devMode = () => { try { return (typeof __FD_FILM__ !== "undefined" && __FD_FILM__ === true) || /FishDockDesktop\/\d/.test(navigator.userAgent); } catch { return false; } };
+const PRESET_ORDER = ["performance", "balanced", "high", "ultra"];
+function DevDiagnostics({ world, view, setOpts, scene }) {
+  const [p, setP] = useState(null), [d, setD] = useState(null), [bench, setBench] = useState(null), [running, setRunning] = useState(false);
+  useEffect(() => { const t = setInterval(() => { setP(world?.perf?.() || null); setD(world?.diag?.() || null); }, 1000); return () => clearInterval(t); }, [world]);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const pct = (a, q) => a[Math.min(a.length - 1, Math.max(0, Math.ceil(a.length * q) - 1))];
+  // the benchmark: the same scene for every run (a clear afternoon, a light wind, looking out over the rod from your
+  // spot), each preset in turn with no custom settings and no battery saver, 6 s to build and settle, then 8 s
+  // measured frame by frame; everything you had set is put back afterwards, whatever happens
+  const run = async () => {
+    if (running || !world) return; setRunning(true);
+    const saved = { gfx: view.gfx || "auto", gfxC: view.gfxC && typeof view.gfxC === "object" ? { ...view.gfxC } : {}, battery: !!view.battery, fpsShow: !!view.fpsShow };
+    const rows = [];
+    try {
+      const fixed = () => { world.setEnv?.({ light: { sunAlt: 28, sunAz: 200 }, cond: { cloudPct: 30, windKph: 16, precipMm: 0 }, facing: scene?.facing ?? 180 }); world.lookAtRod?.(); };
+      // a preset change rebuilds the world: wait until it is drawing again (frames ticking), up to 40 s
+      const ready = async () => { let n0 = -1; for (let i = 0; i < 40; i++) { await wait(1000); const f = world.frameTimes?.(); if (f && n0 >= 0 && f.n > n0 + 5) return f.n; n0 = f ? f.n : -1; } return world.frameTimes?.()?.n ?? 0; };
+      for (const q of PRESET_ORDER) {
+        setOpts({ gfx: q, gfxC: {}, battery: false }); await wait(500); await ready();
+        world.setGfx?.(effectiveGfx(q, {}, false)); fixed(); await wait(5000);
+        const t0 = performance.now(); let since = world.frameTimes?.()?.n ?? 0; const all = [];
+        while (performance.now() - t0 < 8000) { await wait(1000); const f = world.frameTimes?.(since); if (f) { all.push(...f.times); since = f.n; } }
+        const last = world.perf?.();
+        if (all.length > 10 && last) {
+          const a = all.slice().sort((x, y) => x - y), mean = a.reduce((s2, v) => s2 + v, 0) / a.length;
+          rows.push({ q, frames: a.length, fps: Math.round(1000 / mean), p50: +pct(a, 0.5).toFixed(1), p95: +pct(a, 0.95).toFixed(1), p99: +pct(a, 0.99).toFixed(1), low1: Math.round(1000 / pct(a, 0.99)), gpu: last.gpu, calls: last.calls, tris: last.tris, texMB: last.texMB, res: last.res });
+          setBench([...rows]);
+        }
+      }
+    } finally {
+      setOpts(saved); world.setGfx?.(effectiveGfx(saved.gfx === "auto" ? (world.gfx?.preset || "balanced") : saved.gfx, saved.gfxC, saved.battery));
+      if (scene?.light && scene?.cond) world.setEnv?.({ light: scene.light, cond: scene.cond, facing: scene.facing ?? 180 });
+      setRunning(false);
+    }
+  };
+  const text = () => {
+    const head = `FishDock benchmark · ${p?.gpuName || "unknown GPU"} · ${navigator.userAgent.match(/FishDockDesktop\/[\d.]+/)?.[0] || "browser"} · window ${innerWidth}x${innerHeight} @${devicePixelRatio}x · scene: Gorleston, clear afternoon, 16 kph, from the spot\npreset | frames | avg fps | p50 ms | p95 ms | p99 ms | 1% low fps | GPU ms | draws | tris | tex MB | drawn at`;
+    return [head, ...(bench || []).map((r) => `${NAME[r.q]} | ${r.frames} | ${r.fps} | ${r.p50} | ${r.p95} | ${r.p99} | ${r.low1} | ${r.gpu ?? "n/a"} | ${r.calls} | ${r.tris} | ${r.texMB} | ${r.res?.join("x")}`)].join("\n");
+  };
+  return (
+    <div className="gfx-dev">
+      <span className="cam-head">Developer diagnostics</span>
+      {p ? <pre className="gfx-pre">{`${p.fps} fps · 1% low ${p.low} · ${p.ms} ms/frame${p.gpu != null ? ` · GPU ${p.gpu} ms` : " · GPU time n/a"}
+${p.calls} draw calls · ${Math.round(p.tris / 1000)}k triangles · ${p.geometries} geometries · ${p.textures} textures (~${p.texMB} MB)
+drawn at ${p.res?.join(" x ")} (${p.dpr.toFixed(2)}x) · preset ${NAME[p.preset] || p.preset}
+GPU: ${p.gpuName || "not reported"}`}</pre> : null}
+      {d ? <pre className="gfx-pre">{`camera ${d.cam.join(", ")} · yaw ${d.yawDeg}° pitch ${d.pitchDeg}° fov ${d.fov} · ${d.mode}
+light day ${d.light.day} dusk ${d.light.dusk} night ${d.light.night} cloud ${d.light.cloud} rain ${d.light.rain} · exposure ${d.light.exposure}
+sea swell ${d.sea.swell} wind ${d.sea.wind} from ${d.sea.windDir.join(", ")} · built in ${d.buildMs} ms · ${d.programs} shaders
+you at ${d.at ? d.at.join(", ") : "-"} · ${d.phase || "-"}`}</pre> : null}
+      <div className="cam-row">
+        <button type="button" className="ft-pill" disabled={running} onClick={run}>{running ? "Benchmarking: about a minute, your settings come back after" : "Run benchmark: every preset"}</button>
+        {bench?.length ? <button type="button" className="ft-pill" onClick={() => navigator.clipboard?.writeText(text()).catch(() => {})}>Copy results</button> : null}
+      </div>
+      {bench?.length ? <pre className="gfx-pre">{text()}</pre> : null}
+      <span className="gfx-why">Measured on this machine, in this window. GPU time needs a browser that offers the timer (Chrome and the launcher do; Safari doesn't).</span>
     </div>
   );
 }

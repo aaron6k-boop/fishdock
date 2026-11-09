@@ -95,11 +95,19 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // (the water's mirror is drawn first, without your own first-person hands: environment.js reflect)
   let noRefl = [], noReflAt = 0;
   let simT = 0;
+  // the graphics card's own time per frame (what it spends drawing, apart from everything the page does around it):
+  // a GPU timer query round each frame where the browser offers one (Chromium on a PC; not Safari). The answer comes
+  // back a few frames later; the last 60 are kept for perf()
+  const gl = renderer.getContext(), tq = gl.getExtension("EXT_disjoint_timer_query_webgl2"), gpuT = new Float32Array(60); let gpuN = 0, qs = [];
   function drawFrame() {
     sharpen(); renderer.info.reset();
-    if (env.fftSea) env.simulate(simT);
+    let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
+    if (env.fftSea) env.simulate(simT); // (the spectrum sea's passes count in the frame's GPU time)
     if (env.reflections) { if (!noReflAt--) { noRefl = scene.getObjectsByProperty("name", "fdNoReflect"); noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
     if (post) post.render(); else renderer.render(scene, camera);
+    if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); qs.push(q); }
+    // (collect the answers that are ready, oldest first; a disjoint event, as a change of GPU clock, throws them away)
+    while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) { const d = gl.getParameter(tq.GPU_DISJOINT_EXT); const ns = gl.getQueryParameter(qs[0], gl.QUERY_RESULT); gl.deleteQuery(qs.shift()); if (!d) gpuT[gpuN++ % 60] = ns / 1e6; }
   }
   const tBuild = performance.now();
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
@@ -777,7 +785,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const n = Math.min(ftN, 240); if (!n) return null;
       const a = Array.from(ft.subarray(0, n)).sort((x, y) => x - y), mean = a.reduce((s2, v) => s2 + v, 0) / n, worst = a[Math.min(n - 1, Math.floor(n * 0.99))];
       const r = renderer.info.render;
-      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures };
+      let gpu = null; if (gpuN) { const m = Math.min(gpuN, 60); let s2 = 0; for (let i = 0; i < m; i++) s2 += gpuT[i]; gpu = +(s2 / m).toFixed(1); }
+      // texture memory, estimated from each texture's size (with its mip chain): what the card holds for this scene
+      let texMB = 0; try { const seen = new Set(); scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) for (const k in m) { const t = m[k]; if (t && t.isTexture && !seen.has(t)) { seen.add(t); const im = t.image; const w = im?.width || im?.videoWidth || 0, h = im?.height || im?.videoHeight || 0; texMB += (w * h * 4 * (t.generateMipmaps ? 1.333 : 1)) / 1048576; } } }); } catch { texMB = 0; }
+      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), gpu, calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, texMB: Math.round(texMB), gpuName: gpuName(), preset: Q === QUALITY3D.ultra ? "ultra" : Q === QUALITY3D.high ? "high" : Q === QUALITY3D.performance ? "performance" : "balanced", res: [renderer.domElement.width, renderer.domElement.height] };
     },
     setAnglers,
     realCheck,
@@ -787,6 +798,24 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     get mySpot() { const me = anglers.get(localId); const s = me?.a.spot; return s ? { id: s.id, name: s.name, at: s.at, face: s.face } : null; },
     setNow(f) { nowFn = f || Date.now; },
     setEnv: setEnvAll,
+    /** Every frame time since frame `since` (ms, oldest first) and the count so far, for percentiles over a whole
+     *  benchmark run rather than the last few seconds: callers keep `n` and ask again. (240 frames are kept: ask at
+     *  least every two seconds at 120 fps.) */
+    frameTimes(since = 0) { const n = ftN, from = Math.max(since, n - 240), out = []; for (let i = from; i < n; i++) out.push(ft[i % 240]); return { n, times: out }; },
+    /** For the developer diagnostics panel (dev mode only): where the camera is and looks, the light and weather in
+     *  force, how long the place took to build and what has loaded. Numbers only, nothing that identifies a person. */
+    diag() {
+      const d = new THREE.Vector3(); camera.getWorldDirection(d);
+      const yaw = Math.atan2(d.x, -d.z), pitch = Math.asin(Math.max(-1, Math.min(1, d.y)));
+      const L2 = env.current || {}, me = anglers.get(localId)?.out;
+      return {
+        cam: camera.position.toArray().map((v) => +v.toFixed(2)), yawDeg: Math.round((yaw * 180) / Math.PI), pitchDeg: Math.round((pitch * 180) / Math.PI), fov: +camera.fov.toFixed(1), mode,
+        light: { day: +((L2.day ?? 0).toFixed(2)), dusk: +((L2.dusk ?? 0).toFixed(2)), night: +((L2.night ?? 0).toFixed(2)), cloud: +((L2.cloud ?? 0).toFixed(2)), rain: +((L2.rain ?? 0).toFixed(2)), exposure: +renderer.toneMappingExposure.toFixed(2) },
+        sea: { swell: +envState.swell.toFixed(2), wind: +envState.wind.toFixed(2), windDir: envState.windDir.map((v) => +v.toFixed(2)) },
+        buildMs, phase: me?.phase || null, at: me ? me.at.toArray().map((v) => +v.toFixed(1)) : null,
+        programs: renderer.info.programs?.length || 0,
+      };
+    },
     /** Walk about (true) or stand at your spot again (false). Returns null when it worked, or why not. */
     walk(on, { dist = "normal" } = {}) {
       const me = anglers.get(localId);

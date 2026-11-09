@@ -393,6 +393,8 @@ html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(saf
 .gfx-note, .gfx-why { margin: 0; font-size: 12px; line-height: 1.35; color: #b9c8d1; }
 .gfx-row { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-top: 1px solid #ffffff14; }
 .gfx-row.off { opacity: .5; }
+.gfx-dev { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 8px; border-top: 1px solid #ffffff1f; }
+.gfx-pre { margin: 0; padding: 8px 10px; border-radius: 8px; background: #000a; font: 11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; color: #d6e4ec; }
 .gfx-panel .ft-pill.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: var(--action); } /* (the chosen setting, clearly marked) */
 .gfx-label { font-size: 13px; font-weight: 600; }
 .fps-meter { position: absolute; z-index: 6; left: max(10px, env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); padding: 5px 8px; border-radius: 8px; background: #000a; color: #fff; font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: none; }
