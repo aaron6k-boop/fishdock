@@ -5,7 +5,7 @@
 // lookout. All buildings share a handful of meshes (one per material), so a town of 500 stays quick on a phone.
 import * as THREE from "three";
 import { styleFor, pitchedRoof, obb, footprintArea } from "./architecture.js";
-import { facade, roof, bricks, FACADE_TILE, photoTex } from "./textures3d.js";
+import { facade, roof, bricks, FACADE_TILE, FACADE_N, photoTex } from "./textures3d.js";
 
 const area2 = (ring) => { let a = 0; for (let i = 0; i < ring.length; i++) { const [x1, z1] = ring[i], [x2, z2] = ring[(i + 1) % ring.length]; a += x1 * z2 - x2 * z1; } return a / 2; };
 
@@ -29,7 +29,9 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const roofs = { slate: roof("slate", 11), clay: roof("clay", 12), felt: roof("felt", 13) };
   const brk = bricks(17);
   const M = {};
-  for (const [k, t] of Object.entries(tex)) { t.map.wrapS = t.map.wrapT = THREE.ClampToEdgeWrapping; t.emissiveMap.wrapS = t.emissiveMap.wrapT = THREE.ClampToEdgeWrapping; M[k] = new THREE.MeshStandardMaterial({ map: t.map, vertexColors: true, roughness: 0.88, emissive: 0xffc070, emissiveMap: t.emissiveMap, emissiveIntensity: 0 }); }
+  // (the facade's own depth and finish: its normal map gives the reveals, frames, sills and courses their relief under
+  // the sun; its roughness map keeps the wall matt and lets the glass mirror the sky)
+  for (const [k, t] of Object.entries(tex)) { for (const m of [t.map, t.emissiveMap, t.normalMap, t.roughnessMap]) { m.wrapS = m.wrapT = THREE.ClampToEdgeWrapping; m.anisotropy = 8; } M[k] = new THREE.MeshStandardMaterial({ map: t.map, vertexColors: true, roughness: 1, roughnessMap: t.roughnessMap, normalMap: t.normalMap, normalScale: new THREE.Vector2(1, 1), emissive: 0xffc070, emissiveMap: t.emissiveMap, emissiveIntensity: 0 }); }
   // ---- the walls' own surface, photographed (Poly Haven CC0: public/textures), laid over the drawn facades at its
   // real size in the world (about 1.1 m a tile), the windows left clear ----
   // The drawn facades are small (128 px a bay): from the pier the town read as flat, smooth toy houses. Over them now:
@@ -38,7 +40,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const wallPhoto = { brick: photoTex("brick_red_diff"), render: photoTex("plaster_diff"), stone: photoTex("plaster_diff") };
   for (const [k, ph] of Object.entries(wallPhoto)) {
     if (!ph || !M[k]) continue;
-    const m = M[k], strong = k === "brick" ? 1.0 : 0.55;
+    const m = M[k], strong = k === "brick" ? 0.8 : 0.3; // (lighter than before: the drawn facade now carries its own courses and grain, and the photographed plaster at .55 made every painted house read as grey, streaked stucco)
     m.onBeforeCompile = (sh) => {
       sh.uniforms.uWallPh = { value: ph };
       sh.vertexShader = "varying vec3 vWallW;\nvarying vec3 vWallN;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvWallW = (modelMatrix * vec4(transformed, 1.0)).xyz; vWallN = normalize(mat3(modelMatrix) * objectNormal);");
@@ -62,7 +64,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     };
     m.customProgramCacheKey = () => "fdwall1" + k;
   }
-  for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, vertexColors: true, roughness: k === "slate" ? 0.6 : 0.85 });
+  for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1, vertexColors: true });
   M.tower = new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.85 });
   M.trim = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.6, vertexColors: true, side: THREE.DoubleSide });
   M.dark = new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 0.5, metalness: 0.3, vertexColors: true, side: THREE.DoubleSide });
@@ -71,7 +73,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const B = Object.fromEntries(Object.keys(M).map((k) => [k, bucket()]));
   const colliders = [], glow = [M.brick, M.render, M.cladding, M.stone];
   const W1 = [1, 1, 1];
-  const tileUV = (t, u0 = 0, u1 = 1, v0 = 0, v1 = 1) => [(t + u0) / 4, v0, (t + u1) / 4, v0, (t + u1) / 4, v1, (t + u0) / 4, v1];
+  const tileUV = (t, u0 = 0, u1 = 1, v0 = 0, v1 = 1) => [(t + u0) / FACADE_N, v0, (t + u1) / FACADE_N, v0, (t + u1) / FACADE_N, v1, (t + u0) / FACADE_N, v1];
   const chimneyBox = (x, z, y0, h, s = 0.6) => {
     const pts = [[x - s / 2, z - s / 2], [x - s / 2, z + s / 2], [x + s / 2, z + s / 2], [x + s / 2, z - s / 2]];
     for (let k = 0; k < 4; k++) { const [x1, z1] = pts[k], [x2, z2] = pts[(k + 1) % 4]; quad(B.tower, [x1, y0, z1], [x2, y0, z2], [x2, y0 + h, z2], [x1, y0 + h, z1], [0, 0, s / 1.2, 0, s / 1.2, h / 0.6, 0, h / 0.6], W1); }
@@ -123,7 +125,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
         for (let q = 0; q < nb; q++) {
           const f0 = q / nb, f1 = (q + 1) / nb, y0 = base + s * sh, y1 = y0 + sh;
           const A = [x1 + (x2 - x1) * f0, y0, z1 + (z2 - z1) * f0], Bp = [x1 + (x2 - x1) * f1, y0, z1 + (z2 - z1) * f1];
-          let t = len / nb < 1.6 ? FACADE_TILE.plain : FACADE_TILE.window;
+          let t = len / nb < 1.6 ? FACADE_TILE.plain : (st.wide && s > 0 && q % 2 === 0 ? FACADE_TILE.window2 : FACADE_TILE.window);
           if (st.type === "warehouse") t = s === 0 && front && q === Math.floor(nb / 2) ? FACADE_TILE.door : (q + s) % 3 === 0 && st.walls !== "cladding" ? FACADE_TILE.window : FACADE_TILE.plain;
           else if (st.type === "lookout") t = s === 1 ? FACADE_TILE.shop : front && q === Math.floor(nb / 2) ? FACADE_TILE.door : q % 2 ? FACADE_TILE.window : FACADE_TILE.plain;
           else if (s === 0 && st.shop && len > 4) t = FACADE_TILE.shop;
@@ -175,6 +177,14 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
       }
       // the underside of the eave overhang (seen from below), so the roof doesn't look paper thin
       for (let k = 0; k < ring.length; k++) { const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length]; const g = 1 + 0.3 / Math.max(1, box.W / 2), cx = box.c[0], cz = box.c[1]; quad(B.trim, [x1, top, z1], [x2, top, z2], [cx + (x2 - cx) * g, top, cz + (z2 - cz) * g], [cx + (x1 - cx) * g, top, cz + (z1 - cz) * g], [0, 0, 1, 0, 1, 1, 0, 1], [0.7, 0.7, 0.7]); }
+      // the ridge: a run of ridge tiles along the top (half-round clay on a pantile roof, a dark angle on slate), standing
+      // a little proud, so the roof line reads as a built edge, not a crease in the texture
+      if (R.ridge && R.rise > 0.3) {
+        const [r0, r1] = R.ridge, ry = top + R.rise, dx = r1[0] - r0[0], dz = r1[1] - r0[1], l = Math.hypot(dx, dz) || 1, px = -dz / l * 0.14, pz = dx / l * 0.14;
+        const rB = st.roofMat === "clay" ? roofB : B.dark, rcol = st.roofMat === "clay" ? [0.9, 0.86, 0.84] : [0.55, 0.57, 0.6];
+        quad(rB, [r0[0] - px, ry - 0.02, r0[1] - pz], [r1[0] - px, ry - 0.02, r1[1] - pz], [r1[0], ry + 0.09, r1[1]], [r0[0], ry + 0.09, r0[1]], [0, 0, l / 0.3, 0, l / 0.3, 0.6, 0, 0.6], rcol);
+        quad(rB, [r1[0] + px, ry - 0.02, r1[1] + pz], [r0[0] + px, ry - 0.02, r0[1] + pz], [r0[0], ry + 0.09, r0[1]], [r1[0], ry + 0.09, r1[1]], [0, 0, l / 0.3, 0, l / 0.3, 0.6, 0, 0.6], rcol);
+      }
       if (st.chimneys) {
         const [r0, r1] = R.ridge, y0 = top + R.rise * 0.55;
         const ends = st.chimneys === 2 ? [r0, r1] : [r1];

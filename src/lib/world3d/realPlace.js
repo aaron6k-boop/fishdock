@@ -16,6 +16,7 @@ import { localFor } from "./localDetail.js";
 import { LANDMARK_BUILDERS } from "./landmarks3d.js";
 import { WET_PREP, WET_DARKEN, wetRough } from "./wetLook.js";
 import { contactShadows } from "./contactShadow.js";
+import { buildTrees } from "./trees3d.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -855,6 +856,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       return { at: [x, y, z], face: Math.atan2(nx, -nz), edge: Math.max(0.3, e.d), cast: 26 };
     },
   };
+  // ---- trees and scrub on the grass and the cliff's bank (trees3d.js): not on a road, a building or near a spot ----
+  {
+    const roads = place.roads || [];
+    const onRoad = (x, z) => roads.some((r) => { for (let i = 0; i + 1 < r.line.length; i++) if (segDist([x, z], r.line[i], r.line[i + 1]) < r.w / 2 + 2.2) return true; return false; });
+    const bankAt = (x, z) => { if (!local?.hill) return 0; const d = Math.abs(local.hill(x - 2, z) - local.hill(x + 2, z)); return d > 0.3 ? Math.min(1, d / 0.8) : 0; };
+    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z), bank: bankAt, quality, seed: 3 + (place.spots?.length || 0) });
+    if (trees) place.trees = trees.count;
+  }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }
   void PLACE3D;

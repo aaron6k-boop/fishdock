@@ -42,6 +42,7 @@ export function styleFor(b) {
     type: "house", walls: brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < 0.62 ? "slate" : "clay",
     storeys, h: b.tall ? Math.max(3, b.h) : storeys * storeyH, shop: b.use === "shop", chimneys: roofShape !== "flat" ? (A > 60 ? 2 : 1) : 0,
     tint: brick ? tinted(BRICK) : tinted(RENDER),
+    wide: r2 > 0.45, // (the wider three-light windows of a seafront house on its upper storeys, on about half of them)
   };
 }
 
