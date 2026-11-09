@@ -406,14 +406,16 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 body = mix(uWater*1.08, uWater*.6 + vec3(.014, .01, .002), pow(clamp(v.y, 0., 1.), .6));
         // and the turbidity's own soft light, varying slowly (silt clouds and the swell's shade), more of it close by
         body += vec3(.016, .017, .012)*(.4 + .8*noise(p*.07 + uTime*.02))*(1. - smoothstep(4., 60., dist));
-        body = mix(body, uWater*1.3 + vec3(.01, .03, .015), shallow*.7)*lit*dim;
+        // (the shallows by the walls and the beach: lighter and browner, the sand and silt stirred up, not a cleaner green)
+        body = mix(body, uWater*1.3 + vec3(.022, .026, .012), shallow*.7)*lit*dim;
         // under a grey sky the North Sea goes a lighter grey-green (the cloud's light scattered back out of the silty
         // water), not the dark teal of a clear day
         { float ovs = smoothstep(.55, 1., uCloud); body = mix(body, vec3(.2, .235, .22)*lit, ovs*.5); }
         // light through the thin water at the crests, more so looking towards the sun
         float crest = smoothstep(-.05, .4, h)*(1. - uNight);
         float toward = pow(max(dot(-v, normalize(vec3(uSunDir.x, 0., uSunDir.z))), 0.), 3.);
-        body += vec3(.010, .042, .036)*crest*(.5 + 1.1*toward)*lit*dim;
+        // (a grey-green, not a teal: the North Sea's silt takes the blue out of the light through a crest)
+        body += vec3(.012, .034, .024)*crest*(.5 + 1.1*toward)*lit*dim;
         // close below you, light comes back up out of the water: the foreground isn't a black pool
         body *= 1. + .15*(1. - smoothstep(3., 26., dist));
         body += vec3(.004, .008, .014)*uNight;
