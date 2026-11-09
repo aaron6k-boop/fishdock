@@ -28,7 +28,8 @@ export const QUALITY3D = {
   high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2, late: 0.025, easy: 10 },
   // a computer with a graphics card: drawn at twice the screen's pixels (or more) and scaled down, finer shade
   // (and kept smooth: a frame slower than about 48 a second counts as late, where the others allow down to 28)
-  ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021 },
+  // (sea: the spectrum sea, fftSea.js: the wind sea simulated from a wave spectrum on the graphics card)
+  ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021, sea: 1 },
 };
 export function autoQuality3d() {
   try {
@@ -93,14 +94,17 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   renderer.info.autoReset = false;
   // (the water's mirror is drawn first, without your own first-person hands: environment.js reflect)
   let noRefl = [], noReflAt = 0;
+  let simT = 0;
   function drawFrame() {
     sharpen(); renderer.info.reset();
+    if (env.fftSea) env.simulate(simT);
     if (env.reflections) { if (!noReflAt--) { noRefl = scene.getObjectsByProperty("name", "fdNoReflect"); noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
     if (post) post.render(); else renderer.render(scene, camera);
   }
   const tBuild = performance.now();
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
   const buildMs = Math.round(performance.now() - tBuild);
+  if (Q.sea) env.setFftSea(true, renderer);
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
@@ -608,7 +612,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // a set time per frame, so an animation can be filmed exactly even where frames are slow (software graphics)
   let film = null;
   if (typeof window !== "undefined" && FILM) {
-    window.__fdWorld = { Raycaster: THREE.Raycaster,
+    window.__fdWorld = { Raycaster: THREE.Raycaster, renderer, environment: env, THREE,
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),
       // so every phase plays through the real animation code from a known start, frame for frame the same each run:
@@ -714,7 +718,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     }
     dropGeo.attributes.position.needsUpdate = true;
     env.setRipples(stepRipples(ripples, dt));
-    env.update(t, dt, camera);
+    env.update(t, dt, camera); simT = t;
     adapt();
     if (draw) drawFrame();
     const spent = performance.now() - t0;

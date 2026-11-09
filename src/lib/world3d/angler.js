@@ -69,11 +69,12 @@ function noise2(x, y) {
   const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
   return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy;
 }
-export function waveHeight(x, z, t, { swell = 0.3, wind = 0.3, windDir = [0.3, -1], kind = 0 } = {}) {
+export function waveHeight(x, z, t, { swell = 0.3, wind = 0.3, windDir = [0.3, -1], kind = 0, chop = 1 } = {}) {
   const sea = kind < 0.5 ? 1 : kind < 1.5 ? 0.5 : 0;
   const wl = Math.hypot(windDir[0], windDir[1]) || 1, wd = [windDir[0] / wl, windDir[1] / wl], wx = [-wd[1], wd[0]];
   const g1 = noise2(x * 0.011 + t * 0.021, z * 0.011 - t * 0.013), g2 = noise2(x * 0.017 + 31 - t * 0.017, z * 0.017 + 31 - t * 0.024);
-  const ph = (g1 - 0.5) * 5, A = (0.16 + 0.5 * swell) * sea, B = 0.045 + 0.13 * wind;
+  // (chop: how much of the wind chop the trains carry; under the spectrum sea (Ultra) it is .35, the rest is on the GPU)
+  const ph = (g1 - 0.5) * 5, A = (0.16 + 0.5 * swell) * sea, B = (0.045 + 0.13 * wind) * chop;
   const tr = (dx, dz, k, a, p) => { const l = Math.hypot(dx, dz) || 1; return a * Math.sin(((x * dx + z * dz) / l) * k - t * Math.sqrt(9.81 * k) + p); };
   return tr(0.2, -1, 0.085, A * (0.55 + 0.9 * g1), ph)
     + tr(-0.42, -1, 0.131, A * 0.55 * (0.5 + g2), ph * 0.7 + 1.3)

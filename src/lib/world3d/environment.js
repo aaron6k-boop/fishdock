@@ -3,6 +3,7 @@
 // follow the wind and the kind of place; the ground and scenery are built for a pier, beach, estuary quay, river
 // bank or lake. All conditions come in through setEnv, so the sky, light, water, rain and fog agree.
 import * as THREE from "three";
+import { createFftSea } from "./fftSea.js";
 import { installFogScatter, SCATTER } from "./fogScatter.js";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
@@ -216,6 +217,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
     uNrm: { value: null }, uNrmOn: { value: 0 },
     uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() }, uFdSun: { value: new THREE.Vector3() },
+    // the spectrum sea (fftSea.js, Ultra): its displacement and slope maps, the size of each cascade's tile, and how
+    // much of the sine-train chop stays under it (the trains carry the swell; the CPU rides the same trains)
+    uDbg: { value: 0 }, uFft: { value: 0 }, uDisp0: { value: null }, uDer0: { value: null }, uDer1: { value: null }, uL0: { value: 180 }, uL1: { value: 22 }, uChop: { value: 1 },
   };
   // the sea's fine ripples: a water normal map (three.js's, MIT; source-assets/ASSET-LICENCES.json), until it has
   // loaded the old noise ripples stand in
@@ -237,7 +241,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // short chop), so the pattern never lines up and repeats. A slow, broad wander in their phase and size brings groups
   // of bigger waves through and then quieter spells, and bends the crests, so it isn't one animated sheet.
   const GLSL_WAVES = /* glsl */`
-    uniform float uWind, uSwell, uKind; uniform vec2 uWindDir;
+    uniform float uWind, uSwell, uKind, uChop; uniform vec2 uWindDir;
     vec3 train(vec2 p, vec2 d, float k, float a, float ph){ float x = dot(p, d)*k - uTime*sqrt(9.81*k) + ph; return vec3(a*sin(x), a*k*cos(x)*d); }
     // x: height; yz: slope
     vec3 seaWaves(vec2 p){
@@ -245,7 +249,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       float sea = uKind < .5 ? 1. : uKind < 1.5 ? .5 : 0.;
       float g1 = noise(p*.011 + vec2(uTime*.021, -uTime*.013)), g2 = noise(p*.017 + 31. - vec2(uTime*.017, uTime*.024));
       float ph = (g1 - .5)*5.;
-      float A = (.16 + .5*uSwell)*sea, B = .045 + .13*uWind;
+      float A = (.16 + .5*uSwell)*sea, B = (.045 + .13*uWind)*uChop;
       vec3 s = train(p, normalize(vec2(.2, -1.)), .085, A*(.55 + .9*g1), ph);
       s += train(p, normalize(vec2(-.42, -1.)), .131, A*.55*(.5 + g2), ph*.7 + 1.3);
       s += train(p, normalize(vec2(.65, -1.)), .207, A*.25*(.4 + 1.2*g1), 4.1 - ph*.5);
@@ -256,22 +260,28 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       return s;
     }`;
   const waterMat = new THREE.ShaderMaterial({
-    uniforms: wU, transparent: false, defines: { WQ: LQ.waterDetail, SKYQ: 0 },
-    vertexShader: GLSL_NOISE + "uniform float uTime; uniform vec3 uCam;" + GLSL_WAVES + /* glsl */`
-      varying vec3 vW;
+    uniforms: wU, transparent: false, defines: { WQ: LQ.waterDetail, SKYQ: 0, FFT: 0 },
+    vertexShader: GLSL_NOISE + "uniform float uTime; uniform vec3 uCam; uniform float uFft, uL0; uniform sampler2D uDisp0;" + GLSL_WAVES + /* glsl */`
+      varying vec3 vW; varying vec2 vP;
       void main(){
         vec3 w = position + vec3(uCam.x, 0., uCam.z);
+        vP = w.xz;
         float fade = 1. - smoothstep(60., 500., length(w.xz - uCam.xz));
         vec3 s = seaWaves(w.xz);
         // in a blow the crests pinch together (water drawn towards each crest), so they look sharp, not smooth
         w.xz += s.yz*(.4 + 2.*uWind)*fade;
         w.y += s.x*fade;
+        // the spectrum sea's displacement (Ultra): the wind sea's shape, crests drawn together, on top of the swell
+        #if FFT
+          if (uFft > .5) w += texture2D(uDisp0, vP/uL0).xyz*fade;
+        #endif
         vW = w;
         gl_Position = projectionMatrix*viewMatrix*vec4(w, 1.);
       }`,
     fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + POST_GLSL + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
       uniform sampler2D uShore, uShoreF, uNrm, uRefl; uniform float uShoreFHalf, uNrmOn, uReflOn; uniform mat4 uReflMat; uniform vec3 uFdSun;
+      uniform float uFft, uL0, uL1, uDbg; uniform sampler2D uDer0, uDer1;
       // the scene's own light (linear, before the tone curve) to the display colours the water works in: the same
       // neutral curve and sRGB the rest of the picture gets at the end (post.js OutputPass), so the mirrored dune and
       // town match the real ones
@@ -285,7 +295,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec2 fv = p/(2.*uShoreFHalf) + .5;
         if (fv.x > 0. && fv.y > 0. && fv.x < 1. && fv.y < 1.) { float f = texture2D(uShoreF, fv).r*8.; return f < 7.8 ? f : max(far, f); }
         return far; }
-      varying vec3 vW;
+      varying vec3 vW; varying vec2 vP;
       #if WQ > 0
         #define RAIN_LAYERS 2
       #else
@@ -298,6 +308,18 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 s = seaWaves(p);
         float h = s.x;
         vec2 g = s.yz;
+        // ---- the spectrum sea (Ultra): slopes from both cascades (the maps' mip levels average them out with
+        // distance, so the far sea goes smooth by itself), its height into the crest light, its folded crests into foam
+        float fftJ = 1.;
+        #if FFT
+          if (uFft > .5) {
+            vec4 d0 = texture2D(uDer0, vP/uL0), d1 = texture2D(uDer1, vP/uL1);
+            float nearK = 1. - smoothstep(30., 140., dist);
+            g += d0.xy + d1.xy*(.5 + .5*nearK);
+            h += d0.w + d1.w;
+            fftJ = min(d0.z, d1.z*.5 + .5);
+          }
+        #endif
         // ---- fine ripples, carried by the wind (a river's by its current) ----
         // in patches: a gust ruffles one stretch and leaves the next calm, so no one pattern shows across the water.
         // Further out they're smaller than a pixel and are left out rather than shimmer
@@ -311,7 +333,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           vec3 m1 = texture2D(uNrm, mat2(.8, -.6, .6, .8)*p*.085 + fl2 + vec2(uTime*.011, -uTime*.006)).xyz*2. - 1.;
           vec3 m2 = texture2D(uNrm, mat2(.47, .88, -.88, .47)*p*.23 - fl2*1.7 + vec2(-uTime*.017, uTime*.012)).xyz*2. - 1.;
           float fd = 1. - smoothstep(25., 220., dist);
-          g += (m1.xy*(.10 + .2*uWind)*fd + m2.xy*(.06 + .14*uWind)*(1. - smoothstep(10., 90., dist)))*gust;
+          float fk = 1. - uFft*.85; // (the spectrum sea has the chop itself: just a little of the finest ripple on top)
+          g += (m1.xy*(.10 + .2*uWind)*fd*fk + m2.xy*(.06 + .14*uWind)*(1. - smoothstep(10., 90., dist))*(1. - uFft*.5))*gust;
         } else {
           vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
           // (softer, and gone sooner with distance: at full strength out to 220 m it laid one even grain over the whole sea,
@@ -398,16 +421,19 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // (the sharp reflection broken up close by into sparkles on the small facets of the chop: whole, it lay in big
         // white blotches the shape of each wave's face, like paper cut-outs on the water)
         float brk = 1.;
-        if (sp > .99 && dist < 70.) brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
+        // (under the spectrum sea the facets are real, so the reflection is left to them: no drawn-in break-up)
+        if (sp > .99 && dist < 70. && uFft < .5) brk = mix(1., smoothstep(.3, .75, noise(p*vec2(9.3, 7.1) + vec2(uTime*1.3, -uTime*.9))*noise(p*vec2(17.9, 21.3) - uTime*1.7)*1.9), 1. - smoothstep(12., 70., dist));
         // (a low sun's reflection is gold, as its disc is)
         float lowSun = 1. - smoothstep(.07, .5, max(uSunDir.y, 0.));
         vec3 sunC = mix(mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk), vec3(1., .72, .42), lowSun*.7);
-        col += sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis;
+        // (with the spectrum sea: a softer, dimmer highlight per facet, since there are many more of them, and a
+        // little broader one so the far sea's glitter is a sheen rather than confetti)
+        col += uFft > .5 ? sunC*(pow(sp, 700.)*1.6 + pow(sp, 40.)*.09)*sunVis : sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
           // (only where the sun's path is: everywhere else it added nothing but cost four noises a pixel)
-          if (sunVis > .01 && sp > .85 && dist < 160.) {
+          if (sunVis > .01 && sp > .85 && dist < 160. && uFft < .5) {
             float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
             float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
             // (the path is long towards the sun and narrow across it, wider in more wind, as a real glitter path is: it
@@ -426,12 +452,24 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // whitecaps once the wind is up (about force 4): on the higher crests, in patches that come and go, drawn
         // out down wind
         vec2 pf = vec2(dot(p, wd), dot(p, wx));
-        float cap = 0., streak = 0.;
+        float cap = 0., streak = 0., capJ = 0.;
         if (uWind > .22 && sea > .5) {
           // (white horses from about force 4, as a North Sea pier sees most days: they began only in a near gale)
           float capPatch = smoothstep(.3, .62, noise(p*.09 - flow*.3)*.6 + noise(p*.31 + vec2(uTime*.13, -uTime*.09))*.4);
           cap = smoothstep(.1, .42, h/(.12 + .5*uSwell + .2*uWind))*smoothstep(.22, .62, uWind)*sea*capPatch*(.4 + .9*noise(pf*vec2(.6, 2.4) - vec2(uTime*.5, 0.)));
         }
+        #if FFT
+          // the spectrum sea's own whitecaps: where the crests have folded (Jacobian below about .6), from a light
+          // breeze up, more as the wind rises; the patchiness comes from the spectrum itself
+          if (uFft > .5 && sea > .5) {
+            // (the edge of each cap broken by a noise, its body a ragged bubble texture that drifts down wind)
+            float jn = fftJ + (noise(p*1.7 + uTime*.3) - .5)*.14;
+            float bub = .5 + .5*smoothstep(.3, .72, noise(p*4.3 - wd*uTime*.8)*.6 + noise(p*11. + vec2(uTime*.5, -uTime*.3))*.4);
+            // (a crest breaks in separate caps a few metres across, not along its whole length: a patch noise breaks it up)
+            float capBreak = smoothstep(.3, .55, noise(p*.33 + vec2(uTime*.05, -uTime*.04))*.6 + noise(p*.9 - wd*uTime*.2)*.4);
+            capJ = min(1., smoothstep(.72, .42, jn)*1.5)*smoothstep(.3, .6, uWind)*bub*capBreak;
+          }
+        #endif
         #if WQ > 0
         if (uWind > .55 && sea > .5)
           // old foam lying in streaks along the wind, broken into short lengths and thin patches (unbroken, they read as
@@ -454,10 +492,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
           edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
         }
+        if (uDbg > .5) { gl_FragColor = vec4(uDbg < 1.5 ? vec3(fftJ) : uDbg < 2.5 ? vec3(cap) : vec3(n.xz*4. + .5, 0.), 1.); return; }
         float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.8*uShoreOn + churn*.7;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
-        foam = clamp(foam, 0., .8);
-        vec3 foamC = mix(uWater*2.2 + vec3(.3, .33, .34), vec3(.8, .83, .84), smoothstep(.2, .7, foam));
+        // (a fresh whitecap is the exception: a dense head of bubbles, near white in the day's light)
+        foam = max(clamp(foam, 0., .8), capJ*.95);
+        vec3 foamC = mix(mix(uWater*2.2 + vec3(.3, .33, .34), vec3(.8, .83, .84), smoothstep(.2, .7, foam)), vec3(.93, .95, .96), smoothstep(.75, .95, foam));
         col = mix(col, foamC*(lit*dim + uNight*.05), foam*(.75 + .2*smoothstep(.2, .7, foam)));
         // ---- haze: the same as the land's close in (three's exponential fog), the sky's own horizon far out ----
         float fogK = 1. - exp(-uFogD*uFogD*dist*dist);
@@ -645,7 +685,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xc8d4e0, transparent: true, opacity: 0.35, depthWrite: false }));
   rain.frustumCulled = false; rain.visible = false; group.add(rain);
 
-  let rainAmt = 0, wind = 0.3, windDir = [0.3, -1];
+  let rainAmt = 0, wind = 0.3, windDir = [0.3, -1], fft = null;
   // gulls and a few boats at the coast (wildlife.js): where the anglers are, the water to put boats on, lamps to perch on
   const spotsNow = real ? real.spots || [] : L?.spots || [];
   const centre = spotsNow.length ? [spotsNow.reduce((a, q) => a + q.at[0], 0) / spotsNow.length, spotsNow.reduce((a, q) => a + q.at[2], 0) / spotsNow.length] : [0, -20];
@@ -748,7 +788,27 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     floorAt: (x, z) => floorAt(x, z),
     ground,
     /** The waves as the water shows them right now (eased), so floats and fish ride the same sea. */
-    waveState: () => ({ swell: wU.uSwell.value, wind: wU.uWind.value, windDir: [wU.uWindDir.value.x, wU.uWindDir.value.y] }),
+    waveState: () => ({ swell: wU.uSwell.value, wind: wU.uWind.value, windDir: [wU.uWindDir.value.x, wU.uWindDir.value.y], chop: wU.uChop.value }),
+    /** The spectrum sea (fftSea.js) on or off: needs the renderer; returns whether it is on. */
+    setFftSea(on, renderer) {
+      if (on && !fft && renderer) { fft = createFftSea(renderer); if (!fft) return false; wU.uDisp0.value = fft.cascades[0].disp; wU.uDer0.value = fft.cascades[0].der; wU.uDer1.value = fft.cascades[1].der; wU.uL0.value = fft.cascades[0].L; wU.uL1.value = fft.cascades[1].L; }
+      const was = waterMat.defines.FFT;
+      waterMat.defines.FFT = on && fft ? 1 : 0; if (waterMat.defines.FFT !== was) waterMat.needsUpdate = true;
+      wU.uFft.value = on && fft ? 1 : 0; wU.uChop.value = on && fft ? 0.35 : 1;
+      return !!(on && fft);
+    },
+    get fftSea() { return wU.uFft.value > 0.5; },
+    /** (checks only) the simulation itself */
+    get fftSim() { return fft; },
+    /** Each frame before drawing (world.js): the spectrum sea's maps for this moment. */
+    simulate(t) {
+      if (typeof window !== "undefined" && FILM) wU.uDbg.value = window.__fdSeaDebug || 0; // (checks only: the sea's Jacobian, foam or normals drawn as colour)
+      if (!fft || wU.uFft.value < 0.5) return;
+      // (JONSWAP over a long fetch gives a light air more sea than a sheltered pier sees: the energy is eased in
+      // with the wind. Choppiness 1.4: crests drawn together enough to fold in a fresh breeze, not before)
+      const gain = 0.08 + 0.22 * THREE.MathUtils.smoothstep(wind, 0.05, 0.45);
+      fft.update(t, { windKph: wind * 45, windDir, fetchKm: 80, gain, lambda: 1.4 });
+    },
     /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM }; facing: bearing of -z */
     setEnv({ light = {}, cond = {}, facing = 180 } = {}) {
       const toDir = (alt, az) => { const a = (alt * Math.PI) / 180, b = (((az ?? 180) - facing) * Math.PI) / 180; return new THREE.Vector3(Math.sin(b) * Math.cos(a), Math.sin(a), -Math.cos(b) * Math.cos(a)); };
@@ -789,6 +849,6 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         p.needsUpdate = true; rain.position.set(cam.position.x, cam.position.y - 8, cam.position.z);
       }
     },
-    dispose() { envSky.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
+    dispose() { fft?.dispose(); envSky.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
   };
 }
