@@ -789,7 +789,9 @@ function realArms(scene, { gloves, skinHex }) {
       let f = G.f, t = G.t;
       // easing in from wherever the hand was (a change of grip), never a jump
       const B = blend[i];
-      if (B && B.kind !== kind) { B.from = { P: B.P.clone(), Q: B.Q.clone(), f: B.f, t: B.t }; B.u = 0; B.kind = kind; }
+      // (from nothing in the hand, the blend starts just under the grip, not from the hand's place away below the view:
+      // eased up from there, the rod stood with no hands on it for the first frames of a cast)
+      if (B && B.kind !== kind) { const away = B.kind == null; B.from = { P: away ? Pw.clone().add(V(0, -0.12, 0)) : B.P.clone(), Q: away ? Qw.clone() : B.Q.clone(), f: B.f, t: B.t }; B.u = 0; B.kind = kind; }
       if (B?.from) {
         B.u = Math.min(1, B.u + dt / 0.3); const e = ease(B.u);
         Pw = B.from.P.clone().lerp(Pw, e); Qw = B.from.Q.clone().slerp(Qw, e);
@@ -798,7 +800,7 @@ function realArms(scene, { gloves, skinHex }) {
       }
       // the forearm: straight back from the wrist, turned towards where the arm comes from by no more than a wrist can bend
       const back = S.M.y.clone().applyQuaternion(Qw).negate(), toEl = group.localToWorld(elbow.clone()).sub(Pw).normalize();
-      const ang = back.angleTo(toEl), lim = kind === "crank" ? (TUNE.wristLimCrank ?? 1.25) : TUNE.wristLim; // (cupping the knob, the wrist bends back a long way, as a real one does winding: held near straight, the forearm came straight up from under the hand like a raised fist)
+      const ang = back.angleTo(toEl), lim = kind === "crank" ? (TUNE.wristLimCrank ?? 1.25) : kind === "seat" ? (TUNE.wristLimSeat ?? 0.95) : TUNE.wristLim; // (on the rod the wrist bends well back too, so the forearm can come from the elbow out at your side with the rod up for a cast, rather than following the butt across the view) // (cupping the knob, the wrist bends back a long way, as a real one does winding: held near straight, the forearm came straight up from under the hand like a raised fist)
       const dir = ang > lim ? back.clone().lerp(toEl, lim / ang).normalize() : toEl;
       const Ew = Pw.clone().addScaledVector(dir, S.len);
       place2(S, Pw, Ew, Qw);
@@ -1042,7 +1044,15 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           const t = (spec.rail.z - spec.at.z) / (elbow.z - spec.at.z), need = spec.rail.y + 0.08;
           if (t > 0.02 && t < 1 && spec.at.y + (elbow.y - spec.at.y) * t < need) elbow.y = spec.at.y + (need - spec.at.y) / t;
         }
-        if (spec?.kind === "seat" && spec.axis) elbow.copy(spec.at).addScaledVector(spec.axis.clone().normalize(), -0.24).addScaledVector(vu, -0.14).addScaledVector(vr, (TUNE_ELBOW.seatOut ?? 0.24) * h.s);
+        if (spec?.kind === "seat" && spec.axis) {
+          // (the elbow lies back along the rod from the reel; but with the rod back over your shoulder for a cast its axis
+          // points behind you, and back along it put the elbow out in front of your face, the upper arm right across the
+          // picture. So the rod's axis is taken as pointing at least a little way forward, and the elbow stays below and
+          // behind the hand, out of the view)
+          const ax = spec.axis.clone().normalize(), fwd = ax.dot(vf);
+          if (fwd < 0.3) { ax.addScaledVector(vf, 0.3 - fwd).normalize(); }
+          elbow.copy(spec.at).addScaledVector(ax, -0.24).addScaledVector(vu, -0.14).addScaledVector(vr, (TUNE_ELBOW.seatOut ?? 0.24) * h.s);
+        }
         let want;
         if (spec) {
           const quat = frameFor(h, spec, elbow);

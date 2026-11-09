@@ -612,14 +612,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       pitch = lerp(0.6, -0.55, back); pitch = lerp(pitch, 0.55, fwd); yawOff = 0.25 - fwd * 0.15;
       // (first person: the rod goes back over your right shoulder, past upright, its tip behind you, then is driven
       // forwards over the top and down to point at the water: was tipped up to upright in front of you and back down)
-      fpE = lerp(lerp(0.4, 2.05, back), 0.36, fwd); fpYaw = lerp(lerp(-0.03, 0.42, back), -0.03, fwd);
+      fpE = lerp(lerp(0.4, 1.55, back), 0.36, fwd); // (to just short of upright, not back past it: with the reel in front of your eye, a rod tipped back past upright pointed its butt, and your forearm with it, down across the middle of the picture) fpYaw = lerp(lerp(-0.03, 0.42, back), -0.03, fwd);
       // (in first person the hands travel with the cast, not just the rod pivoting about a reel fixed in the view: up and
       // back beside your right shoulder for the wind-up, then driven forwards and down through the release, the arms
       // following through and settling back)
       { const settle = ease(seg(age, 0.85, 1.6)), drive = Math.sin(clamp((age - 0.6) / 0.45, 0, 1) * Math.PI);
         // (the hands go up and back beside your right shoulder for the wind-up, the elbow bending, then the arms extend
         // forwards and down through the release and settle)
-        fpArm = { up: 0.15 * back * (1 - fwd) - 0.05 * drive * (1 - settle), right: 0.1 * back * (1 - fwd), fwd: -0.12 * back * (1 - fwd) + 0.12 * drive * (1 - settle) }; // (not so near: closer, the inside of the sleeve filled the edge of the view)
+        fpArm = { up: 0.15 * back * (1 - fwd) - 0.05 * drive * (1 - settle), right: 0.16 * back * (1 - fwd), fwd: 0.04 * back * (1 - fwd) + 0.12 * drive * (1 - settle) }; // (out to the right and a touch further away for the wind-up, never nearer: drawn back towards the eye, the forearm filled the right half of the picture on the 8 November recording)
         // (and your weight: back onto the rear foot and turned a little to the right for the wind-up, thrown forwards and
         // down through the release, then back up to stand)
         bodyTo = { x: 0.05 * back * (1 - fwd) - 0.02 * drive, y: -0.012 * back * (1 - fwd) - 0.04 * drive * (1 - settle), z: 0.08 * back * (1 - fwd) - 0.12 * drive * (1 - settle) }; }
