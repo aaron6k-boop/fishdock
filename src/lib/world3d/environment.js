@@ -793,6 +793,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     waveState: () => ({ swell: wU.uSwell.value, wind: wU.uWind.value, windDir: [wU.uWindDir.value.x, wU.uWindDir.value.y], chop: wU.uChop.value }),
     /** The spectrum sea (fftSea.js) on or off: needs the renderer; returns whether it is on. */
     setFftSea(on, renderer) {
+      if (kind >= 2) on = false; // (a river or lake has no wind sea to simulate; an estuary gets half of one, see simulate)
       if (on && !fft && renderer) { fft = createFftSea(renderer); if (!fft) return false; wU.uDisp0.value = fft.cascades[0].disp; wU.uDer0.value = fft.cascades[0].der; wU.uDer1.value = fft.cascades[1].der; wU.uL0.value = fft.cascades[0].L; wU.uL1.value = fft.cascades[1].L; }
       const was = waterMat.defines.FFT;
       waterMat.defines.FFT = on && fft ? 1 : 0; if (waterMat.defines.FFT !== was) waterMat.needsUpdate = true;
@@ -808,7 +809,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       if (!fft || wU.uFft.value < 0.5) return;
       // (JONSWAP over a long fetch gives a light air more sea than a sheltered pier sees: the energy is eased in
       // with the wind. Choppiness 1.4: crests drawn together enough to fold in a fresh breeze, not before)
-      const gain = 0.08 + 0.22 * THREE.MathUtils.smoothstep(wind, 0.05, 0.45);
+      const gain = (0.08 + 0.22 * THREE.MathUtils.smoothstep(wind, 0.05, 0.45)) * (kind === 1 ? 0.5 : 1);
       fft.update(t, { windKph: wind * 45, windDir, fetchKm: 80, gain, lambda: 1.4 });
       wU.uFoam0.value = fft.foam;
     },
