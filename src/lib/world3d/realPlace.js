@@ -501,10 +501,46 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         }
       }
     };
-    for (const r of place.roads || []) { if (r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(T, r.line, 0, r.w / 2, 0.035); if (r.kind === "tarmac") ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); }
+    const Pa = { p: [], uv: [], i: [] }; // paths and pedestrian streets: paving, no kerb
+    for (const r of place.roads || []) { if (r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(r.kind === "tarmac" ? T : Pa, r.line, 0, r.w / 2, r.kind === "tarmac" ? 0.035 : 0.06); if (r.kind === "tarmac") ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); }
+    // car parks (the map's amenity=parking): a sheet of tarmac on the ground, bays painted on it
+    for (const ring of place.parking || []) {
+      if (ring.length < 3 || ring.some(([x, z]) => nearSpot(x, z, 25))) continue;
+      const sh = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, z))), g2 = new THREE.ShapeGeometry(sh), P3 = g2.attributes.position;
+      const o = T.p.length / 3; let cx = 0, cz = 0; for (const [x, z] of ring) { cx += x / ring.length; cz += z / ring.length; }
+      for (let v = 0; v < P3.count; v++) { const x = P3.getX(v), z = P3.getY(v); T.p.push(x, (groundAt(x, z) || LAND) + 0.03, z); T.uv.push((x - cx) / 6, (z - cz) / 6); }
+      const idx = g2.index.array; for (let q = 0; q < idx.length; q += 3) T.i.push(o + idx[q], o + idx[q + 2], o + idx[q + 1]);
+      g2.dispose();
+    }
     const mk = (Bk, mat) => { if (!Bk.i.length) return; const g2 = new THREE.BufferGeometry(); g2.setAttribute("position", new THREE.Float32BufferAttribute(Bk.p, 3)); g2.setAttribute("uv", new THREE.Float32BufferAttribute(Bk.uv, 2)); g2.setIndex(Bk.i); g2.computeVertexNormals(); const m = new THREE.Mesh(g2, mat); m.receiveShadow = true; group.add(m); };
-    mk(T, new THREE.MeshStandardMaterial({ map: dTex.map, normalMap: dTex.normalMap, color: 0x46484b, roughness: 0.82, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }));
+    mk(T, new THREE.MeshStandardMaterial({ map: dTex.map, normalMap: dTex.normalMap, color: 0x7c7b78, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }));
     mk(Pv, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb8b4ac, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
+    mk(Pa, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xaaa69c, roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
+  }
+
+  // ---- garden walls, fences and hedges (the map's barriers): the texture of a town between its streets ----
+  {
+    const parts = { wall: [], fence: [], hedge: [] };
+    for (const b of place.barriers || []) {
+      const W = b.kind === "hedge" ? 0.8 : b.kind === "fence" ? 0.06 : 0.24, bucket = parts[b.kind] || parts.wall;
+      for (let k = 0; k + 1 < b.line.length; k++) {
+        const [x1, z1] = b.line[k], [x2, z2] = b.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2; if (nearSpot(mx, mz, 25) || !landAt([mx, mz]) || PR.some((bx) => inB([mx, mz], bx))) continue;
+        const y1 = groundAt(x1, z1) || LAND, y2 = groundAt(x2, z2) || LAND, y0 = Math.min(y1, y2), top = Math.max(y1, y2) + b.h;
+        const g2 = new THREE.BoxGeometry(len + 0.05, top - y0, W); g2.translate(0, (top - y0) / 2, 0); g2.rotateY(-Math.atan2(z2 - z1, x2 - x1)); g2.translate(mx, y0 - 0.02, mz);
+        bucket.push(g2);
+      }
+    }
+    const mats = {
+      wall: new THREE.MeshStandardMaterial({ color: 0x7d7268, roughness: 1 }),
+      fence: new THREE.MeshStandardMaterial({ color: 0x6a5b4a, roughness: 0.95 }),
+      hedge: new THREE.MeshStandardMaterial({ color: 0x2d4f22, roughness: 1 }),
+    };
+    for (const kind of Object.keys(parts)) {
+      if (!parts[kind].length) continue;
+      const g2 = mergeGeometries(parts[kind]); parts[kind].forEach((q) => q.dispose()); if (!g2) continue;
+      const m = new THREE.Mesh(g2, mats[kind]); m.castShadow = kind !== "fence"; m.receiveShadow = true; m.userData.kind = `a ${kind}`; group.add(m);
+    }
   }
 
   // ---- harbour walls: steel sheet piling under a concrete cap, along the real water's edge ----

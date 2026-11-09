@@ -61,3 +61,23 @@ No unit test: the ground is built with the DOM and the map together.
 **Left.** The large quay apron at the pier root is still one concrete sheet (it is a car park and a quay in reality,
 but with no kerbs, bays or the Pavilion). The town ground is one tone everywhere: no hedges or garden walls between
 plots, and it rises with the hill but has no banks between streets.
+
+## Stage 6 (9 November 2026, branch `overhaul-6`, on top of stage 5): more of the map
+
+**Finding.** The map round the pier has 115 footways, 37 flights of steps, 25 walls, 12 fences, 5 hedges, 4 car
+parks, a wood, a garden and allotments, and none of it was drawn: only the streets, the buildings, the grass and the
+beach. The quay apron at the pier root is a car park on the map.
+
+**Change** (`osmPlace.js`, `realPlace.js`). Footpaths and cycleways as narrow paving (no kerbs); car parks as a
+sheet of tarmac on the ground (no bays: their direction is not on the map, and I will not guess it); garden walls,
+retaining walls, fences and hedges as runs of boxes along the map's lines at the map's height where it gives one
+(1.4, 1.3 and 1.5 m otherwise), none within 25 m of a fishing spot, on a pier or in the water, nothing to collide
+with (a player walks through a hedge rather than being caught in a garden). Tarmac lightened from 0x46484b to
+0x7c7b78: at the old tone the car park measured (53, 64, 81) sRGB in sun, blue from the sky's reflection over a near-
+black diffuse, where dry asphalt is a mid grey; now (84, 92, 104). Woods, gardens and allotments count as green
+ground (the trees of stage 3 will stand close together in a wood once #74 is in; the hook is parsed here).
+
+**Checked.** Four views (`stage6-map-before-after.jpg`), `node --test` 313 pass. The tarmac's texture is the deck's
+concrete map at 6 m a tile and shows a repeat on the car park close to; a tarmac drawing of its own is left to do.
+
+**Left.** Steps (37 flights) are not drawn; walls are plain boxes in one tone; car park bays; a tarmac texture.

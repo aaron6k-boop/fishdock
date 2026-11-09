@@ -155,7 +155,7 @@ function bandAround(line, half) {
 }
 
 export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box, approx = false } = {}) {
-  const P = projector(lat0, lon0), nodes = new Map(), ways = new Map(), out = { origin: [lat0, lon0], venue, land: [], water: [], piers: [], beaches: [], green: [], buildings: [], roads: [], spots: [], attribution: "Map data © OpenStreetMap contributors (ODbL)" };
+  const P = projector(lat0, lon0), nodes = new Map(), ways = new Map(), out = { origin: [lat0, lon0], venue, land: [], water: [], piers: [], beaches: [], green: [], woods: [], parking: [], barriers: [], buildings: [], roads: [], spots: [], attribution: "Map data © OpenStreetMap contributors (ODbL)" };
   const rels = [];
   for (const e of osm?.elements || []) {
     if (e.type === "node") nodes.set(e.id, P(e.lat, e.lon));
@@ -176,6 +176,20 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
       const w = { primary: 9, trunk: 10, secondary: 8, tertiary: 7, unclassified: 6, residential: 6, living_street: 5, service: 4, pedestrian: 5 }[t.highway.replace("_link", "")] || 5;
       if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.roads.push({ line: ring, w, kind: t.highway === "pedestrian" ? "paved" : "tarmac" });
     }
+    // footpaths (through the gardens, along the front): a narrow paved path, no pavements of its own
+    else if (/^(footway|path|cycleway)$/.test(t.highway || "") && !isClosed && t.tunnel !== "yes" && t.bridge !== "yes") {
+      if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.roads.push({ line: ring, w: t.highway === "cycleway" ? 3 : 2, kind: "path" });
+    }
+    // garden walls, fences and hedges between the plots (the town's texture between its streets)
+    else if (/^(wall|fence|hedge|retaining_wall)$/.test(t.barrier || "") && !t.building) {
+      const hTag = parseFloat(t.height), kind = t.barrier === "retaining_wall" ? "wall" : t.barrier;
+      if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.barriers.push({ line: isClosed ? ring : ring, kind, h: Number.isFinite(hTag) && hTag > 0.3 && hTag < 4 ? hTag : kind === "hedge" ? 1.5 : kind === "fence" ? 1.3 : 1.4 });
+    }
+    // car parks: tarmac with bays
+    else if (isClosed && t.amenity === "parking" && t.parking !== "multi-storey" && t.parking !== "underground" && !t.building) out.parking.push(ring.slice(0, -1));
+    // woods and the thicker gardens: grass under, and trees close together
+    else if (isClosed && (t.natural === "wood" || t.landuse === "forest" || t.natural === "scrub")) { out.green.push(ring.slice(0, -1)); out.woods.push(ring.slice(0, -1)); }
+    else if (isClosed && (t.leisure === "garden" || t.landuse === "allotments" || t.landuse === "village_green" || t.landuse === "cemetery")) out.green.push(ring.slice(0, -1));
     else if (t.waterway === "river" || t.waterway === "canal") { const wTag = parseFloat(t.width); riverLines.push({ ring, w: Number.isFinite(wTag) && wTag > 2 && wTag < 300 ? wTag : t.waterway === "canal" ? 10 : 20 }); }
     else if (/^(pier|breakwater|groyne|quay)$/.test(t.man_made || "")) {
       const kind = t.man_made, wTag = parseFloat(t.width);
@@ -198,7 +212,9 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
     const outer = stitch((r.members || []).filter((m) => m.type === "way" && m.role !== "inner" && ways.get(m.ref)).map((m) => ways.get(m.ref).nodes)).filter((ids) => closed(ids)).map((ids) => pts(ids).slice(0, -1));
     if (t.natural === "water" || t.waterway === "riverbank" || t.water || t.landuse === "basin" || t.landuse === "reservoir") waterRings.push(...outer);
     else if (t.natural === "beach" || t.natural === "sand" || t.natural === "shingle") out.beaches.push(...outer);
-    else if (t.leisure === "park" || t.landuse === "grass" || t.landuse === "meadow" || t.leisure === "golf_course") out.green.push(...outer);
+    else if (t.leisure === "park" || t.landuse === "grass" || t.landuse === "meadow" || t.leisure === "golf_course" || t.leisure === "garden" || t.landuse === "allotments") out.green.push(...outer);
+    else if (t.natural === "wood" || t.landuse === "forest" || t.natural === "scrub") { out.green.push(...outer); out.woods.push(...outer); }
+    else if (t.amenity === "parking") out.parking.push(...outer);
   }
   out.buildings.sort((a, b) => a.d - b.d); out.buildings = out.buildings.slice(0, PLACE3D.buildingsMax).map(({ d, ...b }) => b);
   // the land: from the coastline where there is one; inland (rivers, lakes) the whole box, less the water
