@@ -53,3 +53,17 @@ test("each graphics setting draws more than the one below it", () => {
   for (const k of ["waterGrid", "waterDetail", "lampLights", "shadowMap"]) assert.ok(p[k] < b[k] && b[k] < h[k], k);
   assert.equal(p.lampLights, 0); assert.equal(p.shadowMap, 0);
 });
+
+test("a clear day's shadow is about a fifth as bright as the sunlit deck beside it", () => {
+  // (the sun against the sky on a horizontal surface, sun 35 degrees up: the sky and the reflections together fill a
+  // shadow to roughly a fifth, as a real one; it was over a third, and shadows read as smudges)
+  const L = lightingFor({ ...DAY, cloud: 0.1, sunDir: { x: 0, y: Math.sin((35 * Math.PI) / 180), z: 0 } });
+  const direct = L.sunIntensity * Math.sin((35 * Math.PI) / 180), sky = L.skyIntensity * 0.9 + L.envIntensity * 0.7;
+  const ratio = sky / (direct + sky);
+  assert.ok(ratio > 0.15 && ratio < 0.3, `shadow/lit ${ratio.toFixed(2)}`);
+  assert.equal(L.shadow, 1, "nothing but the sky fills a shadow in sun");
+  // a low sun: the sky dims with it, and the exposure comes up a little so the scene isn't murky
+  const low = lightingFor({ ...DAY, cloud: 0.1, sunDir: { x: 0, y: Math.sin((5 * Math.PI) / 180), z: 0 } });
+  assert.ok(low.skyIntensity < L.skyIntensity * 0.7, `low sky ${low.skyIntensity}`);
+  assert.ok(low.exposure > L.exposure);
+});
