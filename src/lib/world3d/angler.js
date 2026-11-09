@@ -1031,6 +1031,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (ph === "waiting" || ph === "bite") { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     } else { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     if (!held || (ph !== "cast" && ph !== "hooked" && ph !== "landing" && ph !== "lost")) { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); held = false; }
+    // waiting at a pier's rail, seen from outside: the rod is held, its butt at the hip and the blank resting on the top
+    // rail (as a pier angler stands, and as you see your own hands in first person), not leant against the rail with
+    // the hands in the pockets. The free hand stays free. (A friend's angler and your own in third person.)
+    const railHold = !fp && !walking && rail && venue === "pier" && (ph === "waiting" || ph === "bite" || ph === "missed");
+    if (railHold) { butt = new THREE.Vector3(0.22, 0.92, 0.0); const over = new THREE.Vector3(0.36, 1.12 + 0.06, -Math.max(0.3, edge - 0.22) - 0.25); dir = over.sub(butt).normalize(); held = true; }
     // walking about: the rod carried in the right hand at the reel, low by your side, its tip leading forwards and up
     // (clear of your legs, the rail and anyone behind you); the line wound in. It moves with you: rising and falling and
     // swaying with your shoulders at each step, the tip trailing a little as you turn and dipping as you stop, and held
@@ -1156,6 +1161,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const watch = n1(t * 0.07 + id.length * 3.1) > -0.35;
       if (watch) lookAtW = floatRig ? castAt.clone() : tipWorld();
       const m = Math.floor(t / 23 + (hashSeed(id) % 7)) % 3; idleMode = ["pockets", "fold", "hang"][m];
+      if (hands[1]) idleMode = "hang"; // (a hand on the rod: the other hangs, it can't fold its arms or pocket both)
     } else if (ph === "idle" || ph === "ended" || ph === "paused") idleMode = (hashSeed(id) % 2) ? "pockets" : "hang";
     if (ph === "cast") { lookAtW = age > 0.7 ? (rigAt || castAt).clone() : null; lean = age > 0.6 && age < 1.1 ? 0.22 : age < 0.6 ? -0.08 : 0; twist = age < 0.6 ? 0.3 * ease(age / 0.6) : 0.3 * (1 - ease(seg(age, 0.6, 0.9))); }
     // (seen from outside, the whole body takes the fish: leaning back on the rod and sitting into the knees as the line
