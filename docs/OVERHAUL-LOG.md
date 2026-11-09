@@ -222,3 +222,17 @@ and put back, all in first person) was looked through frame by frame. What it sh
   the way the angler faced, at the sea. It now turns west along the pier first.
 
 Frame-by-frame checks of the cast's first 1.2 s and the landing are in the PR. Frame times are still not claimed.
+
+## Stage 7 (9 November 2026, branch `realism-7`): the water at your feet, and three faults the stills showed
+
+- **Near ripples.** From the pier the sea within 30 m was a smooth sheet with broad soft shapes: the spectrum and
+  the two normal layers stop at wrinkles of about half a metre. A third look-up of the same normal map at 1.2 m a
+  tile adds the hand-width ripples the wind raises, in patches with the gusts, faded out by 30 m (where they would
+  be under a pixel). One texture read a pixel; its cost on a graphics card is not measured here.
+- **Brick at brick size.** Garden walls mapped their 0.9 m by 0.6 m brick tile at 2 m: bricks half a metre long.
+- **Retaining walls are no longer stood up as garden walls** (one ran along the quay's edge on top of the piling).
+- **Lifting the drop net over the rail in first person**, with the hoop beyond arm's reach: both hands now hold
+  the rope, one below the other in front of you, and the rope runs to them. Before, each hand reached towards its
+  own side of the rim: two open hands at the edges of the picture and the rope hanging between them from nothing.
+
+**Checked.** The ten scenes at Ultra before and after; `node --test` 314 pass.
