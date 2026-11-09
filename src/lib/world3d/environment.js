@@ -747,7 +747,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   }
   // ---- reflections of the scene in the water: the scene drawn again from a camera mirrored in the water's surface,
   // at a fraction of the screen's size, with the sky, the water and anything passed in (your own hands) left out ----
-  const R = { rt: null, cam: new THREE.PerspectiveCamera(), scale: 0.5, every: 1, n: 0,
+  const R = { rt: null, cam: new THREE.PerspectiveCamera(), scale: 0.5, every: 1, n: 0, far: 500,
     plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), rot: new THREE.Matrix4(), v: new THREE.Vector3(), look: new THREE.Vector3(), tgt: new THREE.Vector3(), cp: new THREE.Vector3() };
   function reflect(renderer, scene, camera, hide = []) {
     if (!R.rt) return;
@@ -760,7 +760,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     R.rot.extractRotation(camera.matrixWorld);
     R.look.set(0, 0, -1).applyMatrix4(R.rot).add(R.cp); R.tgt.copy(R.look); R.tgt.y = 2 * Y - R.look.y;
     c.position.copy(R.v); c.up.set(0, 1, 0).applyMatrix4(R.rot); c.up.y = -c.up.y; c.lookAt(R.tgt);
-    c.far = camera.far; c.near = camera.near; c.updateMatrixWorld(); c.projectionMatrix.copy(camera.projectionMatrix);
+    // (the mirror sees only so far: beyond a few hundred metres a reflected house is a few pixels of the half-size
+    // picture, broken by the waves, and the sky's own reflection stands in for it; in a rough sea, which breaks every
+    // reflection into glints, it sees less far still and is drawn every other frame)
+    const rough = wind * 0.5 + wU.uSwell.value > 0.75;
+    if (rough && (R.n & 1)) return;
+    c.fov = camera.fov; c.aspect = camera.aspect; c.zoom = camera.zoom; c.near = camera.near; c.far = Math.min(camera.far, rough ? 220 : R.far);
+    c.updateMatrixWorld(); c.updateProjectionMatrix(); // (its own projection, so the shorter far plane culls what it can't see)
     const tm = wU.uReflMat.value; tm.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1); tm.multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
     // (an oblique near plane on the water's surface, so nothing under the water shows in the mirror)
     R.plane.setFromNormalAndCoplanarPoint(N, P).applyMatrix4(c.matrixWorldInverse);
@@ -780,7 +786,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   function setReflections(level, renderer) {
     level = Math.max(0, Math.min(2, level | 0));
     if (!level) { R.rt?.dispose(); R.rt = null; wU.uRefl.value = null; wU.uReflOn.value = 0; return; }
-    R.every = level >= 2 ? 1 : 2; R.scale = level >= 2 ? 0.5 : 0.4;
+    R.every = level >= 2 ? 1 : 2; R.scale = level >= 2 ? 0.5 : 0.4; R.far = level >= 2 ? 500 : 300; // (how far the mirror sees)
     sizeReflections(renderer);
   }
   function sizeReflections(renderer) {
