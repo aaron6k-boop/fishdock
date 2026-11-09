@@ -42,3 +42,183 @@ foam steepness factor 2.6) reads 0.5%, 4% and 5.6% at the same winds; the wind g
 noise bring the drawn cover to roughly a third of that, so the drawn whitecaps are in the right order at a fresh
 breeze and a little generous at a light one. Tuned by eye beyond that; no photograph of the real sea at Gorleston
 at a known wind was available to compare against.
+
+## Stage 3 (9 November 2026, branch `overhaul-3`)
+
+**Survey.** The ten scenes and six close views of the town from the pier and the gardens, against photographs of
+Marine Parade and Pier Gardens. The largest visual gap after the sea was the town itself: every building a flat box
+with a painted window pattern, roofs a single flat colour, no trees on the 2.2 ha of lawns and gardens the map has in the box
+(Pier Gardens and the cliff lawns) nor on the cliff bank.
+
+**Facades** (`textures3d.js: facade()`). Each wall kind drawn at 85 px a metre, with a
+height field beside the colour so the normal map and the roughness map come from the same drawing: brick in 65 mm
+courses, stretcher bond with dark headers; ashlar; cladding; render with trowel sweeps. Five bays a strip (window,
+wide window, door, shop, plain) picked per storey and bay by the building's style and a seeded choice. Windows are
+sashes set back 12 mm into a reveal, with a box frame, a sill that stands out, a soldier arch or lintel, and glass
+that is smooth (roughness 0.06, metalness up) under a sky gradient and curtains, so it reflects the sky and the sun
+where the wall around it does not. Doors have a case, fanlight, panels, step and number plate. Shops a fascia,
+pilasters and a stall riser. Plain bays carry a downpipe and an air brick. Weathering: streaks under sills and from
+the eaves, dirt at the foot, lighter on render.
+
+**Roofs** (`textures3d.js: roof()`). Slates in 0.5 × 0.25 m courses with tone and twist, a lap shadow and moss;
+pantiles in an S-profile at 0.34 m, 0.3 m courses; felt. Normal and roughness maps as the facades. Ridge tiles along
+each ridge line.
+
+**Trees** (`trees3d.js`). Placed on the map's grass cells (parks and verges from OpenStreetMap landuse) and on the
+cliff's grassy bank, never on a road, a building, the pier or within 20 m of a fishing spot; 7 to 12 m in the parks,
+3 to 5.5 m on verges and the bank; three crossed planes with a drawn canopy, normals up so they light as a mass,
+instanced, casting shadows. Count by quality (Ultra all, Balanced three quarters, Performance under half).
+
+**Sea colour.** The sunny shallows moved off teal: shallow tint and crest light toward grey-green.
+
+**Checked.** `node --test` 313 passing; the ten scenes before (main 65d3fb4) and after, and close town views, sent
+with the PR. Nothing here was measured on a graphics card: the trees are one instanced draw and the facades are the
+same draw count as before with two more texture reads a pixel, so the cost should be small, but that is a claim to
+test on the PC, not a number.
+
+**Left.** The buildings are still generic Gorleston (the right heights, footprints and roof shapes from the map and
+the right materials for the street, not the actual elevations); the Coastwatch building is already photograph-based.
+Chimneys stand but have no pots. Shop fronts have no signs. Trees are cards, not models. Lighting audit, weather,
+hands and rig, animations, equipment and the PC measurements are the following stages.
+## Stage 4 (9 November 2026, branch `overhaul-4`): the light
+
+**Audit.** The pier head and the deck at sun heights of 5, 15, 35, 38 and 55 degrees, overcast and a hazy low sun,
+from four cameras (`tools/scenes.mjs` views and close ones), measured as well as looked at. Findings:
+- Shadows in sun were faint. On a 35 degree day the deck in the Coastwatch building's shadow measured 0.31 of the
+  sunlit deck beside it (display-linear luminance from the render). Outdoors it is about a fifth: a horizontal surface
+  gets four to five times as much light from the sun as from the whole sky. The cause was the balance of the lights
+  (sun 2.5 against sky 0.72 plus reflections 0.6) and a shadow strength of 0.85, which let 15% of the sun into every
+  shadow.
+- A 5 degree sun lit the deck almost as a noon one: the sky's light did not fall with the sun, so the deck's light was
+  nearly all sky, flat and white, while the sky itself had gone gold.
+- Shadows were being drawn correctly: a fresh white plane dropped into the scene showed the lamp post, a bench and a box
+  as crisp shadows, so the maps, biases and receivers were right; they only read weakly on the pale concrete under
+  the heavy fill.
+- Wall spray flew round the angler at 16 kph of wind (a near-calm day): the threshold was swell plus half the wind
+  above 0.5, which 16 kph reaches.
+
+**Changes** (`skyLook.js`, `angler.js`): sun 3.4 against sky 0.5 and reflections 0.42 on a clear day; the shadow
+strength 1 in sun (the sky alone fills it), 0.32 under cloud as before; the sky's light and the reflections fall by
+up to two fifths as the sun gets low, and the exposure comes up a quarter to match the eye; overcast, rain, dusk and
+night totals unchanged. Spray from a fresh breeze (about 24 kph) up.
+
+**Measured.** The same deck patch: shadow 0.19 of lit (was 0.31); sunlit deck 0.38 (was 0.34). The 5 and 15 degree
+renders show the bench's long shadow and warmer lit faces where before there was almost none. Overcast renders are
+the same before and after. `tests/skyLook.test.js` pins the ratio (0.15 to 0.3 at 35 degrees) and the low-sun dimming.
+
+**Left.** Cascaded shadow maps (the installed copy of three.js has no CSM addon and installs are off here), so the
+one 4096 map at 80 m stays; shadows from the trees and the town are coarse at that distance. Specular on wet concrete
+and the facades' glass were not re-tuned. Night and dusk looked at only through the ten scenes.
+
+**Five conditions (after review).** The same deck view at midday (sun 55 degrees), sunset (3 degrees), overcast,
+rain and moonless night, before and after, with the lit deck and the building's shadow read at fixed patches
+(display-linear luminance; the patches are the same in every picture, so the sun's own angle moves what falls in
+them and the ratios are a guide, not a law):
+
+| condition | before: deck, shadow, ratio | after: deck, shadow, ratio |
+|---|---|---|
+| midday | 0.388, 0.177, 0.46 | 0.444, 0.175, 0.39 |
+| sunset | 0.146, 0.085, 0.58 | 0.136, 0.080, 0.59 |
+| overcast | 0.255, 0.167, 0.66 | 0.274, 0.183, 0.67 |
+| rain | 0.156, 0.129, 0.82 | 0.157, 0.135, 0.86 |
+| night | 0.078, 0.049, 0.63 | 0.074, 0.056, 0.76 |
+
+The change bites only where it should: in sun. Shadows under cloud, in rain and at night keep their soft fill (the
+shadow strength is 0.32 under cloud and the sky light rises with it), sunset is lifted by its exposure and reads the
+same, and nothing is crushed: the darkest shadow patch in any condition is 0.049 (night, unchanged). Pictures in
+`stage4-five-conditions.jpg`.
+## Stage 5 (9 November 2026, branch `overhaul-5`): the land
+
+**Finding.** Every piece of land the map did not mark as beach, grass, bank or dune was drawn as the pier's concrete,
+slab joints and yellow lines included, from the quay out to the horizon: the town stood on one grey slab.
+
+**Change** (`realPlace.js`). Land more than 26 m from a harbour wall and outside every pier and quay footprint is the
+town's ground: worn grass over earth, duller and browner than a park's lawn, bare in patches, with a little of the
+rough-ground photograph in it. The streets lay their own tarmac and pavements over it as before. Edge triangles stay
+on the concrete side, tinted, so the join is a short fade and not a pale saw-edge (the first attempt had one).
+Pavements: their end overlaps cut from 1.5 m to 0.6 m (they stuck out as teeth along a bending street) and a duller
+tone.
+
+**Checked.** Four views before and after from main 65d3fb4 (`stage5-land-before-after.jpg`); `node --test` 313 pass.
+No unit test: the ground is built with the DOM and the map together.
+
+**Left.** The large quay apron at the pier root is still one concrete sheet (it is a car park and a quay in reality,
+but with no kerbs, bays or the Pavilion). The town ground is one tone everywhere: no hedges or garden walls between
+plots, and it rises with the hill but has no banks between streets.
+
+## Stage 6 (9 November 2026, branch `overhaul-6`, on top of stage 5): more of the map
+
+**Finding.** The map round the pier has 115 footways, 37 flights of steps, 25 walls, 12 fences, 5 hedges, 4 car
+parks, a wood, a garden and allotments, and none of it was drawn: only the streets, the buildings, the grass and the
+beach. The quay apron at the pier root is a car park on the map.
+
+**Change** (`osmPlace.js`, `realPlace.js`). Footpaths and cycleways as narrow paving (no kerbs); car parks as a
+sheet of tarmac on the ground (no bays: their direction is not on the map, and I will not guess it); garden walls,
+retaining walls, fences and hedges as runs of boxes along the map's lines at the map's height where it gives one
+(1.4, 1.3 and 1.5 m otherwise), none within 25 m of a fishing spot, on a pier or in the water, nothing to collide
+with (a player walks through a hedge rather than being caught in a garden). Tarmac lightened from 0x46484b to
+0x7c7b78: at the old tone the car park measured (53, 64, 81) sRGB in sun, blue from the sky's reflection over a near-
+black diffuse, where dry asphalt is a mid grey; now (84, 92, 104). Woods, gardens and allotments count as green
+ground (the trees of stage 3 will stand close together in a wood once #74 is in; the hook is parsed here).
+
+**Second pass (after review).** Asphalt of its own (`textures3d.js: asphalt()`): aggregate, worn chips, hairline
+cracks, a repair patch, as colour, relief and roughness at 6 m a tile, its repeat broken by a 9 m mottle in the
+material; the deck's concrete map is no longer used for tarmac. Kerbs have a face (road level up to the pavement's)
+and a gully every 20 to 30 m against them. Garden walls are brick with a coping; fences are close-boarded panels
+between posts. Steps are drawn from the map's `highway=steps` where the ground falls (17 cm risers), but the ground
+model has no survey heights, only the town's modelled slope, so of 28 flights only one has a drop to draw: the rest
+are flat on our ground and are left out rather than drawn as a ramp of fake risers. Lawns and the town's ground are
+drawn turf (`turf()`: blades, worn patches, the odd daisy), the deck's relief taken out from under them (it read as a
+weave).
+
+**Checked.** Views of the car park, the street through it, the lawns (`stage6-roads-after.jpg`); `node --test`
+313 pass.
+
+**Left.** Car park bays (direction unknown); survey heights for the cliff's steps; walls in one brick.
+
+## Integration (9 November 2026, branch `overhaul-all`, PR #78): the cost
+
+Draw calls read from `renderer.info` for one frame of the pier-head view at Ultra, 1280 x 720, same procedure on
+both builds (the sun and weather set, the camera placed, 600 ms stepped, one frame counted); shadows on, then off.
+
+| build | calls | without the shadow pass | meshes drawn | shadow casters |
+|---|---|---|---|---|
+| production main | 1025 | 704 | 370 | 252 |
+| integration, first cut | 1169 | 787 | 403 | 282 |
+| integration, trees merged | 908 | 607 | 364 | 244 |
+
+The first cut's increase was the trees: four species by three variants, wood and leaves apart, twenty-four meshes,
+each drawn in the shadow, reflection, occlusion and main passes. Now the near trees' wood is one merged mesh (built
+again only when the near set changes, at most twice a second) and every leaf cluster in the town is one instanced
+mesh; both are culled by their own bounds and left out of the water's reflection pass (trees 200 m off add nothing a
+player sees in the water), and a tree changes level with 12 m of hysteresis. The walls, fences, hedges, copings,
+posts and steps are one mesh each. Geometry in memory 27.9 MB against 28.8; texture pixels 13.2 M against 24.0 M.
+Frame times are not claimed: they need the PC (Settings, Graphics, Benchmark at 1080p, 1440p and 4K, Ultra and High),
+and the numbers above are counts, not speed.
+
+## Integration, second pass (9 November 2026): what the walkthrough recording showed
+
+The first normal-speed recording (third person along the pier, then a cast, a fight, the landing, the fish held up
+and put back, all in first person) was looked through frame by frame. What it showed, and what was done:
+
+- **The rod stood with no hands on it for the first frames of a cast.** Taking a grip from nothing, the hands eased
+  up from where they hang out of sight below the view, over 0.3 s. Now a grip taken from nothing starts its blend
+  just under the grip, in both the simple and the real (MPFB) arms.
+- **The forearm filled the right half of the picture at the top of the wind-up.** The rod went back to 2.05 rad,
+  past upright, with the reel in front of the eye, so the butt, and the forearm along it, pointed down across the
+  middle of the view. The wind-up now stops at 1.55 rad, the hands go out to the right rather than back towards
+  the eye, the seat grip's wrist can bend 0.95 rad (was 0.6) so the forearm comes from the elbow out at the side,
+  and the elbow is placed as if the rod pointed at least a little forward.
+- **Both hands ran off the top of the picture when the drop net's rope was first taken.** Before the net is over
+  the wall the hands were placed at a fixed offset below and ahead of the eye; looking steeply down at the net on
+  the deck put that point at the top edge. They are now placed from the view's own axes: low and to the left of
+  wherever you look.
+- **Straight arms on the rope.** Once the net is over the wall the hands sat 0.72 m along the line of sight, at
+  the arm's full reach; now 0.52 m, so the elbows bend.
+- **Hard cuts into the landing shot.** The cut itself is kept (gliding there from your own eyes looked into dark
+  water for two seconds), but the picture now comes up from black over 0.35 s on each cut (`uFade` on the grade
+  pass), so it reads as a cut rather than a jump.
+- **The third-person segment walked into the railing.** A fault of the filming script, not the game: it walked
+  the way the angler faced, at the sea. It now turns west along the pier first.
+
+Frame-by-frame checks of the cast's first 1.2 s and the landing are in the PR. Frame times are still not claimed.

@@ -20,9 +20,9 @@ import { OutputPass } from "./vendor/three-post/postprocessing/OutputPass.js";
 // little noise so the sky's long gradients don't band ----
 export const GradeShader = {
   name: "FishDockGrade",
-  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.22 }, uSat: { value: 0.94 }, uVignette: { value: 0.3 }, uSeed: { value: 0 }, uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 1024) }, uSharp: { value: 0.5 } },
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.22 }, uSat: { value: 0.94 }, uVignette: { value: 0.3 }, uSeed: { value: 0 }, uFade: { value: 1 }, uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 1024) }, uSharp: { value: 0.5 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed, uSharp; uniform vec2 uTexel; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed, uSharp, uFade; uniform vec2 uTexel; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed)*43758.5453); }
     void main(){
       vec4 t = texture2D(tDiffuse, vUv); vec3 c = t.rgb;
@@ -45,6 +45,7 @@ export const GradeShader = {
       c *= mix(vec3(.95, .99, 1.05), vec3(1.03, 1.01, .97), smoothstep(.15, .8, l));
       c = pow(c, vec3(1.06));
       vec2 d = vUv - .5; c *= 1. - uVignette*smoothstep(.35, .95, dot(d, d)*2.2);
+      c *= uFade;
       c += (h(gl_FragCoord.xy) - .5)/255.;
       gl_FragColor = vec4(c, t.a);
     }`,
@@ -74,7 +75,10 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
     ao.overrideVisibility = function () {
       this.scene.traverse((o) => {
         cache.set(o, o.visible);
-        const m = o.material, see = m && (Array.isArray(m) ? m.some((x) => x.transparent || !x.depthWrite) : (m.transparent || !m.depthWrite));
+        // (nor anything cut out by alpha test: leaves and the far trees' cards. The pass draws depth without the cut, so
+        // each card shaded the sky behind it as a dark square)
+        const cut = (x) => x.transparent || !x.depthWrite || x.alphaTest > 0;
+        const m = o.material, see = m && (Array.isArray(m) ? m.some(cut) : cut(m));
         if (o.isPoints || o.isLine || o.isSprite || see) o.visible = false;
       });
     };
@@ -125,6 +129,8 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
     /** sharpening, 0..1 (Settings → Graphics) */
     setSharp(v) { grade.uniforms.uSharp.value = Math.max(0, Math.min(1, +v || 0)); },
     get sharp() { return grade.uniforms.uSharp.value; },
+    /** the picture's brightness, 0 (black) to 1: a cut in the landing shot comes up from black over a few frames */
+    setFade(v) { grade.uniforms.uFade.value = Math.max(0, Math.min(1, +v || 0)); },
     /** frames running late even at the lowest sharpness: drop the ambient occlusion first */
     dropAO() { if (ao?.enabled) { ao.enabled = false; aoLevel = 0; return true; } return false; },
     dispose() { composer.passes.forEach((p) => p.dispose?.()); composer.dispose(); },

@@ -573,7 +573,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // (the water's shader heaves the surface at a wall as a reflected wave does; here, when that heave tops a mark, a
     // burst of drops over the wall's face, at most every couple of seconds at each of three points along it; only for
     // your own angler on a pier, where you can see it, and only once the sea is up)
-    if (local && venue === "pier" && rail && sea.swell + sea.wind * 0.5 > 0.5) {
+    if (local && venue === "pier" && rail && sea.swell + sea.wind * 0.5 > 0.7) { // (from a fresh breeze, about 24 kph, up: at 16 kph drops flew round the angler on a near-calm day)
       const sw = P.spray || (P.spray = { last: [-9, -9, -9], was: [0, 0, 0] });
       const wz = -(edge + 0.25), lim = 0.22 + 0.26 * sea.swell;
       for (let k = 0; k < 3; k++) {
@@ -612,14 +612,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       pitch = lerp(0.6, -0.55, back); pitch = lerp(pitch, 0.55, fwd); yawOff = 0.25 - fwd * 0.15;
       // (first person: the rod goes back over your right shoulder, past upright, its tip behind you, then is driven
       // forwards over the top and down to point at the water: was tipped up to upright in front of you and back down)
-      fpE = lerp(lerp(0.4, 2.05, back), 0.36, fwd); fpYaw = lerp(lerp(-0.03, 0.42, back), -0.03, fwd);
+      fpE = lerp(lerp(0.4, 1.55, back), 0.36, fwd); // (to just short of upright, not back past it: with the reel in front of your eye, a rod tipped back past upright pointed its butt, and your forearm with it, down across the middle of the picture) fpYaw = lerp(lerp(-0.03, 0.42, back), -0.03, fwd);
       // (in first person the hands travel with the cast, not just the rod pivoting about a reel fixed in the view: up and
       // back beside your right shoulder for the wind-up, then driven forwards and down through the release, the arms
       // following through and settling back)
       { const settle = ease(seg(age, 0.85, 1.6)), drive = Math.sin(clamp((age - 0.6) / 0.45, 0, 1) * Math.PI);
         // (the hands go up and back beside your right shoulder for the wind-up, the elbow bending, then the arms extend
         // forwards and down through the release and settle)
-        fpArm = { up: 0.15 * back * (1 - fwd) - 0.05 * drive * (1 - settle), right: 0.1 * back * (1 - fwd), fwd: -0.12 * back * (1 - fwd) + 0.12 * drive * (1 - settle) }; // (not so near: closer, the inside of the sleeve filled the edge of the view)
+        fpArm = { up: 0.15 * back * (1 - fwd) - 0.05 * drive * (1 - settle), right: 0.16 * back * (1 - fwd), fwd: 0.04 * back * (1 - fwd) + 0.12 * drive * (1 - settle) }; // (out to the right and a touch further away for the wind-up, never nearer: drawn back towards the eye, the forearm filled the right half of the picture on the 8 November recording)
         // (and your weight: back onto the rear foot and turned a little to the right for the wind-up, thrown forwards and
         // down through the release, then back up to stand)
         bodyTo = { x: 0.05 * back * (1 - fwd) - 0.02 * drive, y: -0.012 * back * (1 - fwd) - 0.04 * drive * (1 - settle), z: 0.08 * back * (1 - fwd) - 0.12 * drive * (1 - settle) }; }
@@ -1144,6 +1144,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // leaning over the rail to land it, watching the rod tip or the float while they wait ----
     const hands = [null, null];
     const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    // the view's own axes (forward, right, up) in the angler's space, from where the camera looks: hands placed from
+    // them stay in the picture whichever way you look
+    const viewVecs = () => { const vy = viewIn ? Math.atan2(Math.sin(viewIn.yaw - face), Math.cos(viewIn.yaw - face)) : 0, vp = viewIn ? clamp(viewIn.pitch, -0.9, 0.7) : -0.12; const vf = new THREE.Vector3(Math.sin(vy) * Math.cos(vp), Math.sin(vp), -Math.cos(vy) * Math.cos(vp)), vr = new THREE.Vector3(Math.cos(vy), 0, Math.sin(vy)); return { vf, vr, vu: new THREE.Vector3().crossVectors(vr, vf) }; };
     const rodGrip = (m, palm, kind) => { const a = along(m); return { at: a.p, axis: a.t, palm, kind }; };
     let lean = 0, brace = 0, crouch = 0, twist = 0, idleMode = "hang", lookAtW = null, fpRope = false;
     const tension = ph === "hooked" ? clamp(P.tension || 0.6, 0, 1.6) : 0;
@@ -1205,8 +1208,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const base = fp ? (() => { const E = fpEye(), nt = netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
             // (once the net is past the rail, on your line of sight down to it, as when letting a fish go: out at eye height
             // the upper arms came in from the top corner of the screen while you looked down)
-            if (nt && (nt.y < -0.3 || nt.z < railZ)) return E.clone().addScaledVector(nt.clone().sub(E).normalize(), 0.72).add(V3(-0.24, 0.04, 0.06));
-            return V3(E.x - 0.34, E.y - 0.34, E.z - 0.32); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
+            if (nt && (nt.y < -0.3 || nt.z < railZ)) return E.clone().addScaledVector(nt.clone().sub(E).normalize(), 0.52).add(V3(-0.24, 0.04, 0.06));
+            // (before that, from the view itself: low and to the left of wherever you look. Fixed below and ahead of the
+            // eye, looking steeply down at the net on the deck put the hands at the top edge of the picture, the forearms
+            // coming up into it from below: the 8 November recording)
+            const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, 0.5).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
           // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1284,7 +1290,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // forearms hanging in from the top edge, upside down, holding nothing you could see)
       const netTop = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
       const sight = netTop ? netTop.clone().sub(E).normalize() : V3(0, -0.8, -0.6).normalize();
-      const base = fp ? (netTop && (netTop.y < -0.3 || netTop.z < -Math.max(0.3, edge - 0.22)) ? E.clone().addScaledVector(sight, 0.72).add(V3(-0.24, 0.04, 0.06)) : V3(E.x - 0.5, E.y - 0.3, E.z - 0.36)) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
+      const base = fp ? (netTop && (netTop.y < -0.3 || netTop.z < -Math.max(0.3, edge - 0.22)) ? E.clone().addScaledVector(sight, 0.52).add(V3(-0.24, 0.04, 0.06)) : (() => { const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, 0.5).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })()) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1345,7 +1351,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     }
     // first person: your hands (fpHands.js) take hold of the same things, placed from the same eye and view as the rod
     if (fp && fpv) {
-      const vw = fpView || (() => { const vy = viewIn ? Math.atan2(Math.sin(viewIn.yaw - face), Math.cos(viewIn.yaw - face)) : 0, vp = viewIn ? clamp(viewIn.pitch, -0.9, 0.7) : -0.12; const vf = new THREE.Vector3(Math.sin(vy) * Math.cos(vp), Math.sin(vp), -Math.cos(vy) * Math.cos(vp)), vr = new THREE.Vector3(Math.cos(vy), 0, Math.sin(vy)); return { vf, vr, vu: new THREE.Vector3().crossVectors(vr, vf) }; })();
+      const vw = fpView || viewVecs();
       fpv.pose({ hands: walking ? [null, null] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt });
     }
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFigP(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };

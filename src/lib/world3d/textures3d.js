@@ -85,74 +85,173 @@ export function sheetPiling({ w = 128, h = 256, seed = 5, water = 0.5 } = {}) {
   return { map: toTex(col), normalMap: normalFrom(hf, w, h, 3.5), roughnessMap: greyTex(rough, w, h) };
 }
 
-// ---- facades: an atlas of four bays, each one storey (about 3 m) high and one bay (about 3.2 m) wide ----
-// [0] a sash window, [1] a front door with a fanlight, [2] a shop front, [3] plain wall. Pane areas go in an
-// emissive map too, so windows glow after dark.
-export const FACADE_TILE = { window: 0, door: 1, shop: 2, plain: 3 };
+// ---- facades: an atlas of five bays, each one storey (3 m) high and one bay (3.2 m) wide, 256 px a bay ----
+// [0] a sash window, [1] a front door with a fanlight, [2] a shop front, [3] plain wall, [4] a wider three-light
+// window with a stone surround. Besides the colour: a height field (window reveals set back into the wall, frames
+// and sills standing proud, lintels, the brick courses, a downpipe) turned into a normal map, so the sun gives the
+// facade depth; a roughness map, so the glass mirrors the sky while the wall stays matt; and the pane areas in an
+// emissive map, so windows glow after dark. Weathering: rain runs down from the sills, dirt collects at the foot.
+export const FACADE_TILE = { window: 0, door: 1, shop: 2, plain: 3, window2: 4 };
+export const FACADE_N = 5;
 export function facade(kind = "brick", seed = 7) {
-  const T = 128, c = canvas(T * 4, T), g = c.getContext("2d"), e = canvas(T * 4, T), ge = e.getContext("2d");
-  ge.fillStyle = "#000"; ge.fillRect(0, 0, T * 4, T);
-  const base = kind === "brick" ? [150, 78, 58] : kind === "cladding" ? [116, 128, 120] : kind === "stone" ? [176, 168, 150] : [238, 232, 218];
-  for (let t = 0; t < 4; t++) {
-    const x0 = t * T;
-    // the wall itself
-    const img = g.createImageData(T, T);
+  const T = 256, N = FACADE_N, W = T * N, c = canvas(W, T), g = c.getContext("2d"), e = canvas(W, T), ge = e.getContext("2d");
+  ge.fillStyle = "#000"; ge.fillRect(0, 0, W, T);
+  const px = T / 3.0; // pixels a metre (the storey is 3 m)
+  const hf = new Float32Array(W * T), rough = new Float32Array(W * T), glassM = new Uint8Array(W * T);
+  const base = kind === "brick" ? [152, 82, 60] : kind === "cladding" ? [116, 128, 120] : kind === "stone" ? [178, 170, 152] : [236, 230, 216];
+  const wallRough = kind === "brick" ? 0.88 : kind === "cladding" ? 0.55 : kind === "stone" ? 0.8 : 0.74;
+  // ---- the wall itself, every tile ----
+  for (let t = 0; t < N; t++) {
+    const x0 = t * T, img = g.createImageData(T, T);
     for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) {
-      let L = 0.94 + (fbm((x0 + x) / 40, y / 40, 512 / 40, seed, 2) - 0.5) * 0.18 - (y > T - 3 ? 0.1 : 0);
-      if (kind === "brick") { const row = Math.floor(y / 5), off = row % 2 ? 6 : 0, mortar = y % 5 === 0 || (x + off) % 12 === 0; L *= mortar ? 1.35 : 0.9 + hash(Math.floor((x + off) / 12), row, seed) * 0.22; }
-      if (kind === "cladding") { const p = (x % 10) / 10; L *= p < 0.2 ? 0.8 : 1.02; }
-      if (kind === "render") L *= 0.97 + hash(x >> 2, y >> 2, seed) * 0.04;
-      // weathering: rain runs down the wall (more towards the foot of each storey) and dirt splashed up at the bottom
-      L *= 1 - smoothstep01((fbm((x0 + x) / 3, y / 48, 512 / 3, seed + 21, 2) - 0.5) * 4) * 0.1 * (0.3 + y / T) - (y > T * 0.88 ? (y - T * 0.88) / (T * 0.12) * 0.07 : 0);
-      img.data.set([Math.min(255, base[0] * L), Math.min(255, base[1] * L), Math.min(255, base[2] * L), 255], (y * T + x) * 4);
+      const i = y * W + x0 + x;
+      let L = 0.95 + (fbm((x0 + x) / 80, y / 80, W / 80, seed, 2) - 0.5) * (kind === "render" ? 0.07 : 0.16), h = 0, ro = wallRough;
+      if (kind === "brick") {
+        // real brick coursing: 65 mm bricks, 10 mm beds, 215 mm long, stretcher bond; each brick its own tone and a
+        // little of its own face colour (some darker, a few blue-black headers as in Norfolk red brick)
+        const course = 0.075 * px, row = Math.floor(y / course), off = row % 2 ? 0.1125 * px : 0, bl = 0.225 * px;
+        const fy = (y % course) / course, fx = (((x + off) % bl) + bl) % bl / bl, mortar = fy < 0.13 || fx < 0.045;
+        const bi = Math.floor((x + off) / bl), bh = hash(bi, row, seed), dark = hash(bi, row, seed + 2) > 0.93;
+        if (mortar) { L *= 1.28; ro = 0.95; h = -0.5; } else { L *= (0.82 + bh * 0.3) * (dark ? 0.62 : 1); h = 0.4 + hash(x >> 1, y >> 1, seed + 4) * 0.1; }
+        if (dark && !mortar) { L *= 1; }
+      } else if (kind === "stone") {
+        const course = 0.32 * px, row = Math.floor(y / course), off = row % 2 ? 0.3 * px : 0, bl = 0.62 * px;
+        const fy = (y % course) / course, fx = (((x + off) % bl) + bl) % bl / bl, joint = fy < 0.05 || fx < 0.03;
+        L *= joint ? 0.8 : 0.94 + hash(Math.floor((x + off) / bl), row, seed) * 0.12; h = joint ? -0.4 : 0.3 + fbm(x / 9, y / 9, T / 9, seed + 6, 2) * 0.3;
+      } else if (kind === "cladding") {
+        const p = ((x % (0.15 * px)) / (0.15 * px)); L *= p < 0.25 ? 0.78 : 1.02; h = p < 0.25 ? -0.5 : 0.5; ro = 0.5 + p * 0.1;
+      } else { // painted render: smooth, a little uneven, faint trowel sweeps
+        L *= 0.98 + hash(x >> 2, y >> 2, seed) * 0.03 + (fbm(x / 14, y / 30, T / 14, seed + 8, 2) - 0.5) * 0.05; h = fbm(x / 6, y / 6, T / 6, seed + 9, 2) * 0.25;
+      }
+      // weathering: rain streaks down the wall (more towards the foot of each storey), dirt splashed up at the bottom,
+      // and a green-grey damp tide along the base course
+      const streak = smoothstep01((fbm((x0 + x) / 5, y / 90, W / 5, seed + 21, 2) - 0.5) * 4) * (kind === "render" ? 0.05 : 0.1) * (0.3 + y / T); // (painted render is repainted and stays cleaner than brick)
+      const foot = y > T * 0.86 ? (y - T * 0.86) / (T * 0.14) : 0;
+      L *= 1 - streak - foot * 0.1;
+      const r = base[0] * L, gg = base[1] * L * (1 - foot * 0.04), b = base[2] * L;
+      img.data.set([Math.min(255, r), Math.min(255, gg), Math.min(255, b), 255], (y * T + x) * 4);
+      hf[i] = h; rough[i] = ro + streak * 0.3;
     }
     g.putImageData(img, x0, 0);
-    const trim = kind === "brick" ? "#efe9dc" : kind === "cladding" ? "#5d6a63" : "#ffffff";
-    const glass = (x, y, w, h) => { g.fillStyle = "#28333d"; g.fillRect(x, y, w, h); const gr = g.createLinearGradient(x, y, x + w, y + h); gr.addColorStop(0, "rgba(160,190,215,.55)"); gr.addColorStop(0.5, "rgba(60,80,100,.1)"); gr.addColorStop(1, "rgba(140,170,200,.35)"); g.fillStyle = gr; g.fillRect(x, y, w, h); ge.fillStyle = "#c08a40"; ge.fillRect(x, y, w, h); };
-    if (t === FACADE_TILE.window && kind !== "cladding") {
-      const w = T * 0.36, h = T * 0.52, x = x0 + (T - w) / 2, y = T * 0.2;
-      g.fillStyle = trim; g.fillRect(x - 4, y - 4, w + 8, h + 8); glass(x, y, w, h);
-      g.fillStyle = trim; g.fillRect(x, y + h / 2 - 2, w, 4); g.fillRect(x + w / 2 - 1.5, y, 3, h); // sash bars
-      g.fillStyle = kind === "brick" ? "#d8d2c4" : "#d6d0c4"; g.fillRect(x - 7, y + h + 4, w + 14, 5); // sill
-      // grime run off the sill's ends and under it
-      const run = g.createLinearGradient(0, y + h + 9, 0, y + h + 34); run.addColorStop(0, "rgba(40,36,30,.22)"); run.addColorStop(1, "rgba(40,36,30,0)");
-      g.fillStyle = run; g.fillRect(x - 6, y + h + 9, 5, 25); g.fillRect(x + w + 1, y + h + 9, 5, 25); g.fillRect(x + 2, y + h + 9, w - 4, 10);
-      if (kind === "brick") { g.fillStyle = "#8a4636"; for (let k = 0; k < 6; k++) g.fillRect(x - 4 + (k * (w + 8)) / 6, y - 10, (w + 8) / 6 - 1, 6); } // lintel
-    } else if (t === FACADE_TILE.window) { glass(x0 + T * 0.3, T * 0.35, T * 0.4, T * 0.18); }
+  }
+  // ---- drawing helpers that keep the height and roughness fields in step with the colour ----
+  const fillH = (x, y, w, h, colour, height, ro, glass = false) => {
+    g.fillStyle = colour; g.fillRect(x, y, w, h);
+    const X0 = Math.max(0, Math.round(x)), Y0 = Math.max(0, Math.round(y)), X1 = Math.min(W, Math.round(x + w)), Y1 = Math.min(T, Math.round(y + h));
+    for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) { const i = yy * W + xx; hf[i] = height; rough[i] = ro; glassM[i] = glass ? 1 : 0; }
+    if (glass) { ge.fillStyle = "#fff"; ge.fillRect(x, y, w, h); }
+  };
+  const trim = kind === "brick" ? "#ece6d8" : kind === "cladding" ? "#5d6a63" : kind === "stone" ? "#e9e4d6" : "#fbfaf6";
+  const trimRo = 0.45;
+  // glass: a dark room behind it, the sky's gradient over it, a hint of curtain at the sides, the frame's shadow at the top
+  const glass = (x, y, w, h) => {
+    fillH(x, y, w, h, "#232d36", -1.6, 0.1, true);
+    const gr = g.createLinearGradient(x, y, x, y + h); gr.addColorStop(0, "rgba(150,178,205,.5)"); gr.addColorStop(0.45, "rgba(90,110,130,.18)"); gr.addColorStop(1, "rgba(40,52,64,.1)"); g.fillStyle = gr; g.fillRect(x, y, w, h);
+    g.fillStyle = "rgba(0,0,0,.35)"; g.fillRect(x, y, w, 3); g.fillRect(x, y, 2, h); // the reveal's shadow, top and left
+    const cw = w * 0.16; g.fillStyle = "rgba(225,220,205,.22)"; g.fillRect(x + 2, y + 3, cw, h - 5); g.fillRect(x + w - cw - 2, y + 3, cw, h - 5); // curtains
+  };
+  // ---- the bays ----
+  for (let t = 0; t < N; t++) {
+    const x0 = t * T;
+    if ((t === FACADE_TILE.window || t === FACADE_TILE.window2) && kind !== "cladding") {
+      const wide = t === FACADE_TILE.window2;
+      const w = (wide ? 1.7 : 1.05) * px, h = 1.55 * px, x = x0 + (T - w) / 2, y = 0.55 * px;
+      // the reveal: the opening set 0.1 m back into the wall; its frame standing a little proud of the glass
+      fillH(x - 0.1 * px, y - 0.1 * px, w + 0.2 * px, h + 0.14 * px, kind === "render" ? "#e4ded0" : trim, -1.2, 0.6); // the reveal's sides and head
+      fillH(x - 0.05 * px, y - 0.05 * px, w + 0.1 * px, h + 0.08 * px, trim, -0.8, trimRo); // the box frame
+      glass(x, y, w, h);
+      // sash bars and the meeting rail, proud of the glass
+      fillH(x, y + h * 0.47, w, 0.06 * px, trim, -0.7, trimRo);
+      if (wide) { for (const f of [1 / 3, 2 / 3]) fillH(x + w * f - 0.04 * px, y, 0.08 * px, h, trim, -0.7, trimRo); }
+      else fillH(x + w / 2 - 0.02 * px, y, 0.04 * px, h * 0.47, trim, -0.75, trimRo);
+      // the sill: a stone or painted ledge standing out from the wall, with grime run off its ends and under it
+      const sillC = kind === "brick" ? "#d6d0c2" : kind === "stone" ? "#dcd6c8" : "#e6e1d6";
+      fillH(x - 0.12 * px, y + h + 0.04 * px, w + 0.24 * px, 0.11 * px, sillC, 1.4, 0.7);
+      g.fillStyle = "rgba(0,0,0,.28)"; g.fillRect(x - 0.12 * px, y + h + 0.15 * px, w + 0.24 * px, 3); // its shadow line
+      const run = g.createLinearGradient(0, y + h + 0.17 * px, 0, y + h + 0.5 * px); run.addColorStop(0, "rgba(40,36,30,.26)"); run.addColorStop(1, "rgba(40,36,30,0)");
+      g.fillStyle = run; g.fillRect(x - 0.12 * px, y + h + 0.17 * px, 0.07 * px, 0.33 * px); g.fillRect(x + w + 0.05 * px, y + h + 0.17 * px, 0.07 * px, 0.33 * px); g.fillRect(x + 0.05 * px, y + h + 0.17 * px, w - 0.1 * px, 0.12 * px);
+      // over the head: a brick soldier arch on brick, a stone lintel on render and stone
+      if (kind === "brick") { for (let k = 0; k < 9; k++) fillH(x - 0.1 * px + (k * (w + 0.2 * px)) / 9, y - 0.3 * px, (w + 0.2 * px) / 9 - 1.5, 0.2 * px, k % 2 ? "#8e4a39" : "#9a5242", 0.5, 0.88); }
+      else fillH(x - 0.14 * px, y - 0.3 * px, w + 0.28 * px, 0.2 * px, kind === "stone" ? "#e2dccd" : "#eee9dd", 1.2, 0.7);
+    } else if (t === FACADE_TILE.window || t === FACADE_TILE.window2) {
+      glass(x0 + T * 0.3, T * 0.35, T * 0.4, T * 0.18);
+    }
     if (t === FACADE_TILE.door) {
-      const w = T * 0.32, h = T * 0.66, x = x0 + (T - w) / 2, y = T - h - 2;
-      g.fillStyle = trim; g.fillRect(x - 5, y - 16, w + 10, h + 18);
-      glass(x, y - 12, w, 9); // fanlight
-      const doorCol = ["#1f3a5f", "#5b1f24", "#23402e", "#2b2b2b"][seed % 4]; g.fillStyle = doorCol; g.fillRect(x, y, w, h);
-      g.fillStyle = "rgba(255,255,255,.12)"; g.fillRect(x + 4, y + 6, w - 8, h * 0.38); g.fillRect(x + 4, y + h * 0.5, w - 8, h * 0.42);
-      g.fillStyle = "#c8a24a"; g.fillRect(x + w - 8, y + h * 0.5, 3, 3);
+      const w = 0.95 * px, h = 2.1 * px, x = x0 + (T - w) / 2, y = T - h - 0.04 * px;
+      fillH(x - 0.12 * px, y - 0.42 * px, w + 0.24 * px, h + 0.46 * px, kind === "render" ? "#e4ded0" : trim, -1.4, 0.6); // the reveal (deeper than a window's)
+      fillH(x - 0.06 * px, y - 0.36 * px, w + 0.12 * px, h + 0.4 * px, trim, -1.0, trimRo); // the door case
+      glass(x + 0.02 * px, y - 0.3 * px, w - 0.04 * px, 0.22 * px); // fanlight
+      const doorCol = ["#1f3a5f", "#5b1f24", "#23402e", "#2b2b2b", "#6b1d1d", "#1c2e23"][seed % 6];
+      fillH(x, y, w, h, doorCol, -1.3, 0.35);
+      // panels, a letter plate, a brass knob, a step
+      g.fillStyle = "rgba(255,255,255,.1)"; g.fillRect(x + 0.1 * px, y + 0.15 * px, w - 0.2 * px, h * 0.36); g.fillRect(x + 0.1 * px, y + h * 0.55, w - 0.2 * px, h * 0.38);
+      g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(x + 0.1 * px, y + 0.15 * px, w - 0.2 * px, 2); g.fillRect(x + 0.1 * px, y + h * 0.55, w - 0.2 * px, 2);
+      g.fillStyle = "#c8a24a"; g.fillRect(x + w - 0.16 * px, y + h * 0.5, 0.05 * px, 0.05 * px); g.fillRect(x + w * 0.35, y + h * 0.46, w * 0.3, 0.035 * px);
+      fillH(x - 0.1 * px, T - 0.08 * px, w + 0.2 * px, 0.08 * px, "#bdb8ad", 0.8, 0.85);
+      // a number plate and a bell: small, but the eye reads them as a lived-in door
+      g.fillStyle = "#f2f0ea"; g.fillRect(x + w - 0.3 * px, y - 0.6 * px, 0.2 * px, 0.14 * px);
     }
     if (t === FACADE_TILE.shop) {
-      const y = T * 0.18; g.fillStyle = ["#1f3a5f", "#5b1f24", "#23402e", "#3d3d46"][(seed + 1) % 4]; g.fillRect(x0, y - 14, T, 14); // fascia
-      glass(x0 + 6, y + 4, T - 12, T * 0.62); g.fillStyle = trim; g.fillRect(x0 + T / 2 - 2, y + 4, 4, T * 0.62); g.fillRect(x0 + 4, y + T * 0.66, T - 8, 5);
+      const y = 0.5 * px; const fasciaC = ["#1f3a5f", "#5b1f24", "#23402e", "#3d3d46", "#2a4a3a", "#4a2a2a"][(seed + 1) % 6];
+      fillH(x0, y - 0.5 * px, T, 0.5 * px, fasciaC, 0.6, 0.5); // the fascia, standing proud
+      g.fillStyle = "rgba(255,255,255,.75)"; for (let k = 0; k < 4; k++) g.fillRect(x0 + 0.5 * px + k * 0.55 * px, y - 0.33 * px, 0.4 * px, 0.14 * px); // lettering, unreadable at this size
+      g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(x0, y - 0.03 * px, T, 0.03 * px);
+      fillH(x0 + 0.1 * px, y, T - 0.2 * px, 2.1 * px, trim, -0.6, trimRo); // the shop front's frame
+      glass(x0 + 0.16 * px, y + 0.06 * px, T - 0.32 * px, 1.95 * px);
+      fillH(x0 + T / 2 - 0.03 * px, y + 0.06 * px, 0.06 * px, 1.95 * px, trim, -0.5, trimRo); // mullion
+      fillH(x0 + 0.1 * px, y + 2.1 * px, T - 0.2 * px, 0.4 * px, kind === "brick" ? "#5a4a44" : "#4a4c50", 0.2, 0.7); // the stall riser
+      fillH(x0, y - 0.5 * px, 0.1 * px, 2.6 * px, trim, 0.9, 0.6); fillH(x0 + T - 0.1 * px, y - 0.5 * px, 0.1 * px, 2.6 * px, trim, 0.9, 0.6); // pilasters
     }
-    if (kind === "cladding" && t === FACADE_TILE.door) { g.fillStyle = "#6e7670"; g.fillRect(x0 + 10, T * 0.2, T - 20, T * 0.8); for (let k = 0; k < 20; k++) { g.fillStyle = "rgba(0,0,0,.15)"; g.fillRect(x0 + 10, T * 0.2 + k * 5, T - 20, 1); } }
+    if (t === FACADE_TILE.plain) {
+      // a downpipe down the right edge of the bay, with its bracket and the damp streak behind it; an air brick low
+      const pxp = x0 + T - 0.18 * px;
+      g.fillStyle = "rgba(30,30,28,.14)"; g.fillRect(pxp - 0.05 * px, 0, 0.16 * px, T);
+      fillH(pxp, 0, 0.065 * px, T, kind === "brick" ? "#3a3634" : "#2e2e30", 1.6, 0.4);
+      g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(pxp + 0.01 * px, 0, 0.015 * px, T); // its highlight
+      for (const yy of [0.4 * px, 2.2 * px]) fillH(pxp - 0.02 * px, yy, 0.105 * px, 0.06 * px, "#3a3634", 1.9, 0.4);
+      fillH(x0 + 0.9 * px, T - 0.5 * px, 0.22 * px, 0.15 * px, kind === "brick" ? "#9a5b4a" : "#8a8a86", -0.3, 0.9); // air brick
+      for (let k = 0; k < 3; k++) { g.fillStyle = "rgba(0,0,0,.45)"; g.fillRect(x0 + 0.92 * px, T - 0.48 * px + k * 0.045 * px, 0.18 * px, 1.5); }
+    }
+    if (kind === "cladding" && t === FACADE_TILE.door) { fillH(x0 + 0.3 * px, T * 0.2, T - 0.6 * px, T * 0.8, "#6e7670", -0.4, 0.5); for (let k = 0; k < 20; k++) { g.fillStyle = "rgba(0,0,0,.15)"; g.fillRect(x0 + 0.3 * px, T * 0.2 + k * 10, T - 0.6 * px, 2); } }
   }
-  return { map: toTex(c), emissiveMap: toTex(e) };
+  return { map: toTex(c), emissiveMap: toTex(e), normalMap: normalFrom(hf, W, T, 1.1), roughnessMap: greyTex(rough, W, T) };
 }
 
-// ---- roofs: slate (grey-blue) or clay tiles (red-brown), one tile = about 3 m square ----
+// ---- roofs: slate (grey-blue), clay pantiles (red-brown) or felt; one tile = 3 m square ----
+// Slates 0.5 m by 0.25 m in overlapping courses, each its own tone and a slight twist; pantiles 0.34 m wide with
+// their S-profile, courses of 0.3 m; moss in the shaded laps, lichen spots, a grey-green bloom along the lower
+// edges where the damp holds. Height fields for both, so the sun rakes across the courses.
 export function roof(kind = "slate", seed = 11) {
-  const n = 128, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n);
-  const base = kind === "slate" ? [78, 84, 92] : kind === "felt" ? [62, 62, 60] : [150, 72, 50];
-  const rows = kind === "felt" ? 1 : 16, cols = kind === "slate" ? 10 : 14;
+  const n = 256, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n), rough = new Float32Array(n * n);
+  const base = kind === "slate" ? [76, 82, 90] : kind === "felt" ? [62, 62, 60] : [152, 74, 50];
+  const px = n / 3;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-    const r = Math.floor((y / n) * rows), off = r % 2 ? 0.5 : 0, cIdx = Math.floor((x / n) * cols + off), fy = ((y / n) * rows) % 1;
-    const tileV = kind === "felt" ? 0 : 0.85 + hash(cIdx, r, seed) * 0.3;
-    const edge = kind === "felt" ? 0 : fy < 0.12 ? 0.6 : 1, gap = kind === "felt" ? 1 : ((x / n) * cols + off) % 1 < 0.04 ? 0.7 : 1;
-    const moss = fbm(x / 32, y / 32, 4, seed, 2) > 0.68 ? 0.25 : 0;
-    const lich = kind !== "felt" && hash(x >> 1, y >> 1, seed + 3) > 0.985 ? 0.35 : 0; // (lichen: pale yellow-grey spots)
-    const L = (kind === "felt" ? 0.9 + hash(x, y, seed) * 0.15 : tileV) * edge * gap * (0.92 + fbm(x / 20, y / 64, 128 / 20, seed + 5, 2) * 0.16) + lich;
-    img.data.set([base[0] * L * (1 - moss) + 70 * moss, base[1] * L * (1 - moss) + 86 * moss, base[2] * L * (1 - moss) + 40 * moss, 255], (y * n + x) * 4);
-    hf[y * n + x] = fy * (kind === "felt" ? 0 : 1) * gap;
+    let L = 1, h = 0, ro = kind === "slate" ? 0.55 : 0.85, mossK = 0;
+    if (kind === "felt") { L = 0.9 + hash(x, y, seed) * 0.15 + (fbm(x / 40, y / 40, n / 40, seed, 2) - 0.5) * 0.1; h = hash(x, y, seed) * 0.1; }
+    else if (kind === "slate") {
+      const course = 0.25 * px, row = Math.floor(y / course), off = row % 2 ? 0.25 * px : 0, sw = 0.5 * px;
+      const fy = (y % course) / course, fx = ((((x + off) % sw) + sw) % sw) / sw, si = Math.floor((x + off) / sw);
+      const tone = 0.84 + hash(si, row, seed) * 0.32, twist = (hash(si, row, seed + 1) - 0.5) * 0.08 * fx;
+      const lap = fy < 0.1 ? 0.55 + fy * 4 : 1, gap = fx < 0.03 ? 0.6 : 1; // the shadow of the course above; the thin gap between slates
+      L = tone * lap * gap + twist; h = (1 - fy) * 0.8 * gap; mossK = fy < 0.2 && fbm(x / 30, y / 30, n / 30, seed + 2, 2) > 0.62 ? 0.5 : 0;
+      ro = 0.5 + hash(si, row, seed + 3) * 0.2 + (fy < 0.1 ? 0.2 : 0);
+    } else {
+      const course = 0.3 * px, row = Math.floor(y / course), tw = 0.34 * px, off = row % 2 ? tw * 0.5 : 0;
+      const fy = (y % course) / course, fx = ((((x + off) % tw) + tw) % tw) / tw, ti = Math.floor((x + off) / tw);
+      const prof = Math.sin(fx * Math.PI * 2 - 0.6) * 0.5 + 0.5; // the pantile's S: a roll and a pan
+      const tone = 0.82 + hash(ti, row, seed) * 0.36, shade = 0.78 + prof * 0.3, lap = fy < 0.12 ? 0.5 + fy * 4 : 1;
+      L = tone * shade * lap; h = prof * 0.9 + (1 - fy) * 0.4; mossK = (prof < 0.3 || fy < 0.15) && fbm(x / 26, y / 26, n / 26, seed + 2, 2) > 0.6 ? 0.6 : 0;
+      ro = 0.8 + prof * 0.1;
+    }
+    const weather = 0.92 + fbm(x / 60, y / 100, n / 60, seed + 5, 2) * 0.16; // broad patches of paler and darker
+    const lich = kind !== "felt" && hash(x >> 1, y >> 1, seed + 3) > 0.988 ? 0.3 : 0;
+    L = L * weather + lich;
+    const i = y * n + x, m = mossK;
+    img.data.set([Math.min(255, base[0] * L * (1 - m) + 74 * m), Math.min(255, base[1] * L * (1 - m) + 88 * m), Math.min(255, base[2] * L * (1 - m) + 42 * m), 255], i * 4);
+    hf[i] = h; rough[i] = ro + m * 0.1;
   }
   g.putImageData(img, 0, 0);
-  return { map: toTex(c), normalMap: normalFrom(hf, n, n, 2.5) };
+  return { map: toTex(c), normalMap: normalFrom(hf, n, n, 2.2), roughnessMap: greyTex(rough, n, n) };
 }
 
 // ---- a ground detail map with no joints (sand, grass, gravel: the colour comes from the ground's vertex colours) ----
@@ -173,6 +272,57 @@ export function bricks(seed = 17, base = [150, 70, 52]) {
   }
   g.putImageData(img, 0, 0);
   return { map: toTex(c), normalMap: normalFrom(hf, n, n, 1.5) };
+}
+
+// ---- asphalt: one tile covers 6 m. Aggregate (the stone chips in the bitumen, paler where traffic has worn the
+// binder off them), a soft unevenness in the tone, hairline cracks that wander and branch, a repair or two (a patch
+// of darker, newer tarmac with a slightly raised edge). Colour, relief and roughness (the worn stone smoother than the
+// binder round it). Tiling is broken by the material's own large-scale mottle (weather()), not here. ----
+export function asphalt({ size = 512, seed = 23, tint = [122, 122, 118] } = {}) {
+  const n = size, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n), ro = new Float32Array(n * n);
+  let st = seed * 2654435761 >>> 0; const rnd = () => ((st = (st * 1664525 + 1013904223) >>> 0) / 4294967296);
+  // repairs: one or two patches a tile, darker and slightly raised (their position hashed by seed)
+  const patches = []; for (let k = 0; k < 2; k++) if (rnd() < 0.7) patches.push([rnd() * n, rnd() * n, (0.12 + rnd() * 0.2) * n, (0.08 + rnd() * 0.15) * n]);
+  const inPatch = (x, y) => { let v = 0; for (const [px, py, pw, ph] of patches) { const dx = Math.abs(((x - px + n * 1.5) % n) - n / 2) - pw / 2, dy = Math.abs(((y - py + n * 1.5) % n) - n / 2) - ph / 2; const d = Math.max(dx, dy); v = Math.max(v, 1 - Math.max(0, Math.min(1, (d + 3) / 4))); } return v; };
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const k = y * n + x;
+    const agg = hash(x, y, seed), agg2 = hash(x >> 1, y >> 1, seed + 1), tone = fbm(x / 64, y / 64, n / 64, seed + 2, 3), wear = fbm(x / 160, y / 160, n / 160, seed + 3, 2);
+    // a chip shows pale where the binder is worn: more of them where the wear noise is high (wheel tracks, roughly)
+    const chip = agg2 > 0.72 && agg > 0.35 ? 0.35 + 0.45 * Math.max(0, wear - 0.35) * 2 : 0;
+    const patch = inPatch(x, y);
+    let L = 0.8 + (tone - 0.5) * 0.3 + (agg - 0.5) * 0.18 + chip;
+    L = L * (1 - patch * 0.16); // (a repair is darker: newer bitumen)
+    img.data.set([Math.min(255, tint[0] * L), Math.min(255, tint[1] * L), Math.min(255, tint[2] * L * 0.98), 255], k * 4);
+    hf[k] = 0.5 + (agg - 0.5) * 0.25 + (chip ? 0.12 : 0) + patch * 0.08; ro[k] = 0.9 - chip * 0.35 - patch * 0.08 + (agg - 0.5) * 0.08;
+  }
+  // cracks: wandering dark lines, a branch or two, darker and lower
+  const crack = (x, y, a, len, w) => { for (let i = 0; i < len; i++) { a += (rnd() - 0.5) * 0.5; x += Math.cos(a); y += Math.sin(a); const xi = ((Math.round(x) % n) + n) % n, yi = ((Math.round(y) % n) + n) % n; for (let d = -w; d <= w; d++) for (let e = -w; e <= w; e++) { const q = (((yi + e) % n + n) % n) * n + ((xi + d) % n + n) % n, f = 1 - Math.hypot(d, e) / (w + 1); if (f <= 0) continue; img.data[q * 4] *= 1 - 0.32 * f; img.data[q * 4 + 1] *= 1 - 0.32 * f; img.data[q * 4 + 2] *= 1 - 0.32 * f; hf[q] -= 0.15 * f; } if (i > 20 && rnd() < 0.015) crack(x, y, a + (rnd() < 0.5 ? 0.9 : -0.9), len * 0.4, Math.max(1, w - 1)); } };
+  for (let k = 0; k < 3; k++) crack(rnd() * n, rnd() * n, rnd() * Math.PI * 2, 100 + rnd() * 180, 1);
+  g.putImageData(img, 0, 0);
+  return { map: toTex(c), normalMap: normalFrom(hf, n, n, 1.6), roughnessMap: greyTex(ro, n, n) };
+}
+
+// ---- turf: one tile covers 2 m. Short grass as a fine grain of blades (strokes a little lighter and darker than the
+// ground), worn patches where the grass thins to earth, clover and daisies as the odd speck; the blades' relief for
+// the normal map. Drawn near mid-grey so the ground's own tint (vertex colour) decides the green. ----
+export function turf({ size = 256, seed = 29 } = {}) {
+  const n = size, c = canvas(n), g = c.getContext("2d"), img = g.createImageData(n, n), hf = new Float32Array(n * n);
+  let st = seed * 2654435761 >>> 0; const rnd = () => ((st = (st * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const k = y * n + x, wear = fbm(x / 90, y / 90, n / 90, seed, 3), fine = fbm(x / 6, y / 6, n / 6, seed + 1, 2), grain = hash(x, y, seed + 2);
+    const bare = Math.max(0, Math.min(1, (wear - 0.62) * 5)); // (earth showing through)
+    let L = 0.48 + (fine - 0.5) * 0.3 + (grain - 0.5) * 0.22;
+    // colour: the tint comes later; here a touch of yellow in the lit blades and brown in the bare patches
+    let r = L * (1 + bare * 0.35), gg = L * (1 - bare * 0.15), b = L * (0.9 - bare * 0.25);
+    img.data.set([Math.min(255, r * 255), Math.min(255, gg * 255), Math.min(255, b * 255), 255], k * 4);
+    hf[k] = 0.5 + (fine - 0.5) * 0.3 + (grain - 0.5) * 0.3 - bare * 0.15;
+  }
+  // blades: short strokes
+  g.putImageData(img, 0, 0);
+  for (let i = 0; i < 2600; i++) { const x = rnd() * n, y = rnd() * n, a = -Math.PI / 2 + (rnd() - 0.5) * 1.2, L = 3 + rnd() * 6, lit = rnd() < 0.5; g.strokeStyle = lit ? "rgba(170,180,120,0.45)" : "rgba(60,70,40,0.45)"; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); g.stroke(); for (let t = 0; t < L; t++) { const q = (((y + Math.sin(a) * t) | 0) % n + n) % n * n + (((x + Math.cos(a) * t) | 0) % n + n) % n; hf[q] += lit ? 0.08 : -0.05; } }
+  // the odd daisy and clover leaf
+  for (let i = 0; i < 40; i++) { const x = rnd() * n, y = rnd() * n; g.fillStyle = rnd() < 0.4 ? "rgba(235,235,225,0.9)" : "rgba(70,110,60,0.8)"; g.beginPath(); g.arc(x, y, 1 + rnd() * 1.2, 0, Math.PI * 2); g.fill(); }
+  return { map: toTex(c), normalMap: normalFrom(hf, n, n, 1.2) };
 }
 
 // ---- photographed surfaces (public/textures/, Poly Haven CC0, cut down by source-assets/prepare_textures.py) ----

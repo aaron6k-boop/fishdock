@@ -33,22 +33,26 @@ export function lightingFor(st) {
   let sunColour = sum3([[1, 0.95, 0.88], day], [[1, 0.8, 0.62], dusk], [[0.62, 0.7, 0.88], night]);
   sunColour = mix3(sunColour, [1, 0.8, 0.58], low * day * 0.75);
   sunColour = mix3(sunColour, [0.95, 0.95, 0.96], over * 0.6);
-  const sunIntensity = (2.5 * day * (1 - 0.3 * low) + 1.45 * dusk + 0.3 * night * moonLight) * sunVis;
+  // (the sun against the sky: on a clear day a horizontal surface gets four to five times as much light from the sun as
+  // from the whole sky, so a shadow on the deck is about a fifth as bright as the deck beside it. It was 2.5 against
+  // 1.3 of sky and reflections, under a half, and shadows read as faint smudges; now 3.4 against 0.9)
+  const sunIntensity = (3.4 * day * (1 - 0.3 * low) + 1.45 * dusk + 0.3 * night * moonLight) * sunVis;
   // the sky's own light: more of it under a bright overcast (the cloud spreads the sun), a blue moonlit fill at night
   // (never so little that the shadows go black)
   const skyColour = sum3([mix3(mix3([0.66, 0.76, 0.92], [0.72, 0.74, 0.84], low * 0.5), [0.82, 0.84, 0.86], over), day], [[0.66, 0.62, 0.74], dusk], [[0.42, 0.5, 0.72], night]); // (a low sun's sky light is a touch greyer: less blue overhead, more haze)
   const groundColour = sum3([[0.32, 0.3, 0.27], day], [[0.3, 0.26, 0.24], dusk], [[0.13, 0.13, 0.15], night]);
-  const skyIntensity = (day * (0.72 + 0.7 * over) + dusk * (0.78 + 0.3 * over) + night * (0.34 + 0.22 * moonLight)) * (1 - 0.12 * rain);
+  // (a low sun lights the sky less too: the sky at a 5 degree sun gives perhaps two fifths of what it gives at 40)
+  const skyIntensity = (day * (0.5 + 0.92 * over) * (1 - 0.4 * low * (1 - over)) + dusk * (0.78 + 0.3 * over) + night * (0.34 + 0.22 * moonLight)) * (1 - 0.12 * rain);
   // shadows: crisp in sun, faint under a grey sky, soft by moonlight
-  const shadow = mix(mix(0.85, 0.32, over), 0.55, night);
+  const shadow = mix(mix(1, 0.32, over), 0.55, night); // (a shadow in sun is lit by the sky alone: the sky light fills it, nothing else should)
   // haze (exponential, the same for the land and the water): further in rain, a little at dusk and at night. Even on a
   // clear day sea air softens the far shore (about a tenth hazed at 500 m, two fifths at a kilometre), so the distant
   // piers and dunes sit back instead of looking as sharp as the deck
   const fogDensity = (0.00078 + 0.0001 * over + 0.00015 * dusk + 0.00025 * night) + rain * 0.0024; // (a little thicker than it was, so the town and the far shore sit back in the air and glow towards the sun (fogScatter.js), still readable)
   // the eye adapts: dusk and night are lifted, a grey day a touch, so nothing is crushed to black
-  const exposure = 1 + 0.22 * dusk + 0.5 * night + 0.2 * over * (1 - night) + 0.06 * rain; // (a grey day lifted more: the eye adapts to it, and at a touch it all read dim and murky on a phone)
+  const exposure = 1 + 0.22 * dusk + 0.5 * night + 0.2 * over * (1 - night) + 0.06 * rain + 0.25 * low * day * (1 - over); // (a grey day lifted more: the eye adapts to it, and at a touch it all read dim and murky on a phone)
   // how strongly the sky shows in reflections (wet ground in rain shows more of it)
-  const envIntensity = 0.6 + 0.15 * rain - 0.1 * night;
+  const envIntensity = day * (0.42 + 0.18 * over) * (1 - 0.3 * low * (1 - over)) + (dusk + night) * 0.6 + 0.15 * rain - 0.1 * night; // (the sky in reflections and as fill: less on a clear day, as the sky light above)
   const lampOn = clamp01(night + dusk * 0.35);
   return { sunColour, sunIntensity, sunVis, skyColour, groundColour, skyIntensity, shadow, fogDensity, fogColour: horizonColour(st), exposure, envIntensity, lampOn };
 }

@@ -406,14 +406,16 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 body = mix(uWater*1.08, uWater*.6 + vec3(.014, .01, .002), pow(clamp(v.y, 0., 1.), .6));
         // and the turbidity's own soft light, varying slowly (silt clouds and the swell's shade), more of it close by
         body += vec3(.016, .017, .012)*(.4 + .8*noise(p*.07 + uTime*.02))*(1. - smoothstep(4., 60., dist));
-        body = mix(body, uWater*1.3 + vec3(.01, .03, .015), shallow*.7)*lit*dim;
+        // (the shallows by the walls and the beach: lighter and browner, the sand and silt stirred up, not a cleaner green)
+        body = mix(body, uWater*1.3 + vec3(.022, .026, .012), shallow*.7)*lit*dim;
         // under a grey sky the North Sea goes a lighter grey-green (the cloud's light scattered back out of the silty
         // water), not the dark teal of a clear day
         { float ovs = smoothstep(.55, 1., uCloud); body = mix(body, vec3(.2, .235, .22)*lit, ovs*.5); }
         // light through the thin water at the crests, more so looking towards the sun
         float crest = smoothstep(-.05, .4, h)*(1. - uNight);
         float toward = pow(max(dot(-v, normalize(vec3(uSunDir.x, 0., uSunDir.z))), 0.), 3.);
-        body += vec3(.010, .042, .036)*crest*(.5 + 1.1*toward)*lit*dim;
+        // (a grey-green, not a teal: the North Sea's silt takes the blue out of the light through a crest)
+        body += vec3(.012, .034, .024)*crest*(.5 + 1.1*toward)*lit*dim;
         // close below you, light comes back up out of the water: the foreground isn't a black pool
         body *= 1. + .15*(1. - smoothstep(3., 26., dist));
         body += vec3(.004, .008, .014)*uNight;
@@ -745,7 +747,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   }
   // ---- reflections of the scene in the water: the scene drawn again from a camera mirrored in the water's surface,
   // at a fraction of the screen's size, with the sky, the water and anything passed in (your own hands) left out ----
-  const R = { rt: null, cam: new THREE.PerspectiveCamera(), scale: 0.5, every: 1, n: 0,
+  const R = { rt: null, cam: new THREE.PerspectiveCamera(), scale: 0.5, every: 1, n: 0, far: 500,
     plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), rot: new THREE.Matrix4(), v: new THREE.Vector3(), look: new THREE.Vector3(), tgt: new THREE.Vector3(), cp: new THREE.Vector3() };
   function reflect(renderer, scene, camera, hide = []) {
     if (!R.rt) return;
@@ -758,7 +760,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     R.rot.extractRotation(camera.matrixWorld);
     R.look.set(0, 0, -1).applyMatrix4(R.rot).add(R.cp); R.tgt.copy(R.look); R.tgt.y = 2 * Y - R.look.y;
     c.position.copy(R.v); c.up.set(0, 1, 0).applyMatrix4(R.rot); c.up.y = -c.up.y; c.lookAt(R.tgt);
-    c.far = camera.far; c.near = camera.near; c.updateMatrixWorld(); c.projectionMatrix.copy(camera.projectionMatrix);
+    // (the mirror sees only so far: beyond a few hundred metres a reflected house is a few pixels of the half-size
+    // picture, broken by the waves, and the sky's own reflection stands in for it; in a rough sea, which breaks every
+    // reflection into glints, it sees less far still and is drawn every other frame)
+    const rough = wind * 0.5 + wU.uSwell.value > 0.75;
+    if (rough && (R.n & 1)) return;
+    c.fov = camera.fov; c.aspect = camera.aspect; c.zoom = camera.zoom; c.near = camera.near; c.far = Math.min(camera.far, rough ? 220 : R.far);
+    c.updateMatrixWorld(); c.updateProjectionMatrix(); // (its own projection, so the shorter far plane culls what it can't see)
     const tm = wU.uReflMat.value; tm.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1); tm.multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
     // (an oblique near plane on the water's surface, so nothing under the water shows in the mirror)
     R.plane.setFromNormalAndCoplanarPoint(N, P).applyMatrix4(c.matrixWorldInverse);
@@ -778,7 +786,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   function setReflections(level, renderer) {
     level = Math.max(0, Math.min(2, level | 0));
     if (!level) { R.rt?.dispose(); R.rt = null; wU.uRefl.value = null; wU.uReflOn.value = 0; return; }
-    R.every = level >= 2 ? 1 : 2; R.scale = level >= 2 ? 0.5 : 0.4;
+    R.every = level >= 2 ? 1 : 2; R.scale = level >= 2 ? 0.5 : 0.4; R.far = level >= 2 ? 500 : 300; // (how far the mirror sees)
     sizeReflections(renderer);
   }
   function sizeReflections(renderer) {
@@ -844,6 +852,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     setRipples(list) { for (let i = 0; i < 8; i++) { const r = list[i]; wU.uRip.value[i].set(r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0); } },
     update(t, dt, cam) {
       real?.skyline?.update(t);
+      real?.treesUpdate?.(t, cam, wind, windDir); // (the trees' level of detail by distance, and their wind)
       if (real?.beacons) { const nt = cur ? Math.min(1, cur.night + cur.dusk * 0.6) : 0; for (const b of real.beacons) b(t, nt); }
       U.uTime.value = t; wU.uCam.value.set(Math.round(cam.position.x / 4) * 4, 0, Math.round(cam.position.z / 4) * 4);
       // the shadows' box round the camera, moved a 2 m step at a time
