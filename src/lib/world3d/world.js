@@ -103,7 +103,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     sharpen(); renderer.info.reset();
     let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
     if (env.fftSea) env.simulate(simT); // (the spectrum sea's passes count in the frame's GPU time)
-    if (env.reflections) { if (!noReflAt--) { noRefl = scene.getObjectsByProperty("name", "fdNoReflect"); noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
+    if (env.reflections) { if (!noReflAt--) { noRefl = [...scene.getObjectsByProperty("name", "fdNoReflect"), ...scene.getObjectsByProperty("noReflect", true)]; noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
     if (post) post.render(); else renderer.render(scene, camera);
     if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); qs.push(q); }
     // (collect the answers that are ready, oldest first; a disjoint event, as a change of GPU clock, throws them away)
