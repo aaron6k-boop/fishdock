@@ -219,7 +219,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() }, uFdSun: { value: new THREE.Vector3() },
     // the spectrum sea (fftSea.js, Ultra): its displacement and slope maps, the size of each cascade's tile, and how
     // much of the sine-train chop stays under it (the trains carry the swell; the CPU rides the same trains)
-    uDbg: { value: 0 }, uFft: { value: 0 }, uDisp0: { value: null }, uDer0: { value: null }, uDer1: { value: null }, uL0: { value: 180 }, uL1: { value: 22 }, uChop: { value: 1 },
+    uDbg: { value: 0 }, uFft: { value: 0 }, uFoam0: { value: null }, uDisp0: { value: null }, uDer0: { value: null }, uDer1: { value: null }, uL0: { value: 180 }, uL1: { value: 22 }, uChop: { value: 1 },
   };
   // the sea's fine ripples: a water normal map (three.js's, MIT; source-assets/ASSET-LICENCES.json), until it has
   // loaded the old noise ripples stand in
@@ -281,7 +281,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     fragmentShader: GLSL_NOISE + GLSL_SKY + GLSL_WAVES + POST_GLSL + /* glsl */`
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
       uniform sampler2D uShore, uShoreF, uNrm, uRefl; uniform float uShoreFHalf, uNrmOn, uReflOn; uniform mat4 uReflMat; uniform vec3 uFdSun;
-      uniform float uFft, uL0, uL1, uDbg; uniform sampler2D uDer0, uDer1;
+      uniform float uFft, uL0, uL1, uDbg; uniform sampler2D uDer0, uDer1, uFoam0;
       // the scene's own light (linear, before the tone curve) to the display colours the water works in: the same
       // neutral curve and sRGB the rest of the picture gets at the end (post.js OutputPass), so the mirrored dune and
       // town match the real ones
@@ -463,7 +463,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           // breeze up, more as the wind rises; the patchiness comes from the spectrum itself
           if (uFft > .5 && sea > .5) {
             // (the edge of each cap broken by a noise, its body a ragged bubble texture that drifts down wind)
-            float jn = fftJ + (noise(p*1.7 + uTime*.3) - .5)*.14;
+            // (the foam map: born where the crest folded, lingering a few seconds after it has passed on)
+            float lf = texture2D(uFoam0, vP/uL0).r;
+            float jn = 1. - lf*.6 + (noise(p*1.7 + uTime*.3) - .5)*.14;
             float bub = .5 + .5*smoothstep(.3, .72, noise(p*4.3 - wd*uTime*.8)*.6 + noise(p*11. + vec2(uTime*.5, -uTime*.3))*.4);
             // (a crest breaks in separate caps a few metres across, not along its whole length: a patch noise breaks it up)
             float capBreak = smoothstep(.3, .55, noise(p*.33 + vec2(uTime*.05, -uTime*.04))*.6 + noise(p*.9 - wd*uTime*.2)*.4);
@@ -808,6 +810,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       // with the wind. Choppiness 1.4: crests drawn together enough to fold in a fresh breeze, not before)
       const gain = 0.08 + 0.22 * THREE.MathUtils.smoothstep(wind, 0.05, 0.45);
       fft.update(t, { windKph: wind * 45, windDir, fetchKm: 80, gain, lambda: 1.4 });
+      wU.uFoam0.value = fft.foam;
     },
     /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM }; facing: bearing of -z */
     setEnv({ light = {}, cond = {}, facing = 180 } = {}) {

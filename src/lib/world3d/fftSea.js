@@ -115,6 +115,16 @@ const DERIVE_FRAG = GLSL_COMMON + /* glsl */`
     gl_FragColor = vec4(dydx/max(1. + dxdx, .2), dydz/max(1. + dzdz, .2), J, c.y);
   }`;
 
+// ---- foam that lingers: born where the Jacobian folds, fading over a few seconds (a whitecap's bubbles outlast the
+// crest that made them, and drift off as a streak behind it) ----
+const FOAM_FRAG = GLSL_COMMON + /* glsl */`
+  uniform sampler2D uDer, uPrev; uniform float uDecay, uBirth;
+  void main(){
+    float J = texture2D(uDer, vUv).b, prev = texture2D(uPrev, vUv).r;
+    float born = smoothstep(.72, .42, J)*uBirth;
+    gl_FragColor = vec4(max(born, prev*uDecay), 0., 0., 1.);
+  }`;
+
 /**
  * @param renderer THREE.WebGLRenderer
  * @param o.N texture size (power of two); o.cascades [{ L (metres a tile), longest, shortest (metres) }]
@@ -135,8 +145,10 @@ export function createFftSea(renderer, { N = 256, cascades = [{ L: 256, longest:
     const h0 = rt(T), ping = rt(T), pong = rt(T);
     const disp = rt(THREE.HalfFloatType, THREE.LinearFilter, false), der = rt(THREE.HalfFloatType, THREE.LinearFilter, true);
     der.texture.anisotropy = 4;
+    const foamA = rt(THREE.HalfFloatType, THREE.LinearFilter, true), foamB = rt(THREE.HalfFloatType, THREE.LinearFilter, true);
     return {
-      L: c.L, longest: c.longest, shortest: c.shortest, h0, ping, pong, disp: disp, der, seed: seed + i * 31,
+      L: c.L, longest: c.longest, shortest: c.shortest, h0, ping, pong, disp: disp, der, foamA, foamB, foamOut: foamA, seed: seed + i * 31,
+      mFoam: mat(FOAM_FRAG, { uDer: { value: der.texture }, uPrev: { value: null }, uDecay: { value: 0.9 }, uBirth: { value: 1 } }),
       mH0: mat(H0_FRAG, { uN: { value: N }, uL: { value: c.L }, uWindSpeed: { value: 0 }, uFetch: { value: 80000 }, uSeed: { value: seed + i * 31 }, uLongest: { value: c.longest }, uShortest: { value: Math.max(c.shortest, (2.2 * c.L) / N) }, uGain: { value: 1 }, uWindDir: { value: new THREE.Vector2(0, -1) } }),
       mSpec: mat(SPEC_FRAG, { uH0: { value: h0.texture }, uN: { value: N }, uL: { value: c.L }, uTime: { value: 0 }, uLambda: { value: 1.1 } }),
       mDisp: mat(DISP_FRAG, { uIn: { value: null }, uN: { value: N } }),
@@ -145,8 +157,9 @@ export function createFftSea(renderer, { N = 256, cascades = [{ L: 256, longest:
     };
   });
   const mFft = mat(FFT_FRAG, { uIn: { value: null }, uN: { value: N }, uNs: { value: 1 }, uDir: { value: 0 } });
-  let frame = 0;
-  function update(t, { windKph = 12, windDir = [0, -1], fetchKm = 80, gain = 1, lambda = 1.1, foamK = 2.6 } = {}) {
+  let frame = 0, lastT = null;
+  function update(t, { windKph = 12, windDir = [0, -1], fetchKm = 80, gain = 1, lambda = 1.1, foamK = 2.6, foamLife = 5 } = {}) {
+    const dt = lastT == null ? 0.016 : Math.max(0, Math.min(0.5, t - lastT)); lastT = t;
     const prevT = renderer.getRenderTarget(), prevAuto = renderer.autoClear; renderer.autoClear = false;
     const U = Math.max(0, windKph) / 3.6, dl = Math.hypot(windDir[0], windDir[1]) || 1;
     for (const c of C) {
@@ -158,6 +171,8 @@ export function createFftSea(renderer, { N = 256, cascades = [{ L: 256, longest:
       for (let dir = 0; dir < 2; dir++) for (let s = 0; s < log2N; s++) { mFft.uniforms.uIn.value = src.texture; mFft.uniforms.uNs.value = 1 << s; mFft.uniforms.uDir.value = dir; run(mFft, dst); [src, dst] = [dst, src]; }
       c.mDisp.uniforms.uIn.value = src.texture; run(c.mDisp, c.disp);
       c.mDer.uniforms.uJK.value = foamK; run(c.mDer, c.der);
+      // the foam: this frame's births over what was left of last frame's (only the long cascade: a wavelet's fold is not a whitecap)
+      if (c === C[0]) { const prev = c.foamOut, next = prev === c.foamA ? c.foamB : c.foamA; c.mFoam.uniforms.uPrev.value = prev.texture; c.mFoam.uniforms.uDecay.value = Math.exp(-dt / foamLife); run(c.mFoam, next); c.foamOut = next; }
     }
     renderer.setRenderTarget(prevT); renderer.autoClear = prevAuto; frame++;
   }
@@ -165,7 +180,9 @@ export function createFftSea(renderer, { N = 256, cascades = [{ L: 256, longest:
     ok: true, N, floatOk: !!floatOk,
     _c: C, // (checks only)
     cascades: C.map((c) => ({ L: c.L, disp: c.disp.texture, der: c.der.texture })),
+    /** the lingering foam of the long cascade (r), the texture to sample this frame */
+    get foam() { return C[0].foamOut.texture; },
     update, get frames() { return frame; },
-    dispose() { for (const c of C) { for (const k of ["h0", "ping", "pong", "disp", "der"]) c[k].dispose(); for (const k of ["mH0", "mSpec", "mDisp", "mDer"]) c[k].dispose(); } mFft.dispose(); quad.geometry.dispose(); },
+    dispose() { for (const c of C) { for (const k of ["h0", "ping", "pong", "disp", "der", "foamA", "foamB"]) c[k].dispose(); for (const k of ["mH0", "mSpec", "mDisp", "mDer", "mFoam"]) c[k].dispose(); } mFft.dispose(); quad.geometry.dispose(); },
   };
 }
