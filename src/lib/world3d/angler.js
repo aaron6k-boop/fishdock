@@ -567,8 +567,21 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // what you feel (haptics.js), at the same moments the scene draws; a real trip only feels what was logged
     const fishInfo = () => { const d = info.ev?.type === "catch" ? info.ev.data || {} : hintFish || {}; return { species: prof.species || d.species || null, lengthCm: d.lengthCm || null, pull: prof.pull }; };
     const feel = (n, extra = {}, recorded = false) => onFeel?.(n, { ...fishInfo(), ...extra, real, recorded, key: recorded ? `${id}|${info.since}|${n}` : undefined });
-    const sea = { swell: env.swell, wind: env.wind, windDir: env.windDir, kind: env.kind };
+    const sea = { swell: env.swell, wind: env.wind, windDir: env.windDir, kind: env.kind, chop: env.chop ?? 1 }; // (chop: under the spectrum sea the trains carry less of the wind chop; the same share here)
     const wh = (x, z) => waveHeight(x, z, t, sea);
+    // ---- the sea against the wall: a crest arriving at the sheet piling in front of you throws spray ----
+    // (the water's shader heaves the surface at a wall as a reflected wave does; here, when that heave tops a mark, a
+    // burst of drops over the wall's face, at most every couple of seconds at each of three points along it; only for
+    // your own angler on a pier, where you can see it, and only once the sea is up)
+    if (local && venue === "pier" && rail && sea.swell + sea.wind * 0.5 > 0.5) {
+      const sw = P.spray || (P.spray = { last: [-9, -9, -9], was: [0, 0, 0] });
+      const wz = -(edge + 0.25), lim = 0.22 + 0.26 * sea.swell;
+      for (let k = 0; k < 3; k++) {
+        const wp = toWorld(new THREE.Vector3((k - 1) * 3.2, 0, wz)), hNow = wh(wp.x, wp.z) * (1 + 0.45 * 0.85); // (the shader's clapotis band raises the heave by the wall: .45 of it at .25 m out)
+        if (hNow > lim && sw.was[k] <= lim && t - sw.last[k] > 1.6) { sw.last[k] = t; wp.y = hNow; const back = toWorld(new THREE.Vector3(0, 0, 1)).sub(toWorld(new THREE.Vector3(0, 0, 0))).normalize(); splashCb?.(wp, 0.5 + 0.9 * Math.min(1, (hNow - lim) / 0.3 + sea.wind * 0.4), 2.2, back); } // (thrown up and back over the wall, as spray off a wall goes)
+        sw.was[k] = hNow;
+      }
+    }
     // the drop net's places at this pier spot (ns: how much bigger than a 70 cm net it is): where it lies on the deck,
     // the column it hangs in (clear of the pier's edge) and the water there, where its rope goes over the top rail, and
     // the knot's height for so much rope out

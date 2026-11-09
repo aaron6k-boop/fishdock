@@ -261,19 +261,26 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     }`;
   const waterMat = new THREE.ShaderMaterial({
     uniforms: wU, transparent: false, defines: { WQ: LQ.waterDetail, SKYQ: 0, FFT: 0 },
-    vertexShader: GLSL_NOISE + "uniform float uTime; uniform vec3 uCam; uniform float uFft, uL0; uniform sampler2D uDisp0;" + GLSL_WAVES + /* glsl */`
-      varying vec3 vW; varying vec2 vP;
+    vertexShader: GLSL_NOISE + "uniform float uTime; uniform vec3 uCam; uniform float uFft, uL0; uniform sampler2D uDisp0; uniform sampler2D uShore, uShoreF; uniform float uShoreOn, uShoreHalf, uShoreFHalf;" + GLSL_WAVES + /* glsl */`
+      varying vec3 vW; varying vec2 vP; varying float vWall;
+      // metres to the nearest wall (the shore maps), as the fragment shader has it
+      float shoreDistV(vec2 p){ vec2 uv = p/(2.*uShoreHalf) + .5; if (uShoreOn < .5 || uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return 99.;
+        float far = texture2D(uShore, uv).r*40.; vec2 fv = p/(2.*uShoreFHalf) + .5;
+        if (fv.x > 0. && fv.y > 0. && fv.x < 1. && fv.y < 1.) { float f = texture2D(uShoreF, fv).r*8.; return f < 7.8 ? f : max(far, f); } return far; }
       void main(){
         vec3 w = position + vec3(uCam.x, 0., uCam.z);
         vP = w.xz;
         float fade = 1. - smoothstep(60., 500., length(w.xz - uCam.xz));
         vec3 s = seaWaves(w.xz);
+        // against a wall a wave comes back off it (clapotis): the surface heaves up to twice as high right at the wall
+        // and the water can't move into it, so the crests' horizontal pinch dies out there
+        float wall = 1. - smoothstep(0., 6., shoreDistV(w.xz)); vWall = wall;
         // in a blow the crests pinch together (water drawn towards each crest), so they look sharp, not smooth
-        w.xz += s.yz*(.4 + 2.*uWind)*fade;
-        w.y += s.x*fade;
+        w.xz += s.yz*(.4 + 2.*uWind)*fade*(1. - wall*.85);
+        w.y += s.x*fade*(1. + wall*.45);
         // the spectrum sea's displacement (Ultra): the wind sea's shape, crests drawn together, on top of the swell
         #if FFT
-          if (uFft > .5) w += texture2D(uDisp0, vP/uL0).xyz*fade;
+          if (uFft > .5) { vec3 d = texture2D(uDisp0, vP/uL0).xyz; d.xz *= 1. - wall*.85; d.y *= 1. + wall*.5; w += d*fade; }
         #endif
         vW = w;
         gl_Position = projectionMatrix*viewMatrix*vec4(w, 1.);
@@ -295,7 +302,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec2 fv = p/(2.*uShoreFHalf) + .5;
         if (fv.x > 0. && fv.y > 0. && fv.x < 1. && fv.y < 1.) { float f = texture2D(uShoreF, fv).r*8.; return f < 7.8 ? f : max(far, f); }
         return far; }
-      varying vec3 vW; varying vec2 vP;
+      varying vec3 vW; varying vec2 vP; varying float vWall;
       #if WQ > 0
         #define RAIN_LAYERS 2
       #else
@@ -306,8 +313,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 toCam = cameraPosition - vW; float dist = length(toCam); vec3 v = toCam/dist;
         vec2 wd = uWindDir, wx = vec2(-wd.y, wd.x);
         vec3 s = seaWaves(p);
-        float h = s.x;
-        vec2 g = s.yz;
+        float h = s.x*(1. + vWall*.45);
+        vec2 g = s.yz*(1. + vWall*.45);
         // ---- the spectrum sea (Ultra): slopes from both cascades (the maps' mip levels average them out with
         // distance, so the far sea goes smooth by itself), its height into the crest light, its folded crests into foam
         float fftJ = 1.;

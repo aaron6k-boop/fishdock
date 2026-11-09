@@ -145,11 +145,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const dropTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d"); const r = g.createRadialGradient(16, 16, 0, 16, 16, 16); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.45, "rgba(240,248,252,.85)"); r.addColorStop(1, "rgba(240,248,252,0)"); g.fillStyle = r; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
   const drops = new THREE.Points(dropGeo, new THREE.PointsMaterial({ color: 0xf2f6f8, size: 0.09, map: dropTex, transparent: true, opacity: 0.95, depthWrite: false, alphaTest: 0.02 })); drops.frustumCulled = false; scene.add(drops);
   let dropHead = 0;
-  function splash(at, size = 0.6) {
-    const n = Math.round(30 * size + 10);
+  /** at: world point; size: how big (a rig .6, a landed fish .9); mult: how many more drops (spray off a wall, seen from further off); up: a direction to throw them (spray goes up and back over the wall, not out in a ring) */
+  function splash(at, size = 0.6, mult = 1, up = null) {
+    const n = Math.round((30 * size + 10) * mult);
     for (let i = 0; i < n; i++) {
       const k = dropHead++ % DROPS, a = Math.random() * Math.PI * 2, sp = (0.8 + Math.random() * 2.2) * size;
-      dropPos.set([at.x, Math.max(at.y, 0) + 0.02, at.z], k * 3); dropV.set([Math.cos(a) * sp * 0.6, 1.5 + Math.random() * 3 * size, Math.sin(a) * sp * 0.6], k * 3); dropLife[k] = 1;
+      dropPos.set([at.x, Math.max(at.y, 0) + 0.02, at.z], k * 3);
+      if (up) dropV.set([Math.cos(a) * sp * 0.35 + up.x * sp * 0.8, 2.2 + Math.random() * 4 * size, Math.sin(a) * sp * 0.35 + up.z * sp * 0.8], k * 3);
+      else dropV.set([Math.cos(a) * sp * 0.6, 1.5 + Math.random() * 3 * size, Math.sin(a) * sp * 0.6], k * 3);
+      dropLife[k] = 1;
     }
   }
   const ripples = [];
