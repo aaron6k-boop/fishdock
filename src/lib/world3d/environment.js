@@ -203,7 +203,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   const sun = new THREE.DirectionalLight(0xffffff, 2.2);
   sun.position.set(30, 40, -40);
   // (the shadows' box follows the camera, a 2 m step at a time so their edges don't crawl)
-  if (quality >= 1) { sun.castShadow = true; sun.shadow.mapSize.set(LQ.shadowMap, LQ.shadowMap); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 160 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02; }
+  if (quality >= 1) { sun.castShadow = true; sun.shadow.mapSize.set(LQ.shadowMap, LQ.shadowMap); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 240 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02; }
   group.add(hemi, sun, sun.target);
   scene.fog = new THREE.FogExp2(0xb8c8d4, 0.0006);
 
@@ -710,7 +710,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     // own light takes over, so overcast and rain are soft and even, never a glare ----
     look = lightingFor(st);
     lightDir.copy(st.night > 0.6 ? st.moonDir : st.sunDir);
-    sun.position.copy(shadowAt).addScaledVector(lightDir, 80); sun.target.position.copy(shadowAt);
+    sun.position.copy(shadowAt).addScaledVector(lightDir, 120); sun.target.position.copy(shadowAt);
     sun.color.setRGB(...look.sunColour); sun.intensity = look.sunIntensity;
     if (sun.castShadow) sun.shadow.intensity = look.shadow;
     hemi.color.setRGB(...look.skyColour); hemi.groundColor.setRGB(...look.groundColour); hemi.intensity = look.skyIntensity;
@@ -841,7 +841,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       U.uTime.value = t; wU.uCam.value.set(Math.round(cam.position.x / 4) * 4, 0, Math.round(cam.position.z / 4) * 4);
       // the shadows' box round the camera, moved a 2 m step at a time
       const sx = Math.round(cam.position.x / 2) * 2, sz = Math.round(cam.position.z / 2) * 2;
-      if (sx !== shadowAt.x || sz !== shadowAt.z) { shadowAt.set(sx, 0, sz); sun.position.copy(shadowAt).addScaledVector(lightDir, 80); sun.target.position.copy(shadowAt); }
+      if (sx !== shadowAt.x || sz !== shadowAt.z) { shadowAt.set(sx, 0, sz); sun.position.copy(shadowAt).addScaledVector(lightDir, 120); sun.target.position.copy(shadowAt); }
       if (target && cur) {
         const k = 1 - Math.exp(-dt * EASE);
         let moved = false;
