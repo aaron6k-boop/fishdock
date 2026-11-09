@@ -42,3 +42,33 @@ foam steepness factor 2.6) reads 0.5%, 4% and 5.6% at the same winds; the wind g
 noise bring the drawn cover to roughly a third of that, so the drawn whitecaps are in the right order at a fresh
 breeze and a little generous at a light one. Tuned by eye beyond that; no photograph of the real sea at Gorleston
 at a known wind was available to compare against.
+
+## Stage 4 (9 November 2026, branch `overhaul-4`): the light
+
+**Audit.** The pier head and the deck at sun heights of 5, 15, 35, 38 and 55 degrees, overcast and a hazy low sun,
+from four cameras (`tools/scenes.mjs` views and close ones), measured as well as looked at. Findings:
+- Shadows in sun were faint. On a 35 degree day the deck in the Coastwatch building's shadow measured 0.31 of the
+  sunlit deck beside it (display-linear luminance from the render). Outdoors it is about a fifth: a horizontal surface
+  gets four to five times as much light from the sun as from the whole sky. The cause was the balance of the lights
+  (sun 2.5 against sky 0.72 plus reflections 0.6) and a shadow strength of 0.85, which let 15% of the sun into every
+  shadow.
+- A 5 degree sun lit the deck almost as a noon one: the sky's light did not fall with the sun, so the deck's light was
+  nearly all sky, flat and white, while the sky itself had gone gold.
+- Shadows were being drawn correctly: a fresh white plane dropped into the scene showed the lamp post, a bench and a box
+  as crisp shadows, so the maps, biases and receivers were right; they only read weakly on the pale concrete under
+  the heavy fill.
+- Wall spray flew round the angler at 16 kph of wind (a near-calm day): the threshold was swell plus half the wind
+  above 0.5, which 16 kph reaches.
+
+**Changes** (`skyLook.js`, `angler.js`): sun 3.4 against sky 0.5 and reflections 0.42 on a clear day; the shadow
+strength 1 in sun (the sky alone fills it), 0.32 under cloud as before; the sky's light and the reflections fall by
+up to two fifths as the sun gets low, and the exposure comes up a quarter to match the eye; overcast, rain, dusk and
+night totals unchanged. Spray from a fresh breeze (about 24 kph) up.
+
+**Measured.** The same deck patch: shadow 0.19 of lit (was 0.31); sunlit deck 0.38 (was 0.34). The 5 and 15 degree
+renders show the bench's long shadow and warmer lit faces where before there was almost none. Overcast renders are
+the same before and after. `tests/skyLook.test.js` pins the ratio (0.15 to 0.3 at 35 degrees) and the low-sun dimming.
+
+**Left.** Cascaded shadow maps (the installed copy of three.js has no CSM addon and installs are off here), so the
+one 4096 map at 80 m stays; shadows from the trees and the town are coarse at that distance. Specular on wet concrete
+and the facades' glass were not re-tuned. Night and dusk looked at only through the ten scenes.
