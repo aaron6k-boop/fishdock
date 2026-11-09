@@ -334,6 +334,17 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     h[k] += up;
     if (Math.abs(hill(X[k] - 2, Z[k]) - hill(X[k] + 2, Z[k])) > 0.3) bank[k] = 1;
   }
+  // ---- the town's ground: the map's unmarked land away from the water, the piers and the streets is not the pier's
+  // concrete (it was drawn so, slab joints and all, out to the horizon) but yards, gardens, verges and waste ground:
+  // worn grass and bare earth, the streets' own tarmac and pavements laid over it. Concrete stays on the piers, within
+  // 26 m of a harbour wall (the quays and aprons); the streets lay their own surface over it ----
+  const town = new Uint8Array(n * n);
+  for (let k = 0; k < n * n; k++) {
+    if (cls[k] !== 1 || bank[k] || dune[k] > 0.05 || inland) continue;
+    const q = [X[k], Z[k]]; if (PR.some((b) => inB(q, b))) continue;
+    const w = nearestWall(X[k], Z[k]); if (w && w.d < 26) continue;
+    town[k] = 1; // (the streets draw their own tarmac and pavements over it, so no margin is kept for them)
+  }
   // along every wall: a vertex on the water side within a cell of it moves onto the wall's line, at the deck's height;
   // a land vertex the grid called water is put back. The ground then ends exactly at the wall's top.
   for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
@@ -368,6 +379,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const sand = [0.48, 0.31, 0.14], dry = [0.34, 0.235, 0.11]; // (linear light: on screen a warm ochre and a duller tan)
       GR = [sand[0] + (dry[0] - sand[0]) * (1 - face), sand[1] + (dry[1] - sand[1]) * (1 - face), sand[2] + (dry[2] - sand[2]) * (1 - face)];
     }
+    if (town[k]) { // (the town's unmarked ground: worn grass over earth, duller and browner than a park's lawn, bare in patches)
+      const s1 = noise2(X[k] / 11, Z[k] / 11, 1e6, 13), s2 = noise2(X[k] / 3.5, Z[k] / 3.5, 1e6, 14), bare = Math.max(0, Math.min(1, (s1 - 0.58) * 3.5)), f = 0.88 + s2 * 0.24;
+      const r = 0.23 + bare * 0.08, gg = 0.26 - bare * 0.03, b = 0.13 + bare * 0.02;
+      pos.set([X[k], h[k], Z[k]], k * 3); col.set([r * f, gg * f, b * f], k * 3); uv.set([X[k] / 8, Z[k] / 8], k * 2); continue;
+    }
     if (bank[k]) { // (the cliff's face: rough grass, darker clumps of scrub and paler worn patches, not a lawn)
       const s1 = noise2(X[k] / 9, Z[k] / 9, 1e6, 11), s2 = noise2(X[k] / 3, Z[k] / 3, 1e6, 12), sc = Math.max(0, Math.min(1, (s1 - 0.55) * 4)), pale = Math.max(0, Math.min(1, (0.35 - s1) * 4)) * 0.5;
       const r = 0.29 - sc * 0.1 + pale * 0.12, gg = 0.36 - sc * 0.1 + pale * 0.08, b = 0.19 - sc * 0.05 + pale * 0.07, f = 0.9 + s2 * 0.18;
@@ -380,7 +396,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const addTri = (a, b, c) => {
     const sa = solid[a], sb = solid[b], sc = solid[c];
     if (!sa && !sb && !sc && h[a] < -1 && h[b] < -1 && h[c] < -1) return; // open water: nothing to draw
-    const soft = [a, b, c].some((q) => cls[q] === 2 || cls[q] === 3 || bank[q] || dune[q] > 0.05) || inland; // (the dune too: on dry land it was drawn with the pier's concrete, its joints and all, never the rough ground)
+    const soft = [a, b, c].some((q) => cls[q] === 2 || cls[q] === 3 || bank[q] || dune[q] > 0.05) || (town[a] && town[b] && town[c]) || inland; // (the town's ground only where a whole triangle is: its edge triangles stay concrete, tinted, where a white-to-green fade across them stood out as a pale saw-edge) // (the dune too: on dry land it was drawn with the pier's concrete, its joints and all, never the rough ground)
     // a triangle reaching from a wall out into the water would stand above the water in front of the wall: only beaches
     // and banks slope into the water
     if (!(sa && sb && sc) && !soft) return;
@@ -391,7 +407,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   g.setAttribute("aDamp", new THREE.BufferAttribute(wet, 1)); // (the deck's shader: damp along the walls)
   // rough ground (the cliff's face, the dune): how much of the photographed scrubby ground shows there (soft shader)
-  const ruf = new Float32Array(n * n); for (let k = 0; k < n * n; k++) ruf[k] = bank[k] ? 1 : Math.min(1, dune[k] * 1.4);
+  const ruf = new Float32Array(n * n); for (let k = 0; k < n * n; k++) ruf[k] = bank[k] ? 1 : town[k] ? 0.18 : Math.min(1, dune[k] * 1.4);
   g.setAttribute("aRuf", new THREE.BufferAttribute(ruf, 1));
   for (let k = 0; k < n * n; k++) if (bank[k] || dune[k] <= 0) faceA[k] = -1; // (-1: not the dune, no scrub drawn)
   g.setAttribute("aFace", new THREE.BufferAttribute(faceA, 1));
@@ -477,7 +493,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           const nx = -(z2 - z1) / len, nz = (x2 - x1) / len, a0 = w0 > 0 ? side * w0 : -w1, a1 = w0 > 0 ? side * w1 : w1;
           const ya = groundAt(x1, z1) + y, yb = groundAt(x2, z2) + y, o = Bk.p.length / 3;
           // ends pushed a little past each node so consecutive pieces overlap at bends instead of leaving a notch
-          const ex = ((x2 - x1) / len) * Math.min(1.5, w1 * 0.5), ez = ((z2 - z1) / len) * Math.min(1.5, w1 * 0.5);
+          const ex = ((x2 - x1) / len) * Math.min(0.6, w1 * 0.15), ez = ((z2 - z1) / len) * Math.min(0.6, w1 * 0.15); // (a short overlap: at 1.5 m the pavements' ends stuck out as a saw's teeth along a bending street)
           Bk.p.push(x1 - ex + nx * a0, ya, z1 - ez + nz * a0, x2 + ex + nx * a0, yb, z2 + ez + nz * a0, x2 + ex + nx * a1, yb, z2 + ez + nz * a1, x1 - ex + nx * a1, ya, z1 - ez + nz * a1);
           Bk.uv.push(run / 6, 0, (run + len) / 6, 0, (run + len) / 6, (a1 - a0) / 6, run / 6, (a1 - a0) / 6);
           if (side > 0 || w0 === 0) Bk.i.push(o, o + 2, o + 1, o, o + 3, o + 2); else Bk.i.push(o, o + 1, o + 2, o, o + 2, o + 3);
@@ -488,7 +504,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (const r of place.roads || []) { if (r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(T, r.line, 0, r.w / 2, 0.035); if (r.kind === "tarmac") ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); }
     const mk = (Bk, mat) => { if (!Bk.i.length) return; const g2 = new THREE.BufferGeometry(); g2.setAttribute("position", new THREE.Float32BufferAttribute(Bk.p, 3)); g2.setAttribute("uv", new THREE.Float32BufferAttribute(Bk.uv, 2)); g2.setIndex(Bk.i); g2.computeVertexNormals(); const m = new THREE.Mesh(g2, mat); m.receiveShadow = true; group.add(m); };
     mk(T, new THREE.MeshStandardMaterial({ map: dTex.map, normalMap: dTex.normalMap, color: 0x46484b, roughness: 0.82, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }));
-    mk(Pv, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xd8d4cc, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
+    mk(Pv, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb8b4ac, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
   }
 
   // ---- harbour walls: steel sheet piling under a concrete cap, along the real water's edge ----
