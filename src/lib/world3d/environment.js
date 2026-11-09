@@ -428,7 +428,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 sunC = mix(mix(vec3(1., .93, .8), vec3(1., .74, .48), uDusk), vec3(1., .72, .42), lowSun*.7);
         // (with the spectrum sea: a softer, dimmer highlight per facet, since there are many more of them, and a
         // little broader one so the far sea's glitter is a sheen rather than confetti)
-        col += uFft > .5 ? sunC*(pow(sp, 700.)*1.6 + pow(sp, 40.)*.09)*sunVis : sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis;
+        // (further off the slope maps' mip levels have averaged the facets away, so the glitter path is drawn as the
+        // facets' spread instead: a broader, dimmer highlight that widens with distance and wind)
+        float farR = smoothstep(15., 160., dist);
+        col += uFft > .5 ? sunC*(pow(sp, 700.)*1.6*(1. - farR*.6) + pow(sp, mix(150., 28., farR))*mix(.05, .4, farR)*(.4 + .6*uWind))*sunVis : sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
