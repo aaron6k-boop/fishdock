@@ -28,7 +28,8 @@ export const QUALITY3D = {
   high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2, late: 0.025, easy: 10 },
   // a computer with a graphics card: drawn at twice the screen's pixels (or more) and scaled down, finer shade
   // (and kept smooth: a frame slower than about 48 a second counts as late, where the others allow down to 28)
-  ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021 },
+  // (sea: the spectrum sea, fftSea.js: the wind sea simulated from a wave spectrum on the graphics card)
+  ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021, sea: 1 },
 };
 export function autoQuality3d() {
   try {
@@ -93,6 +94,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   renderer.info.autoReset = false;
   // (the water's mirror is drawn first, without your own first-person hands: environment.js reflect)
   let noRefl = [], noReflAt = 0;
+  let simT = 0;
   // the graphics card's own time per frame (what it spends drawing, apart from everything the page does around it):
   // a GPU timer query round each frame where the browser offers one (Chromium on a PC; not Safari). The answer comes
   // back a few frames later; the last 60 are kept for perf()
@@ -100,6 +102,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   function drawFrame() {
     sharpen(); renderer.info.reset();
     let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
+    if (env.fftSea) env.simulate(simT); // (the spectrum sea's passes count in the frame's GPU time)
     if (env.reflections) { if (!noReflAt--) { noRefl = scene.getObjectsByProperty("name", "fdNoReflect"); noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
     if (post) post.render(); else renderer.render(scene, camera);
     if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); qs.push(q); }
@@ -109,6 +112,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const tBuild = performance.now();
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
   const buildMs = Math.round(performance.now() - tBuild);
+  if (Q.sea) env.setFftSea(true, renderer);
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
@@ -616,7 +620,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // a set time per frame, so an animation can be filmed exactly even where frames are slow (software graphics)
   let film = null;
   if (typeof window !== "undefined" && FILM) {
-    window.__fdWorld = { Raycaster: THREE.Raycaster,
+    window.__fdWorld = { Raycaster: THREE.Raycaster, renderer, environment: env, THREE,
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),
       // so every phase plays through the real animation code from a known start, frame for frame the same each run:
@@ -722,7 +726,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     }
     dropGeo.attributes.position.needsUpdate = true;
     env.setRipples(stepRipples(ripples, dt));
-    env.update(t, dt, camera);
+    env.update(t, dt, camera); simT = t;
     adapt();
     if (draw) drawFrame();
     const spent = performance.now() - t0;
@@ -741,7 +745,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // (the scene's own detail, the sea's mesh, the cloud shading and the people's textures come with the preset: those
   // need the place built again)
   const G = { res: 1, fps: 0, shadows: Q.shadows ? (Q.q >= 2 ? 2 : 1) : 0, shadowDist: 30, // (World3D applies the preset's own straight after: Ultra's far shadows)
-    ao: post ? post.aoLevel : 0, bloom: post ? 1 : 0, aa: post ? 4 : 0, sharp: post ? post.sharp : 0, refl: 0, tex: maxAniso };
+    ao: post ? post.aoLevel : 0, bloom: post ? 1 : 0, aa: post ? 4 : 0, sharp: post ? post.sharp : 0, refl: 0, tex: maxAniso, sea: Q.sea ? 1 : 0 };
   function setGfx(o = {}) {
     if (o.res != null) { G.res = Math.max(0.5, Math.min(1, +o.res || 1)); dprMax = Math.max(1, dprTop * G.res); dprFloor = Math.min(dprMax, Q.floor || 1); dprNow = dprMax; renderer.setPixelRatio(dprNow); resize(); late = 0; easyFor = 0; }
     if (o.fps != null) { G.fps = [30, 60].includes(+o.fps) ? +o.fps : 0; fpsCap = G.fps; }
@@ -752,15 +756,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (o.aa != null) { G.aa = o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(G.aa); }
       if (o.sharp != null) { G.sharp = Math.max(0, Math.min(1, +o.sharp || 0)); post.setSharp(G.sharp); }
       if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer); }
+      if (o.sea != null) G.sea = env.setFftSea(!!o.sea, renderer) ? 1 : 0; // (the spectrum sea: Settings, or Ultra's default)
     }
     const sun = env.sun;
     if (sun && (o.shadows != null || o.shadowDist != null)) {
       const was = G.shadows;
       if (o.shadows != null) G.shadows = Math.max(0, Math.min(2, o.shadows | 0));
-      if (o.shadowDist != null) G.shadowDist = [20, 30, 45].includes(+o.shadowDist) ? +o.shadowDist : 30;
+      if (o.shadowDist != null) G.shadowDist = [20, 30, 45, 80].includes(+o.shadowDist) ? +o.shadowDist : 30;
       const size = [0, 2048, 4096][G.shadows];
       if (size && sun.shadow.mapSize.x !== size) { sun.shadow.map?.dispose(); sun.shadow.map = null; sun.shadow.mapSize.set(size, size); }
-      const c = sun.shadow.camera, d = G.shadowDist; if (c.right !== d) { Object.assign(c, { left: -d, right: d, top: d, bottom: -d }); c.updateProjectionMatrix(); }
+      const c = sun.shadow.camera, d = G.shadowDist; if (c.right !== d) { Object.assign(c, { left: -d, right: d, top: d, bottom: -d, far: Math.max(160, d * 3) }); c.updateProjectionMatrix(); }
+      // (the map's texels grow with the box: the biases grow with them, or the wider boxes show acne on the deck)
+      sun.shadow.normalBias = 0.02 * Math.max(1, d / 30) * (G.shadows === 2 ? 0.6 : 1); sun.shadow.bias = -0.0005 * Math.max(1, d / 45);
       if (!!was !== !!G.shadows) {
         renderer.shadowMap.enabled = !!G.shadows; sun.castShadow = !!G.shadows;
         if (G.shadows) Object.assign(sun.shadow, { bias: -0.0005, normalBias: 0.02 });

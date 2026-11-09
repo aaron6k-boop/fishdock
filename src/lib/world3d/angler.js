@@ -69,11 +69,12 @@ function noise2(x, y) {
   const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
   return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uy;
 }
-export function waveHeight(x, z, t, { swell = 0.3, wind = 0.3, windDir = [0.3, -1], kind = 0 } = {}) {
+export function waveHeight(x, z, t, { swell = 0.3, wind = 0.3, windDir = [0.3, -1], kind = 0, chop = 1 } = {}) {
   const sea = kind < 0.5 ? 1 : kind < 1.5 ? 0.5 : 0;
   const wl = Math.hypot(windDir[0], windDir[1]) || 1, wd = [windDir[0] / wl, windDir[1] / wl], wx = [-wd[1], wd[0]];
   const g1 = noise2(x * 0.011 + t * 0.021, z * 0.011 - t * 0.013), g2 = noise2(x * 0.017 + 31 - t * 0.017, z * 0.017 + 31 - t * 0.024);
-  const ph = (g1 - 0.5) * 5, A = (0.16 + 0.5 * swell) * sea, B = 0.045 + 0.13 * wind;
+  // (chop: how much of the wind chop the trains carry; under the spectrum sea (Ultra) it is .35, the rest is on the GPU)
+  const ph = (g1 - 0.5) * 5, A = (0.16 + 0.5 * swell) * sea, B = (0.045 + 0.13 * wind) * chop;
   const tr = (dx, dz, k, a, p) => { const l = Math.hypot(dx, dz) || 1; return a * Math.sin(((x * dx + z * dz) / l) * k - t * Math.sqrt(9.81 * k) + p); };
   return tr(0.2, -1, 0.085, A * (0.55 + 0.9 * g1), ph)
     + tr(-0.42, -1, 0.131, A * 0.55 * (0.5 + g2), ph * 0.7 + 1.3)
@@ -698,7 +699,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       fpPull = 0.055 * surge * tk; P.tk = tk; P.pump = pump; P.surge = surge; // (and for the body, seen from outside)
       fpArm = { up: 0.05 * pump - 0.03 * surge * tk + 0.006 * shake * Math.sin(t * 19 + P.s1), right: 0.03 * run * st.runWidth * tk, fwd: -0.05 * pump }; // (and through the rod into your hands; a run drags them its way)
       bodyTo = { x: clamp(run * 0.05 * st.runWidth, -0.05, 0.05), y: -0.012 * tk - 0.025 * surge * tk, z: 0.03 * tk + 0.03 * pump - 0.08 * surge * tk };
-      pitch = 0.95 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5);
+      pitch = 0.82 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5); // (seen from outside: the rod at about 47 degrees, as a fish is played on a long rod, the butt down by the hip; it stood at 54, nearer a flagpole than a bent rod)
       fpE = 0.95 - 0.22 * surge * tk + 0.28 * pump; fpYaw = -0.08 + clamp(run * 0.15 * st.runWidth, -0.22, 0.22); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
       // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
@@ -1030,6 +1031,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (ph === "waiting" || ph === "bite") { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     } else { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
     if (!held || (ph !== "cast" && ph !== "hooked" && ph !== "landing" && ph !== "lost")) { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); held = false; }
+    // waiting at a pier's rail, seen from outside: the rod is held, its butt at the hip and the blank resting on the top
+    // rail (as a pier angler stands, and as you see your own hands in first person), not leant against the rail with
+    // the hands in the pockets. The free hand stays free. (A friend's angler and your own in third person.)
+    const railHold = !fp && !walking && rail && venue === "pier" && (ph === "waiting" || ph === "bite" || ph === "missed");
+    if (railHold) { butt = new THREE.Vector3(0.22, 0.92, 0.0); const over = new THREE.Vector3(0.36, 1.12 + 0.06, -Math.max(0.3, edge - 0.22) - 0.25); dir = over.sub(butt).normalize(); held = true; }
     // walking about: the rod carried in the right hand at the reel, low by your side, its tip leading forwards and up
     // (clear of your legs, the rail and anyone behind you); the line wound in. It moves with you: rising and falling and
     // swaying with your shoulders at each step, the tip trailing a little as you turn and dipping as you stop, and held
@@ -1155,6 +1161,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const watch = n1(t * 0.07 + id.length * 3.1) > -0.35;
       if (watch) lookAtW = floatRig ? castAt.clone() : tipWorld();
       const m = Math.floor(t / 23 + (hashSeed(id) % 7)) % 3; idleMode = ["pockets", "fold", "hang"][m];
+      if (hands[1]) idleMode = "hang"; // (a hand on the rod: the other hangs, it can't fold its arms or pocket both)
     } else if (ph === "idle" || ph === "ended" || ph === "paused") idleMode = (hashSeed(id) % 2) ? "pockets" : "hang";
     if (ph === "cast") { lookAtW = age > 0.7 ? (rigAt || castAt).clone() : null; lean = age > 0.6 && age < 1.1 ? 0.22 : age < 0.6 ? -0.08 : 0; twist = age < 0.6 ? 0.3 * ease(age / 0.6) : 0.3 * (1 - ease(seg(age, 0.6, 0.9))); }
     // (seen from outside, the whole body takes the fish: leaning back on the rod and sitting into the knees as the line
