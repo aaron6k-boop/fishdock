@@ -1,0 +1,25 @@
+{
+  "name": "fishdock-desktop",
+  "productName": "FishDock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FishDock for Windows: the UK fishing game and companion in its own window, on your graphics card.",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "uk.co.fishdock.desktop",
+    "productName": "FishDock",
+    "artifactName": "FishDock-Setup-${version}.${ext}",
+    "directories": { "output": "out", "buildResources": "build" },
+    "files": ["main.cjs", "launcher/**", "build/icon.png"],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "build/icon.ico" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "perMachine": false, "createDesktopShortcut": true, "shortcutName": "FishDock" }
+  }
+}
