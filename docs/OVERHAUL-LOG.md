@@ -47,7 +47,8 @@ at a known wind was available to compare against.
 
 **Survey.** The ten scenes and six close views of the town from the pier and the gardens, against photographs of
 Marine Parade and Pier Gardens. The largest visual gap after the sea was the town itself: every building a flat box
-with a painted window pattern, roofs a single flat colour, no trees anywhere on 30 ha of parks and lawns.
+with a painted window pattern, roofs a single flat colour, no trees on the 2.2 ha of lawns and gardens the map has in the box
+(Pier Gardens and the cliff lawns) nor on the cliff bank.
 
 **Facades** (`textures3d.js: facade()`). Each wall kind drawn at 85 px a metre, with a
 height field beside the colour so the normal map and the roughness map come from the same drawing: brick in 65 mm

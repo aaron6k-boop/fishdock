@@ -60,10 +60,10 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
     if (!grass && bk < 0.3) continue;
     // how deep into the grass this cell is (a tree stands back from the edge of a lawn)
     let deep = 0; if (grass) { deep = 1; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (cls[(j + dj) * n + i + di] !== 3) deep = 0; }
-    const p = grass ? (deep ? 0.12 : 0.03) : 0.035 * bk;
+    const p = grass ? (deep ? 0.5 : 0.12) : 0.035 * bk;
     if (hash(i, j) > p * density) continue;
     const px = x + (rnd() - 0.5) * cw * 0.8, pz = z + (rnd() - 0.5) * cw * 0.8;
-    if (avoid(px, pz) || tooClose(px, pz, grass ? 7 : 5)) continue;
+    if (avoid(px, pz) || tooClose(px, pz, grass ? 5.5 : 5)) continue;
     const big = grass && deep && rnd() < 0.7;
     const h = big ? 7 + rnd() * 5 : 3 + rnd() * 2.5; // (a park tree 7 to 12 m; a verge tree or scrub 3 to 5.5)
     placed.push({ x: px, z: pz, y: heightAt(px, pz), h, w: h * (0.75 + rnd() * 0.3), rot: rnd() * Math.PI, tint: 0.85 + rnd() * 0.3, lean: (rnd() - 0.5) * 0.06 });
