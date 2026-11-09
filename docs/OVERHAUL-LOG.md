@@ -72,3 +72,21 @@ the same before and after. `tests/skyLook.test.js` pins the ratio (0.15 to 0.3 a
 **Left.** Cascaded shadow maps (the installed copy of three.js has no CSM addon and installs are off here), so the
 one 4096 map at 80 m stays; shadows from the trees and the town are coarse at that distance. Specular on wet concrete
 and the facades' glass were not re-tuned. Night and dusk looked at only through the ten scenes.
+
+**Five conditions (after review).** The same deck view at midday (sun 55 degrees), sunset (3 degrees), overcast,
+rain and moonless night, before and after, with the lit deck and the building's shadow read at fixed patches
+(display-linear luminance; the patches are the same in every picture, so the sun's own angle moves what falls in
+them and the ratios are a guide, not a law):
+
+| condition | before: deck, shadow, ratio | after: deck, shadow, ratio |
+|---|---|---|
+| midday | 0.388, 0.177, 0.46 | 0.444, 0.175, 0.39 |
+| sunset | 0.146, 0.085, 0.58 | 0.136, 0.080, 0.59 |
+| overcast | 0.255, 0.167, 0.66 | 0.274, 0.183, 0.67 |
+| rain | 0.156, 0.129, 0.82 | 0.157, 0.135, 0.86 |
+| night | 0.078, 0.049, 0.63 | 0.074, 0.056, 0.76 |
+
+The change bites only where it should: in sun. Shadows under cloud, in rain and at night keep their soft fill (the
+shadow strength is 0.32 under cloud and the sky light rises with it), sunset is lifted by its exposure and reads the
+same, and nothing is crushed: the darkest shadow patch in any condition is 0.049 (night, unchanged). Pictures in
+`stage4-five-conditions.jpg`.
