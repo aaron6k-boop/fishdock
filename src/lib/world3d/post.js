@@ -74,7 +74,10 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
     ao.overrideVisibility = function () {
       this.scene.traverse((o) => {
         cache.set(o, o.visible);
-        const m = o.material, see = m && (Array.isArray(m) ? m.some((x) => x.transparent || !x.depthWrite) : (m.transparent || !m.depthWrite));
+        // (nor anything cut out by alpha test: leaves and the far trees' cards. The pass draws depth without the cut, so
+        // each card shaded the sky behind it as a dark square)
+        const cut = (x) => x.transparent || !x.depthWrite || x.alphaTest > 0;
+        const m = o.material, see = m && (Array.isArray(m) ? m.some(cut) : cut(m));
         if (o.isPoints || o.isLine || o.isSprite || see) o.visible = false;
       });
     };

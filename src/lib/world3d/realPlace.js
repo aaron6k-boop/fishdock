@@ -861,8 +861,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const roads = place.roads || [];
     const onRoad = (x, z) => roads.some((r) => { for (let i = 0; i + 1 < r.line.length; i++) if (segDist([x, z], r.line[i], r.line[i + 1]) < r.w / 2 + 2.2) return true; return false; });
     const bankAt = (x, z) => { if (!local?.hill) return 0; const d = Math.abs(local.hill(x - 2, z) - local.hill(x + 2, z)); return d > 0.3 ? Math.min(1, d / 0.8) : 0; };
-    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z), bank: bankAt, quality, seed: 3 + (place.spots?.length || 0) });
-    if (trees) place.trees = trees.count;
+    const woods = (place.woods || []).map(bb), woodAt = (x, z) => woods.some((b) => inB([x, z], b));
+    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z), bank: bankAt, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
+    if (trees) { place.trees = trees.count; place.treesBuilt = trees.built; place.treesUpdate = trees.update; }
   }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }
