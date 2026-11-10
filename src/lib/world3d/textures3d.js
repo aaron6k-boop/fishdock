@@ -389,12 +389,17 @@ export function woodTex() {
 export function weather(mat, o = {}) {
   const noise = weatherTex(); if (!noise) return mat;
   const wood = o.wood ? woodTex() : null, local = !!o.wood;
-  const f = (v) => (+v).toFixed(4), S = o.scale || 1;
+  const S = o.scale || 1;
   const rust = o.rust || [0, 0.36, 0.17, 0.07], grime = o.grime || [0, 0, 0], streaks = o.streaks || [0, 1, 0], rough = o.rough || [1, 1];
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     prev?.(sh, r);
     sh.uniforms.fdNoise = { value: noise }; sh.uniforms.fdWet = o.wet || { value: 0 };
+    // (the amounts are uniforms, not numbers written into the shader: written in, every surface with its own mottle,
+    // grime or rust was a shader program of its own to build, several dozen of them as a place loaded. Only what
+    // changes the shader's shape, the timber map, streaks, rust and relief being there at all, makes a new one)
+    Object.assign(sh.uniforms, { fdScale: { value: S }, fdMottle: { value: o.mottle ?? 0.3 }, fdGrime: { value: new THREE.Vector3(...grime) }, fdStreaks: { value: new THREE.Vector3(...streaks) },
+      fdRust: { value: new THREE.Vector4(...rust) }, fdRough: { value: new THREE.Vector2(...rough) }, fdBump: { value: o.bump || 0 } });
     if (wood) sh.uniforms.fdWood = { value: wood };
     sh.vertexShader = "varying vec3 vFdW;\nvarying vec3 vFdP;\nvarying vec3 vFdN;\n" + sh.vertexShader.replace("#include <project_vertex>", `#include <project_vertex>
       {
@@ -409,31 +414,31 @@ export function weather(mat, o = {}) {
         #endif
         vFdP = transformed * sc; vFdN = objectNormal;${o.wood === "y" ? " vFdP = vFdP.yxz; vFdN = vFdN.yxz;" : ""}` : "vFdP = fw.xyz; vFdN = normalize(mat3(modelMatrix) * fn);"}
       }`);
-    sh.fragmentShader = `uniform sampler2D fdNoise;\nuniform float fdWet;\n${wood ? "uniform sampler2D fdWood;\n" : ""}varying vec3 vFdW;\nvarying vec3 vFdP;\nvarying vec3 vFdN;
+    sh.fragmentShader = `uniform sampler2D fdNoise;\nuniform float fdWet;\nuniform float fdScale;\nuniform float fdMottle;\nuniform vec3 fdGrime;\nuniform vec3 fdStreaks;\nuniform vec4 fdRust;\nuniform vec2 fdRough;\nuniform float fdBump;\n${wood ? "uniform sampler2D fdWood;\n" : ""}varying vec3 vFdW;\nvarying vec3 vFdP;\nvarying vec3 vFdN;
       vec4 fdTri(sampler2D t, vec3 p, vec3 n, vec2 k) { vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z + 1e-5); return texture2D(t, p.zy * k) * w.x + texture2D(t, p.xz * k) * w.y + texture2D(t, p.xy * k) * w.z; }
       vec3 fdPerturb(vec3 sp, vec3 sn, vec2 dh, float fd) { vec3 sx = normalize(dFdx(sp)), sy = normalize(dFdy(sp)); vec3 r1 = cross(sy, sn), r2 = cross(sn, sx); float det = dot(sx, r1) * fd; return normalize(abs(det) * sn - sign(det) * (dh.x * r1 + dh.y * r2)); }
       ` + sh.fragmentShader
       .replace("#include <map_fragment>", `#include <map_fragment>
-        vec3 fdN = normalize(vFdN); vec3 fdP = vFdP / ${f(S)};
+        vec3 fdN = normalize(vFdN); vec3 fdP = vFdP / fdScale;
         vec4 fdT = fdTri(fdNoise, fdP, fdN, vec2(1.0));
         float fdH = fdT.r;
-        diffuseColor.rgb *= 1.0 + (fdT.r - 0.5) * ${f(o.mottle ?? 0.3)} + (fdT.g - 0.5) * ${f((o.mottle ?? 0.3) * 1.4)};
+        diffuseColor.rgb *= 1.0 + (fdT.r - 0.5) * fdMottle + (fdT.g - 0.5) * (fdMottle * 1.4);
         ${wood ? `{ vec4 wd = fdTri(fdWood, fdP, fdN, vec2(1.0, 4.0)); diffuseColor.rgb *= wd.rgb * 1.25; fdH = dot(wd.rgb, vec3(0.33)) * 1.6; }` : ""}
-        float fdG = ${f(grime[2])} * (1.0 - smoothstep(${f(grime[0])}, ${f(grime[1])}, vFdW.y)) * (0.55 + fdT.g * 0.9);
+        float fdG = fdGrime.z * (1.0 - smoothstep(fdGrime.x, fdGrime.y, vFdW.y)) * (0.55 + fdT.g * 0.9);
         float fdS = 0.0;
-        ${streaks[2] ? `{ float run = clamp((${f(streaks[0])} - vFdW.y) / ${f(streaks[1])}, 0.0, 1.0); float st = texture2D(fdNoise, vec2((vFdW.x + vFdW.z) * 0.9, vFdW.y * 0.06)).b; fdS = ${f(streaks[2])} * smoothstep(0.5, 0.75, st) * (1.0 - run) * step(0.0, ${f(streaks[0])} - vFdW.y); }` : ""}
+        ${streaks[2] ? `{ float run = clamp((fdStreaks.x - vFdW.y) / fdStreaks.y, 0.0, 1.0); float st = texture2D(fdNoise, vec2((vFdW.x + vFdW.z) * 0.9, vFdW.y * 0.06)).b; fdS = fdStreaks.z * smoothstep(0.5, 0.75, st) * (1.0 - run) * step(0.0, fdStreaks.x - vFdW.y); }` : ""}
         float fdR = 0.0;
-        ${rust[0] ? `{ vec4 q = fdTri(fdNoise, fdP * 2.7 + 0.31, fdN, vec2(1.0)); fdR = smoothstep(0.62, 0.7, q.g + fdG * 0.6 + fdS * 0.5 + (fdT.r - 0.5) * 0.2) * ${f(rust[0])}; }` : ""}
+        ${rust[0] ? `{ vec4 q = fdTri(fdNoise, fdP * 2.7 + 0.31, fdN, vec2(1.0)); fdR = smoothstep(0.62, 0.7, q.g + fdG * 0.6 + fdS * 0.5 + (fdT.r - 0.5) * 0.2) * fdRust.x; }` : ""}
         diffuseColor.rgb *= (1.0 - fdG) * (1.0 - fdS);
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${f(rust[1])}, ${f(rust[2])}, ${f(rust[3])}) * (0.7 + fdT.r * 0.6), fdR);
+        diffuseColor.rgb = mix(diffuseColor.rgb, fdRust.yzw * (0.7 + fdT.r * 0.6), fdR);
         diffuseColor.rgb *= 1.0 - fdWet * 0.28;`)
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = clamp(roughnessFactor * mix(${f(rough[0])}, ${f(rough[1])}, fdT.g) + fdR * 0.35 + fdG * 0.1, 0.05, 1.0) * (1.0 - fdWet * 0.45);`)
+        roughnessFactor = clamp(roughnessFactor * mix(fdRough.x, fdRough.y, fdT.g) + fdR * 0.35 + fdG * 0.1, 0.05, 1.0) * (1.0 - fdWet * 0.45);`)
       .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\n        metalnessFactor *= 1.0 - fdR;")
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
-        ${o.bump ? `normal = fdPerturb(-vViewPosition, normal, vec2(dFdx(fdH), dFdy(fdH)) * ${f(o.bump)} + vec2(dFdx(fdR), dFdy(fdR)) * ${f(o.bump * 0.5)}, faceDirection);` : ""}`);
+        ${o.bump ? `normal = fdPerturb(-vViewPosition, normal, vec2(dFdx(fdH), dFdy(fdH)) * fdBump + vec2(dFdx(fdR), dFdy(fdR)) * (fdBump * 0.5), faceDirection);` : ""}`);
   };
-  const key = "fdw1:" + JSON.stringify(o, (k, v) => (k === "wet" ? !!v : v));
+  const key = `fdw2:${o.wood || 0}${streaks[2] ? "s" : ""}${rust[0] ? "r" : ""}${o.bump ? "b" : ""}`;
   const prevKey = mat.customProgramCacheKey?.bind(mat);
   mat.customProgramCacheKey = () => (prevKey ? prevKey() : "") + key;
   mat.needsUpdate = true;

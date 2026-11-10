@@ -11,14 +11,17 @@ const TORCH_HEX = { white: 0xfff1dc, red: 0xff2a1a, green: 0x39ff6a };
 const GREEN = 0x35ff5e, RED = 0xff2414;
 
 /**
- * What a rod's tip light shows. phase: the angler's phase; dark: 0 (day) to 1 (night); t: seconds.
+ * What a rod's tip light shows. phase: the angler's phase; dark: 0 (day) to 1 (night); t: seconds; mode: "auto"
+ * (green only in the dark), "on" or "off".
  * Returns { hex, level } (level 0: off).
  */
-export function tipLightFor(phase, dark, t = 0) {
+export function tipLightFor(phase, dark, t = 0, mode = "auto") {
+  // (the demo's own Tip light setting: "off" is no light at all, "on" is the green by day as well)
+  if (mode === "off") return { hex: GREEN, level: 0 };
   if (phase === "bite") return { hex: RED, level: Math.sin(t * 2 * Math.PI * 3) > -0.2 ? 1 : 0.25 }; // (three flashes a second)
   if (phase === "hooked" || phase === "landing") return { hex: RED, level: 1 };
   const d = Math.min(1, Math.max(0, (dark - 0.3) / 0.35));
-  return { hex: GREEN, level: d };
+  return { hex: GREEN, level: mode === "on" ? Math.max(0.7, d) : d };
 }
 
 function glowTexture() {
@@ -42,12 +45,12 @@ export function createTipLights(scene) {
     return { bulb, glow, bulbMat, glowMat };
   };
   return {
-    update(list, dark, t) {
+    update(list, dark, t, mode = "auto") {
       const seen = new Set();
       for (const a of list) {
         if (!a?.tip) continue; seen.add(a.id);
         let it = items.get(a.id); if (!it) { it = make(); items.set(a.id, it); }
-        const s = tipLightFor(a.phase, dark, t), on = s.level > 0.02;
+        const s = tipLightFor(a.phase, dark, t, mode), on = s.level > 0.02;
         it.bulb.visible = it.glow.visible = on; if (!on) continue;
         it.bulb.position.copy(a.tip); it.glow.position.copy(a.tip);
         it.bulbMat.color.setHex(s.hex).multiplyScalar(0.35 + 0.65 * s.level);

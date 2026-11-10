@@ -40,3 +40,10 @@ test("the head torch: off until chosen, white, red or green, pointing where you 
   T.set("purple"); T.update(1, 1); assert.equal(T.colour, "off"); assert.equal(T.light.intensity, 0);
   T.dispose();
 });
+
+test("the demo's Tip light setting: Off is dark whatever happens, On shows the green by day", { skip }, () => {
+  const { tipLightFor } = kit;
+  for (const ph of ["waiting", "bite", "hooked"]) assert.equal(tipLightFor(ph, 1, 0, "off").level, 0);
+  assert.ok(tipLightFor("waiting", 0, 0, "on").level >= 0.7); assert.equal(tipLightFor("waiting", 0, 0, "auto").level, 0);
+  assert.equal(tipLightFor("hooked", 0, 0, "on").level, 1);
+});

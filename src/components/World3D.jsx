@@ -35,7 +35,7 @@ export function loadView() {
 }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onReel = null, onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onReel = null, tipLight = "auto", onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   // the phone can take the 3D drawing away (low memory, the browser in the background): when it gives it back the
@@ -137,6 +137,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   }, [venue, quality, real, panoOn, gen]);
 
   useEffect(() => { W.current?.setFight(fight); }, [fight, ready]);
+  useEffect(() => { W.current?.setTipLight(tipLight); }, [tipLight, ready]);
   useEffect(() => { W.current?.setAnglers(anglers); setOthers(anglers.filter((a) => !a.local).map((a) => ({ id: a.id, name: a.name }))); }, [anglers, ready]);
   useEffect(() => { if (ready) W.current?.setEnv({ light, cond, facing: facingNow }); }, [ready, JSON.stringify(light), JSON.stringify(cond), facingNow]); // eslint-disable-line react-hooks/exhaustive-deps
   // the same sound as the photo view: the water, wind, rain and gulls for these conditions

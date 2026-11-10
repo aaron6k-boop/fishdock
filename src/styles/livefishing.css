@@ -501,6 +501,10 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .walk-prompt { display: flex; align-items: center; gap: 10px; padding: 10px 18px 10px 10px; border-radius: 14px; border: 0; background: #0a141be6; color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 6px 20px #0008; animation: prompt-in .25s ease both; }
 .walk-prompt .key { background: #fff; color: #0a141b; border-radius: 8px; padding: 4px 8px; font-size: 12px; }
 @keyframes prompt-in { from { transform: scale(.85); opacity: 0; } }
+/* the keyboard hints need a wide window: in a narrow one the one line ran off both sides and under the Cast button */
+@media (max-width: 640px) { .w3d-keys { display: none; } }
+/* a party on a phone: its top bar wraps to a second row (Invite a friend, the mic), and a message sat on top of it */
+@media (max-width: 520px) { .stage3d:has(.fs-top .invite-btn) .w3d-toasts { top: calc(max(10px, env(safe-area-inset-top)) + 88px); } }
 /* messages while walking about join the toasts' one column under the top bar, so they stack rather than overlap */
 .w3d-toast.msg { white-space: normal; max-width: min(86vw, 360px); text-align: center; border-radius: 14px; line-height: 1.35; }
 /* the menu open: a tap anywhere else closes it, and the toasts, label and compass step back so nothing stacks under it */
