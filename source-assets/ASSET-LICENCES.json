@@ -744,12 +744,12 @@
   {
    "id": "fishdock:fp_body",
    "name": "First-person arms with sleeves (derived)",
-   "source": "cut from the MPFB angler (MakeHuman, CC0) in Blender: source-assets/blender/make_fp_body.py",
+   "source": "cut from the MPFB angler (MakeHuman, CC0) in Blender, with the sleeves of the MakeHuman system assets' field jacket male_casualsuit05 (CC0) fitted by MPFB: source-assets/blender/make_fp_body_hd.py (the first build: make_fp_body.py)",
    "author": "FishDock",
    "licence": "CC0 1.0 (as its source)",
    "attribution": "Not required",
    "type": "models",
-   "resolution": "3,844 + 4,860 vertices",
+   "resolution": "3,886 + 8,076 vertices; skin maps 2048 px (colour, normal, roughness), sleeve maps 1024 x 520 (shade) and 2048 x 1040 (normal)",
    "use": "your arms and jacket sleeves in first person (public/models/fp_body.glb)",
    "files": []
   }

@@ -238,12 +238,15 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
   const m = new THREE.Matrix4();
   // the forearms are only drawn from the wrist to a little way inside the sleeve: beyond that the sleeve (a separate,
   // looser tube) covers them, and the skin used to show through it wherever the arm was thicker than the sleeve
-  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.075 } };
+  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.086 } };
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = false;
     // (fp_body.glb: the jacket's sleeve is a mesh of its own on the same bones, from the cuff to the shoulder; it takes
     // the jacket's cloth and none of the skin's work below)
+    // (the sleeve of a modelled jacket, with its makers' folds, seams and cuff in its own maps: coloured as your jacket,
+    // the maps kept. The earlier sleeve had none and took a tiled weave instead, below)
+    if (o.material?.name === "jacket" && o.material.normalMap && sleeveMat) { sleeveMat.map = o.material.map; sleeveMat.normalMap = o.material.normalMap; sleeveMat.normalScale.set(1.5, 1.5); sleeveMat.roughnessMap = null; sleeveMat.roughness = 0.8; sleeveMat.needsUpdate = true; o.material = sleeveMat; o.userData.fdSleeve = true; return; }
     if (o.material?.name === "jacket") { if (sleeveMat) o.material = sleeveMat; o.userData.fdSleeve = true; const uv = o.geometry.attributes.uv; if (uv) { for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 3, uv.getY(k) * 2.2); uv.needsUpdate = true; } /* (the model's sleeve is mapped in metres: scaled to the weave the drawn sleeve had, 16 round the arm) */ return; }
     // (one step of subdivision: the model's fingers had a few flat sides each, which read as blocks this close)
     // (and a second step on High and Ultra: the knuckles and fingertips were still faceted where a hand fills a third of
@@ -255,11 +258,16 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
     try { o.geometry.setAttribute("fdCurv", new THREE.Float32BufferAttribute(curvature(o.geometry), 1)); } catch (e) { console.warn("fp arms: no curvature", e?.message || e); }
     // (a plain opaque skin material: the export marks it see-through and physical, neither of which a hand needs)
     const src = o.material, D = detailMaps();
+    // (the second build of the arms: the skin has a sheet of its own with its relief and roughness baked for it in Blender,
+    // source-assets/blender/make_fp_body_hd.py. Those are used as they are; the tiled pores and the relief cut from the
+    // body's sheet, below, were stand-ins for them)
+    const baked = !!src.normalMap && !gloves;
     // skin: the model's colour with fine pores and creases over it (a normal and a roughness map, tiled), a little oilier
     // than before (real skin has a soft sheen, not a matte plastic look)
     // (a little less shine than before, and that shine broken up: the even waxy sheen was much of the plastic look)
-    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 0.62, metalness: 0, specularIntensity: 0.45, normalMap: D && !gloves ? D.skin.normal : null, roughnessMap: D && !gloves ? D.skin.rough : null, normalScale: new THREE.Vector2(0.5, 0.5), sheen: 0, sheenRoughness: 0.55, sheenColor: new THREE.Color(0.9, 0.55, 0.45) }); // (sheen: the soft, slightly velvety edge light of skin, with the fine hairs and the outer layer scattering it) // (a soft sheen broken up by the pores, and the pores and creases visible: fully matte, it read as clay)
-    if (D && !gloves) { D.skin.normal.repeat.set(26, 26); D.skin.rough.repeat.set(11, 11); }
+    const mt = o.material = new THREE.MeshPhysicalMaterial({ map: src.map || null, roughness: 0.62, metalness: 0, specularIntensity: baked ? 0.36 : 0.45, normalMap: baked ? src.normalMap : D && !gloves ? D.skin.normal : null, roughnessMap: baked ? src.roughnessMap || null : D && !gloves ? D.skin.rough : null, normalScale: baked ? new THREE.Vector2(1.35, 1.35) : new THREE.Vector2(0.5, 0.5), sheen: 0, sheenRoughness: 0.55, sheenColor: new THREE.Color(0.9, 0.55, 0.45) }); // (sheen: the soft, slightly velvety edge light of skin, with the fine hairs and the outer layer scattering it) // (a soft sheen broken up by the pores, and the pores and creases visible: fully matte, it read as clay)
+    if (baked) mt.roughness = 1; // (the baked map is the roughness itself)
+    else if (D && !gloves) { D.skin.normal.repeat.set(26, 26); D.skin.rough.repeat.set(11, 11); }
     if (gloves) { mt.map = null; mt.color.set(0x24272b); mt.roughness = 0.5; } // (fitted neoprene)
     else { const t = new THREE.Color(skinHex), ref = new THREE.Color(0xd8a682); mt.color.setRGB(Math.min(1.4, t.r / ref.r), Math.min(1.4, t.g / ref.g), Math.min(1.4, t.b / ref.b)); const lum = mt.color.r * 0.3 + mt.color.g * 0.59 + mt.color.b * 0.11; mt.color.lerp(new THREE.Color(lum, lum, lum), 0.14); } // (a touch less saturated: the model's tone read orange under the warm light) // (your skin tone over the model's)
     // light through the skin at its edges (a warm glow where the fingers turn away from you, as real skin does: a cheap
@@ -267,7 +275,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
     // the hands' own relief: the skin texture's painted knuckle creases, nail edges and tendons turned into a normal map
     // (source-assets: high-passed from the model's own colour map; only the strip of the atlas the hands use, its
     // bottom quarter), so they catch the light as real folds instead of lying flat on the surface as colour
-    const relief = gloves ? null : photoTex("fp_hand_relief", { srgb: false });
+    const relief = gloves || baked ? null : photoTex("fp_hand_relief", { srgb: false });
     if (relief) { relief.wrapS = relief.wrapT = THREE.ClampToEdgeWrapping; relief.flipY = false; }
     mt.onBeforeCompile = (sh) => {
       Object.assign(sh.uniforms, CUT);
@@ -311,7 +319,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
         reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.42, 0.32) * rim * 0.15"};
         ${gloves ? "" : "reflectedLight.directDiffuse *= vec3(1.0, 0.96, 0.93);"} }`);
     };
-    mt.customProgramCacheKey = () => "fdskin6" + (gloves ? "g" : "");
+    mt.customProgramCacheKey = () => "fdskin7" + (gloves ? "g" : "") + (baked ? "b" : "");
   });
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
