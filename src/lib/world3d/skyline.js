@@ -44,7 +44,7 @@ const hazed = (mesh, dist, far) => {
  * Builds the skyline for a real place into `group`. place: the built place (origin, land rings). Returns
  * { turbines, update(t) } (the rotors turn slowly), or null when nothing applies.
  */
-export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industry = null, hill = null } = {}) {
+export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industry = null, hill = null, town: wantTown = true } = {}) {
   if (!place?.origin) return null;
   const [lat0, lon0] = place.origin, P = projector(lat0, lon0), H = PLACE3D.box;
   const far = 9000, rotors = [];
@@ -93,7 +93,7 @@ export function buildSkyline(group, place, { groundY = 2.2, quality = 1, industr
   // ---- the indicative town: low roofs over the land beyond the mapped square ----
   const land = place.land || [];
   let town = null;
-  if (land.length) {
+  if (land.length && wantTown) { // (town: false for a place that shows no generated buildings at all)
     const step = quality < 1 ? 85 : 60, R = 2600, out = [];
     let seed = 1; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
     for (let gx = -R; gx <= R; gx += step) for (let gz = -R; gz <= R; gz += step) {

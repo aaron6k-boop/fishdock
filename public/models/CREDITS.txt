@@ -42,3 +42,11 @@ in the 3D view there) is cut from "View into the harbour from South Pier, Gorles
 https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg
 (from Geograph, photo 7618525). Changes: the band of the town cropped out, the sky and the near foreground made
 transparent, enlarged to twice its size. This adapted image is offered under the same licence, CC BY-SA 2.0.
+
+gorleston_pierhead.webp (public/textures/: the town at the landward end of Gorleston South Pier, the Pier Hotel, the
+Pavilion Theatre and the houses on the cliff top) is cut from "Gorleston South Pier" by habiloid, licensed CC BY-SA 2.0
+(https://creativecommons.org/licenses/by-sa/2.0/):
+https://commons.wikimedia.org/wiki/File:Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg
+(from Geograph, photo 6234922). Changes: the left half of the band of the town cropped out, the sky and the near
+foreground made transparent, enlarged to twice its size, and its colours lifted from dusk to daylight to match the
+photograph above. This adapted image is offered under the same licence, CC BY-SA 2.0.

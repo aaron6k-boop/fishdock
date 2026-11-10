@@ -718,6 +718,18 @@
    "files": []
   },
   {
+   "id": "commons:geograph-6234922",
+   "name": "Gorleston South Pier",
+   "source": "https://commons.wikimedia.org/wiki/File:Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg (Geograph photo 6234922)",
+   "author": "habiloid",
+   "licence": "CC BY-SA 2.0",
+   "attribution": "Required: photo by habiloid, CC BY-SA 2.0. The adapted image is itself CC BY-SA 2.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "2000x576 (the band used: 950x91, enlarged to 1900x182)",
+   "use": "the town at the landward end of the pier in the 3D view at Gorleston South Pier (public/textures/gorleston_pierhead.webp), its sky and near foreground made transparent, its colours lifted from dusk to daylight",
+   "files": []
+  },
+  {
    "id": "fishdock:fp_body",
    "name": "First-person arms with sleeves (derived)",
    "source": "cut from the MPFB angler (MakeHuman, CC0) in Blender: source-assets/blender/make_fp_body.py",

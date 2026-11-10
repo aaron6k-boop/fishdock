@@ -845,9 +845,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
 
   // ---- buildings ----
 
+  const backs = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null /* (__fdNoBackdrop: a measuring switch, for comparing the scene with and without it) */, mid = (b) => { let x = 0, z = 0; for (const [px, pz] of b.ring) { x += px; z += pz; } return [x / b.ring.length, z / b.ring.length]; };
+  const behindBackdrop = (b) => { if (!backs) return false; const [x, z] = mid(b); return backdropCovers(backs, x, z); };
   // a mark's own landmark buildings, built from photographs (localDetail.js), in place of the generic style
   const marks = Object.fromEntries(Object.entries(local?.landmarks || {}).filter(([, k]) => LANDMARK_BUILDERS[k])), beacons = [];
-  for (const b of (place.buildings || []).filter((b) => marks[b.id])) {
+  for (const b of (place.buildings || []).filter((b) => marks[b.id] && !behindBackdrop(b))) { // (not one a photograph of the place already shows)
     const lm = LANDMARK_BUILDERS[marks[b.id]](group, b.ring, Math.min(...b.ring.map(([x, z]) => groundAt(x, z) || LAND)));
     for (const m of lm.meshes) { m.userData.kind = "a building"; targets.push(m); }
     place.buildingGlow = [...(place.buildingGlow || []), ...lm.glow];
@@ -859,11 +861,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   if (beacons.length) place.beacons = beacons;
   setTownStyle(local?.town || null);
   // (a far shore shown by a photograph of it (backdrop3d.js): the map's buildings behind that sheet aren't built too)
-  const backs = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null /* (__fdNoBackdrop: a measuring switch, for comparing the scene with and without it) */, mid = (b) => { let x = 0, z = 0; for (const [px, pz] of b.ring) { x += px; z += pz; } return [x / b.ring.length, z / b.ring.length]; };
-  const behindBackdrop = (b) => { if (!backs) return false; const [x, z] = mid(b); return backdropCovers(backs, x, z); };
   if (backs) { const bd = buildBackdrops(group, backs); place.backdropUpdate = bd.update; place.backdropCredit = backs.map((d) => d.credit).filter(Boolean); }
   const asBuilt = (b) => { if (local?.sheds && !b.use) { const [x, z] = mid(b); if (local.sheds(x, z)) return { ...b, use: "portshed" }; } return b; };
-  const res = buildBuildings(group, (place.buildings || []).filter((b) => !marks[b.id] && !behindBackdrop(b)).map(asBuilt), {
+  // (generated: false in localDetail.js: this place has none of the map's buildings drawn in a generic style at all.
+  // What stands there is shown by photographs of it, or not shown)
+  const res = buildBuildings(group, (local?.generated === false ? [] : (place.buildings || []).filter((b) => !marks[b.id] && !behindBackdrop(b))).map(asBuilt), {
     groundAt: (x, z) => groundAt(x, z) || LAND,
     // nothing on a fishing spot, the deck round it or in front of it
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
@@ -999,7 +1001,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   place.waterAt = (x, z) => { const q = [x, z]; return !LR.some((bb) => inB(q, bb)) && !PR.some((bb) => inB(q, bb)) && !WR.some((bb) => inB(q, bb)); };
   place.perches = perches;
   // beyond the mapped square: real landmarks where they are, an indicative low town over the land (skyline.js)
-  place.skyline = buildSkyline(group, place, { groundY: LAND, quality, industry: local?.industry || null, hill: local?.hill || null });
+  place.skyline = buildSkyline(group, place, { groundY: LAND, quality, industry: local?.industry || null, hill: local?.hill || null, town: local?.generated !== false });
   if (place.skyline?.glow?.length) place.buildingGlow = [...(place.buildingGlow || []), ...place.skyline.glow];
   return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c] + (local?.hill && (c === 1 || c === 3) ? local.hill(x, z) : 0); const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
