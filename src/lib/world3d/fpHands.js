@@ -231,7 +231,7 @@ function curvature(geo) {
   return out;
 }
 
-function realArms(scene, { gloves, skinHex }) {
+function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
   const root = cloneSkinned(scene); root.updateMatrixWorld(true);
   const bone = (n) => root.getObjectByName(n);
   const wp = (o) => o.getWorldPosition(V()), wq = (o) => o.getWorldQuaternion(new THREE.Quaternion());
@@ -242,6 +242,9 @@ function realArms(scene, { gloves, skinHex }) {
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = false;
+    // (fp_body.glb: the jacket's sleeve is a mesh of its own on the same bones, from the cuff to the shoulder; it takes
+    // the jacket's cloth and none of the skin's work below)
+    if (o.material?.name === "jacket") { if (sleeveMat) o.material = sleeveMat; o.userData.fdSleeve = true; const uv = o.geometry.attributes.uv; if (uv) { for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 3, uv.getY(k) * 2.2); uv.needsUpdate = true; } /* (the model's sleeve is mapped in metres: scaled to the weave the drawn sleeve had, 16 round the arm) */ return; }
     // (one step of subdivision: the model's fingers had a few flat sides each, which read as blocks this close)
     // (and a second step on High and Ultra: the knuckles and fingertips were still faceted where a hand fills a third of
     // the view, as it does holding a fish up or resting on the rail; about 66,000 points, skinned once a frame)
@@ -313,6 +316,10 @@ function realArms(scene, { gloves, skinHex }) {
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
     if (!hand || !fore) throw new Error("bones missing");
+    // (fp_body.glb has the upper arm too: laid from a shoulder to the elbow each frame, so the arm is one connected
+    // limb in one sleeve. Its rest line and turn, measured here once)
+    const upper = bone("upperarm_" + sfx);
+    const up = upper ? { b: upper, restW: wq(upper), dir0: wp(fore).sub(wp(upper)).normalize(), len: wp(fore).distanceTo(wp(upper)) } : null;
     const P = wp(hand), Yh = wp(bone("middle_01_" + sfx)).sub(P).normalize();
     const across = wp(bone("index_01_" + sfx)).sub(wp(bone("pinky_01_" + sfx))); across.addScaledVector(Yh, -across.dot(Yh)).normalize();
     const X = across.clone().multiplyScalar(s), Z = X.clone().cross(Yh).normalize(); X.copy(Yh).cross(Z).normalize();
@@ -364,7 +371,7 @@ function realArms(scene, { gloves, skinHex }) {
     const gapPt = mid1.clone().lerp(mid2, 0.5).lerp(rin1.clone().lerp(rin2, 0.5), 0.5);
     const hookPt = ix1.clone().lerp(ix2, 0.5).lerp(mid1.clone().lerp(mid2, 0.5), 0.5);
     const M = { y: toH(Yh), n: toH(palmW), x: toH(idxW), palm: toH(palmPt.sub(P)), gap: toH(gapPt.sub(P)), hook: toH(hookPt.sub(P)) };
-    return { i, M, hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone(), mid: bone("middle_01_" + sfx), ring: bone("ring_01_" + sfx) };
+    return { up, shoulder: V(s * 0.2, 1.4, 0.1), i, M, hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone(), mid: bone("middle_01_" + sfx), ring: bone("ring_01_" + sfx) };
   });
   if (typeof window !== "undefined" && FILM) window.__fdArms = { sides, root };
   const q = new THREE.Quaternion(), qa = new THREE.Quaternion(), gq = new THREE.Quaternion(), qb = new THREE.Quaternion();
@@ -428,11 +435,25 @@ function realArms(scene, { gloves, skinHex }) {
     const along = t0.clone().sub(base).normalize(), d = t1.sub(t0); d.addScaledVector(along, -d.dot(along));
     return d.lengthSq() > 1e-10 ? d.normalize() : V(0, 0, 1);
   }
+  // ---- the upper arm (fp_body.glb): from the shoulder's side to the elbow, at its own length ----
+  // The elbow is where the forearm starts (the wrist, back along the forearm by its length). The upper arm runs to it
+  // from the direction of the shoulder (S.shoulder, world: a point beside and below the eye, set each frame), keeping
+  // its length: the shoulder end is behind the view, so it's that end that gives, never the sleeve at the elbow.
+  const qu = new THREE.Quaternion();
+  function placeUpper(S, elbowW) {
+    const U = S.up; if (!U) return;
+    const d = elbowW.clone().sub(S.shoulder); if (d.lengthSq() < 1e-8) d.set(0, -1, 0); d.normalize();
+    const par = U.b.parent; par.updateWorldMatrix(true, false);
+    U.b.position.copy(par.worldToLocal(elbowW.clone().addScaledVector(d, -U.len)));
+    U.b.quaternion.copy(par.getWorldQuaternion(q).invert().multiply(qu.setFromUnitVectors(U.dir0, d)).multiply(U.restW));
+    U.b.updateMatrixWorld(true);
+  }
   function place(S, Pw, Ew, Qw) {
     const handT = Qw.clone().multiply(S.frameInv).multiply(S.handW); // (the hand bone's world turn for that frame)
     // the forearm from the elbow's side to the wrist, rolled so the palm side stays the palm side (no twist)
     const dir = Pw.clone().sub(Ew).normalize(), Zt = V(0, 0, 1).applyQuaternion(Qw); Zt.addScaledVector(dir, -Zt.dot(dir)); if (Zt.lengthSq() < 1e-6) Zt.set(0, 1, 0); Zt.normalize();
     const foreT = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(dir.clone().cross(Zt), dir, Zt)).multiply(S.fr0Inv).multiply(S.foreW);
+    placeUpper(S, Pw.clone().addScaledVector(dir, -S.len));
     const par = S.fore.parent; par.updateWorldMatrix(true, false);
     S.fore.position.copy(par.worldToLocal(Pw.clone().addScaledVector(dir, -S.len)));
     CUT.uFdW.value[S.i].copy(Pw); CUT.uFdDir.value[S.i].copy(dir);
@@ -447,6 +468,7 @@ function realArms(scene, { gloves, skinHex }) {
     // (the palm side of the forearm turned the way the palm faces: the model's forearm frame is mapped the same way at rest)
     const rest = S.M.n.clone().applyQuaternion(S.handW); const dir0 = V(0, 1, 0).applyQuaternion(S.fr0Inv.clone().invert()); void rest; void dir0;
     const foreT = new THREE.Quaternion().setFromRotationMatrix(m.makeBasis(dir.clone().cross(Zt), dir, Zt)).multiply(S.fr0Inv).multiply(S.foreW);
+    placeUpper(S, Pw.clone().addScaledVector(dir, -S.len));
     const par = S.fore.parent; par.updateWorldMatrix(true, false);
     S.fore.position.copy(par.worldToLocal(Pw.clone().addScaledVector(dir, -S.len)));
     CUT.uFdW.value[S.i].copy(Pw); CUT.uFdDir.value[S.i].copy(dir);
@@ -827,6 +849,10 @@ function realArms(scene, { gloves, skinHex }) {
       const t = S.thumb.map((j) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(j.b.quaternion).w), 0, 1)));
       blend[i] = { kind, P: wp(S.hand), Q: wq(S.hand), f, t, from: null, u: 1 };
     },
+    /** true when the model has the whole arm and its sleeve (fp_body.glb) */
+    body: sides.every((S) => !!S.up),
+    /** where shoulder i is (world): the upper arm comes from there */
+    shoulder(i, w) { sides[i].shoulder.copy(w); },
     /** where the sleeve covers the forearm from: the wrist and the way along the forearm to the hand (world) */
     cuff(i, wristW, dirW) { CUT.uFdW.value[i].copy(wristW); CUT.uFdDir.value[i].copy(dirW); },
     /** hand i at `pos` with frame `quat` (the group's space), its fingers curled as `curl`, the elbow towards `elbow`;
@@ -958,7 +984,9 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   // (only if the model fails to load: on a slow connection it can take well over 20 seconds, and the simple hands that
   // showed meanwhile looked like a misshapen lump on the rod; better nothing in your hands for those moments)
   const slow = null, born = performance.now(); // (slow: no timer now; clearTimeout(null) below does nothing)
-  loadPart("fp_arms").then((sc) => { try { real = realArms(sc, { gloves, skinHex }); } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
+  // (fp_body.glb: the whole arm from the shoulder with its sleeve modelled on it; fp_arms.glb, the forearms alone in
+  // drawn sleeves, if that can't load)
+  loadPart("fp_body").catch(() => loadPart("fp_arms")).then((sc) => { try { real = realArms(sc, { gloves, skinHex, sleeveMat }); if (real.body) for (const h of hands) { group.remove(h.sleeve, h.upper); h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry?.dispose?.(); h.sleeve = new THREE.Group(); h.upper = new THREE.Group(); } /* (the drawn sleeves aren't needed: stand-ins take their place so the code that moves them has something to move) */ } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
 
   const m4 = new THREE.Matrix4();
   // the hand's frame from what it holds: the thumb along the handle (towards the rod's tip, or out along the reel's
@@ -1018,6 +1046,10 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       const empty = !specs[0] && !specs[1];
       { const wait = empty || ((!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 90000);
         if (real) real.root.visible = !wait; for (const h of hands) { h.sleeve.visible = !wait; h.upper.visible = !wait; } } // (the sleeves too: without their hands they were two empty blue tubes)
+      // (the shoulders: beside and below the eye, a little behind it, turning with the view's heading but not its pitch,
+      // as your shoulders do when you look down)
+      if (real?.body) { const fl = V(vf.x, 0, vf.z); if (fl.lengthSq() < 1e-6) fl.set(0, 0, -1); fl.normalize(); const rt = V(vr.x, 0, vr.z).normalize();
+        for (let i = 0; i < 2; i++) real.shoulder(i, group.localToWorld(eye.clone().addScaledVector(rt, hands[i].s * 0.2).add(V(0, -0.27, 0)).addScaledVector(fl, -0.14))); }
       for (let i = 0; i < 2; i++) {
         const h = hands[i], spec = specs[i];
         // the elbow: fixed in the view, below and out to the side, out of sight
@@ -1119,6 +1151,6 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
     },
     /** where each hand is (the wrist, in the group's space), for tests */
     get wrists() { return hands.map((h) => (h.cur ? h.cur.pos.clone() : null)); },
-    dispose() { built.geo.dispose(); geoL.dispose(); mat.dispose(); sleeveMat.dispose(); hemMat.dispose(); for (const h of hands) { h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry.dispose(); } },
+    dispose() { built.geo.dispose(); geoL.dispose(); mat.dispose(); sleeveMat.dispose(); hemMat.dispose(); for (const h of hands) { h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry?.dispose?.(); } },
   };
 }
