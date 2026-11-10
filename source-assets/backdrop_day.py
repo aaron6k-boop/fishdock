@@ -1,9 +1,10 @@
-# The pier-end photograph (Geograph 6234922, habiloid, CC BY-SA 2.0) was taken at dusk: dark, with the lamps lit.
-# For the daytime sheet: the same picture brought to daylight tones (the per-channel match night.py measures where this
-# photograph and the daylight one, 7618525, show the same riverside), the lit lamps and their glare painted out from
-# the wall around them (they are on their own sheet, gorleston_town_lights.webp, shown after dark), enlarged twice
-# with a light sharpening so it is less soft when the phone magnifies it, and the sheet's cut ends broken up into a
-# stipple so the picture thins out instead of stopping at a straight edge. Nothing is added to the picture.
+# The pier-end sheet (Geograph 6234922, habiloid, CC BY-SA 2.0) comes from a dusk photograph. Stage 10 lifted its colours
+# towards the daylight photograph's (7618525), but it still read as evening against a sunlit pier: flat, dark under the
+# eaves, with the lamps lit. Here the same contrast step is applied once more to that sheet, its shadows are lifted,
+# the lit lamps and their glare are painted out from the wall around them (they are on their own sheet,
+# gorleston_town_lights.webp, shown after dark), it is enlarged twice with a light sharpening so it is less soft when
+# the phone magnifies it, and the sheet's cut end is broken up into a stipple so the picture thins out instead of
+# stopping at a straight edge. The north bank's sheet gets the same sharpening and end. Nothing is added to a picture.
 # python3 -I backdrop_day.py photosdir texturesdir outdir
 import sys
 from PIL import Image, ImageFilter

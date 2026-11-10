@@ -725,8 +725,8 @@
    "licence": "CC BY-SA 2.0",
    "attribution": "Required: photo by habiloid, CC BY-SA 2.0. The adapted image is itself CC BY-SA 2.0 (share-alike).",
    "type": "photographs",
-   "resolution": "2000x576 (the band used: 950x91, enlarged to 1900x182)",
-   "use": "the town at the landward end of the pier in the 3D view at Gorleston South Pier (public/textures/gorleston_pierhead.webp), its sky and near foreground made transparent, its colours lifted from dusk to daylight",
+   "resolution": "2000x576 (the band used: 950x91, enlarged to 3800x364)",
+   "use": "the town at the landward end of the pier in the 3D view at Gorleston South Pier (public/textures/gorleston_pierhead.webp), its sky and near foreground made transparent, its colours and contrast lifted from dusk to daylight, its shadows lightened, the lit lamps painted out, lightly sharpened, its cut end thinned to a stipple (source-assets/backdrop_day.py)",
    "files": []
   },
   {
