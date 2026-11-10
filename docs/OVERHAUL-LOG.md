@@ -282,3 +282,20 @@ explained yet, and not caused by the backdrop.
   not models of named vessels; no engine sound yet.
 
 Still generated: the houses on the Pier Hotel side to the south-west.
+
+## Stage 10 (10 November 2026, branch `no-generated-buildings`): no generated buildings at Gorleston
+
+Aaron's phone screenshots still showed generated houses on the Pier Hotel side and a generated shed across the river.
+
+- **None of the map's buildings are drawn in a generic style at Gorleston now** (`generated: false` in `localDetail.js`,
+  read in `realPlace.js`), and the indicative far town beyond the mapped square is off there too (`skyline.js`,
+  `town: false`). The real far landmarks placed from published positions stay.
+- **The town at the landward end of the pier is a second photograph** (`gorleston_pierhead.webp`): the Pier Hotel, the
+  Pavilion Theatre and the cliff-top houses, cut from "Gorleston South Pier" by habiloid (CC BY-SA 2.0, Geograph
+  6234922), credited on screen and in `public/models/CREDITS.txt`. It is a dusk photograph with its colours lifted to
+  match the daylight one, so the lamps lit that evening still show in it. The modelled Pier Hotel, Pavilion, bandstand
+  and Cliff Hotel stand behind that sheet and are no longer built; the lighthouse and coastwatch station on the pier is.
+- Not done: across the river north of the dune there is now only the ground, the quay and the far landmarks. No openly
+  licensed photograph of that bank from the pier has been lined up yet.
+- Checked: 314 unit tests pass, the end-to-end presets pass, and the views south-west, west, north-west and north from
+  the mark were rendered by day and at night (software renderer in the build container, not a phone).

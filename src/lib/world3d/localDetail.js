@@ -21,7 +21,20 @@ export const LOCAL = {
     // a degree, the picture's left edge at 263.5. The frontage's distances are read off the map.
     backdrop: [{ tex: "gorleston_riverside.webp", cam: [-8.7, -12.4], bearing0: 263.5, pxPerDeg: 21.35, px: [1600, 132], waterline: [107, 100],
       dist: [[263.5, 285], [275, 300], [290, 360], [305, 430], [323, 500], [338.5, 540]],
-      credit: { by: "Christopher Hilton", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg" } }],
+      credit: { by: "Christopher Hilton", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg" } },
+    // and the town at the landward end of the pier (the Pier Hotel, the Pavilion Theatre, Pier Gardens and the houses on
+    // the cliff top along Marine Parade), from "Gorleston South Pier" by habiloid, CC BY-SA 2.0 (Geograph 6234922, via
+    // Wikimedia Commons), taken on the pier about 65 m from the mark. It is a dusk photograph: its colours have been
+    // lifted to match the daylight one above (measured on the stretch of riverside both show), so the real lamps that
+    // were lit that evening still show in it. Lined up by the Pier Hotel (bearing 246.1) and the old lighthouse (272.9):
+    // 21.5 pixels a degree, left edge at 219.6. Distances from the map.
+    { tex: "gorleston_pierhead.webp", cam: [61.5, -18.8], bearing0: 219.6, pxPerDeg: 21.5, px: [950, 91], waterline: [91, 95],
+      dist: [[219.6, 520], [232, 520], [238, 300], [246, 250], [252, 250], [256, 320], [263.8, 320]],
+      credit: { by: "habiloid", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg" } }],
+    // none of the map's buildings are drawn in a generic style here (Aaron, 10 November 2026: the generated houses and
+    // the shed across the river were not the real ones). The town is the two photographs above; the lighthouse and
+    // coastwatch station on the pier is the one building modelled
+    generated: false,
     // across the harbour mouth: the bank north of the river is a low dune grown over with marram grass (photographs),
     // kept clear of the road and the buildings behind it
     // across the river is the port's South Denes estate: sheds, stores and tanks (the photographs from the pier and from
@@ -47,7 +60,7 @@ export const LOCAL = {
     hill: gorlestonHill,
     // (landmarks, above, also: the Pier Hotel; Pavilion Theatre: red brick and terracotta, copper roofs, four domed corner towers at its south end;
     // the bandstand in Pier Gardens; the Cliff Hotel on the cliff top)
-    note: "The lighthouse, lamps, fences, the Pier Hotel, Pavilion Theatre, bandstand, Cliff Hotel, the height of the cliff and the dune across the harbour mouth at Gorleston are modelled from photographs and descriptions; their sizes are estimates.",
+    note: "The lighthouse, lamps, fences, the height of the cliff and the dune across the harbour mouth at Gorleston are modelled from photographs and descriptions; their sizes are estimates. The town is shown by two photographs of it; no other buildings are drawn.",
   },
 };
 export const localFor = (id) => LOCAL[id] || null;
