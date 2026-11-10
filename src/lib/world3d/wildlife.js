@@ -4,6 +4,7 @@
 // record of anything: it's the kind of life you'd see at a British seaside place, kept sparse so it never clutters, and
 // left out at rivers and lakes (which aren't a gull's harbour and have no sea for boats). Cheap: a few small meshes.
 import * as THREE from "three";
+import { vesselMesh, vesselMaterials } from "./vessels3d.js";
 
 const rngOf = (seed) => { let a = seed || 1; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
@@ -28,26 +29,6 @@ function gullMesh(mats) {
   return g;
 }
 
-// a small boat: a hull narrowing to the bow, a wheelhouse and a mast with a light
-function boatMesh(mats, rnd) {
-  const g = new THREE.Group(), L = 8 + rnd() * 5, W = L * 0.32;
-  const hg = new THREE.BoxGeometry(W, 1.3, L, 2, 1, 6), p = hg.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const z = p.getZ(i) / L, y = p.getY(i);
-    let x = p.getX(i);
-    if (z < -0.2) x *= Math.max(0.05, 1 - ((-z - 0.2) / 0.3) ** 1.6); // the bow
-    if (y < 0) x *= 0.7; // a rounded bottom
-    p.setX(i, x); if (z < -0.4 && y > 0) p.setY(i, y + 0.25);
-  }
-  hg.computeVertexNormals();
-  const hull = new THREE.Mesh(hg, mats.hulls[Math.floor(rnd() * mats.hulls.length)]); hull.position.y = 0.3; g.add(hull);
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(W * 0.7, 1.5, L * 0.28), mats.cabin); cab.position.set(0, 1.65, L * 0.08); g.add(cab);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 4.5, 6), mats.mast); mast.position.set(0, 3.3, -L * 0.12); g.add(mast);
-  const light = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mats.light); light.position.set(0, 5.6, -L * 0.12); g.add(light);
-  g.userData.L = L;
-  return g;
-}
-
 /**
  * venue: the kind of place; waterAt(x, z): true for open water (a real place's map, or the drawn layout's sea);
  * perches: [[x, y, z]] lamp tops a gull may sit on; centre: [x, z] where the anglers are; seed.
@@ -63,6 +44,7 @@ export function createWildlife(parent, { venue = "pier", waterAt = null, perches
     cabin: new THREE.MeshStandardMaterial({ color: 0xe9e6dc, roughness: 0.7 }), mast: new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.5, metalness: 0.4 }),
     light: new THREE.MeshStandardMaterial({ color: 0xfff6dd, emissive: 0xffe8b0, emissiveIntensity: 0 }),
   };
+  const vmats = vesselMaterials();
   // ---- gulls: four or five wheeling, up to two perched ----
   const gulls = [];
   const nFly = 4 + Math.floor(rnd() * 2);
@@ -77,15 +59,20 @@ export function createWildlife(parent, { venue = "pier", waterAt = null, perches
   if (waterAt) {
     const clear = (x, z, r) => { for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; if (!waterAt(x + Math.cos(a) * r, z + Math.sin(a) * r)) return false; } return waterAt(x, z); };
     const spots = [];
-    for (let tries = 0; tries < 400 && spots.length < 3; tries++) {
-      const x = centre[0] + (rnd() - 0.5) * 2 * box, z = centre[1] + (rnd() - 0.5) * 2 * box, d = Math.hypot(x - centre[0], z - centre[1]);
-      if (d < 180 || d > box) continue;
-      if (spots.some((s) => Math.hypot(s[0] - x, s[1] - z) < 120)) continue;
+    // (well out: 320 m at the nearest and up to 650 m, where a working boat is a small thing on the water, not a toy at
+    // the end of the pier; nearer only if the map's water gives nowhere further)
+    for (const [near, far] of [[320, 650], [260, box]]) for (let tries = 0; tries < 500 && spots.length < 3; tries++) {
+      const a0 = rnd() * Math.PI * 2, d = near + rnd() * (far - near), x = centre[0] + Math.sin(a0) * d, z = centre[1] - Math.cos(a0) * d;
+      if (spots.some((s) => Math.hypot(s[0] - x, s[1] - z) < 160)) continue;
       // open water all round it, and open water all the way from the anglers to it (never beyond a pier or the land)
       let seen = true; for (let k = 60; k < d; k += 12) { const f = k / d; if (!waterAt(centre[0] + (x - centre[0]) * f, centre[1] + (z - centre[1]) * f)) { seen = false; break; } }
       if (seen && clear(x, z, 70) && clear(x, z, 35)) spots.push([x, z]);
     }
-    for (const [x, z] of spots) { const m = boatMesh(mats, rnd); m.position.set(x, 0, z); const head = rnd() * Math.PI * 2; m.rotation.y = head; group.add(m); boats.push({ m, x, z, head, v: 0.6 + rnd() * 1.2, ph: rnd() * 10, x0: x, z0: z }); }
+    spots.forEach(([x, z], k) => {
+      const m = vesselMesh(vmats, rnd, k % 2 ? "workboat" : "fishing"); m.position.set(x, 0, z); const head = rnd() * Math.PI * 2; m.rotation.y = head; group.add(m);
+      // (its beat: a long narrow loop, 120 to 200 m by 30, at 2 to 3.5 m/s, so it holds a course, comes round and returns)
+      boats.push({ m, head, v: 2 + rnd() * 1.5, ph: rnd() * 10, x0: x, z0: z, a: 120 + rnd() * 80, b: 30 });
+    });
   }
   return {
     update(t, dt, { night = 0, swell = 0.3 } = {}) {
@@ -104,13 +91,17 @@ export function createWildlife(parent, { venue = "pier", waterAt = null, perches
         g.m.userData.wings[0].rotation.z = -f; g.m.userData.wings[1].rotation.z = f;
       }
       for (const b of boats) {
-        // a slow course back and forth, riding the swell
-        const s = Math.sin(t * 0.02 * b.v + b.ph) * 60;
-        b.m.position.set(b.x0 + Math.sin(b.head) * s, Math.sin(t * 0.7 + b.ph) * 0.25 * (0.5 + swell), b.z0 - Math.cos(b.head) * s);
-        b.m.rotation.set(Math.sin(t * 0.55 + b.ph) * 0.05 * (0.5 + swell), b.head + (Math.cos(t * 0.02 * b.v + b.ph) > 0 ? 0 : Math.PI), Math.sin(t * 0.8 + b.ph * 2) * 0.07 * (0.5 + swell));
+        // round its beat, heading the way it goes, riding the swell: pitching a little, rolling a little more
+        const th = (t * b.v) / b.a + b.ph, ca = Math.cos(th), sa = Math.sin(th), hx = Math.sin(b.head), hz = -Math.cos(b.head);
+        const px = b.x0 + hx * ca * b.a + -hz * sa * b.b, pz = b.z0 + hz * ca * b.a + hx * sa * b.b;
+        const vx = -hx * sa * b.a + -hz * ca * b.b, vz = -hz * sa * b.a + hx * ca * b.b; // (the way it is going)
+        b.m.position.set(px, Math.sin(t * 0.7 + b.ph) * 0.18 * (0.5 + swell) - 0.05, pz);
+        b.m.rotation.set(Math.sin(t * 0.55 + b.ph) * 0.035 * (0.5 + swell), Math.atan2(-vx, -vz), Math.sin(t * 0.8 + b.ph * 2) * 0.06 * (0.5 + swell));
+        // (slower through the turns at the ends of the beat, and its wake shorter there)
+        const way = Math.hypot(vx, vz) / b.a; if (b.m.userData.wake) b.m.userData.wake.scale.set(1, 1, 0.35 + 0.65 * way);
       }
-      mats.light.emissiveIntensity = night > 0.3 ? 2.5 * Math.min(1, night) : 0;
+      vmats.lamp.emissiveIntensity = night > 0.3 ? 3 * Math.min(1, night) : 0; vmats.wake.opacity = 0.32 * (1 - 0.8 * Math.min(1, night));
     },
-    dispose() { parent.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); }); for (const m of Object.values(mats).flat()) m.dispose?.(); },
+    dispose() { parent.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); }); for (const m of [...Object.values(mats).flat(), ...Object.values(vmats)]) m.dispose?.(); },
   };
 }

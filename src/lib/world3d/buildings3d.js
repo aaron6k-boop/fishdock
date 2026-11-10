@@ -31,7 +31,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const M = {};
   // (the facade's own depth and finish: its normal map gives the reveals, frames, sills and courses their relief under
   // the sun; its roughness map keeps the wall matt and lets the glass mirror the sky)
-  for (const [k, t] of Object.entries(tex)) { for (const m of [t.map, t.emissiveMap, t.normalMap, t.roughnessMap]) { m.wrapS = m.wrapT = THREE.ClampToEdgeWrapping; m.anisotropy = 8; } M[k] = new THREE.MeshStandardMaterial({ map: t.map, vertexColors: true, roughness: 1, roughnessMap: t.roughnessMap, normalMap: t.normalMap, normalScale: new THREE.Vector2(1, 1), emissive: 0xffc070, emissiveMap: t.emissiveMap, emissiveIntensity: 0 }); }
+  for (const [k, t] of Object.entries(tex)) { for (const m of [t.map, t.emissiveMap, t.normalMap, t.roughnessMap]) { m.wrapS = THREE.RepeatWrapping /* (across: a bay whose window is dark at night is mapped one whole turn along, see `unlit` below) */; m.wrapT = THREE.ClampToEdgeWrapping; m.anisotropy = 8; } M[k] = new THREE.MeshStandardMaterial({ map: t.map, vertexColors: true, roughness: 1, roughnessMap: t.roughnessMap, normalMap: t.normalMap, normalScale: new THREE.Vector2(1, 1), emissive: 0xffc070, emissiveMap: t.emissiveMap, emissiveIntensity: 0 }); }
   // ---- the walls' own surface, photographed (Poly Haven CC0: public/textures), laid over the drawn facades at its
   // real size in the world (about 1.1 m a tile), the windows left clear ----
   // The drawn facades are small (128 px a bay): from the pier the town read as flat, smooth toy houses. Over them now:
@@ -64,6 +64,15 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     };
     m.customProgramCacheKey = () => "fdwall1" + k;
   }
+  // ---- not every window is lit at night ----
+  // Every window of every building glowed after dark: a grid of identical yellow squares, which is most of what made
+  // the town look drawn. About a third are lit now. A bay whose window is dark has its picture mapped one whole turn
+  // along the facade sheet (the same picture, as it repeats), and the glow is switched off wherever that is so.
+  for (const k of Object.keys(tex)) {
+    const m = M[k], prev = m.onBeforeCompile, key = m.customProgramCacheKey;
+    m.onBeforeCompile = (sh, r) => { prev?.call(m, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n#ifdef USE_EMISSIVEMAP\n  totalEmissiveRadiance *= step(vEmissiveMapUv.x, 1.0);\n#endif"); };
+    m.customProgramCacheKey = () => (key ? key.call(m) : "fdwall0" + k) + "lit1";
+  }
   for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1, vertexColors: true });
   M.tower = new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.85 });
   M.trim = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.6, vertexColors: true, side: THREE.DoubleSide });
@@ -73,6 +82,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const B = Object.fromEntries(Object.keys(M).map((k) => [k, bucket()]));
   const colliders = [], glow = [M.brick, M.render, M.cladding, M.stone];
   const W1 = [1, 1, 1];
+  const litHash = (id, k, st, q) => { let h = (Math.imul((id | 0) ^ 0x9e3779b9, 2654435761) ^ Math.imul(k + 1, 40503) ^ Math.imul(st + 1, 7919) ^ Math.imul(q + 1, 104729)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; };
   const tileUV = (t, u0 = 0, u1 = 1, v0 = 0, v1 = 1) => [(t + u0) / FACADE_N, v0, (t + u1) / FACADE_N, v0, (t + u1) / FACADE_N, v1, (t + u0) / FACADE_N, v1];
   const chimneyBox = (x, z, y0, h, s = 0.6) => {
     const pts = [[x - s / 2, z - s / 2], [x - s / 2, z + s / 2], [x + s / 2, z + s / 2], [x + s / 2, z - s / 2]];
@@ -155,7 +165,9 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
             quad(B.trim, [A[0] + nx, y0 + 0.5, A[2] + nz], [A[0] + ux * mw + nx, y0 + 0.5, A[2] + uz * mw + nz], [A[0] + ux * mw + nx, y1 - 0.25, A[2] + uz * mw + nz], [A[0] + nx, y1 - 0.25, A[2] + nz], [0, 0, 1, 0, 1, 1, 0, 1], W1);
             continue;
           }
-          quad(wallB, A, Bp, [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], tileUV(t), tint);
+          // (which windows are lit after dark: about one in three, the same ones every time for this building)
+          const unlit = (t === FACADE_TILE.window || t === FACADE_TILE.window2) && litHash(b.id, k, s, q) > 0.34;
+          quad(wallB, A, Bp, [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], unlit ? tileUV(t).map((v, i) => (i % 2 === 0 ? v + 1 : v)) : tileUV(t), tint);
           // ---- built detail on the near houses: the drawn facade's frames, sills, lintels, door cases and steps stand out
           // from the wall as geometry too, so they catch the sun and throw shadows close to ----
           if (fine && (t === FACADE_TILE.window || t === FACADE_TILE.window2 || t === FACADE_TILE.door) && st.walls !== "cladding") {
