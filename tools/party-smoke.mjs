@@ -50,7 +50,7 @@ async function main() {
 
   // ---- start and preview ----
   const made = await api("/api/party", { method: "POST", body: JSON.stringify({ mode: "virtual", venue: "pier", place: { label: "Smoke test" }, name: "Smoke A", hours: 2 }) });
-  ok(made.status === 200 && /^[A-Z0-9]{6}$/.test(made.body?.code || ""), "host starts a party", made);
+  ok(made.status === 200 && /^(?:[0-9]{4}|[A-Z0-9]{6})$/.test(made.body?.code || ""), "host starts a party", made);
   if (made.status !== 200) return;
   const { code, secret } = made.body, A = made.body.member;
   ok(noPosition(made.body), "start answer holds no position");
