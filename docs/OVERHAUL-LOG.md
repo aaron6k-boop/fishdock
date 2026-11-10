@@ -345,3 +345,19 @@ hands and characters redone.
   own skeleton and animations are a separate, larger job (the earlier 17-phase brief).
 - Checked: unit tests and the end-to-end presets; stills by day from the mark, close to the rocks and in third person
   (software renderer in the build container, not a phone; no frame rates measured).
+
+## Stage 13 (10 November 2026, branch `splashes`): splashes
+
+Aaron asked for the splashes to be more realistic.
+
+- **Every splash on the water** (a rig going in, a fish at the surface, a leap, the net) is now a crown of fine drops
+  thrown steeply out and up, a few straight up the middle, and a short puff of white where it went in
+  (`rockSpray.js` `splash`, `splashPlan`). They were 260 round white dots of one size, 9 cm across, thrown out in a
+  fan. Drops fall as a stone falls and are gone where they meet the water, waves and all.
+- **In the light of the hour.** Drops and mist take the day's light, so a splash is white at noon, grey at dusk and
+  dark at night. The old dots were as bright at midnight as at noon.
+- **Spray off the rocks and the wall** has ragged puffs (each with its own pattern, lit from above) in place of smooth
+  discs, and heavier drops flung higher and further than the mist.
+- One draw call for all of it (up to 1,600 points), in place of two. How splashes behave in general: nothing measured.
+- Checked: unit tests, the end-to-end presets, and stills of a small and a large splash at four moments (software
+  renderer in the build container, not a phone; no frame rates measured).
