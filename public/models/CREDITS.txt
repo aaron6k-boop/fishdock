@@ -9,6 +9,11 @@ fp_body.glb (your arms and hands in first person, with the jacket's sleeves mode
 forearms alone, the fallback) are cut from a person made with MPFB, MakeHuman for Blender
 (https://static.makehumancommunity.org/mpfb/), with the MakeHuman system assets' skin; the people MPFB makes and the
 system assets are CC0 1.0. Credited with thanks to the MakeHuman team.
+The sleeves of fp_body.glb are the sleeves of the MakeHuman system assets' field jacket ("male_casualsuit05"), fitted to
+that person by MPFB: its folds, seams and cuff are its makers' own, from its normal map; its colour map is kept only
+as light and dark so the game can colour it as your jacket; the cuff is drawn in round the wrist. The skin's colour is
+the same MakeHuman skin laid out on a sheet of its own, with a normal map and a roughness map baked from it in Blender
+(source-assets/blender/make_fp_body_hd.py).
 
 pierprops.glb (the pier's lamps, lifebuoy stations, bollards and benches): the bollard, bench and lifebuoy housing were
 modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and the buoy Poly Haven's "Lifebuoy"

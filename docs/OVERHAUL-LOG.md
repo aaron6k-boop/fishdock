@@ -361,3 +361,28 @@ Aaron asked for the splashes to be more realistic.
 - One draw call for all of it (up to 1,600 points), in place of two. How splashes behave in general: nothing measured.
 - Checked: unit tests, the end-to-end presets, and stills of a small and a large splash at four moments (software
   renderer in the build container, not a phone; no frame rates measured).
+
+## Stage 14 (10 November 2026, branch `hands-hd`): the first-person arms and hands, second build
+
+Aaron: "The biggest issue is the arms and the hands. Can you remodel them completely and make them very good and HD."
+
+- **The sleeves are a modelled jacket's.** They were the arm's own surface let out with noise for folds, drawn with a
+  ribbed weave: a corduroy tube. Now they are the sleeves of MakeHuman's field jacket (`male_casualsuit05`, from the
+  MakeHuman system assets, CC0), fitted to the angler by MPFB in Blender on Aaron's PC: its makers' folds, seam and
+  cuff, from its 4096 px normal map (the sleeves' share of it kept at 2048 x 1040). Its colour map is kept only as
+  light and dark, with its ambient-occlusion map multiplied in, so the game still colours it as your jacket. The cuff,
+  which hangs open like a bell on the model, is drawn in round the wrist.
+- **The skin has a sheet of its own.** On the body's 2048 px sheet a hand was about 250 px long. The arms' pieces are
+  laid out again on their own 2048 px sheet (2.65 times the size), the colour carried across, and a normal map and a
+  roughness map baked beside it with Cycles: the creases, knuckle lines and nail edges painted in the colour map
+  turned into relief, plus the fine net of lines skin has, 2 to 3 mm apart. That net is drawn by rule, not scanned.
+  The game uses these in place of the tiled pores and the relief it cut from the body's sheet.
+- **What is the same:** the hand's shape and its bones (MakeHuman's base mesh), every grip and animation, the gloves
+  option, the fallback `fp_arms.glb`. The colour map holds no more detail than before: it is the same MakeHuman skin,
+  enlarged.
+- **Limits.** This is a MakeHuman hand with baked maps, not a scanned or sculpted one: closer to a current game's
+  hands than before, not at the level of a big studio's. Seen from outside (which the game does not show) the cuff's
+  slit and the open top of the sleeve are ragged. Your third-person angler wears a gilet over a top, not this jacket.
+  The file is 1.2 MB (it was 0.66 MB). `source-assets/blender/make_fp_body_hd.py` is the script.
+- Checked: unit tests, the end-to-end presets, and stills waiting, fighting, holding and releasing a fish (software
+  renderer in the build container, not a phone; no frame rates or load times measured).
