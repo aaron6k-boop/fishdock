@@ -30,10 +30,11 @@ Rocketbox model's own.
 3. **No grip is authored. Every grip is solved by code at run time.** `wrap()` bends each finger joint in 0.06 rad
    steps until the end of the segment meets a cylinder standing in for the handle (rod radius 14.5 mm, the knob a
    2 cm cylinder). The real rod, reel stem, reel foot and knob shapes are not used. The result depends on exactly
-   where the hand was put, so it differs from state to state: in the fight renders the right hand lies flat on top
-   of the rod with all four fingers straight, and the left hand is an open palm under the reel; in the waiting and
-   reeling renders the same hands are closed. Tuning angles fixes one state and breaks another, which is what the
-   repeated finger adjustments have been doing.
+   where the hand was put and on a scoring search with a dozen hand-tuned weights (`solveGrip`). Changing one weight
+   to fix one view moves the answer in the others, which is what the repeated finger adjustments have been doing.
+   (Correction, 10 November: the first version of this note cited the fight renders, where the right hand lies flat
+   over the rod and the left is open under the reel, as a broken grip. That frame is the rod still in its rest with
+   the hands held ready to strike, which is intended. The waiting and reeling grips do close on the handle and knob.)
 4. **Several systems write the same transforms.** The hand's place comes from the equipment (`sock`), is clamped by
    a wrist limit, blended from the last grip over 0.3 s (twice: once in the simple hands' state, once in the real
    arms'), rolled with the reel handle (`CRANK.follow`), then the elbow is placed by rule, then the sleeve follows the
@@ -65,3 +66,15 @@ rod and reel meshes.
 
 Needs Blender (5.2 is installed on the PC; there is none in the cloud workspace). Nothing in Blender has been
 changed yet.
+
+## Done so far on `character-rebuild`
+
+- **`public/models/fp_body.glb` replaces `fp_arms.glb` in first person** (`source-assets/blender/make_fp_body.py`,
+  built in Blender 5.2 on the PC from the same MPFB angler): the arm from the shoulder (upper arm, forearm, hand,
+  fingers) with a jacket sleeve modelled on the arm and skinned to the same bones, a turned-in cuff and soft folds.
+  3,844 vertices of skin, 4,860 of sleeve, 665 kB.
+- **The upper arm is a bone now.** `fpHands.js` lays it from a shoulder (beside and below the eye, turning with your
+  heading) to the elbow at its own length, then the forearm from it. The drawn sleeve tube, cuff and upper-arm
+  cylinder are not used when this model loads; `fp_arms.glb` and they remain as the fallback.
+- Not done yet: palm and twist bones, authored grip poses, one person across first and third person, the casting,
+  fighting, walking and landing animation work, skin and cloth shading beyond what was there.

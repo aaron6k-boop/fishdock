@@ -5,7 +5,8 @@ The net mesh textures are from ambientCG (https://ambientcg.com), by Lennart Dem
 No attribution is required by the licence; credited here with thanks.
 The full list of third-party assets, with sources, licences and file hashes: source-assets/ASSET-LICENCES.json.
 
-fp_arms.glb (your forearms and hands in first person) is cut from a person made with MPFB, MakeHuman for Blender
+fp_body.glb (your arms and hands in first person, with the jacket's sleeves modelled on them) and fp_arms.glb (the
+forearms alone, the fallback) are cut from a person made with MPFB, MakeHuman for Blender
 (https://static.makehumancommunity.org/mpfb/), with the MakeHuman system assets' skin; the people MPFB makes and the
 system assets are CC0 1.0. Credited with thanks to the MakeHuman team.
 
