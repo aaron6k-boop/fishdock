@@ -7,7 +7,8 @@ import * as THREE from "three";
 import { checkScene } from "./sceneCheck.js";
 import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor } from "./walker.js";
 import { createEnvironment } from "./environment.js";
-import { createAngler } from "./angler.js";
+import { createAngler, waveHeight } from "./angler.js";
+import { createRockSpray } from "./rockSpray.js";
 import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
@@ -159,7 +160,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       else dropV.set([Math.cos(a) * sp * 0.6, 1.5 + Math.random() * 3 * size, Math.sin(a) * sp * 0.6], k * 3);
       dropLife[k] = 1;
     }
+    // (spray off a wall: the white of it as well as the drops)
+    if (up && spray) spray.burst(at.x + up.x * 0.3, Math.max(at.y, 0), at.z + up.z * 0.3, Math.min(1, size * 0.45), up.x, up.z, 0.7);
   }
+  // spray where the sea breaks on the rock armour (rockSpray.js); made once the place is built
+  let spray = null; const sprayLight = new THREE.Color(), tmpSprayC = new THREE.Color();
   const ripples = [];
   // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
   // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)
@@ -734,6 +739,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (dropPos[k * 3 + 1] < -0.05) dropLife[k] = 0;
     }
     dropGeo.attributes.position.needsUpdate = true;
+    if (!spray && env.rockEdge) spray = createRockSpray(scene, env.rockEdge);
+    if (spray) {
+      const ws = env.waveState(), sea = { ...ws, kind }, L2 = env.light;
+      // (white water in the day's light, as bright as a white surface in it: the scene's own units, so it holds its
+      // own against sunlit sand behind it, and goes grey at dusk and dark at night with everything else)
+      if (L2) sprayLight.setRGB(...L2.skyColour).multiplyScalar(L2.skyIntensity * 0.34).add(tmpSprayC.copy(env.sun.color).multiplyScalar(L2.sunIntensity * 0.26)); else sprayLight.setRGB(1, 1, 1);
+      spray.update(t, dt || 0, sea, (x, z) => waveHeight(x, z, t, sea), sprayLight, renderer.domElement.height / renderer.getPixelRatio(), camera.fov);
+    }
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera); simT = t;
     adapt();
@@ -935,6 +948,6 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     /** the screen position (0..1) of a world point, or null when behind the camera */
     project(p) { const v = p.clone().project(camera); return v.z > 1 ? null : { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; },
     snapshot() { drawFrame(); return canvas.toDataURL("image/jpeg", 0.9); },
-    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
+    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); spray?.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
   };
 }

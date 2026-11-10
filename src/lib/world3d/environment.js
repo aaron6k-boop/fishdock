@@ -812,6 +812,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     /** The conditions as shown right now (eased) and their light (skyLook.js lightingFor). */
     get current() { return cur ? { day: cur.day, dusk: cur.dusk, night: cur.night, cloud: cur.cloud, rain: cur.rain, moonLight: cur.moonLight } : null; },
     get light() { return look; },
+    /** where the sea breaks on the rock armour: [x, z, ox, oz] (rockSpray.js) */
+    get rockEdge() { return real?.rockEdge || null; },
     floorAt: (x, z) => floorAt(x, z),
     ground,
     /** The waves as the water shows them right now (eased), so floats and fish ride the same sea. */

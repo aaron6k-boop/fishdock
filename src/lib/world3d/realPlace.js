@@ -324,7 +324,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     }
   }
   // ---- rock armour (localDetail.js rocks): dark granite boulders heaped in the water along the foot of a sea wall ----
-  if (local?.rocks) buildRocks(group, cls, xs, n, local.rocks, quality);
+  if (local?.rocks) place.rockEdge = buildRocks(group, cls, xs, n, local.rocks, quality); // (rockEdge: where the sea breaks on them, rockSpray.js)
   const X = new Float32Array(n * n), Z = new Float32Array(n * n), wet = new Float32Array(n * n); const faceA = new Float32Array(n * n);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; X[k] = xs[i]; Z[k] = xs[j]; }
   // the town's rising ground (localDetail.js hill): built-up land and grass climb with it; the grassy face of the slope
@@ -435,9 +435,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   if (rufMap) {
     softMat.onBeforeCompile = (sh) => {
       sh.uniforms.uRuf = { value: rufMap }; sh.uniforms.uRufN = { value: rufNor }; sh.uniforms.uTurf = { value: turfT.map }; sh.uniforms.uTurfN = { value: turfT.normalMap };
-      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; varying float vRuf; varying float vFace; varying float vGrass; varying vec2 vRufUv;")
-        .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vRufUv = uv * 1.33;");
-      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D uRuf, uRufN, uTurf, uTurfN; varying float vRuf; varying float vFace; varying float vGrass; varying vec2 vRufUv;")
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; varying float vRuf; varying float vFace; varying float vGrass; varying vec2 vRufUv; varying vec3 vWPos;")
+        .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz;");
+      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+          uniform sampler2D uRuf, uRufN, uTurf, uTurfN; varying float vRuf; varying float vFace; varying float vGrass; varying vec2 vRufUv; varying vec3 vWPos;
+          float fdDuneH = 0.0;
+          float fdDH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+          float fdDN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fdDH(i), fdDH(i + vec2(1.0, 0.0)), f.x), mix(fdDH(i + vec2(0.0, 1.0)), fdDH(i + vec2(1.0, 1.0)), f.x), f.y); }
+          float fdDF(vec2 p) { float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++) { s += a * fdDN(p); p = p * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }`)
         .replace("#include <color_fragment>", `#include <color_fragment>
           if (vGrass > 0.01) {
             // turf at two scales (2 m and about 7 m) so the blades don't repeat visibly across a lawn; the tint is the ground's
@@ -457,35 +462,52 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             // (its stones' light and dark softened: at full contrast the sand read as a heap of pebbles)
             vec3 tinted = vColor.rgb * clamp(pow(lum / 0.06, 0.55), 0.45, 1.7) + (ph - lum) * 0.12;
             if (vFace >= 0.0) {
-              // the dune: marram and scrub where the photograph has growth (its green against its red and blue), clump
-              // by clump at the pixel, thick along the top and thinning to a few clumps on the steep bare face, broken
-              // into bigger drifts by the second, coarser sample so it isn't an even stipple
-              // (the clumps are metres across, from a coarse sample of the photograph (a 40 m tile), their edges from a
-              // finer one; the pebble-sized detail is kept out of this, which from 100 m away read as an even stipple)
-              vec3 r3 = texture2D(uRuf, vRufUv * 0.15 + 0.57).rgb;
-              float nearK = 1.0 - smoothstep(25.0, 90.0, length(vViewPosition));
-              float veg3 = smoothstep(0.52, 0.78, r3.g / (r3.r + r3.b + 1e-3)), veg2 = smoothstep(0.5, 0.8, r2.g / (r2.r + r2.b + 1e-3));
-              // (about two thirds of the crest grown over, in drifts metres across with pale sand between, as the
-              // photograph from the pier head shows; the bare face below nearly all sand)
-              float want = mix(0.7, 0.08, vFace); // how much of it is grown over
-              float cover = smoothstep(1.0 - want - 0.12, 1.0 - want + 0.18, veg3 * 0.9 + veg2 * 0.25 + 0.1);
-              // (the sand itself: the photograph's fine relief only close to, a smooth pale sand further off)
-              tinted = mix(vColor.rgb * clamp(pow(lum / 0.06, 0.2), 0.8, 1.25), tinted, nearK);
-              // the growth's own colour from the photograph: a dark brown-olive, a little greyer where it's thin
-              vec3 g0 = mix(r3, r2, 0.35 + nearK * 0.3), growth = mix(g0, vec3(dot(g0, vec3(0.3, 0.55, 0.15))), 0.3) * 1.9 * vec3(1.0, 0.95, 0.62);
-              growth = mix(growth, vec3(0.1, 0.088, 0.036), 0.35);
-              tinted = mix(tinted, growth, cover * 0.92);
-              // the sand between pales and dries on the top, and holds a darker damp band low on the face
-              tinted *= mix(1.0, 1.1, (1.0 - vFace) * (1.0 - cover));
+              // the dune, drawn from where each point is on the ground (not from the tiled photograph, whose pebbles
+              // read from the pier as an even yellow stipple): pale sand; marram grass in drifts metres across, straw
+              // where it has dried and grey-green where it hasn't, thick along the top and thinning to a few clumps
+              // on the steep bare face; darker patches of low scrub; the sand slumped in runs down the face. Each
+              // layer fades out before it gets smaller than a pixel, so the far dune is smooth, not noisy.
+              // (how a marram dune looks in general, and the bare face under a grown-over top that the pier-head
+              // photograph shows; the clumps are not surveyed one by one)
+              vec2 wp = vWPos.xz; float dist = length(vViewPosition);
+              float nearK = 1.0 - smoothstep(25.0, 90.0, dist), midK = 1.0 - smoothstep(120.0, 320.0, dist);
+              float drift = fdDF(wp / 13.0), clump = fdDF(wp / 3.4 + 31.0), tuft = fdDN(wp * 2.3 + 7.0);
+              float field = drift * 0.62 + clump * 0.44 * (0.35 + 0.65 * midK) + (tuft - 0.5) * 0.16 * nearK;
+              float th = mix(0.385, 0.64, vFace);
+              float cover = smoothstep(th - 0.035, th + 0.045, field);
+              // sand: pale and warm, a little greyer and brighter on the wind-dried top, with slow changes of tone,
+              // the photograph's fine relief close to, and darker runs where it has slipped down the face
+              vec3 sand = mix(vec3(0.47, 0.37, 0.23), vec3(0.56, 0.47, 0.32), fdDN(wp / 7.0 + 3.0)) * mix(0.92, 1.06, 1.0 - vFace);
+              sand *= mix(1.0, clamp(pow(lum / 0.06, 0.22), 0.8, 1.22), 1.0 - smoothstep(8.0, 28.0, dist));
+              float run = fdDN(vec2(wp.x * 0.55, vWPos.y * 0.22 + wp.y * 0.03));
+              sand *= mix(1.0, 0.8 + 0.34 * run, vFace * 0.8);
+              // (the shade at the foot of a clump: the sand darker just outside its edge)
+              sand *= 1.0 - 0.22 * smoothstep(th - 0.13, th, field) * (1.0 - cover);
+              // marram: straw and grey-green mixed in drifts, streaked finely close to; low scrub darker and greener
+              float dry = smoothstep(0.34, 0.62, fdDF(wp / 8.0 + 70.0));
+              vec3 marram = mix(vec3(0.115, 0.15, 0.062), vec3(0.34, 0.3, 0.145), dry);
+              marram *= 0.78 + 0.44 * mix(0.5, fdDN(wp * vec2(5.0, 1.6) + 11.0), nearK) + 0.25 * (clump - 0.47) * midK;
+              float scrubK = smoothstep(0.56, 0.66, fdDF(wp / 19.0 + 5.0)) * (1.0 - vFace);
+              vec3 growth = mix(marram, vec3(0.04, 0.052, 0.027) * (0.8 + 0.6 * clump), scrubK * 0.85);
+              // (thicker growth is darker inside: the stems shade each other)
+              growth *= mix(1.0, 0.8, smoothstep(th + 0.03, th + 0.2, field));
+              tinted = mix(sand, growth, cover * 0.96);
+              fdDuneH = cover * 0.5 + field * 0.25;
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
         .replace("#include <normal_fragment_maps>", `vec3 fdFlatN = normal;
           #include <normal_fragment_maps>
           if (vGrass > 0.01) { vec3 gn = texture2D(uTurfN, vRufUv * 4.0).xyz * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
-          if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; float nk = vFace >= 0.0 ? 1.0 - smoothstep(25.0, 90.0, length(vViewPosition)) : 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf * nk)); }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
+          if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; float nk = vFace >= 0.0 ? 1.0 - smoothstep(10.0, 35.0, length(vViewPosition)) : 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf * nk * (vFace >= 0.0 ? 0.3 : 1.0))); }
+          if (vFace >= 0.0 && fdDuneH > 0.0) {
+            // the clumps stand up from the sand: the light catches their sunward side (their height's slope across the screen)
+            vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition); vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx); float det = dot(dpx, r1);
+            vec3 grad = sign(det) * (dFdx(fdDuneH) * r1 + dFdy(fdDuneH) * r2);
+            normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
+          }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf9";
+    softMat.customProgramCacheKey = () => "fdruf10";
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
@@ -1020,7 +1042,7 @@ function buildRocks(group, cls, xs, n, area, quality) {
     for (const [ii, jj] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; const q = jj * n + ii; if (src[q] < 0) { src[q] = src[k]; queue.push(q); } }
   }
   let seed = 1234567; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const spots = [];
+  const spots = [], edge = [];
   for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
     const k = j * n + i; if (cls[k] !== 0 || src[k] < 0) continue;
     const x0 = xs[i], z0 = xs[j], cw = xs[i + 1] - x0, ch = xs[j + 1] - z0; if (cw > 8 || !area(x0, z0)) continue;
@@ -1030,9 +1052,11 @@ function buildRocks(group, cls, xs, n, area, quality) {
       const x = x0 + rnd() * cw, z = z0 + rnd() * ch, d = Math.hypot(x - lx, z - lz); if (d > 7 + rnd() * 2) continue;
       const t = Math.min(1, d / 8), size = 1.0 + rnd() * 1.2;
       spots.push([x, 3.0 * (1 - t * t) - 0.7 + rnd() * 0.5 - size * 0.15, z, size]);
+      // (the seaward fringe, where a crest breaks: a stone 4.5 m and more out from the wall that still shows above the water)
+      if (d > 4.5 && d < 7.5) { const l = d || 1; edge.push([x, z, (x - lx) / l, (z - lz) / l]); }
     }
   }
-  if (!spots.length) return;
+  if (!spots.length) return [];
   // four boulder shapes: a ball pushed about at two scales, then split flat on a few planes, as quarried armour stone
   // is (angular blocks with broken faces, never round pebbles). Each face gets its own projection of the photographed-
   // style granite (made in source-assets/make_granite.py) at about 1.4 m a tile, so nothing stretches
@@ -1078,6 +1102,7 @@ function buildRocks(group, cls, xs, n, area, quality) {
     });
     mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
   });
+  return edge;
 }
 
 function buildFences(group, timber, bars, dTex, wet) {
