@@ -155,6 +155,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // ---- splashes (droplets) and rings on the water ----
   // (rockSpray.js: a crown of drops, a few up the middle and a puff of white, in the light of the hour. They used to
   // be 260 round white dots of one size, 9 cm across, thrown out in a fan and as bright at midnight as at noon)
+  let tipMode = "auto";
   const tipLights = createTipLights(scene), torch = createHeadTorch(scene, camera), tipList = [];
   const spray = createRockSpray(scene, []), sprayLight = new THREE.Color(1, 1, 1), tmpSprayC = new THREE.Color(); let sprayEdge = false;
   /** at: world point; size: how big (a rig .6, a landed fish .9); mult: how many more drops (spray off a wall, seen from further off); up: a direction to throw them (spray goes up and back over the wall, not out in a ring) */
@@ -644,6 +645,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // (single: one frame of that length, as a slow phone would draw it, rather than split into short steps)
       /** (checks) a splash at a point on the water */
       torch(c) { torch.set(c); },
+      /** The shader programs in use, by kind (for finding out why there are so many). */
+      get programs() { const by = {}; for (const p of renderer.info.programs || []) { const k = `${p.name}|${(p.cacheKey || "").length}`; (by[p.name] ||= { n: 0, used: 0, keys: new Set() }).n++; by[p.name].used += p.usedTimes; by[p.name].keys.add(p.cacheKey); void k; } return Object.entries(by).map(([name, v]) => ({ name, n: v.n, used: v.used })).sort((a, b) => b.n - a.n); },
+      programKeys(name) { return (renderer.info.programs || []).filter((p) => p.name === name).map((p) => p.cacheKey); },
       splash(x, z, size = 0.6, mult = 1) { const y = waveHeight(x, z, film ? film.t : 0, { ...env.waveState(), kind }); splash(new THREE.Vector3(x, y, z), size, mult); ripple(new THREE.Vector3(x, y, z), Math.min(1, size)); },
       step(ms, single = false) { if (!film) return; const n = single ? 1 : Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
       get mode() { return mode; },
@@ -745,7 +749,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
-      tipLights.update(tipList, dark, t); torch.update(dark, dt || 0.016); setHandsDim(1 - 0.5 * (c.night ?? 0) * (torch.colour === "off" ? 1 : 0.4)); }
+      tipLights.update(tipList, dark, t, tipMode); torch.update(dark, dt || 0.016); setHandsDim(1 - 0.5 * (c.night ?? 0) * (torch.colour === "off" ? 1 : 0.4)); }
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera); simT = t;
     adapt();
@@ -927,6 +931,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (pose?.spotAt) { const x = anglers.get(id); remote.delete(id); if (x) { x.a.setWalk(null); x.a.place({ ...x.a.spot, at: pose.at, face: pose.face, edge: pose.edge, cast: pose.cast }); } return; }
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },
+    /** The rod-tip lights: "auto" (green in the dark), "on" or "off". */
+    setTipLight(m) { tipMode = m === "on" || m === "off" ? m : "auto"; },
     /** Your head torch: "off", "white", "red" or "green". */
     setTorch(c) { torch.set(c); },
     get torch() { return torch.colour; },
