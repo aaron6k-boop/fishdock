@@ -227,15 +227,15 @@ function PartyLive({ code, mkey }) {
   // ---- inviting: the host shares the private link; anyone else, while the host lets the short code be used, a link
   // with the code in it (the same as telling a friend the code). Both open straight into this party ----
   const inviteLink = link || (party.codeOn && !party.locked ? codeLink(code) : null);
-  const inviteText = `Come and fish with me on FishDock${party.place?.label ? ` at ${party.place.label}` : ""}. Tap the link, or type the code ${code} in Fish Together.`;
+  const inviteText = `Come and fish with me on FishDock${party.place?.label ? ` at ${party.place.label}` : ""}. Tap the link, or type the PIN ${code} in Fish Together.`;
   async function invite() {
     if (!inviteLink) { setSheet("invite"); return; }
     if (navigator.share) {
       try { await navigator.share({ title: "Fish with me on FishDock", text: inviteText, url: inviteLink }); return; }
       catch (e) { if (e?.name === "AbortError") return; } // closed the share sheet: nothing more to do
     }
-    try { await navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); toast(`Invite link copied. Or tell them the code: ${code}`, "join"); }
-    catch { toast(`Tell them the code: ${code}`, "join"); }
+    try { await navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); toast(`Invite link copied. Or tell them the PIN: ${code}`, "join"); }
+    catch { toast(`Tell them the PIN: ${code}`, "join"); }
     setSheet("invite");
   }
   const tab = sheet || "people"; // on a wide screen the panel is always there, open at People
@@ -253,12 +253,13 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D onWindIn={mode === "virtual" ? vf.windIn : undefined} menu={[{ key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "people", label: "People, chat and catches", icon: "users", onClick: () => setSheet("people") }]} feel={haptics.feel} fight={mode === "virtual" ? vf.fight : null} reelOpts={mode === "virtual" ? vf.opts : null} onReelOpts={vf.setOpts} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D onWindIn={mode === "virtual" ? vf.windIn : undefined} onReel={mode === "virtual" ? { tap: vf.tap, hold: vf.hold } : null} menu={[{ key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "people", label: "People, chat and catches", icon: "users", onClick: () => setSheet("people") }]} feel={haptics.feel} fight={mode === "virtual" ? vf.fight : null} reelOpts={mode === "virtual" ? vf.opts : null} onReelOpts={vf.setOpts} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>
             {mode === "real" && party.place?.label ? <span className="fs-chip">{party.place.label}</span> : null}
             <button type="button" className="fs-chip" onClick={() => setSheet("people")}><Icon name="users" />{P.members.filter((m) => m.spot).length}{P.members.some((m) => !m.spot) ? ` + ${P.members.filter((m) => !m.spot).length} watching` : ""}</button>
+            {party.codeOn && !party.locked ? <button type="button" className="fs-chip fs-pin" onClick={() => { navigator.clipboard?.writeText(code).then(() => toast(`PIN ${code} copied. Friends tap Fish Together, then Join with a PIN.`, "join"), () => toast(`Tell them the PIN: ${code}`, "join")); }} aria-label={`Party PIN ${code.split("").join(" ")}: copy`} title="Friends join with this PIN">PIN <b className="num">{code}</b></button> : null}
             {P.status === "reconnecting" ? <span className="fs-chip">Reconnecting…</span> : null}
             <span className="grow" />
             <button type="button" className="fs-chip invite-btn" onClick={invite} aria-label="Invite a friend"><Icon name="share" />Invite a friend</button>
@@ -355,24 +356,24 @@ function PartyLive({ code, mkey }) {
             {inviteLink ? (
               <>
                 <div className="invite-code-box">
-                  <span className="lbl">{party.codeOn && !party.locked ? "Join code" : "Party code"}</span>
-                  <b className="invite-code" aria-label={`Code ${code.split("").join(" ")}`}>{code.slice(0, 3)} {code.slice(3)}</b>
-                  <span className="tiny">{party.locked ? "The party is locked: nobody new can join until the host unlocks it." : party.codeOn ? "They can tap the link, or open FishDock, tap Fish Together, then Join with an invite code." : "The code is turned off: only the link works."}</span>
+                  <span className="lbl">{party.codeOn && !party.locked ? "Join PIN" : "Party PIN"}</span>
+                  <b className="invite-code" aria-label={`Code ${code.split("").join(" ")}`}>{code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code}</b>
+                  <span className="tiny">{party.locked ? "The party is locked: nobody new can join until the host unlocks it." : party.codeOn ? "They can tap the link, or open FishDock, tap Fish Together, then Join with a PIN." : "The PIN is turned off: only the link works."}</span>
                 </div>
                 <div className="row">
                   <button type="button" className="btn small primary" onClick={invite}><Icon name="share" />{navigator.share ? "Invite a friend" : copied ? "Link copied" : "Copy invite link"}</button>
                   {navigator.share ? <button type="button" className="btn small" onClick={async () => { try { await navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ } }}><Icon name={copied ? "check" : "copy"} />{copied ? "Copied" : "Copy link"}</button> : null}
                 </div>
                 <div className="qr" aria-label="QR code for the invite link" dangerouslySetInnerHTML={{ __html: qrSvg(inviteLink) || "" }} />
-                <p className="tiny">Private: only people with this link{party.codeOn ? " or the code" : ""} can join, and they arrive here, at {party.place?.label || "this place"}. Don't post it publicly.{host ? " You can make a new link in Host if it gets passed on." : ""}</p>
+                <p className="tiny">Private: only people with this link{party.codeOn ? " or the PIN" : ""} can join, and they arrive here, at {party.place?.label || "this place"}. Don't post it publicly.{host ? " You can make a new link in Host if it gets passed on." : ""}</p>
               </>
-            ) : <p className="small">{party.locked ? "The host has locked this party, so nobody new can join just now." : "Ask the host for the invitation: they've turned the short code off, so only their link works."}</p>}
+            ) : <p className="small">{party.locked ? "The host has locked this party, so nobody new can join just now." : "Ask the host for the invitation: they've turned the PIN off, so only their link works."}</p>}
           </section>
         ) : null}
 
         {tab === "host" && host ? (
           <section className="watch-sec host-ctl">
-            {[["locked", "Lock the party (no one new can join)"], ["codeOn", "Let people join with the short code"], ["anglersOn", "Let new people join as anglers"], ["chatOn", "Text chat"], ["voiceOn", "Voice chat"]].map(([k, l]) => <label key={k} className="check"><input type="checkbox" checked={!!party[k]} onChange={(e) => P.send({ t: "settings", [k]: e.target.checked })} /> {l}</label>)}
+            {[["locked", "Lock the party (no one new can join)"], ["codeOn", "Let people join with the PIN"], ["anglersOn", "Let new people join as anglers"], ["chatOn", "Text chat"], ["voiceOn", "Voice chat"]].map(([k, l]) => <label key={k} className="check"><input type="checkbox" checked={!!party[k]} onChange={(e) => P.send({ t: "settings", [k]: e.target.checked })} /> {l}</label>)}
             {mode === "virtual" ? <div className="field"><span className="lbl">Time of day</span><div className="moments">{LIGHTS.map(([k, l]) => <button key={k} type="button" className={`chip${(party.light || "midday") === k ? " on" : ""}`} onClick={() => P.send({ t: "settings", light: k })}>{l}</button>)}</div></div> : null}
             <button type="button" className="btn small" onClick={() => { P.send({ t: "newLink" }); toast("New link made. The old one no longer works."); }}>Make a new invite link</button>
             <div className="field"><span className="lbl">Friendly challenge</span><div className="moments">

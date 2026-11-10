@@ -29,12 +29,12 @@ export default function Together() {
   }
   async function byCode() {
     const c = cleanCode(code);
-    if (!CODE_RE.test(c)) { setMsg("A party code is six letters and numbers."); return; }
+    if (!CODE_RE.test(c)) { setMsg("A party PIN is four digits."); return; }
     setBusy(true); setMsg("");
     try { await previewParty(c, { viaCode: true }); go(`#party/${c}/code`); } catch (e) { setMsg(e.message); } finally { setBusy(false); }
   }
   function openLink() {
-    const m = link.match(/#party\/([A-Z0-9]{6})\/([A-Za-z0-9_-]{8,40})/);
+    const m = link.match(/#party\/([0-9]{4}|[A-Z0-9]{6})\/([A-Za-z0-9_-]{8,40})/);
     if (!m) { setMsg("That doesn't look like a FishDock party link. It should contain #party/ and a code."); return; }
     go(`#party/${m[1]}/${m[2]}`);
   }
@@ -76,12 +76,12 @@ export default function Together() {
             <button type="button" className="btn block" onClick={openLink}>Open</button>
           </section>
         ) : null}
-        {card("code", "lock", "Join with an invite code", "Six letters and numbers from the host")}
+        {card("code", "lock", "Join with a PIN", "The four digits the host can see")}
         {panel === "code" ? (
           <section className="tg-form">
-            <label className="field"><span className="lbl">Invite code</span><input className="tg-code" value={code} onChange={(e) => { const v = e.target.value, m = v.match(/#party\/([A-Za-z0-9]{6})\/([A-Za-z0-9_-]{4,40})/); if (m) go(`#party/${m[1].toUpperCase()}/${m[2]}`); else setCode(cleanCode(v.replace(/^.*#party\//, ""))); }} inputMode="text" autoCapitalize="characters" autoComplete="off" placeholder="ABC234" maxLength={6} /></label>
-            <span className="tiny">The host sees it under Invite a friend. Pasting their whole link works too.</span>
-            <button type="button" className="btn primary block" disabled={busy || code.length !== 6} onClick={byCode}>{busy ? "Checking…" : "Find the party"}</button>
+            <label className="field"><span className="lbl">Party PIN</span><input className="tg-code" value={code} onChange={(e) => { const v = e.target.value, m = v.match(/#party\/([0-9]{4}|[A-Za-z0-9]{6})\/([A-Za-z0-9_-]{4,40})/); if (m) go(`#party/${m[1].toUpperCase()}/${m[2]}`); else setCode(cleanCode(v.replace(/^.*#party\//, ""))); }} inputMode="numeric" autoCapitalize="characters" autoComplete="off" placeholder="1234" maxLength={6} onKeyDown={(e) => { if (e.key === "Enter" && CODE_RE.test(code)) byCode(); }} /></label>
+            <span className="tiny">The host sees it in the top corner of their screen. Pasting their whole link works too.</span>
+            <button type="button" className="btn primary block" disabled={busy || !CODE_RE.test(code)} onClick={byCode}>{busy ? "Checking…" : "Find the party"}</button>
           </section>
         ) : null}
         {mine.length ? card("mine", "clock", "Continue a party", `${mine.length} on this phone`) : null}

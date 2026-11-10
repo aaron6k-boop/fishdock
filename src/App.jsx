@@ -75,7 +75,7 @@ const tryRoute = () => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+
 // Fish Together: #together (start, join, continue) and a party, #party/<code>/<secret> (or /code, or just the code to
 // come back to one this phone has joined).
 const togetherRoute = () => /^#\/?together$/.test(location.hash);
-const partyRoute = () => { const m = location.hash.match(/^#\/?party\/([A-Z0-9]{6})(?:\/([A-Za-z0-9_-]{4,40}))?$/); return m ? { code: m[1], secret: m[2] || null } : null; };
+const partyRoute = () => { const m = location.hash.match(/^#\/?party\/([0-9]{4}|[A-Z0-9]{6})(?:\/([A-Za-z0-9_-]{4,40}))?$/); return m ? { code: m[1], secret: m[2] || null } : null; };
 export default function Root() {
   const [tg, setTg] = useState(togetherRoute), [party, setParty] = useState(partyRoute);
   useEffect(() => { const on = () => { setTg(togetherRoute()); setParty((p) => { const n = partyRoute(); return n && p && n.code === p.code ? p : n; }); }; addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);

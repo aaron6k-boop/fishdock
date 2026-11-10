@@ -191,7 +191,7 @@ photographer (CC BY-SA 4.0) and labelled as not a live camera. A switch goes bac
 
 `server/party.js`, `worker/party-do.js`, `src/lib/party.js`, `src/pages/Together.jsx`, `src/pages/Party.jsx`.
 
-- A party is one Cloudflare Durable Object (SQLite-backed, hibernating WebSockets) named by its six-character code.
+- A party is one Cloudflare Durable Object (SQLite-backed, hibernating WebSockets) named by its code: a four-digit PIN while FishDock is being tested (`PARTY.pin` in `server/party.js`; six letters and numbers when that is turned off). A PIN can be guessed, so wrong guesses are limited to 20 an hour per network, the host can turn joining by PIN off, and a PIN is only given out again once its party has ended.
   Up to four anglers at the place's four spots, plus spectators (twelve people in all). Only events travel: casts,
   bites, fish on, catches, reactions, chat and the voice set-up. Each phone animates them.
 - Two kinds, never mixed: virtual (the simulation; the server marks every catch simulated and enforces the order:
@@ -206,7 +206,7 @@ photographer (CC BY-SA 4.0) and labelled as not a live camera. A switch goes bac
 - Reconnecting: the phone reconnects by itself (and when the screen comes back on), gets everything it missed, and
   sends events queued while offline once each (the server drops repeats by their ids). Spots are kept ten minutes.
 - Inviting: an Invite a friend button on the fishing screen opens the phone's share sheet (or copies the link) and
-  shows the six-character code big enough to read out. The host shares the private link; anyone else, while the host
+  shows the PIN big enough to read out, and it stays in the top bar of the party screen (tap to copy) while joining by PIN is on. The host shares the private link; anyone else, while the host
   allows the code, shares `#party/<code>/code`, which is the same as telling a friend the code. Both open the join
   screen of that party, at its place. The code box on Fish Together also takes a pasted link.
 - Joining and leaving: the server adds a line to the chat when someone joins, leaves or is removed (`sys`: joined,

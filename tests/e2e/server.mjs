@@ -109,7 +109,7 @@ const server = createServer(async (req, res) => {
 });
 // Fish Together's live connections: the same checks as the Worker (same origin, a member's key), then the party
 server.on("upgrade", async (req, socket) => {
-  const url = new URL(req.url, `http://localhost:${port}`), m = url.pathname.match(/^\/api\/party\/([A-Z0-9]{6})\/ws$/);
+  const url = new URL(req.url, `http://localhost:${port}`), m = url.pathname.match(/^\/api\/party\/([0-9]{4}|[A-Z0-9]{6})\/ws$/);
   const origin = req.headers.origin ? new URL(req.headers.origin).host : "";
   if (!m || origin !== req.headers.host) { socket.end("HTTP/1.1 403 Forbidden\r\n\r\n"); return; }
   const ws = acceptWebSocket(req, socket);
