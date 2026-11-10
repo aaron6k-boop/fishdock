@@ -342,6 +342,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           float fd = 1. - smoothstep(25., 220., dist);
           float fk = 1. - uFft*.85; // (the spectrum sea has the chop itself: just a little of the finest ripple on top)
           g += (m1.xy*(.10 + .2*uWind)*fd*fk + m2.xy*(.06 + .14*uWind)*(1. - smoothstep(10., 90., dist))*(1. - uFft*.5))*gust;
+          // (and close to you, the smallest ripples: the hand-width wrinkles the wind raises on top of everything else,
+          // which are most of what water looks like from a pier three metres above it. Without them the sea at your
+          // feet was a smooth sheet with broad soft shapes on it. One more look-up, gone by 30 m, where they would be
+          // smaller than a pixel; in patches with the gusts, and all but still in a calm)
+          vec3 m3 = texture2D(uNrm, mat2(.3, .954, -.954, .3)*p*.85 + fl2*4. + vec2(uTime*.045, -uTime*.03)).xyz*2. - 1.;
+          g += m3.xy*(.14 + .55*uWind)*(1. - smoothstep(6., 30., dist))*gust;
         } else {
           vec3 r1 = noised(mat2(.8, -.6, .6, .8)*p*vec2(1.9, 2.6) + flow);
           // (softer, and gone sooner with distance: at full strength out to 220 m it laid one even grain over the whole sea,

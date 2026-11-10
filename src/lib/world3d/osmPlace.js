@@ -185,8 +185,8 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
       if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.roads.push({ line: ring, w: t.highway === "cycleway" ? 3 : 2, kind: "path" });
     }
     // garden walls, fences and hedges between the plots (the town's texture between its streets)
-    else if (/^(wall|fence|hedge|retaining_wall)$/.test(t.barrier || "") && !t.building) {
-      const hTag = parseFloat(t.height), kind = t.barrier === "retaining_wall" ? "wall" : t.barrier;
+    else if (/^(wall|fence|hedge)$/.test(t.barrier || "") && !t.building /* (not retaining walls: they hold ground back, and stood up as a garden wall one ran along the quay's edge on top of the piling) */) {
+      const hTag = parseFloat(t.height), kind = t.barrier;
       if (ring.some(([x, z]) => Math.abs(x) < box * 0.8 && Math.abs(z) < box * 0.8)) out.barriers.push({ line: isClosed ? ring : ring, kind, h: Number.isFinite(hTag) && hTag > 0.3 && hTag < 4 ? hTag : kind === "hedge" ? 1.5 : kind === "fence" ? 1.3 : 1.4 });
     }
     // car parks: tarmac with bays

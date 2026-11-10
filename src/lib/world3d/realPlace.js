@@ -573,7 +573,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           box(len + 0.02, top - y0, 0.035, 0.08, parts.fence, [len / 1.8, (top - y0) / 1.8]);
           for (let q = 0; q <= len; q += 1.8) { const f = q / len, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f; const g2 = new THREE.BoxGeometry(0.1, top - y0 + 0.08, 0.1); g2.translate(0, (top - y0 + 0.08) / 2, 0); g2.translate(px, y0 - 0.02, pz); parts.post.push(g2); }
         } else { // a brick wall with a coping on top
-          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, [len / 2, (top - y0) / 2]);
+          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, [len / 0.9, (top - y0) / 0.6]); // (the brick tile is four bricks by eight courses: 0.9 m by 0.6 m. At 2 m a tile the bricks were half a metre long)
           box(len + 0.07, 0.07, 0.3, top - y0 - 0.06, parts.coping);
         }
       }

@@ -1346,9 +1346,19 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // holds the rope that far along, towards the hoop, and the rope carries the net: holding the rim itself drew arms
       // up to two metres long, a sleeve across half the screen, as on the 8 November recording)
       const E = fpEye(), sh = V3(E.x + (hh === hands[1] ? 0.2 : -0.2), E.y - 0.16, E.z + 0.24), toH = at.clone().sub(sh), reach = 0.62; // (the shoulder where fpHands.js draws it)
-      if (toH.length() > reach) at.copy(sh).addScaledVector(toH.normalize(), reach);
+      if (toH.length() > reach) {
+        // (and both hands on the one rope, one below the other, in front of you: each reaching towards its own side of
+        // the rim left two open hands in the air at the edges of the picture and the rope hanging between them from
+        // nothing)
+        const top = c.clone().add(V3(0, 0.72 * net.scale.x, 0)), mid = V3(E.x - 0.08, E.y - 0.3, E.z - 0.34), rd2 = top.clone().sub(mid).normalize();
+        at.copy(mid).addScaledVector(rd2, hh === hands[1] ? 0.17 : 0);
+        const X = rd2.clone(), Y = V3(0, 0, 1).addScaledVector(rd2, -rd2.z).normalize();
+        hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, X.clone().cross(Y))) };
+        continue;
+      }
       hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
     }
+    if (fp && ropeHeld === false && hands.some((h) => h?.kind === "rope")) { handsNow = hands.map((h, i) => (h ? h.at.clone() : handsNow[i])); ropeHeld = true; } // (the rope runs to where the hands were just put)
     // first person: your hands (fpHands.js) take hold of the same things, placed from the same eye and view as the rod
     if (fp && fpv) {
       const vw = fpView || viewVecs();
