@@ -50,3 +50,21 @@ own address, so do the same there.
   something else was in the scene (a walker, a boat) and the run is still fine but not identical.
 - A run whose 1% low is far below its mean had stutters: shader compiles (the first run after opening), another
   program, or a thermal step. Run it again before drawing conclusions.
+
+## Counts that need no graphics card (10 November 2026)
+
+Triangles and draw calls per frame are the renderer's own counts, the same on any machine, so they can be compared
+without a PC to hand. Measured on High, 900 by 600, at Gorleston, same scene and view in both builds:
+
+    view                                   | before (5f41e05) | after
+    looking along the rail, rod in hand    | 3,874,701 tris   | 1,913,235 tris
+    fish on, looking out over the rod      | 3,126,371 tris   | 1,415,577 tris
+
+Draw calls were 402 and 344 before, 389 and 339 after. What changed: railing posts far from you carry simple
+fittings (about 170 triangles a post instead of 1,424) with no shadow of their own; breakwater stones too far away
+for their shadow to land in the shadow map are not drawn into it; the sea, the far stones and the far fittings are
+left out of the ambient occlusion pass and the fittings out of the water's mirror; the first-person skin is no
+longer subdivided on loading (13,584 triangles instead of 54,336).
+
+These are counts, not frame rates. How much faster a frame is depends on the graphics card: run the benchmark above
+on production and on the preview to see it.

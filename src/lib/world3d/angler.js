@@ -1254,8 +1254,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (keptPose.lift) {
         // (one hand under it behind the head, cupped round the belly; the other closed round the wrist of its tail, as
         // anyone holds a fish to look at it: two flat palms under it read as a tray)
-        const wrist = toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.86));
-        hands[0] = { at: under(0.3), axis: d, palm: upL, kind: "fish" }; hands[1] = { at: wrist, axis: d, palm: upL, kind: "tailwrist", R: Math.max(0.008, halfDepth() * 0.32) }; }
+        const wrist = toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * (fishLen < 0.45 ? 0.9 : 0.86)));
+        hands[0] = { at: under(fishLen < 0.45 ? 0.24 : 0.3), axis: d, palm: upL, kind: "fish" };
+        // (a small fish lies across two cupped hands: its tail's wrist is thinner than a finger, and a hand closed round
+        // that stood open beside it like a claw. A bigger one is held by the wrist of the tail, as before)
+        if (fishLen < 0.45) hands[1] = { at: under(0.78), axis: d, palm: upL, kind: "fish" };
+        else hands[1] = { at: wrist, axis: d, palm: upL, kind: "tailwrist", R: Math.max(0.008, halfDepth() * 0.32) }; }
       else { hands[1] = { at: toLocal(keptPose.centre).add(V3(0.02, halfThick() + 0.02, 0.03)), axis: d, palm: V3(0, -1, 0), kind: "fish" }; hands[0] = null; }
       lookAtW = keptPose.centre.clone(); kneel = 1; crouch = 0.6; lean = keptPose.lift ? 0.06 : 0.42; brace = 0; // (upright while holding it out, so your head stays clear of it)
       // the shoulders turned towards it (it's off to one side lifting it from the net, in front on the mat), and bent

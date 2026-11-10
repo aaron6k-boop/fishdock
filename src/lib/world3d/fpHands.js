@@ -231,7 +231,9 @@ function curvature(geo) {
   return out;
 }
 
-function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
+// a model with fewer points than this is coarse: its fingers are a few flat sides each and are subdivided once on loading
+const DENSE_POINTS = 6000;
+function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
   const root = cloneSkinned(scene); root.updateMatrixWorld(true);
   const bone = (n) => root.getObjectByName(n);
   const wp = (o) => o.getWorldPosition(V()), wq = (o) => o.getWorldQuaternion(new THREE.Quaternion());
@@ -254,7 +256,11 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
     // (one step of subdivision: the model's fingers had a few flat sides each, which read as blocks this close)
     // (and a second step on High and Ultra: the knuckles and fingertips were still faceted where a hand fills a third of
     // the view, as it does holding a fish up or resting on the rail; about 66,000 points, skinned once a frame)
-    try { o.geometry = subdivide(o.geometry, { keep: 0.55 }); if (fine) o.geometry = subdivide(o.geometry, { keep: 0.8 }); } catch (e) { console.warn("fp arms: not subdivided", e?.message || e); }
+    // (the third build of the arms is modelled finely enough as it comes, about 11,000 points of skin and 8,000 of
+    // sleeve: divided again it was over 100,000 triangles of arm to skin and draw every frame, three times over with
+    // the shadow and occlusion passes, for no rounder a finger. Only a coarse model, the old fallback, is divided)
+    const coarse = o.geometry.attributes.position.count < DENSE_POINTS;
+    try { if (coarse) { o.geometry = subdivide(o.geometry, { keep: 0.55 }); if (fine) o.geometry = subdivide(o.geometry, { keep: 0.8 }); } } catch (e) { console.warn("fp arms: not subdivided", e?.message || e); }
     // (how the skin curves at each point, worked out once: in the creases of the knuckles and joints and between the
     // tendons it folds in, there it's darker and a little redder; over the knuckles and the tendons it stands out and
     // catches the light. Without it the hand read as one smooth, evenly coloured piece of plastic)
@@ -1030,7 +1036,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   const slow = null, born = performance.now(); // (slow: no timer now; clearTimeout(null) below does nothing)
   // (fp_body.glb: the whole arm from the shoulder with its sleeve modelled on it; fp_arms.glb, the forearms alone in
   // drawn sleeves, if that can't load)
-  loadPart("fp_body").catch(() => loadPart("fp_arms")).then((sc) => { try { real = realArms(sc, { gloves, skinHex, sleeveMat }); if (real.body) for (const h of hands) { group.remove(h.sleeve, h.upper); h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry?.dispose?.(); h.sleeve = new THREE.Group(); h.upper = new THREE.Group(); } /* (the drawn sleeves aren't needed: stand-ins take their place so the code that moves them has something to move) */ } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
+  loadPart("fp_body").catch(() => loadPart("fp_arms")).then((sc) => { try { real = realArms(sc, { gloves, skinHex, sleeveMat, fine }); if (real.body) for (const h of hands) { group.remove(h.sleeve, h.upper); h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry?.dispose?.(); h.sleeve = new THREE.Group(); h.upper = new THREE.Group(); } /* (the drawn sleeves aren't needed: stand-ins take their place so the code that moves them has something to move) */ } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
 
   const m4 = new THREE.Matrix4();
   // the hand's frame from what it holds: the thumb along the handle (towards the rod's tip, or out along the reel's
@@ -1098,6 +1104,11 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         const h = hands[i], spec = specs[i];
         // the elbow: fixed in the view, below and out to the side, out of sight
         const elbow = eye.clone().addScaledVector(vr, h.s * (o.elbowX ?? 0.2)).addScaledVector(vu, o.elbowY ?? -0.6).addScaledVector(vf, o.elbowZ ?? 0.35);
+        // (a fish in your hands: each forearm comes up to it from below, from its own side and from your side of it,
+        // wherever you look. Fixed in the view, the elbows swung under the fish as you looked down at it and the two
+        // forearms ran together or crossed)
+        if ((spec?.kind === "fish" || spec?.kind === "tailwrist") && (spec.palm?.y ?? 0) > 0.5 /* (held up, palm under it: not the hand laid on a fish on the mat) */) { const fl = tmpV.set(vf.x, 0, vf.z); if (fl.lengthSq() < 1e-6) fl.set(0, 0, -1); fl.normalize(); const rx = vr.x, rz = vr.z, rl = Math.hypot(rx, rz) || 1;
+          elbow.copy(spec.at).addScaledVector(fl, -0.2).add(V((rx / rl) * h.s * 0.17, -0.2, (rz / rl) * h.s * 0.17)); }
         // (holding the rod at the reel, the forearm lies back along the rod's butt, just under it)
         // (winding: the elbow and forearm go a little way round with the knob, the wrist turning for the rest, rather
         // than the hand going round on the end of a still arm)

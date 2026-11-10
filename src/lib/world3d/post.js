@@ -79,7 +79,8 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
         // each card shaded the sky behind it as a dark square)
         const cut = (x) => x.transparent || !x.depthWrite || x.alphaTest > 0;
         const m = o.material, see = m && (Array.isArray(m) ? m.some(cut) : cut(m));
-        if (o.isPoints || o.isLine || o.isSprite || see) o.visible = false;
+        // (nor what is marked as too far or too small to shade anything: userData.noAO, the far stones and post fittings)
+        if (o.isPoints || o.isLine || o.isSprite || see || o.userData.noAO) o.visible = false;
       });
     };
     composer.insertPass(ao, 1); // (straight after the scene is drawn)

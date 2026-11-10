@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { checkScene } from "./sceneCheck.js";
 import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor } from "./walker.js";
 import { createEnvironment } from "./environment.js";
+import { setShadowReach } from "./realPlace.js";
 import { createAngler, waveHeight } from "./angler.js";
 import { createRockSpray } from "./rockSpray.js";
 import { createTipLights, createHeadTorch } from "./nightKit.js";
@@ -70,6 +71,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   setPeopleDetail(Q.q >= 2); // (High and Ultra: the people's full-detail textures)
   // (with post-processing the antialiasing is the post buffer's own MSAA, so the screen's would be wasted)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !Q.post, powerPreference: "high-performance" });
+  // (three.js asks the graphics driver, after every shader it builds, whether it built and for its log: a question
+  // that makes the driver finish the build there and then, holding the frame up, a hundred-odd times as a place
+  // loads. The shaders here are known good, so outside test builds it isn't asked)
+  renderer.debug.checkShaderErrors = FILM;
   const dprTop = Math.min(Q.dpr, Math.max(window.devicePixelRatio || 1, Q.ss || 1)); let dprMax = dprTop; // (dprMax: lowered by Settings → Graphics → Resolution)
   renderer.setPixelRatio(dprMax);
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0; // (see adapt)
@@ -84,12 +89,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   let texSeen = -1, sharpenAt = 0;
   function sharpen() {
     // (textures arrive as the models load: look again whenever the count changes, at most once a second or so)
-    if (++sharpenAt < 60) return; sharpenAt = 0;
-    const n = renderer.info.memory.textures; if (n === texSeen) return; texSeen = n;
+    // (looked for six times a second, so nearly every texture gets its sharpness before the graphics card first has
+    // it. Found only once a second, after the count of textures had changed, most had been sent already and were sent
+    // again whole, mip levels and all, a few dozen at a time as a place loaded: stutters just as you arrive)
+    if (++sharpenAt < 10) return; sharpenAt = 0;
     scene.traverse((o) => {
       const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null; if (!ms) return;
       for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "bumpMap", "emissiveMap"]) {
-        const t = m[k]; if (t && t.isTexture && !t.isRenderTargetTexture && t.anisotropy !== maxAniso) { t.anisotropy = maxAniso; t.needsUpdate = true; }
+        const t = m[k]; if (t && t.isTexture && !t.isRenderTargetTexture && t.anisotropy !== maxAniso) { t.anisotropy = maxAniso; if (renderer.properties.get(t).__webglTexture) t.needsUpdate = true; /* (one not sent yet takes it when it is: asked to update before its picture had arrived, it only logged a warning) */ }
       }
     });
   }
@@ -776,7 +783,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (sun && (o.shadows != null || o.shadowDist != null)) {
       const was = G.shadows;
       if (o.shadows != null) G.shadows = Math.max(0, Math.min(2, o.shadows | 0));
-      if (o.shadowDist != null) G.shadowDist = [20, 30, 45, 80].includes(+o.shadowDist) ? +o.shadowDist : 30;
+      if (o.shadowDist != null) G.shadowDist = [20, 30, 45, 80].includes(+o.shadowDist) ? +o.shadowDist : 30; setShadowReach(G.shadowDist);
       const size = [0, 2048, 4096][G.shadows];
       if (size && sun.shadow.mapSize.x !== size) { sun.shadow.map?.dispose(); sun.shadow.map = null; sun.shadow.mapSize.set(size, size); }
       const c = sun.shadow.camera, d = G.shadowDist; if (c.right !== d) { Object.assign(c, { left: -d, right: d, top: d, bottom: -d, far: Math.max(160, d * 3) }); c.updateProjectionMatrix(); }
