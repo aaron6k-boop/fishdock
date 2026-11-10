@@ -986,7 +986,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   const slow = null, born = performance.now(); // (slow: no timer now; clearTimeout(null) below does nothing)
   // (fp_body.glb: the whole arm from the shoulder with its sleeve modelled on it; fp_arms.glb, the forearms alone in
   // drawn sleeves, if that can't load)
-  loadPart("fp_body").catch(() => loadPart("fp_arms")).then((sc) => { try { real = realArms(sc, { gloves, skinHex, sleeveMat }); if (real.body) for (const h of hands) { group.remove(h.sleeve, h.upper); h.sleeve = new THREE.Group(); h.upper = new THREE.Group(); } } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
+  loadPart("fp_body").catch(() => loadPart("fp_arms")).then((sc) => { try { real = realArms(sc, { gloves, skinHex, sleeveMat }); if (real.body) for (const h of hands) { group.remove(h.sleeve, h.upper); h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry?.dispose?.(); h.sleeve = new THREE.Group(); h.upper = new THREE.Group(); } /* (the drawn sleeves aren't needed: stand-ins take their place so the code that moves them has something to move) */ } catch (e) { real = null; if (typeof console !== "undefined") console.warn("fp arms:", e?.message || e); } clearTimeout(slow); if (real) { group.add(real.root); for (const h of hands) h.mesh.visible = false; } else fallback(); }).catch(() => { clearTimeout(slow); fallback(); });
 
   const m4 = new THREE.Matrix4();
   // the hand's frame from what it holds: the thumb along the handle (towards the rod's tip, or out along the reel's
@@ -1151,6 +1151,6 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
     },
     /** where each hand is (the wrist, in the group's space), for tests */
     get wrists() { return hands.map((h) => (h.cur ? h.cur.pos.clone() : null)); },
-    dispose() { built.geo.dispose(); geoL.dispose(); mat.dispose(); sleeveMat.dispose(); hemMat.dispose(); for (const h of hands) { h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry.dispose(); } },
+    dispose() { built.geo.dispose(); geoL.dispose(); mat.dispose(); sleeveMat.dispose(); hemMat.dispose(); for (const h of hands) { h.sleeve.traverse((o) => o.geometry?.dispose?.()); h.upper.geometry?.dispose?.(); } },
   };
 }
