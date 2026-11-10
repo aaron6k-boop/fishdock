@@ -32,7 +32,7 @@ const stubs = {
 const res = await build({
   plugins: [stubs],
   entryPoints: [join(root, "src/main.jsx")],
-  bundle: true, splitting: true, format: "esm", minify: true, sourcemap: false,
+  bundle: true, splitting: true, format: "esm", minify: process.env.FISHDOCK_NOMINIFY !== "1", /* (unminified for profiling: names stay readable) */ sourcemap: false,
   target: ["es2020", "safari15", "chrome100"], jsx: "automatic", loader: { ".js": "jsx", ".png": "file", ".svg": "file" },
   outdir: join(out, "assets"), entryNames: "[name]-[hash]", chunkNames: "chunk-[hash]", assetNames: "[name]-[hash]",
   metafile: true, legalComments: "none", logLevel: "warning",

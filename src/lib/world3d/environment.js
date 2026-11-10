@@ -528,6 +528,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       }`,
   });
   const water = new THREE.Mesh(wGeo, waterMat); water.frustumCulled = false; water.renderOrder = -5; group.add(water);
+  // (the occlusion pass drew the sea as a flat sheet, all its triangles again, to shade waves that are not on that
+  // sheet: left out of it, post.js)
+  water.userData.noAO = true;
 
   // ---- materials ----
   const stoneTex = canvasTex(256, 256, (g, w, h) => { speckle(g, w, h, "#8e8b84", 0.18, 3000); g.strokeStyle = "rgba(40,36,30,.35)"; g.lineWidth = 2; for (let y = 0; y <= h; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); for (let x = (y / 64) % 2 ? 0 : 64; x < w; x += 128) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 64); g.stroke(); } } }, [4, 30]);
@@ -756,6 +759,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // at a fraction of the screen's size, with the sky, the water and anything passed in (your own hands) left out ----
   const R = { rt: null, cam: new THREE.PerspectiveCamera(), scale: 0.5, every: 1, n: 0, far: 500,
     plane: new THREE.Plane(), clip: new THREE.Vector4(), q: new THREE.Vector4(), rot: new THREE.Matrix4(), v: new THREE.Vector3(), look: new THREE.Vector3(), tgt: new THREE.Vector3(), cp: new THREE.Vector3() };
+  R.cam.userData.fdMirror = true; // (the mirror's own camera: nothing chooses its detail by it)
   function reflect(renderer, scene, camera, hide = []) {
     if (!R.rt) return;
     if (R.n++ % R.every) return; // (Medium draws it every other frame)

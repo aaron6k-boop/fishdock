@@ -149,7 +149,7 @@ function placeProps(group, stand, props, glowGlass, wet) {
         group.add(contactShadows(list.map(([x, y, z, ry]) => [x + cx * Math.cos(ry) + cz * Math.sin(ry), y, z - cx * Math.sin(ry) + cz * Math.cos(ry), ry, w, d]), name === "bench" ? 0.65 : 0.55));
       }
     }
-    group.remove(stand);
+    group.remove(stand); stand.traverse((o) => o.geometry?.dispose?.()); // (and their shapes freed: a hundred-odd boxes and tubes were left on the graphics card for good)
   }).catch(() => {}); // (the simple shapes stay)
 }
 
@@ -267,6 +267,18 @@ function pilingMaterial(sp, quality) {
   return mat;
 }
 
+// ---- near and far detail ----
+/** How far (m) from your eye a stone can be and still cast a shadow that lands in the sun's shadow map (world.js sets it from the shadow distance). */
+export const SHADOW_REACH = { m: 55 };
+export const setShadowReach = (shadowDist) => { SHADOW_REACH.m = Math.max(40, shadowDist * 1.42 + 12); };
+/** How near (m) a railing post has to be to get its full fittings (realPlace's rails). */
+export const POST_DETAIL_M = 9;
+/** Indices of `points` ([x, z, ...]) within sqrt(near2) of (x, z), and the rest: [near, far]. */
+export function splitByDistance(points, x, z, near2) {
+  const near = [], far = [];
+  points.forEach((p, q) => { const dx = p[0] - x, dz = p[1] - z; (dx * dx + dz * dz < near2 ? near : far).push(q); });
+  return [near, far];
+}
 export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const local = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
   const fenceKind = (x, z, nx, nz) => (local?.fence ? local.fence(x, z, nx, nz) : "rail");
@@ -737,8 +749,31 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       ...[0, 1, 2, 3].map((k) => new THREE.CylinderGeometry(0.0045, 0.0045, 0.012, 8, 1).translate(Math.cos(k * Math.PI / 2 + 0.785) * 0.055, 0.037, Math.sin(k * Math.PI / 2 + 0.785) * 0.055)), // (the bolts' ends)
     ].map((g2) => g2.toNonIndexed());
     for (const g2 of parts) g2.deleteAttribute("uv");
-    const fm = new THREE.InstancedMesh(mergeGeometries(parts), jointMat, posts.length);
-    posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND, z); fm.setMatrixAt(q, mx); }); fm.castShadow = true; group.add(fm); void fit;
+    // (near and far: the fittings above are about 1,400 triangles a post, and a long pier has well over a hundred posts,
+    // every one drawn again for the shadows and for the water's mirror. Only the posts within a few metres of your
+    // eye get them; the rest get the same shapes in about a tenth of the triangles, with no shadow of their own (the
+    // post's shadow covers a 4 cm cap's), and neither set is drawn in the mirror, where they were a pixel or two)
+    const far = [
+      new THREE.SphereGeometry(0.04, 10, 3, 0, Math.PI * 2, 0, Math.PI * 0.55).translate(0, RAIL.h + 0.02, 0),
+      new THREE.SphereGeometry(0.038, 8, 5).translate(0, RAIL.h * 0.5, 0),
+      new THREE.CylinderGeometry(0.075, 0.08, 0.018, 10, 1).translate(0, 0.009, 0),
+      new THREE.CylinderGeometry(0.036, 0.036, 0.05, 8, 1, true).translate(0, 0.043, 0),
+    ].map((g2) => g2.toNonIndexed());
+    for (const g2 of far) g2.deleteAttribute("uv");
+    const fm = new THREE.InstancedMesh(mergeGeometries(parts), jointMat, posts.length), fl = new THREE.InstancedMesh(mergeGeometries(far), jointMat, posts.length);
+    fm.castShadow = true; fl.castShadow = false; fm.noReflect = fl.noReflect = true; fl.userData.noAO = true; group.add(fm, fl); void fit;
+    const NEAR2 = POST_DETAIL_M * POST_DETAIL_M, at = new THREE.Vector3(Infinity, 0, 0), eye = new THREE.Vector3();
+    const share = (cam) => {
+      eye.setFromMatrixPosition(cam.matrixWorld); if (eye.distanceToSquared(at) < 1) return; at.copy(eye);
+      const [h, l] = splitByDistance(posts, eye.x, eye.z, NEAR2);
+      h.forEach((q, k) => { mx.makeTranslation(posts[q][0], LAND, posts[q][1]); fm.setMatrixAt(k, mx); });
+      l.forEach((q, k) => { mx.makeTranslation(posts[q][0], LAND, posts[q][1]); fl.setMatrixAt(k, mx); });
+      fm.count = h.length; fl.count = l.length; fm.instanceMatrix.needsUpdate = fl.instanceMatrix.needsUpdate = true;
+      fm.computeBoundingSphere(); fl.computeBoundingSphere();
+    };
+    fm.count = 0; posts.forEach(([x, z], q) => { mx.makeTranslation(x, LAND, z); fl.setMatrixAt(q, mx); });
+    // (the posts themselves are always drawn, so they do the sharing out as the view moves: at most once a metre)
+    pm.onBeforeRender = (_r, _s, cam) => { if (cam.isPerspectiveCamera && !cam.userData.fdMirror) share(cam); };
   }
   if (rails.length) {
     const rm = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 24, 1, true), railMat, rails.length), mx = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0);
@@ -1094,13 +1129,31 @@ function buildRocks(group, cls, xs, n, area, quality) {
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
   per.forEach((list, v) => {
     if (!list.length) return;
-    const mesh = new THREE.InstancedMesh(shapes[v], mat, list.length);
-    list.forEach(([x, y, z, s], i) => {
+    // (two meshes of the same stones: those near enough for their shadows to fall inside the sun's shadow map cast
+    // them; the rest, most of a long breakwater, are drawn without being drawn a second time into that map)
+    const mesh = new THREE.InstancedMesh(shapes[v], mat, list.length), away = new THREE.InstancedMesh(shapes[v], mat, list.length);
+    const mats = [], cols = [];
+    list.forEach(([x, y, z, s]) => {
       e.set((rnd() - 0.5) * 1.2, rnd() * 6.28, (rnd() - 0.5) * 1.2); q4.setFromEuler(e); // (lying roughly flat, as placed stone settles)
-      m4.compose(new THREE.Vector3(x, y, z), q4, new THREE.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.35), s)); mesh.setMatrixAt(i, m4);
-      const t = 0.82 + rnd() * 0.3; c.setRGB(t * (0.98 + rnd() * 0.06), t, t * (0.97 + rnd() * 0.06)); mesh.setColorAt(i, c);
+      mats.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q4, new THREE.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.35), s)));
+      const t = 0.82 + rnd() * 0.3; cols.push(new THREE.Color().setRGB(t * (0.98 + rnd() * 0.06), t, t * (0.97 + rnd() * 0.06)));
     });
-    mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
+    const at = new THREE.Vector3(Infinity, 0, 0), eye = new THREE.Vector3(); let reachWas = 0;
+    const share = (cam) => {
+      if (cam) eye.setFromMatrixPosition(cam.matrixWorld);
+      if (cam && eye.distanceToSquared(at) < 9 && reachWas === SHADOW_REACH.m) return; at.copy(eye); reachWas = SHADOW_REACH.m;
+      const [near, far] = cam ? splitByDistance(list.map(([x, , z]) => [x, z]), eye.x, eye.z, SHADOW_REACH.m * SHADOW_REACH.m) : [[], list.map((_, i) => i)];
+      near.forEach((i, k) => { mesh.setMatrixAt(k, mats[i]); mesh.setColorAt(k, cols[i]); });
+      far.forEach((i, k) => { away.setMatrixAt(k, mats[i]); away.setColorAt(k, cols[i]); });
+      mesh.count = near.length; away.count = far.length;
+      mesh.instanceMatrix.needsUpdate = away.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; if (away.instanceColor) away.instanceColor.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    };
+    // (both get every stone once, so each has its colours set up before the first share by distance)
+    mats.forEach((m, i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, cols[i]); away.setMatrixAt(i, m); away.setColorAt(i, cols[i]); });
+    share(null);
+    mesh.castShadow = true; away.castShadow = false; away.userData.noAO = true; mesh.receiveShadow = away.receiveShadow = true; away.frustumCulled = false; group.add(mesh, away);
+    away.onBeforeRender = (_r, _s, cam) => { if (cam.isPerspectiveCamera && !cam.userData.fdMirror) share(cam); };
   });
   return edge;
 }
