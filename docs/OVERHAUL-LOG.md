@@ -236,3 +236,33 @@ Frame-by-frame checks of the cast's first 1.2 s and the landing are in the PR. F
   own side of the rim: two open hands at the edges of the picture and the rope hanging between them from nothing.
 
 **Checked.** The ten scenes at Ultra before and after; `node --test` 314 pass.
+
+## Stage 8 (10 November 2026, branch `photo-backdrop`): the far shore is a photograph of it
+
+Up the river from the pier the Gorleston riverside (Quay Road and Riverside Road, the old brick lighthouse among the
+houses) was rows of generated houses from the map's footprints: repetitive and not that town. It is now a photograph
+of that shore, taken on the pier 15 m from the mark: "View into the harbour from South Pier, Gorleston-on-Sea" by
+Christopher Hilton, 8 October 2023, CC BY-SA 2.0 (Geograph 7618525, found through Wikimedia Commons' search; chosen
+from 271 openly licensed candidates). `backdrop3d.js`:
+
+- **Where it hangs.** The town's band of the picture (1600 by 132 pixels, enlarged to twice that), its sky cut away
+  along its own roofline and the near jetty and quay cut off its foot, on a curved sheet centred on where the
+  photographer stood. Lined up on the map by two things in the picture: the lighthouse (bearing 274.9 from the
+  camera) and the lifeboat station (323), which give 21.35 pixels a degree and the left edge at 263.5. Each column
+  stands at that stretch of frontage's distance off the map (285 m at the left to 540 m at the right), each row at
+  its angle above the far waterline.
+- **Depth.** One sheet, at the frontage's real distance: the game's own jetty, quay and boats in front slide across
+  it as you walk the pier (checked from two places 57 m apart). The picture is not split into nearer and further
+  rows of houses: at this distance and resolution that could not be done honestly.
+- **Light.** Unlit by the scene's lamps and tinted from the hour's sun and sky, fogged with the scene. Checked at
+  midday, dusk, night and overcast. At night it is a dark shape with no lit windows: none are invented.
+- **What it replaces.** The map's buildings and trees behind the sheet are not built. Measured in one session, same
+  camera, Ultra: 3,980,911 triangles a frame without it, 3,752,217 with (5.7% fewer); draw calls 1,048 and 1,047
+  (the houses were already merged). Texture: one 3200 by 264 image, 76 kB to download.
+- **Credit.** On the 3D view's label and its About text, in `public/models/CREDITS.txt` and
+  `source-assets/ASSET-LICENCES.json`. CC BY-SA is share-alike: the adapted image carries the same licence.
+
+**Not done.** The houses to the south-west (the Pier Hotel side, nearer than 285 m and left of the picture) are still
+generated; a daylight photograph of that side from the pier is needed. The harbour's north side and the ships are
+untouched. Draw calls from this camera are 1,047 where the integration branch measured 908 on 9 November: not
+explained yet, and not caused by the backdrop.

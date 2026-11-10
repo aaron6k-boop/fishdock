@@ -14,9 +14,20 @@ export const LOCAL = {
     fence(x, z, nx, nz) { if (nz < -0.3) return "rail"; if (Math.hypot(x - 8, z - 12) < 24) return "bars"; return nz > 0.35 ? "timber" : "rail"; },
     // the lighthouse and coastwatch station (OSM way 223803033): built from photographs, not as a generic building
     landmarks: { 223803033: "gorlestonLighthouse", 182378351: "pierHotel", 182663241: "pavilion", 172370482: "bandstand", 223804728: "cliffHotel" },
+    // the Gorleston riverside up the river from the pier (Quay Road and Riverside Road, the old brick lighthouse among
+    // the houses), from a photograph taken on the pier 15 m from the mark: "View into the harbour from South Pier,
+    // Gorleston-on-Sea" by Christopher Hilton, 8 October 2023, CC BY-SA 2.0 (Geograph 7618525, via Wikimedia Commons).
+    // Lined up on the map by the lighthouse (bearing 274.9 from the camera) and the lifeboat station (323): 21.35 pixels
+    // a degree, the picture's left edge at 263.5. The frontage's distances are read off the map.
+    backdrop: [{ tex: "gorleston_riverside.webp", cam: [-8.7, -12.4], bearing0: 263.5, pxPerDeg: 21.35, px: [1600, 132], waterline: [107, 100],
+      dist: [[263.5, 285], [275, 300], [290, 360], [305, 430], [323, 500], [338.5, 540]],
+      credit: { by: "Christopher Hilton", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg" } }],
     // across the harbour mouth: the bank north of the river is a low dune grown over with marram grass (photographs),
     // kept clear of the road and the buildings behind it
-    dunes: (x, z) => z < -85 && z > -175 && x > -140 && x < 80,
+    // (only at the harbour mouth, seaward of x -35: up the river from there the north bank is a low flat quay, brown
+    // piling with grass on top, as Christopher Hilton's photograph from the pier shows (Geograph 7618525, bearing 338
+    // from the camera meets that bank at about x -44). The dune used to run on to x -140 and hid the town behind it)
+    dunes: (x, z) => z < -85 && z > -175 && x > -35 && x < 80,
     // (the pier-head photograph Aaron shared, John Ellis, April 2018: across the harbour mouth the dune is a tall bank, about 8 m, estimated)
     duneH: 8,
     // and along its foot a bank of dark granite boulders in the water, from the end of the north pier round to the sea

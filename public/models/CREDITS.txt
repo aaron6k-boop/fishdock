@@ -35,3 +35,10 @@ over it in the app.
 rodkit.glb (the sea-spinning rod: its handle, reel seat, guides, whippings, tip ring and blank, and the spinning reel with
 its rotor, bail, line roller, spool and handle) was modelled in Blender for FishDock (source-assets/blender/
 build_rodkit.py); no third-party assets. The game bends the blank and turns the reel.
+
+gorleston_riverside.webp (public/textures/: the Gorleston riverside seen up the river from the South Pier, the far shore
+in the 3D view there) is cut from "View into the harbour from South Pier, Gorleston-on-Sea" by Christopher Hilton,
+8 October 2023, licensed CC BY-SA 2.0 (https://creativecommons.org/licenses/by-sa/2.0/):
+https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg
+(from Geograph, photo 7618525). Changes: the band of the town cropped out, the sky and the near foreground made
+transparent, enlarged to twice its size. This adapted image is offered under the same licence, CC BY-SA 2.0.
