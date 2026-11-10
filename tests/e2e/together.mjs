@@ -67,7 +67,7 @@ async function main() {
     await A.page.fill("input[placeholder='Shown above your angler']", "Alice");
     await A.page.fill("input[placeholder='e.g. Norfolk coast']", "Norfolk coast");
     await A.page.click("button:has-text('Start the party')");
-    const code = await until(() => A.page.evaluate(() => (location.hash.match(/^#party\/([A-Z0-9]{6})/) || [])[1]));
+    const code = await until(() => A.page.evaluate(() => (location.hash.match(/^#party\/([0-9]{4}|[A-Z0-9]{6})/) || [])[1]));
     ok(!!code, "host starts a party and lands in it", await A.page.evaluate(() => location.hash));
     await until(() => A.page.$(".fs-top"));
     ok(!!(await A.page.$(".fs-top")), "host is in the fishing view");
@@ -77,7 +77,7 @@ async function main() {
     ok(!!inviteBtn, "an Invite a friend button is on the fishing screen");
     // no navigator.share in desktop Chromium: the button falls back to copying the link
     await inviteBtn?.click();
-    const copied = await until(async () => { const t = await A.page.evaluate(() => navigator.clipboard.readText()); return /#party\/[A-Z0-9]{6}\//.test(t) ? t : null; }, 5000);
+    const copied = await until(async () => { const t = await A.page.evaluate(() => navigator.clipboard.readText()); return /#party\/(?:[0-9]{4}|[A-Z0-9]{6})\//.test(t) ? t : null; }, 5000);
     ok(!!copied, "without the share sheet, Invite a friend copies the link", copied);
     const shownCode = await until(() => A.page.$eval(".invite-code", (e) => e.textContent.replace(/\s/g, "")));
     ok(shownCode === code, "the short join code is shown big enough to read out", shownCode);
@@ -131,7 +131,7 @@ async function main() {
 
     // ---- a third person types the short code ----
     await C.page.goto(`${base}/#together`);
-    await C.page.click("text=Join with an invite code");
+    await C.page.click("text=Join with a PIN");
     await C.page.fill("input.tg-code", code.toLowerCase());
     await C.page.click("button:has-text('Find the party')");
     await until(() => C.page.$("text=Alice's party"));

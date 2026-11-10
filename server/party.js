@@ -1,6 +1,6 @@
 // /api/party  Fish Together: private fishing parties of up to four anglers (and a few spectators).
 //
-// - Each party lives in one Cloudflare Durable Object, named by its six-character code, which keeps the members,
+// - Each party lives in one Cloudflare Durable Object, named by its code (a four-digit PIN for now: see makePin below), which keeps the members,
 //   their events, the chat and the settings, and holds everyone's WebSocket. Only meaningful events travel (a cast,
 //   a bite, a fish on, a catch, a reaction): every phone animates them itself, so nothing like video is streamed.
 // - Two kinds, never mixed: "virtual" (everyone fishes the simulation; every catch is marked simulated and is never
@@ -19,7 +19,7 @@
 //   kept with the chat so someone who connects later sees it too. A name only, nothing else about them.
 
 import { json, err, guard, toResponse, sameOrigin, readJson, routePath, cleanLine, randomId, sha256Hex } from "./http.js";
-import { needDb, enforce } from "./db.js";
+import { needDb, enforce, giveBack } from "./db.js";
 import { ipKey } from "./ipKey.js";
 import { assignSpots, layoutFor, MAX_ANGLERS } from "../src/lib/world3d/spots.js";
 import { markFor } from "./place3d.js";
@@ -58,7 +58,7 @@ export function cleanPlace(place, mode) {
 
 export const PARTY = {
   maxAnglers: MAX_ANGLERS, maxMembers: 12, maxEverMembers: 60, maxReports: 100, maxEvents: 3000, maxChat: 120, chatChars: 200, chatPer10s: 6, chatPerMinute: 20, hours: [2, 6, 12, 24], defaultHours: 12,
-  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, maxSpeed: 12, signalBytes: 16000, photoBytes: 400e3,
+  spotHoldMs: 10 * 60e3, createPerDay: 12, lookupsPerMinute: 30, missesPerHour: 20, pin: true, joinsPerMinute: 12, msgsPer10s: 40, posesPer10s: 50, maxSpeed: 12, signalBytes: 16000, photoBytes: 400e3,
 };
 export const VENUES = ["pier", "beach", "estuary", "river", "lake"];
 export const EVENT_TYPES = ["cast", "bite", "missed", "hooked", "lost", "catch", "reelin"];
@@ -66,12 +66,21 @@ export const REACTIONS = { nice: "Nice one", wow: "Wow", clap: "Well done", fish
 export const CHALLENGES = { biggest: "Biggest fish", most: "Most fish", species: "Most species", longest: "Longest fish" };
 const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 // each character equally likely (a byte that would favour the first few letters is thrown away and drawn again)
-export function makeCode() {
+export function makeLongCode() {
   const out = [], top = 256 - (256 % CODE_ABC.length);
   while (out.length < 6) for (const b of crypto.getRandomValues(new Uint8Array(12))) { if (b < top && out.length < 6) out.push(CODE_ABC[b % CODE_ABC.length]); }
   return out.join("");
 }
-export const validCode = (c) => typeof c === "string" && /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/.test(c);
+// ---- the four-digit PIN ----
+// While FishDock is being tested a party's code is a four-digit PIN, easy to read out and type. There are only
+// 10,000 of them, so a PIN can be guessed: wrong guesses are counted per network (PARTY.missesPerHour), the host can
+// turn joining by PIN off, and the private link still carries its own long secret. Before FishDock opens to the
+// public, set PARTY.pin to false to go back to six letters and numbers (old codes of either kind keep working).
+export function makePin() {
+  for (;;) for (const b of crypto.getRandomValues(new Uint16Array(8))) if (b < 60000) return String(b % 10000).padStart(4, "0");
+}
+export const makeCode = () => (PARTY.pin ? makePin() : makeLongCode());
+export const validCode = (c) => typeof c === "string" && /^(?:[0-9]{4}|[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6})$/.test(c);
 const hashKey = (k) => sha256Hex(`party-member|${k}`);
 const nameOf = (v, d) => cleanLine(v, 24) || d;
 
@@ -382,8 +391,11 @@ export class PartyHost {
     const room = await this.load();
     const url = new URL(request.url), op = url.pathname.split("/").pop();
     if (op === "init" && request.method === "POST") {
-      if (room.ready) return json({ error: "exists" }, 409);
+      // (a code whose party has ended can be given out again: with four digits they would soon run out otherwise)
+      if (room.ready && !room.ended(now)) return json({ error: "exists" }, 409);
       const b = await request.json();
+      if (room.ready) for (const ws of this.sockets.all()) { try { this.sockets.close(ws, 4001, "ended"); } catch { /* already gone */ } }
+      room.s = null;
       const host = await room.init(b, now); await this.save();
       return json({ code: room.s.code, secret: room.s.secret, member: host, expiresAt: room.s.expiresAt });
     }
@@ -479,7 +491,7 @@ export async function handleParty(request, env, now = Date.now()) {
       await enforce(db, `party:new:${who}`, PARTY.createPerDay, now, { daily: true }, "That's as many parties as can be started from here today.");
       const b = await readJson(request, 4096);
       const body = { mode: b.mode === "real" ? "real" : "virtual", venue: VENUES.includes(b.venue) ? b.venue : "pier", place: cleanPlace(b.place, b.mode), name: nameOf(b.name, "Host"), outfit: Number(b.outfit) || 0, look: cleanLook(b.look), hours: Number(b.hours) || PARTY.defaultHours };
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < 12; i++) {
         const c = makeCode();
         const r = await inner(c, "init", { method: "POST", body: JSON.stringify({ ...body, code: c }) });
         if (r.status === 409) continue;
@@ -492,15 +504,21 @@ export async function handleParty(request, env, now = Date.now()) {
     if (upgrade && op === "ws") return stub(code).fetch(new Request(`https://party.internal/ws?m=${encodeURIComponent(m)}`, { headers: request.headers }));
     if (!op && request.method === "GET") {
       await enforce(db, `party:look:${who}`, PARTY.lookupsPerMinute, now, { windowMs: 60e3 }, "That's a lot of codes. Wait a minute and try again.");
+      // (wrong guesses at a code, per network: a right one is given back, so only misses use the hour's allowance up)
+      await enforce(db, `party:miss:${who}`, PARTY.missesPerHour, now, { windowMs: 3600e3 }, "Too many wrong codes from here. Try again in an hour, or ask the host for their invite link.");
       const s = url.searchParams.get("s") || "", via = url.searchParams.get("via") === "code" ? "code" : "";
       const r = await inner(code, `info?s=${encodeURIComponent(s)}&via=${via}`);
+      if (r.ok) await giveBack(db, `party:miss:${who}`);
       return r.ok ? new Response(r.body, { status: 200, headers: { "content-type": "application/json", "cache-control": "no-store" } }) : err(r.status, r.status === 410 ? "ended" : "not_found", r.status === 410 ? "That party has ended." : "There's no party with that code, or its invitation has changed.");
     }
     if (op === "join" && request.method === "POST") {
       await enforce(db, `party:join:${who}`, PARTY.joinsPerMinute, now, { windowMs: 60e3 }, "That's a lot of tries. Wait a minute and try again.");
+      // (wrong guesses at a code, per network: a right one is given back, so only misses use the hour's allowance up)
+      await enforce(db, `party:miss:${who}`, PARTY.missesPerHour, now, { windowMs: 3600e3 }, "Too many wrong codes from here. Try again in an hour, or ask the host for their invite link.");
       const b = await readJson(request, 4096);
       const r = await inner(code, "join", { method: "POST", body: JSON.stringify({ secret: typeof b.secret === "string" ? b.secret.slice(0, 40) : null, viaCode: !!b.viaCode, name: b.name, role: b.role === "spectator" ? "spectator" : "angler", outfit: Number(b.outfit) || 0, look: cleanLook(b.look) }) });
       const out = await r.json();
+      if (r.ok || out.error !== "not_found") await giveBack(db, `party:miss:${who}`);
       if (!r.ok) return err(r.status, out.error || "not_found", { not_found: "There's no party with that code, or its invitation has changed.", ended: "That party has ended.", locked: "The host has locked this party.", full: "This party is full." }[out.error] || "Couldn't join.");
       return json(out);
     }

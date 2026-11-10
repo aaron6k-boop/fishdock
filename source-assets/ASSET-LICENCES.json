@@ -429,6 +429,19 @@
    ]
   },
   {
+   "id": "blender:human-base-meshes",
+   "name": "Human Base Meshes bundle, version 1.1.0 (the realistic male body)",
+   "source": "https://download.blender.org/demo/asset-bundles/human-base-meshes/human-base-meshes-bundle-v1.1.0.zip (listed at https://www.blender.org/download/demo-files/)",
+   "author": "Blender Studio",
+   "licence": "CC0 1.0, as announced at its release (reported by CG Channel, 28 June 2023); the bundle itself carries no licence file",
+   "attribution": "Not required; credited in public/models/CREDITS.txt",
+   "type": "models",
+   "resolution": "10,582 points with three levels of sculpted detail (about 677,000 points at the finest); UVs; no skeleton, no textures",
+   "use": "the hands and wrists of your first-person arms (public/models/fp_body.glb): its second level as the mesh, its finest baked to a normal map",
+   "downloaded": "2026-11-10",
+   "files": []
+  },
+  {
    "id": "mpfb:extension",
    "name": "MPFB (MakeHuman plugin for Blender), installed from extensions.blender.org",
    "source": "https://extensions.blender.org/add-ons/mpfb/",
@@ -744,12 +757,12 @@
   {
    "id": "fishdock:fp_body",
    "name": "First-person arms with sleeves (derived)",
-   "source": "cut from the MPFB angler (MakeHuman, CC0) in Blender, with the sleeves of the MakeHuman system assets' field jacket male_casualsuit05 (CC0) fitted by MPFB: source-assets/blender/make_fp_body_hd.py (the first build: make_fp_body.py)",
+   "source": "third build (source-assets/blender/make_fp_body_bs.py): the hands and wrists of Blender Studio's realistic male body (Human Base Meshes 1.1.0, see blender:human-base-meshes) on the MPFB angler's skeleton, coloured from his MakeHuman skin. Before that: cut from the MPFB angler (MakeHuman, CC0) in Blender, with the sleeves of the MakeHuman system assets' field jacket male_casualsuit05 (CC0) fitted by MPFB: source-assets/blender/make_fp_body_hd.py (the first build: make_fp_body.py)",
    "author": "FishDock",
    "licence": "CC0 1.0 (as its source)",
    "attribution": "Not required",
    "type": "models",
-   "resolution": "3,886 + 8,076 vertices; skin maps 2048 px (colour, normal, roughness), sleeve maps 1024 x 520 (shade) and 2048 x 1040 (normal)",
+   "resolution": "11,104 + 8,076 vertices (13,584 + 13,952 triangles); skin maps 2048 px (colour, normal, roughness), sleeve maps 1024 x 520 (shade) and 2048 x 1040 (normal)",
    "use": "your arms and jacket sleeves in first person (public/models/fp_body.glb)",
    "files": []
   }

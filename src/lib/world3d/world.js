@@ -9,6 +9,8 @@ import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor } from 
 import { createEnvironment } from "./environment.js";
 import { createAngler, waveHeight } from "./angler.js";
 import { createRockSpray } from "./rockSpray.js";
+import { createTipLights, createHeadTorch } from "./nightKit.js";
+import { setHandsDim } from "./fpHands.js";
 import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
@@ -146,6 +148,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // ---- splashes (droplets) and rings on the water ----
   // (rockSpray.js: a crown of drops, a few up the middle and a puff of white, in the light of the hour. They used to
   // be 260 round white dots of one size, 9 cm across, thrown out in a fan and as bright at midnight as at noon)
+  const tipLights = createTipLights(scene), torch = createHeadTorch(scene, camera), tipList = [];
   const spray = createRockSpray(scene, []), sprayLight = new THREE.Color(1, 1, 1), tmpSprayC = new THREE.Color(); let sprayEdge = false;
   /** at: world point; size: how big (a rig .6, a landed fish .9); mult: how many more drops (spray off a wall, seen from further off); up: a direction to throw them (spray goes up and back over the wall, not out in a ring) */
   function splash(at, size = 0.6, mult = 1, up = null) {
@@ -633,6 +636,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       keep(state) { anglers.get(localId)?.a.keepFish(state); },
       // (single: one frame of that length, as a slow phone would draw it, rather than split into short steps)
       /** (checks) a splash at a point on the water */
+      torch(c) { torch.set(c); },
       splash(x, z, size = 0.6, mult = 1) { const y = waveHeight(x, z, film ? film.t : 0, { ...env.waveState(), kind }); splash(new THREE.Vector3(x, y, z), size, mult); ripple(new THREE.Vector3(x, y, z), Math.min(1, size)); },
       step(ms, single = false) { if (!film) return; const n = single ? 1 : Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
       get mode() { return mode; },
@@ -731,6 +735,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (L2) sprayLight.setRGB(...L2.skyColour).multiplyScalar(L2.skyIntensity * 0.34).add(tmpSprayC.copy(env.sun.color).multiplyScalar(L2.sunIntensity * 0.26)); else sprayLight.setRGB(1, 1, 1);
       spray.update(t, dt || 0, sea, (x, z) => waveHeight(x, z, t, sea), sprayLight, renderer.domElement.height / renderer.getPixelRatio(), camera.fov);
     }
+    // the rod-tip lights (everyone's) and your head torch (nightKit.js)
+    { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
+      for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
+      tipLights.update(tipList, dark, t); torch.update(dark, dt || 0.016); setHandsDim(1 - 0.5 * (c.night ?? 0) * (torch.colour === "off" ? 1 : 0.4)); }
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera); simT = t;
     adapt();
@@ -912,6 +920,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (pose?.spotAt) { const x = anglers.get(id); remote.delete(id); if (x) { x.a.setWalk(null); x.a.place({ ...x.a.spot, at: pose.at, face: pose.face, edge: pose.edge, cast: pose.cast }); } return; }
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },
+    /** Your head torch: "off", "white", "red" or "green". */
+    setTorch(c) { torch.set(c); },
+    get torch() { return torch.colour; },
     setTrack(on) { track = !!on && !reduceMotion; },
     /** the landing shot (the camera stepping back beside you to land a fish): on, or stay where you are */
     setLandShot(on) { landShotOn = !!on; },
@@ -932,6 +943,6 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     /** the screen position (0..1) of a world point, or null when behind the camera */
     project(p) { const v = p.clone().project(camera); return v.z > 1 ? null : { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; },
     snapshot() { drawFrame(); return canvas.toDataURL("image/jpeg", 0.9); },
-    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); spray.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
+    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); spray.dispose(); tipLights.dispose(); torch.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
   };
 }

@@ -35,7 +35,7 @@ export function loadView() {
 }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onReel = null, onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   // the phone can take the 3D drawing away (low memory, the browser in the background): when it gives it back the
@@ -50,7 +50,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
   const [walk, setWalk] = useState(null); // { on, canFish, sprint } while walking about
   useEffect(() => { props.current.onWalk?.(walk); }, [walk]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, feel, onWalk, onKept, onBusy, onFishTap, onPose, onHear };
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, onReel, fight, feel, onWalk, onKept, onBusy, onFishTap, onPose, onHear };
   const phases = useRef({});
   // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
   const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
@@ -128,7 +128,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
             if (o.landed && !phases.current[id].landed) { phases.current[id].landed = true; props.current.onLanded?.(id, o.info.ev); }
           }
         });
-        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.fishCam === "cinematic"); W.current?.setGfx(effectiveGfx(q, v0.gfxC, !!v0.battery)); }
+        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.fishCam === "cinematic"); W.current?.setTorch(v0.torch || "off"); W.current?.setGfx(effectiveGfx(q, v0.gfxC, !!v0.battery)); }
         usedQ.current = q;
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
@@ -151,7 +151,11 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
     const pts = new Map(); let pinch = 0, stopping = false;
     // a touch while the view is still turning (after a flick, or steering itself) just stops it: it isn't a tap, so it
     // doesn't show or hide the controls by accident
-    const down = (e) => { el.setPointerCapture?.(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) { const st = W.current?.look.state(); stopping = !!st && (Math.abs(st.vyaw) > 0.05 || Math.abs(st.vpitch) > 0.05 || !!st.aim); W.current?.look.start(); } if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
+    // with a fish on, a press anywhere on the picture winds the reel, as the Reel button does: one turn for a tap,
+    // steadily while held (dragging still looks about)
+    let reeling = false;
+    const reelOff = () => { if (reeling) { reeling = false; props.current.onReel?.hold?.(false); } };
+    const down = (e) => { el.setPointerCapture?.(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1 && props.current.fight && props.current.onReel && !W.current?.walking) { reeling = true; props.current.onReel.tap?.(); props.current.onReel.hold?.(true); } else if (pts.size > 1) reelOff(); if (pts.size === 1) { const st = W.current?.look.state(); stopping = !!st && (Math.abs(st.vyaw) > 0.05 || Math.abs(st.vpitch) > 0.05 || !!st.aim); W.current?.look.start(); } if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
     const move = (e) => {
       if (!pts.has(e.pointerId)) return;
       const p = pts.get(e.pointerId), dx = e.clientX - p[0], dy = e.clientY - p[1]; pts.set(e.pointerId, [e.clientX, e.clientY]);
@@ -162,6 +166,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
     let tapTimer = 0;
     const up = (e) => {
       if (!pts.has(e.pointerId)) return; pts.delete(e.pointerId);
+      reelOff();
       if (pts.size === 0) {
         const L = W.current?.look; L?.end();
         // a tap on your landed fish: have a look at it
@@ -194,6 +199,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
     setGfx: (o) => W.current?.setGfx(o), get gfx() { return W.current ? { ...W.current.gfx, preset: usedQ.current } : null; }, perf: () => W.current?.perf() || null, diag: () => W.current?.diag?.() || null, frameTimes: (since) => W.current?.frameTimes?.(since) || null, setEnv: (o) => W.current?.setEnv?.(o),
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
+    setTorch: (c) => W.current?.setTorch(c),
     setTrack: (on) => W.current?.setTrack(on), setLandShot: (on) => W.current?.setLandShot(on),
     inspectFish: (on) => W.current?.inspectFish(on), keepFish: () => W.current?.keepFish(), releaseFish: () => W.current?.releaseFish(),
     setSpeaking: (id, on) => W.current?.setSpeaking(id, on),

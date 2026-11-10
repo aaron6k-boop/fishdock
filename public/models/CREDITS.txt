@@ -14,6 +14,12 @@ that person by MPFB: its folds, seams and cuff are its makers' own, from its nor
 as light and dark so the game can colour it as your jacket; the cuff is drawn in round the wrist. The skin's colour is
 the same MakeHuman skin laid out on a sheet of its own, with a normal map and a roughness map baked from it in Blender
 (source-assets/blender/make_fp_body_hd.py).
+From the third build (source-assets/blender/make_fp_body_bs.py) the hands and wrists of fp_body.glb are those of the
+realistic male body in Blender Studio's Human Base Meshes bundle, version 1.1.0
+(https://www.blender.org/download/demo-files/; CC0 1.0 as announced at its release, the bundle itself carries no
+licence file), set on the MPFB person's skeleton with the
+finger joints moved to that hand's own, its finest sculpted level baked to a normal map, and the MakeHuman skin's
+colour carried across to it. Credited with thanks to Blender Studio.
 
 pierprops.glb (the pier's lamps, lifebuoy stations, bollards and benches): the bollard, bench and lifebuoy housing were
 modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and the buoy Poly Haven's "Lifebuoy"

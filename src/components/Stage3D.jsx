@@ -10,10 +10,11 @@ import { speciesById } from "../data/species.js";
 import { catchInfo } from "../lib/catchInfo.js";
 import { landingTech } from "../lib/sceneActors.js";
 import GraphicsPanel, { FpsMeter } from "./GraphicsPanel.jsx";
+const TORCHES = ["off", "white", "red", "green"], TORCH_NAMES = { off: "Off", white: "White", red: "Red", green: "Green" }; // (as nightKit.js)
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts }) {
+export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState(() => (loadView().fishCam === "third" ? "third" : "first")), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -105,7 +106,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   // (several settings at once, from one view: Settings → Graphics)
   const setOpts = (o) => { setView((cur) => { const next = { ...cur, ...o }; saveView(next); return next; }); };
   const [gfxOpen, setGfxOpen] = useState(false);
-  const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "fishCam") { w.current?.setLandShot(v === "cinematic"); const m = v === "third" ? "third" : "first"; setMode(m); w.current?.setMode(m); } if (k === "look" || k === "smooth") w.current?.setLookFeel(next); if (k === "side") { if (v === "left") document.documentElement.dataset.hand = "left"; else delete document.documentElement.dataset.hand; } };
+  const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "torch") w.current?.setTorch(v); if (k === "fishCam") { w.current?.setLandShot(v === "cinematic"); const m = v === "third" ? "third" : "first"; setMode(m); w.current?.setMode(m); } if (k === "look" || k === "smooth") w.current?.setLookFeel(next); if (k === "side") { if (v === "left") document.documentElement.dataset.hand = "left"; else delete document.documentElement.dataset.hand; } };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
   useEffect(() => { if (watching && mode !== "spectator" && mode !== "cinematic") { const t = setTimeout(() => pick("spectator"), 600); return () => clearTimeout(t); } return undefined; }, [watching]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -141,7 +142,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   return (
     <div ref={stageEl} className={`stage3d${walk ? " walking" : ""}${menu ? " menu-open" : ""}${fs ? " is-fs" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
-      <World3D ref={w} fight={fight} startMode={view.fishCam === "third" ? "third" : "first"} feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} sound={sound} now={now} quality={view.gfx && view.gfx !== "auto" ? view.gfx : quality}
+      <World3D ref={w} fight={fight} startMode={view.fishCam === "third" ? "third" : "first"} feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} onReel={onReel} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} sound={sound} now={now} quality={view.gfx && view.gfx !== "auto" ? view.gfx : quality}
         onPhase={(id, phase, info) => {
           onPhase?.(id, phase, info);
           // your own bite or fish on: the menu gets out of the way of the Strike and Reel buttons, and Walk about
@@ -204,6 +205,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
               <button type="button" role="menuitemcheckbox" aria-checked={view.side === "left"} className={`ft-pill${view.side === "left" ? " on" : ""}`} onClick={() => setOpt("side", view.side === "left" ? "right" : "left")} title="Cast, Strike and Reel at the bottom left, for your left thumb">Controls on the left</button>
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("fishCam", { first: "third", third: "cinematic", cinematic: "first" }[view.fishCam] || "first")} title="First person: everything through your own eyes, landing the fish too. Third person: from behind you. Cinematic: your own eyes, with framed shots of the landing">Fishing camera: {{ first: "First person", third: "Third person", cinematic: "Cinematic" }[view.fishCam] || "First person"}</button>
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("look", { low: "normal", normal: "high", high: "low" }[view.look] || "normal")} title="How far the view turns for a drag">Look speed: {{ low: "Low", normal: "Normal", high: "High" }[view.look] || "Normal"}</button>
+              <button type="button" role="menuitem" className={`ft-pill${view.torch && view.torch !== "off" ? " on" : ""}`} onClick={() => setOpt("torch", TORCHES[(TORCHES.indexOf(view.torch || "off") + 1) % TORCHES.length])} title="A lamp on your head that lights where you look. Red and green are kinder to your night sight than white"><Icon name="sun" />Head torch: {TORCH_NAMES[view.torch] || "Off"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={view.smooth !== false} className={`ft-pill${view.smooth !== false ? " on" : ""}`} onClick={() => setOpt("smooth", view.smooth === false)} title="The view carries on turning a little after a flick">Smooth camera</button>
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("stick", { s: "m", m: "l", l: "s" }[view.stick] || "m")} title="The walking stick's size">Stick size: {{ s: "Small", m: "Medium", l: "Large" }[view.stick] || "Medium"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={!!view.stickFloat} className={`ft-pill${view.stickFloat ? " on" : ""}`} onClick={() => setOpt("stickFloat", !view.stickFloat)} title="Touch anywhere in the lower left to walk, instead of a stick in the corner">Floating stick</button>

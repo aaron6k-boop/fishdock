@@ -50,6 +50,9 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const [species, setSpecies] = useState(speciesById(initialSpecies) ? initialSpecies : fresh ? "perch" : "cod");
   const sp = speciesById(species) || fishList[0];
   const [length, setLength] = useState(DRAW_CM[species] || 45);
+  // which fish the demo catches: a different one each cast (the default), or the one you choose below
+  const [randomFish, setRandomFish] = useState(() => { try { return localStorage.getItem("fishdock.demoFish") !== "pick"; } catch { return true; } });
+  const setFishMode = (random) => { setRandomFish(random); try { localStorage.setItem("fishdock.demoFish", random ? "random" : "pick"); } catch { /* private window: the choice lasts this visit */ } };
   const [photos, setPhotos] = useState(null);
   const [pick, setPick] = useState(0);
   const [view, setView] = useState(defaultView());
@@ -128,6 +131,18 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   // the fight's over (landed, lost or never started): the reeling ticks stop with it
   useEffect(() => { if (p.phase !== "hooked") haptics.reeling(false); }, [p.phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = events.at(-1)?.type;
+  // (a random fish: one of this water's kinds that FishDock has a picture of, at four fifths to five quarters of the
+  // size the demo usually draws it; drawn as each cast goes out, however it was made, so nothing changes under a fish
+  // already on)
+  const castN = events.reduce((n, e) => n + (e.type === "cast" ? 1 : 0), 0);
+  useEffect(() => {
+    if (!castN || !randomFish) return;
+    const pool = fishList.filter((f) => hasArt(f.id)), list = pool.length ? pool : fishList, f = list[Math.floor(Math.random() * list.length)];
+    if (f) { setSpecies(f.id); setLength(Math.max(10, Math.min(150, Math.round((DRAW_CM[f.id] || 40) * (0.8 + Math.random() * 0.45))))); }
+  }, [castN]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (what is on the line isn't known until it is hooked)
+  const fishKnown = !randomFish || p.phase === "hooked" || last === "catch";
+  const fishLabel = fishKnown ? `${sp.name}, ${length} cm` : "Random fish";
   const base = `${location.origin}/#try`;
   const copy = async (u) => { try { await navigator.clipboard.writeText(u); setCopied(u); setTimeout(() => setCopied(""), 1800); } catch { /* ignore */ } };
 
@@ -141,7 +156,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
               {fromMap ? <a className="fs-chip map-back" href={`#map/${placeId}`} aria-label="Back to map" title="Back to map"><Icon name="back" /><Icon name="explore" /></a> : null}
               <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
-              <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${sp.name}, ${length} cm at ${place.name}: change`}>{sp.name}, {length} cm</button>
+              <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${fishLabel} at ${place.name}: change`}>{fishLabel}</button>
               <span className="grow" />
               {/* in 3D these live in the view's one menu (top right); the photo view keeps its buttons */}
               {!view3d ? <>
@@ -162,7 +177,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D onWindIn={vf.windIn} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} onReel={{ tap: () => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }, hold: vf.hold }} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (
@@ -194,16 +209,20 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
           </div>
 
           <section className="watch-sec">
-            <div className="card-h"><h2>Fish</h2><span className="aside">{sp.name}, {length} cm</span></div>
+            <div className="card-h"><h2>Fish</h2><span className="aside">{randomFish ? "A different fish each cast" : `${sp.name}, ${length} cm`}</span></div>
+            <div className="moments" role="group" aria-label="Which fish you catch">
+              <button type="button" className={`chip${randomFish ? " on" : ""}`} aria-pressed={randomFish} onClick={() => setFishMode(true)}>Random fish</button>
+              <button type="button" className={`chip${randomFish ? "" : " on"}`} aria-pressed={!randomFish} onClick={() => setFishMode(false)}>Choose a fish</button>
+            </div>
             <div className="try-fish">
               {fishList.map((f) => (
-                <button key={f.id} type="button" className={`try-fish-b${f.id === sp.id ? " on" : ""}`} onClick={() => { setSpecies(f.id); setLength(DRAW_CM[f.id] || 40); }}>
+                <button key={f.id} type="button" className={`try-fish-b${!randomFish && f.id === sp.id ? " on" : ""}`} onClick={() => { setFishMode(false); setSpecies(f.id); setLength(DRAW_CM[f.id] || 40); }}>
                   {hasArt(f.id) ? <img src={artUrl(f.id, "s")} alt="" loading="lazy" /> : <span className="ph"><Icon name="fish" /></span>}
                   <span>{f.name}</span>
                 </button>
               ))}
             </div>
-            <div className="cond-row"><span>Length</span><input type="range" min="10" max="150" step="1" value={length} onChange={(e) => setLength(Number(e.target.value))} aria-label="Demo length in cm" /><span className="num tiny">{length} cm</span></div>
+            <div className="cond-row"><span>Length</span><input type="range" min="10" max="150" step="1" value={length} disabled={randomFish} onChange={(e) => setLength(Number(e.target.value))} aria-label="Demo length in cm" /><span className="num tiny">{length} cm</span></div>
             <p className="tiny">Sea fish are drawn from FishDock's own pictures. Freshwater fish without one yet splash and go straight to the close-up.</p>
           </section>
 

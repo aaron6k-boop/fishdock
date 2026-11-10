@@ -238,6 +238,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
   const m = new THREE.Matrix4();
   // the forearms are only drawn from the wrist to a little way inside the sleeve: beyond that the sleeve (a separate,
   // looser tube) covers them, and the skin used to show through it wherever the arm was thicker than the sleeve
+  let skinRaw = null;
   const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.086 } };
   root.traverse((o) => {
     if (!o.isMesh) return;
@@ -248,6 +249,8 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
     // the maps kept. The earlier sleeve had none and took a tiled weave instead, below)
     if (o.material?.name === "jacket" && o.material.normalMap && sleeveMat) { sleeveMat.map = o.material.map; sleeveMat.normalMap = o.material.normalMap; sleeveMat.normalScale.set(1.5, 1.5); sleeveMat.roughnessMap = null; sleeveMat.roughness = 0.8; sleeveMat.needsUpdate = true; o.material = sleeveMat; o.userData.fdSleeve = true; return; }
     if (o.material?.name === "jacket") { if (sleeveMat) o.material = sleeveMat; o.userData.fdSleeve = true; const uv = o.geometry.attributes.uv; if (uv) { for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 3, uv.getY(k) * 2.2); uv.needsUpdate = true; } /* (the model's sleeve is mapped in metres: scaled to the weave the drawn sleeve had, 16 round the arm) */ return; }
+    // (the skin as modelled, kept for measuring each finger's thickness off it below)
+    if (o.isSkinnedMesh && o.geometry.attributes.skinIndex) skinRaw = { pos: o.geometry.attributes.position.clone(), si: o.geometry.attributes.skinIndex.clone(), sw: o.geometry.attributes.skinWeight.clone(), names: o.skeleton.bones.map((b) => b.name), mw: o.matrixWorld.clone() };
     // (one step of subdivision: the model's fingers had a few flat sides each, which read as blocks this close)
     // (and a second step on High and Ultra: the knuckles and fingertips were still faceted where a hand fills a third of
     // the view, as it does holding a fish up or resting on the rail; about 66,000 points, skinned once a frame)
@@ -278,7 +281,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
     const relief = gloves || baked ? null : photoTex("fp_hand_relief", { srgb: false });
     if (relief) { relief.wrapS = relief.wrapT = THREE.ClampToEdgeWrapping; relief.flipY = false; }
     mt.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, CUT);
+      Object.assign(sh.uniforms, CUT); sh.uniforms.uFdDim = HANDS_DIM;
       if (relief) {
         sh.uniforms.uRelief = { value: relief };
         sh.fragmentShader = "uniform sampler2D uRelief;\n" + sh.fragmentShader.replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
@@ -291,7 +294,8 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
           #endif`);
       }
       sh.vertexShader = "attribute float fdCurv; varying float vCurv; varying vec3 vFdW;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvFdW = (modelMatrix * vec4(transformed, 1.0)).xyz; vCurv = fdCurv;");
-      sh.fragmentShader = "varying float vCurv; varying vec3 vFdW; uniform vec3 uFdW[2]; uniform vec3 uFdDir[2]; uniform float uFdCut;\n" + sh.fragmentShader
+      sh.fragmentShader = "varying float vCurv; varying vec3 vFdW; uniform vec3 uFdW[2]; uniform vec3 uFdDir[2]; uniform float uFdCut; uniform float uFdDim;\n" + sh.fragmentShader
+        .replace("#include <opaque_fragment>", "outgoingLight *= uFdDim;\n#include <opaque_fragment>")
         .replace("#include <color_fragment>", `#include <color_fragment>
           ${gloves ? "" : `{ float cr = smoothstep(0.0, 1.0, vCurv), cv = smoothstep(0.0, 1.0, -vCurv);
             // folds darker and warmer (blood close under thin skin), ridges a touch paler and drier
@@ -316,10 +320,13 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
             float t = dot(a, a) < dot(b, b) ? ta : tb; if (t < -uFdCut) discard; }`)
         .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
       { float rim = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.6);
-        reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.42, 0.32) * rim * 0.15"};
+        // (as bright as the light that is falling on the skin, no brighter: added as a fixed glow, it was the only thing
+        // lit after dark, and with the eye's night exposure the hands shone orange against a black sea)
+        vec3 fdLit = min(vec3(1.0), (reflectedLight.directDiffuse + reflectedLight.indirectDiffuse) / max(diffuseColor.rgb, vec3(0.04)) * 2.5);
+        reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.42, 0.32) * rim * 0.15"} * fdLit;
         ${gloves ? "" : "reflectedLight.directDiffuse *= vec3(1.0, 0.96, 0.93);"} }`);
     };
-    mt.customProgramCacheKey = () => "fdskin7" + (gloves ? "g" : "") + (baked ? "b" : "");
+    mt.customProgramCacheKey = () => "fdskin9" + (gloves ? "g" : "") + (baked ? "b" : "");
   });
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
@@ -374,13 +381,36 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
     const ix1 = wp(bone("index_01_" + sfx)), ix2 = wp(bone("index_02_" + sfx));
     // (where a handle lies in a gripping hand: across the palm just behind the knuckles, in its far crease, not in the
     // middle of it, so the fingers close round it from their roots)
+    // (a hand whose first finger bones start at the knuckles, as a real hand's do: the first segment is the long one.
+    // The first model's started a couple of centimetres beyond them, and the places below were set for that)
+    const anat = fingers[1][0].len > fingers[1][1].len * 1.4, f1 = anat ? 0.72 : 0.5;
     const knAvg = ["index", "middle", "ring", "pinky"].reduce((a2, d) => a2.add(wp(bone(`${d}_01_${sfx}`))), V()).multiplyScalar(0.25);
-    const palmPt = P.clone().lerp(knAvg, 0.82).addScaledVector(palmW, 0.012);
-    const gapPt = mid1.clone().lerp(mid2, 0.5).lerp(rin1.clone().lerp(rin2, 0.5), 0.5);
-    const hookPt = ix1.clone().lerp(ix2, 0.5).lerp(mid1.clone().lerp(mid2, 0.5), 0.5);
+    const palmPt = P.clone().lerp(knAvg, anat ? 1.02 : 0.82).addScaledVector(palmW, anat ? 0.015 : 0.012);
+    const gapPt = mid1.clone().lerp(mid2, f1).lerp(rin1.clone().lerp(rin2, f1), 0.5);
+    const hookPt = ix1.clone().lerp(ix2, f1).lerp(mid1.clone().lerp(mid2, f1), 0.5);
     const M = { y: toH(Yh), n: toH(palmW), x: toH(idxW), palm: toH(palmPt.sub(P)), gap: toH(gapPt.sub(P)), hook: toH(hookPt.sub(P)) };
     return { up, shoulder: V(s * 0.2, 1.4, 0.1), i, M, hand, fore, frameInv: frame.clone().invert(), handW, foreW, len, fr0Inv: fr0.clone().invert(), fingers, thumb, handRest: hand.quaternion.clone(), mid: bone("middle_01_" + sfx), ring: bone("ring_01_" + sfx) };
   });
+  // ---- each finger as it really is, measured off the model at rest: how thick each segment is (half-way along it,
+  // the middle one of the distances of its skin from the bone's line) and how long the last one is to its tip. The
+  // grips close each segment onto what it holds by these, so a thicker or longer finger still ends on the surface
+  // (set by rule for the first model's thin fingers, a thicker hand's closed short and hooked in the air)
+  if (skinRaw) {
+    const { pos, si, sw, names, mw } = skinRaw, P3 = V(), dom = new Int16Array(pos.count);
+    for (let v = 0; v < pos.count; v++) { let best = 0, bi = -1; for (let c = 0; c < 4; c++) { const w = sw.getComponent(v, c); if (w > best) { best = w; bi = si.getComponent(v, c); } } dom[v] = bi; }
+    for (const S of sides) for (const ch of [...S.fingers, S.thumb]) ch.forEach((j, k) => {
+      const bi = names.indexOf(j.b.name); if (bi < 0) return;
+      const A = wp(j.b), ax = (k < 2 ? wp(ch[k + 1].b) : A.clone().add(V(0, 1, 0).applyQuaternion(wq(j.b)).multiplyScalar(j.len))).sub(A), L = ax.length(); ax.normalize();
+      const ds = []; let far = 0;
+      for (let v = 0; v < pos.count; v++) {
+        if (dom[v] !== bi) continue;
+        P3.fromBufferAttribute(pos, v).applyMatrix4(mw).sub(A); const t = P3.dot(ax); if (t > far) far = t;
+        if (t > L * 0.25 && t < L * 0.75) ds.push(P3.addScaledVector(ax, -t).length());
+      }
+      if (ds.length > 3) { ds.sort((a, b) => a - b); j.r = clamp(ds[ds.length >> 1], 0.004, 0.016); }
+      if (k === 2 && far > 0.006) j.len = Math.max(0.008, far - (j.r || 0.008) * 0.75);
+    });
+  }
   if (typeof window !== "undefined" && FILM) window.__fdArms = { sides, root };
   const q = new THREE.Quaternion(), qa = new THREE.Quaternion(), gq = new THREE.Quaternion(), qb = new THREE.Quaternion();
   // the thumb from its angles: [base bend, middle, end, base swing across the palm]
@@ -407,7 +437,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null }) {
     for (let k = 0; k < 3; k++) {
       const j = ch[k], tipOf = () => (k < 2 ? wp(ch[k + 1].b) : wp(j.b).add(V(0, 1, 0).applyQuaternion(wq(j.b)).multiplyScalar(j.len)));
       for (let kk = k + 1; kk < 3; kk++) ch[kk].b.quaternion.copy(ch[kk].rest);
-      const r = R + fr * (1 - 0.15 * k);
+      const r = R + (j.r != null ? j.r * 0.92 : fr * (1 - 0.15 * k)); // (the finger's own half-thickness where the model gives it)
       let got = null;
       // (the thumb can meet the handle bending either way: it sits across from the fingers, and its joint's natural
       // bend isn't always towards what it holds; the nearer contact is taken, or none)
@@ -942,6 +972,12 @@ function cuffGeo() {
   g.computeVertexNormals(); return g;
 }
 
+// ---- your hands after dark ----
+// The pier's lamps light your hands (they are right under them) while the sea beyond stays dark, and with the eye's
+// night exposure bare skin became the brightest thing in the picture. So the skin is turned down as night comes on:
+// 1 by day, about half at full night (world.js sets it each frame).
+const HANDS_DIM = { value: 1 };
+export const setHandsDim = (v) => { HANDS_DIM.value = Math.min(1, Math.max(0.2, v)); };
 export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, fine = false } = {}) {
   const group = new THREE.Group(); group.name = "fp-hands"; group.visible = false;
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: gloves ? 0.55 : 0.6, metalness: 0 });
@@ -952,7 +988,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   const sleeveMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.78, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, roughnessMap: D0?.cloth.rough || null, normalScale: new THREE.Vector2(0.4, 0.4) });
   // (the cloth's soft pale edge as a cheap rim term rather than three's sheen lobe: the sleeves fill a third of the view
   // in first person, and the physical material's extra lobe cost a phone frames in the fight)
-  sleeveMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "{ float rim = pow(1. - abs(dot(normalize(vViewPosition), normal)), 3.); outgoingLight += vec3(.55, .6, .68)*rim*.18*(.4 + .6*totalDiffuse.g*4.); }\n#include <opaque_fragment>"); };
+  sleeveMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "{ float rim = pow(1. - abs(dot(normalize(vViewPosition), normal)), 3.); outgoingLight += vec3(.55, .6, .68)*rim*.18*min(1., totalDiffuse.g*6.); /* (only as the light on the cloth allows: a fixed part of it glowed at night) */ }\n#include <opaque_fragment>"); };
   if (D0) { D0.cloth.normal.repeat.set(16, 30); D0.cloth.rough.repeat.set(16, 30); } // (a finer weave: coarser, it read as stripes close up)
   const hemMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(coatHex).multiplyScalar(0.62), roughness: 0.9, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, normalScale: new THREE.Vector2(0.8, 0.8) });
   const built = buildHand(gloves, skinHex);

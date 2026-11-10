@@ -8,7 +8,7 @@ import { PREVIEW } from "./api.js";
 
 const KEY = "fishdock.parties.v1";
 const H = { accept: "application/json", "content-type": "application/json", "x-fishdock": "1" };
-export const CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
+export const CODE_RE = /^(?:[0-9]{4}|[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6})$/;
 export const cleanCode = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
 export const partyLink = (code, secret) => `${location.origin}/#party/${code}/${secret}`;
 

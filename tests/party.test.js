@@ -2,7 +2,7 @@
 // real events, host controls, chat, voice signalling, reconnecting, and the shared leaderboards.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleParty, PartyRoom, standings, validCode, makeCode, PARTY } from "../server/party.js";
+import { handleParty, PartyRoom, standings, validCode, makeCode, makeLongCode, makePin, PARTY } from "../server/party.js";
 import { setup, O, jpeg } from "./helpers/fishdock.js";
 import { localPartyNamespace } from "./helpers/party.js";
 
@@ -21,7 +21,7 @@ function harness(t) {
 }
 const start = (c, body = {}) => c("POST", "", { body: { mode: "virtual", venue: "pier", name: "Aaron", place: { label: "Norfolk coast" }, ...body } });
 
-test("starting a party: a six-character code, a private link secret, and the host fishing at the first spot", async (t) => {
+test("starting a party: a four-digit PIN, a private link secret, and the host fishing at the first spot", async (t) => {
   const h = harness(t);
   const r = await start(h.c);
   assert.equal(r.status, 200, r.text);
@@ -32,7 +32,8 @@ test("starting a party: a six-character code, a private link secret, and the hos
   assert.equal(hello.members[0].name, "Aaron"); assert.equal(hello.members[0].spot, 1); assert.equal(hello.members[0].role, "host");
   // no coordinates anywhere: only the kind of place and the host's label
   assert.doesNotMatch(JSON.stringify(hello), /lat|lon|"pos"/);
-  assert.equal(new Set(Array.from({ length: 200 }, makeCode)).size > 190, true);
+  assert.match(r.body.code, /^[0-9]{4}$/);
+  assert.equal(new Set(Array.from({ length: 200 }, makeLongCode)).size > 190, true);
   // without the Durable Object binding (the Pages set-up), it says so
   delete h.env.PARTY; assert.equal((await start(h.c)).status, 503);
 });
@@ -228,7 +229,7 @@ test("asking about codes, joining and starting parties are limited per connectio
   assert.equal(last.status, 429, "guessing codes is slowed down");
   for (let i = 0; i <= PARTY.joinsPerMinute; i++) last = await h.c("POST", `/${code}/join`, { body: { secret: `wrong${i}xxxxxx`, name: "x" } });
   assert.equal(last.status, 429, "guessing invite secrets is slowed down");
-  h.advance?.(70e3);
+  h.tick(70e3);
 });
 
 test("a party's saved record can't grow without limit: reports are capped, and so is everyone who ever joined", async (t) => {
@@ -415,4 +416,32 @@ test("voice: someone whose phone drops out of the party is out of voice too, so 
   assert.deepEqual(host.last("voice").voice, { on: false, muted: true });
   james = await h.sock(code, j.key);
   assert.equal(james.last("hello").members.find((m) => m.id === james.member).voice.on, false);
+});
+
+test("the four-digit PIN: evenly drawn, wrong guesses run out, a right one costs nothing, and an ended party's PIN can be used again", async (t) => {
+  const pins = Array.from({ length: 4000 }, makePin);
+  assert.ok(pins.every((p) => /^[0-9]{4}$/.test(p) && validCode(p)));
+  assert.ok(new Set(pins).size > 3000, "spread over the whole range");
+  assert.ok(validCode("ABC234") && !validCode("12345") && !validCode("12a4"), "old six-character codes still open; nothing else does");
+  const h = harness(t);
+  const r = await start(h.c), code = r.body.code;
+  // right guesses never use the allowance up
+  for (let i = 0; i < PARTY.missesPerHour + 5; i++) assert.equal((await h.c("GET", `/${code}?via=code`)).status, 200);
+  // wrong ones do: after the hour's allowance even the right PIN is refused from this network
+  const wrong = code === "0000" ? "0001" : "0000";
+  let n404 = 0, last; h.tick(61e3);
+  for (let i = 0; i < PARTY.missesPerHour + 2; i++) { h.tick(4000); last = await h.c("GET", `/${wrong}?via=code`); if (last.status === 404) n404++; }
+  assert.equal(last.status, 429); assert.equal(n404, PARTY.missesPerHour); h.tick(61e3);
+  assert.equal((await h.c("GET", `/${code}?via=code`)).status, 429, "no telling a hit from a miss once the guesses are spent");
+});
+test("a PIN whose party has ended can start a new party, and the old members are not in it", async (t) => {
+  const h = harness(t);
+  const r = await start(h.c), code = r.body.code;
+  const stub = h.P.get(h.P.idFromName(code));
+  const again = () => stub.fetch(new Request("https://party.internal/init", { method: "POST", body: JSON.stringify({ code, mode: "virtual", venue: "pier", name: "Sam" }) }));
+  assert.equal((await again()).status, 409, "a running party's PIN is never given to another");
+  h.tick(25 * 3600e3);
+  const b = await again(); assert.equal(b.status, 200);
+  const j = await b.json(); assert.notEqual(j.secret, r.body.secret); assert.notEqual(j.member.key, r.body.member.key);
+  assert.equal(await h.sock(code, r.body.member.key), null, "the old host's key opens nothing");
 });
