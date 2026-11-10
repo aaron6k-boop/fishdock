@@ -313,3 +313,35 @@ Aaron's phone screenshots still showed generated houses on the Pier Hotel side a
   None of the map's fences or garden walls are drawn at Gorleston now.
 - Limits: the photographs are about 21 pixels a degree, so the town is soft close up, and walking to the landward end
   of the pier brings you up to a flat picture. Checked in the build container's software renderer, not on a phone.
+
+## Stage 12 (10 November 2026, branch `realism-pass`): the dune, spray off the rocks, the town by day, your angler
+
+Aaron asked for a better texture on the hill, spray coming off the rocks, a more realistic town at the back, and the
+hands and characters redone.
+
+- **The dune is drawn from the ground itself** (`realPlace.js`, the soft ground's shader). It was a tiled photograph of
+  pebbly ground tinted yellow, which from the pier read as an even stipple. Now: pale sand, marram grass in drifts
+  metres across (straw where dry, grey-green where not), thick on the top and thin on the steep face, darker patches
+  of low scrub, and runs where sand has slipped. Each layer fades out before it gets smaller than a pixel. This is how
+  a marram dune looks in general, with the bare face under a grown-over top that the pier-head photograph shows; the
+  clumps are not surveyed.
+- **Spray off the rocks** (`rockSpray.js`, new). Where a crest reaches the seaward edge of the rock armour it throws a
+  burst of white water up and back over the stones, which drifts with the wind and falls. How hard depends on the sea
+  that is running: nothing in a calm, more as wind and swell rise. One draw call, up to 900 soft puffs. Spray off the
+  wall at your feet gets the same white as well as its drops. Not measured at Gorleston: general behaviour.
+- **The town at the landward end by day** (`source-assets/backdrop_day.py`). The dusk photograph's sheet still read as
+  evening: now its contrast is lifted again, shadows lightened, the lit lamps painted out of the daytime sheet (they
+  stay on the night sheet), and it is twice the size with a light sharpening. Its cut left end, which stopped at a
+  straight edge, thins out in a stipple. No new detail exists in it: it is the same 2000 pixel photograph.
+- **Your angler is the Rocketbox man in his own clothes** (`people.js` `OWN_DEFAULT`): a modelled gilet with pockets
+  and a zip over a long-sleeved top, coloured as your jacket. The jacket made in Blender for "Angler, fishing jacket"
+  was the suit's surface let out and smoothed, and looked melted; that person is still in the list but is no longer
+  the default. The gilet's hem line is lower (0.455), so its last few centimetres no longer stay beige.
+- **Tried and not kept:** three ways of rebuilding the jacket in Blender on Aaron's PC (the suit's surface with a
+  nearest-surface clearance; a voxel-remeshed body; rings cast round the body and arms). The first two kept lumps or
+  grew rolled rims at the suit's openings; the third showed that the model's own gilet was already better than any of
+  them. None of those meshes shipped and `make_angler_clothes.py` is unchanged.
+- **Not done:** the first-person hands and arms are the same models as before. New hands and a new character with their
+  own skeleton and animations are a separate, larger job (the earlier 17-phase brief).
+- Checked: unit tests and the end-to-end presets; stills by day from the mark, close to the rocks and in third person
+  (software renderer in the build container, not a phone; no frame rates measured).

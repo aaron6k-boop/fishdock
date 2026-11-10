@@ -48,8 +48,10 @@ Pavilion Theatre and the houses on the cliff top) is cut from "Gorleston South P
 (https://creativecommons.org/licenses/by-sa/2.0/):
 https://commons.wikimedia.org/wiki/File:Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg
 (from Geograph, photo 6234922). Changes: the left half of the band of the town cropped out, the sky and the near
-foreground made transparent, enlarged to twice its size, and its colours lifted from dusk to daylight to match the
-photograph above. This adapted image is offered under the same licence, CC BY-SA 2.0.
+foreground made transparent, enlarged to four times its size and lightly sharpened, its colours and contrast lifted
+from dusk to daylight to match the photograph above, its shadows lightened, the lit lamps and their glare painted out
+from the wall around them, and its cut end thinned to a stipple. This adapted image is offered under the same licence,
+CC BY-SA 2.0.
 
 gorleston_town_lights.webp (public/textures/: the town's lamps and lit windows after dark) is the bright points only of
 the same photograph, "Gorleston South Pier" by habiloid, CC BY-SA 2.0 (Geograph 6234922), on black, enlarged to twice
@@ -60,6 +62,7 @@ their lamps after dark) are cut from "The River Yare seen from Gorleston South P
 (https://creativecommons.org/licenses/by-sa/2.0/):
 https://commons.wikimedia.org/wiki/File:The_River_Yare_seen_from_Gorleston_South_Pier_-_geograph.org.uk_-_6235518.jpg
 (from Geograph, photo 6235518). Changes: the band of the sheds cropped out, the sky, the cranes and rigs above the roofs
-and the near foreground made transparent, enlarged to twice its size, colours lifted from dusk to daylight; the lamps
+and the near foreground made transparent, enlarged to twice its size, colours lifted from dusk to daylight, lightly
+sharpened, its cut end thinned to a stipple; the lamps
 file is its bright points only, on black, with a soft glow. Both offered under the same licence, CC BY-SA 2.0.
 The script that makes them is source-assets/night.py.

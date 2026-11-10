@@ -29,7 +29,7 @@ export const LOOK_KEYS = { skin: SKINS.length, hair: HAIRS.length, hat: HATS.len
 // colour stops and the trousers start)
 export const PEOPLE = [
   { file: "gardener", sex: "m", name: "Man, stubble", skin: 1, hair: 2, beard: 1, hem: 0.5 },
-  { file: "m05", sex: "m", name: "Man, short hair", skin: 0, hair: 1, beard: 1, hem: 0.5 },
+  { file: "m05", sex: "m", name: "Man, short hair", skin: 0, hair: 1, beard: 1, hem: 0.455 }, // (his gilet comes down past the hip: at 0.5 its last few centimetres kept their own beige under the jacket colour)
   { file: "m03", sex: "m", name: "Older man, grey hair", skin: 1, hair: 5, beard: 0, hem: 0.47 },
   { file: "m04", sex: "m", name: "Man, curly hair", skin: 5, hair: 0, beard: 1, hem: 0.52 },
   { file: "m18", sex: "m", name: "Man, hoodie", skin: 5, hair: 0, beard: 0, hem: 0.5 },
@@ -47,7 +47,7 @@ export const PEOPLE = [
 ];
 // who your own angler is until you choose: the angler in their fishing clothes, so the jacket you see on your arms in
 // first person is the one you see them wearing from behind
-export const OWN_DEFAULT = PEOPLE.findIndex((p) => p.file === "angler1");
+export const OWN_DEFAULT = PEOPLE.findIndex((p) => p.file === "m05");
 // clothing colours: the first keeps the jacket or trousers as they come (the model's own fabric, unrecoloured)
 export const COATS = [
   { hex: null, name: "As they come" }, { hex: 0x1d3150, name: "Navy" }, { hex: 0x3d4a2c, name: "Olive" }, { hex: 0x2e5e4e, name: "Bottle green" },
