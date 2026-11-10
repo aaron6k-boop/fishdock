@@ -144,27 +144,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const kind = { pier: 0, beach: 0, estuary: 1, river: 2, lake: 3 }[venue] ?? 0;
 
   // ---- splashes (droplets) and rings on the water ----
-  const DROPS = 260, dropPos = new Float32Array(DROPS * 3), dropV = new Float32Array(DROPS * 3), dropLife = new Float32Array(DROPS);
-  const dropGeo = new THREE.BufferGeometry(); dropGeo.setAttribute("position", new THREE.BufferAttribute(dropPos, 3));
-  // round, soft droplets (a radial sprite), not square points
-  const dropTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d"); const r = g.createRadialGradient(16, 16, 0, 16, 16, 16); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.45, "rgba(240,248,252,.85)"); r.addColorStop(1, "rgba(240,248,252,0)"); g.fillStyle = r; g.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(c); })();
-  const drops = new THREE.Points(dropGeo, new THREE.PointsMaterial({ color: 0xf2f6f8, size: 0.09, map: dropTex, transparent: true, opacity: 0.95, depthWrite: false, alphaTest: 0.02 })); drops.frustumCulled = false; scene.add(drops);
-  let dropHead = 0;
+  // (rockSpray.js: a crown of drops, a few up the middle and a puff of white, in the light of the hour. They used to
+  // be 260 round white dots of one size, 9 cm across, thrown out in a fan and as bright at midnight as at noon)
+  const spray = createRockSpray(scene, []), sprayLight = new THREE.Color(1, 1, 1), tmpSprayC = new THREE.Color(); let sprayEdge = false;
   /** at: world point; size: how big (a rig .6, a landed fish .9); mult: how many more drops (spray off a wall, seen from further off); up: a direction to throw them (spray goes up and back over the wall, not out in a ring) */
   function splash(at, size = 0.6, mult = 1, up = null) {
-    const n = Math.round((30 * size + 10) * mult);
-    for (let i = 0; i < n; i++) {
-      const k = dropHead++ % DROPS, a = Math.random() * Math.PI * 2, sp = (0.8 + Math.random() * 2.2) * size;
-      dropPos.set([at.x, Math.max(at.y, 0) + 0.02, at.z], k * 3);
-      if (up) dropV.set([Math.cos(a) * sp * 0.35 + up.x * sp * 0.8, 2.2 + Math.random() * 4 * size, Math.sin(a) * sp * 0.35 + up.z * sp * 0.8], k * 3);
-      else dropV.set([Math.cos(a) * sp * 0.6, 1.5 + Math.random() * 3 * size, Math.sin(a) * sp * 0.6], k * 3);
-      dropLife[k] = 1;
-    }
+    spray.splash(at.x, at.y, at.z, size, mult, up);
     // (spray off a wall: the white of it as well as the drops)
-    if (up && spray) spray.burst(at.x + up.x * 0.3, Math.max(at.y, 0), at.z + up.z * 0.3, Math.min(1, size * 0.45), up.x, up.z, 0.7);
+    if (up) spray.burst(at.x + up.x * 0.3, Math.max(at.y, 0), at.z + up.z * 0.3, Math.min(1, size * 0.45), up.x, up.z, 0.7);
   }
-  // spray where the sea breaks on the rock armour (rockSpray.js); made once the place is built
-  let spray = null; const sprayLight = new THREE.Color(), tmpSprayC = new THREE.Color();
   const ripples = [];
   // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
   // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)
@@ -644,6 +632,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       fightIn(f) { anglers.get(localId)?.a.setFight(f); },
       keep(state) { anglers.get(localId)?.a.keepFish(state); },
       // (single: one frame of that length, as a slow phone would draw it, rather than split into short steps)
+      /** (checks) a splash at a point on the water */
+      splash(x, z, size = 0.6, mult = 1) { const y = waveHeight(x, z, film ? film.t : 0, { ...env.waveState(), kind }); splash(new THREE.Vector3(x, y, z), size, mult); ripple(new THREE.Vector3(x, y, z), Math.min(1, size)); },
       step(ms, single = false) { if (!film) return; const n = single ? 1 : Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
       get mode() { return mode; },
       // for visual checks: the weather and light as given (eased in: step the clock a few seconds after)
@@ -732,15 +722,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // (gliding into first person: your body shows until the camera is nearly at your eyes, so no floating hands)
     if (camBlend) { applyBlend(); const me = anglers.get(localId); if (!W && me?.out?.eye && (mode === "first" || mode === "free") && camera.position.distanceTo(me.out.eye) > 0.7) me.a.setFirstPerson(false); }
     if (aimPower != null) { const pl = castPlanFor(aimPower); aimMark.visible = !!pl; if (pl) { aimMark.position.set(pl.point[0], 0.03, pl.point[1]); const k = (1.2 + pl.dist / 40) * (1 + 0.08 * Math.sin(t * 6)); aimMark.scale.set(k, 1, k); } } else aimMark.visible = false;
-    // droplets fall back, rings spread
-    for (let k = 0; k < DROPS; k++) {
-      if (dropLife[k] <= 0) { dropPos[k * 3 + 1] = -50; continue; }
-      dropV[k * 3 + 1] -= 9.8 * dt; dropPos[k * 3] += dropV[k * 3] * dt; dropPos[k * 3 + 1] += dropV[k * 3 + 1] * dt; dropPos[k * 3 + 2] += dropV[k * 3 + 2] * dt;
-      if (dropPos[k * 3 + 1] < -0.05) dropLife[k] = 0;
-    }
-    dropGeo.attributes.position.needsUpdate = true;
-    if (!spray && env.rockEdge) spray = createRockSpray(scene, env.rockEdge);
-    if (spray) {
+    // spray and splashes fall back, rings spread
+    if (!sprayEdge && env.rockEdge) { spray.setEdge(env.rockEdge); sprayEdge = true; }
+    {
       const ws = env.waveState(), sea = { ...ws, kind }, L2 = env.light;
       // (white water in the day's light, as bright as a white surface in it: the scene's own units, so it holds its
       // own against sunlit sand behind it, and goes grey at dusk and dark at night with everything else)
@@ -948,6 +932,6 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     /** the screen position (0..1) of a world point, or null when behind the camera */
     project(p) { const v = p.clone().project(camera); return v.z > 1 ? null : { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; },
     snapshot() { drawFrame(); return canvas.toDataURL("image/jpeg", 0.9); },
-    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); spray?.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
+    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); spray.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
   };
 }

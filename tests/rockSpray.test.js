@@ -1,7 +1,7 @@
 // spray off the rock armour: how hard a crest breaks, and where along the rocks it can
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { burstStrength, breakHeight, thinEdge, SPRAY } from "../src/lib/world3d/rockSpray.js";
+import { burstStrength, breakHeight, thinEdge, splashPlan, SPRAY } from "../src/lib/world3d/rockSpray.js";
 
 test("a flat calm throws no spray, however fast the water moves", () => {
   assert.equal(burstStrength(1, 0), 0);
@@ -25,4 +25,14 @@ test("the rocks' edge is thinned to one point every few metres", () => {
   const out = thinEdge(pts, SPRAY.gap);
   assert.ok(out.length < 25 && out.length > 10, String(out.length));
   assert.deepEqual(thinEdge([], 3), []);
+});
+test("a bigger splash throws more, faster, and a small one still throws something", () => {
+  const rig = splashPlan(0.6), fish = splashPlan(1.2), tiny = splashPlan(0.05);
+  assert.ok(fish.crown > rig.crown && fish.speed > rig.speed && fish.mist >= rig.mist);
+  assert.ok(tiny.crown > 0 && tiny.jet > 0 && tiny.mist > 0);
+  assert.ok(splashPlan(0.6, 2.2).crown > rig.crown * 2);
+});
+test("no splash can use up the whole pool of points", () => {
+  const big = splashPlan(5, 10);
+  assert.ok(big.crown + big.jet + big.mist < SPRAY.max / 3, JSON.stringify(big));
 });
