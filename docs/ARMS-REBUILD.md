@@ -51,6 +51,28 @@ the joints, the forms or the movement. They need replacing, and the animation ne
 
 Claude cannot buy things, make accounts or sign in, so either of the first two needs Aaron to fetch the files.
 
+## 3a. Foundation chosen (10 November 2026)
+
+Aaron first chose a bought model, then said he would not pay and asked for a free one. A bought model cannot be used
+without buying it, so that route is closed.
+
+**Blender Studio's Human Base Meshes bundle, version 1.1.0, licence CC0** (as reported by CG Channel, 28 June 2023;
+the bundle itself carries no licence file). Fetched from Blender's own server to
+`FishDock-assets/downloads/blender_human_base_meshes/` (47 MB):
+`https://download.blender.org/demo/asset-bundles/human-base-meshes/human-base-meshes-bundle-v1.1.0.zip`
+
+What it has, measured in Blender: `GEO-body_male_realistic`, a whole male body of 10,582 points in quads with UVs
+and three levels of sculpted detail (about 677,000 points at the finest), 1.69 m tall, arms at the sides; and
+`Hand  - Realistic`, a separate hand of 831 points with one finer level. Rendered in plain clay
+(`FishDock-assets/renders/hbm2_*.png`), the body's hand has knuckles, tendons across the back, modelled nails and
+tapered fingers in a relaxed pose, and the forearm has its muscle forms: the geometry the MakeHuman hand lacks.
+
+What it does not have: a skeleton, skin weights, colour or any other texture, or clothes. Those are to be made:
+a skeleton with joints at the knuckles, palm bones and forearm twist bones; weights; normal and ambient-occlusion
+maps baked from the finest sculpt level onto a game mesh; a skin colour map (painted by rule from those bakes, since
+there is no photograph-based one that fits its UVs); and the jacket sleeves fitted to it. One body, so first and
+third person can share it.
+
 ## 4. Order of work once a foundation is chosen (from the brief)
 
 1. A test scene in the game: neutral light, orbit camera, the real rod and reel, optional bone and contact overlays.
