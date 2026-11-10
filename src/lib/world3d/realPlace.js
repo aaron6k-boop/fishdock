@@ -862,7 +862,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const backs = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null /* (__fdNoBackdrop: a measuring switch, for comparing the scene with and without it) */, mid = (b) => { let x = 0, z = 0; for (const [px, pz] of b.ring) { x += px; z += pz; } return [x / b.ring.length, z / b.ring.length]; };
   const behindBackdrop = (b) => { if (!backs) return false; const [x, z] = mid(b); return backdropCovers(backs, x, z); };
   if (backs) { const bd = buildBackdrops(group, backs); place.backdropUpdate = bd.update; place.backdropCredit = backs.map((d) => d.credit).filter(Boolean); }
-  const res = buildBuildings(group, (place.buildings || []).filter((b) => !marks[b.id] && !behindBackdrop(b)), {
+  const asBuilt = (b) => { if (local?.sheds && !b.use) { const [x, z] = mid(b); if (local.sheds(x, z)) return { ...b, use: "portshed" }; } return b; };
+  const res = buildBuildings(group, (place.buildings || []).filter((b) => !marks[b.id] && !behindBackdrop(b)).map(asBuilt), {
     groundAt: (x, z) => groundAt(x, z) || LAND,
     // nothing on a fishing spot, the deck round it or in front of it
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),

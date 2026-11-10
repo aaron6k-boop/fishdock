@@ -24,6 +24,10 @@ export function styleFor(b) {
   const RENDER = [[1, 1, 1], [0.98, 0.94, 0.84], [0.9, 0.95, 1], [0.98, 0.96, 0.9], [0.95, 0.9, 0.82]];
   const BRICK = [[1, 1, 1], [0.9, 0.86, 0.84], [1.05, 0.95, 0.9], [0.82, 0.78, 0.76]];
   if (b.use === "lighthouse") return { type: "lighthouse", walls: "brick", roof: "dome", storeys: 0, h: b.tall ? Math.max(12, b.h) : 21, tint: [1, 1, 1] };
+  // (a port's sheds, where a place says so (localDetail.js `sheds`): profiled steel, one tall storey, no windows, a low
+  // roof. Drawn as houses or brick mills by their size alone, with a lit window in every bay, they were not what stands
+  // on a quay)
+  if (b.use === "portshed") { const flat = A > 1400 || b.roof === "flat"; return { type: "warehouse", walls: "cladding", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: 1, h: b.tall ? Math.min(b.h, 14) : A > 600 ? 9 : 6.5, pitch: 0.2, tint: [1, 1, 1] }; }
   if (b.use === "lookout") return { type: "lookout", walls: "render", roof: "flat", roofMat: "felt", storeys: 2, h: 6.4, tint: [1, 1, 1] };
   // (single storey: sheds, huts, kiosks, and anything mapped as public toilets or a shelter whatever its building tag,
   // such as the Pier Head Public Toilets at Gorleston, which was drawn as a two-storey house)

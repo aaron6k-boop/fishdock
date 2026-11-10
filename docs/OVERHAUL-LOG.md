@@ -266,3 +266,19 @@ from 271 openly licensed candidates). `backdrop3d.js`:
 generated; a daylight photograph of that side from the pier is needed. The harbour's north side and the ships are
 untouched. Draw calls from this camera are 1,047 where the integration branch measured 908 on 9 November: not
 explained yet, and not caused by the backdrop.
+
+## Stage 9 (10 November 2026, branch `night-fix`): what Aaron's phone screenshots showed at night
+
+- **Every window of every building was lit**, a grid of identical yellow squares. About one in three is lit now, the
+  same ones each time for a building (`buildings3d.js`: a dark window's bay is mapped one turn along the facade
+  sheet and its glow switched off).
+- **The north bank's buildings were drawn as houses and brick mills** with a window in every bay. Across the river
+  is the port's South Denes estate; the photographs from the pier show sheds, stores and tanks. They are drawn as
+  port sheds now: profiled steel, one tall storey, no windows (`localDetail.js` `sheds`, `architecture.js`).
+- **The boats were boxes.** `vessels3d.js`: an inshore fishing boat and a harbour workboat, each one mesh with a
+  lofted hull (raked stem, flare, sheer, transom, antifouling under a boot-top line), a wheelhouse with windows, a
+  mast, navigation lights that glow after dark and a wake astern. They keep 320 to 650 m out (they were as near as
+  180 m) and go round a long narrow beat at 2 to 3.5 m/s instead of sliding back and forth. Generic working boats,
+  not models of named vessels; no engine sound yet.
+
+Still generated: the houses on the Pier Hotel side to the south-west.
