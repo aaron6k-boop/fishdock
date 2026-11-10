@@ -30,10 +30,25 @@ export const LOCAL = {
     // 21.5 pixels a degree, left edge at 219.6. Distances from the map.
     { tex: "gorleston_pierhead.webp", cam: [61.5, -18.8], bearing0: 219.6, pxPerDeg: 21.5, px: [950, 91], waterline: [91, 95],
       dist: [[219.6, 520], [232, 520], [238, 300], [246, 250], [252, 250], [256, 320], [263.8, 320]],
-      credit: { by: "habiloid", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg" } }],
+      credit: { by: "habiloid", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:Gorleston_South_Pier_-_geograph.org.uk_-_6234922.jpg" } },
+    // the lamps and lit windows of the whole town after dark: the bright points of that same dusk photograph, its full
+    // width (round to bearing 312.6), hung just in front of the two sheets above
+    { lights: "gorleston_town_lights.webp", cam: [61.5, -18.8], bearing0: 219.6, pxPerDeg: 21.5, px: [2000, 91], waterline: [91, 99.4],
+      dist: [[219.6, 520], [232, 520], [238, 300], [246, 250], [252, 250], [256, 320], [263.8, 352], [273, 370], [286, 425], [300, 486], [312.6, 520]] },
+    // across the river: the port's sheds and offices on the north bank, from "The River Yare seen from Gorleston South
+    // Pier" by habiloid, CC BY-SA 2.0 (Geograph 6235518, via Wikimedia Commons), taken on the pier about 90 m west of the
+    // mark at dusk on the same evening. Colours lifted to daylight by the same measure; the cranes and jack-up rigs moored
+    // behind the sheds that day are cut away at the roofs. Lined up by the green light on the north pier's end (bearing
+    // 65.6 from the camera, the map's seamark) at the same 21.5 pixels a degree, which puts the mapped sheds within a
+    // degree or two of where the picture shows them: left edge at 346.1. Its own lamps light it after dark.
+    { tex: "gorleston_northbank.webp", lights: "gorleston_northbank_lights.webp", cam: [-89.4, 3.2], bearing0: 346.1, pxPerDeg: 21.5, px: [1130, 114], waterline: [120, 120],
+      dist: [[346.1, 250], [360, 245], [375, 270], [398.7, 270]],
+      credit: { by: "habiloid", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:The_River_Yare_seen_from_Gorleston_South_Pier_-_geograph.org.uk_-_6235518.jpg" } }],
     // none of the map's buildings are drawn in a generic style here (Aaron, 10 November 2026: the generated houses and
     // the shed across the river were not the real ones). The town is the two photographs above; the lighthouse and
     // coastwatch station on the pier is the one building modelled
+    // (the same goes for the map's fences and garden walls: the pole fence mapped along the pier was being drawn as a
+    // garden's close-boarded fence, a brown board wall down the deck. Aaron had it removed)
     generated: false,
     // across the harbour mouth: the bank north of the river is a low dune grown over with marram grass (photographs),
     // kept clear of the road and the buildings behind it

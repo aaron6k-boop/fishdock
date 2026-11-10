@@ -730,6 +730,18 @@
    "files": []
   },
   {
+   "id": "commons:geograph-6235518",
+   "name": "The River Yare seen from Gorleston South Pier",
+   "source": "https://commons.wikimedia.org/wiki/File:The_River_Yare_seen_from_Gorleston_South_Pier_-_geograph.org.uk_-_6235518.jpg (Geograph photo 6235518)",
+   "author": "habiloid",
+   "licence": "CC BY-SA 2.0",
+   "attribution": "Required: photo by habiloid, CC BY-SA 2.0. The adapted images are themselves CC BY-SA 2.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "2000x607 (the band used: 1130x114, enlarged to 2260x228)",
+   "use": "the port's sheds on the north bank in the 3D view at Gorleston South Pier (public/textures/gorleston_northbank.webp) and their lamps after dark (gorleston_northbank_lights.webp); the town's lamps after dark (gorleston_town_lights.webp) come from Geograph 6234922, listed above",
+   "files": []
+  },
+  {
    "id": "fishdock:fp_body",
    "name": "First-person arms with sleeves (derived)",
    "source": "cut from the MPFB angler (MakeHuman, CC0) in Blender: source-assets/blender/make_fp_body.py",
