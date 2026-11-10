@@ -17,6 +17,7 @@ import { LANDMARK_BUILDERS } from "./landmarks3d.js";
 import { WET_PREP, WET_DARKEN, wetRough } from "./wetLook.js";
 import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
+import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -857,7 +858,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   }
   if (beacons.length) place.beacons = beacons;
   setTownStyle(local?.town || null);
-  const res = buildBuildings(group, (place.buildings || []).filter((b) => !marks[b.id]), {
+  // (a far shore shown by a photograph of it (backdrop3d.js): the map's buildings behind that sheet aren't built too)
+  const backs = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null /* (__fdNoBackdrop: a measuring switch, for comparing the scene with and without it) */, mid = (b) => { let x = 0, z = 0; for (const [px, pz] of b.ring) { x += px; z += pz; } return [x / b.ring.length, z / b.ring.length]; };
+  const behindBackdrop = (b) => { if (!backs) return false; const [x, z] = mid(b); return backdropCovers(backs, x, z); };
+  if (backs) { const bd = buildBackdrops(group, backs); place.backdropUpdate = bd.update; place.backdropCredit = backs.map((d) => d.credit).filter(Boolean); }
+  const res = buildBuildings(group, (place.buildings || []).filter((b) => !marks[b.id] && !behindBackdrop(b)), {
     groundAt: (x, z) => groundAt(x, z) || LAND,
     // nothing on a fishing spot, the deck round it or in front of it
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
@@ -982,7 +987,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const onRoad = (x, z) => roads.some((r) => { for (let i = 0; i + 1 < r.line.length; i++) if (segDist([x, z], r.line[i], r.line[i + 1]) < r.w / 2 + 2.2) return true; return false; });
     const bankAt = (x, z) => { if (!local?.hill) return 0; const d = Math.abs(local.hill(x - 2, z) - local.hill(x + 2, z)); return d > 0.3 ? Math.min(1, d / 0.8) : 0; };
     const woods = (place.woods || []).map(bb), woodAt = (x, z) => woods.some((b) => inB([x, z], b));
-    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z), bank: bankAt, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
+    const backsT = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null;
+    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
     if (trees) { place.trees = trees.count; place.treesBuilt = trees.built; place.treesUpdate = trees.update; }
   }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)

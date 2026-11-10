@@ -729,6 +729,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     sun.color.setRGB(...look.sunColour); sun.intensity = look.sunIntensity;
     if (sun.castShadow) sun.shadow.intensity = look.shadow;
     hemi.color.setRGB(...look.skyColour); hemi.groundColor.setRGB(...look.groundColour); hemi.intensity = look.skyIntensity;
+    real?.backdropUpdate?.({ sun: sun.color, sunI: look.sunIntensity, sky: hemi.color, skyI: look.skyIntensity }); // (the photographed far shore takes the hour's light)
     // ---- haze: the horizon's colour, the same exponential haze for the land and the water (thicker in rain) ----
     // (the haze colour is the sky's horizon as you see it, a display colour. The water works in display colours and
     // takes it as it is; the land's fog is mixed in linear light before the tone curve and the exposure, so it gets the

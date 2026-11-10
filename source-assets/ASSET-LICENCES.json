@@ -704,6 +704,30 @@
    "resolution": "2048x512",
    "use": "the first-person hands' knuckle creases and nail edges as relief (public/textures/fp_hand_relief.jpg)",
    "files": []
+  },
+  {
+   "id": "commons:geograph-7618525",
+   "name": "View into the harbour from South Pier, Gorleston-on-Sea",
+   "source": "https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg (Geograph photo 7618525)",
+   "author": "Christopher Hilton",
+   "licence": "CC BY-SA 2.0",
+   "attribution": "Required: photo by Christopher Hilton, CC BY-SA 2.0. The adapted image is itself CC BY-SA 2.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "1600x721 (the band used: 1600x132, enlarged to 3200x264)",
+   "use": "the Gorleston riverside as the far shore in the 3D view at Gorleston South Pier (public/textures/gorleston_riverside.webp), its sky and near foreground made transparent",
+   "files": []
+  },
+  {
+   "id": "fishdock:fp_body",
+   "name": "First-person arms with sleeves (derived)",
+   "source": "cut from the MPFB angler (MakeHuman, CC0) in Blender: source-assets/blender/make_fp_body.py",
+   "author": "FishDock",
+   "licence": "CC0 1.0 (as its source)",
+   "attribution": "Not required",
+   "type": "models",
+   "resolution": "3,844 + 4,860 vertices",
+   "use": "your arms and jacket sleeves in first person (public/models/fp_body.glb)",
+   "files": []
   }
  ]
 }
