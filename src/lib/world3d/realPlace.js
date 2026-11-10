@@ -563,7 +563,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   {
     const parts = { wall: [], coping: [], fence: [], post: [], hedge: [] };
     const okHere = (mx, mz) => !(nearSpot(mx, mz, 25) || !landAt([mx, mz]) || PR.some((bx) => inB([mx, mz], bx)));
-    for (const b of place.barriers || []) {
+    for (const b of (local?.generated === false ? [] : place.barriers || [])) {
       for (let k = 0; k + 1 < b.line.length; k++) {
         const [x1, z1] = b.line[k], [x2, z2] = b.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
         const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2; if (!okHere(mx, mz)) continue;

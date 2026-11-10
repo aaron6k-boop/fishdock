@@ -50,3 +50,16 @@ https://commons.wikimedia.org/wiki/File:Gorleston_South_Pier_-_geograph.org.uk_-
 (from Geograph, photo 6234922). Changes: the left half of the band of the town cropped out, the sky and the near
 foreground made transparent, enlarged to twice its size, and its colours lifted from dusk to daylight to match the
 photograph above. This adapted image is offered under the same licence, CC BY-SA 2.0.
+
+gorleston_town_lights.webp (public/textures/: the town's lamps and lit windows after dark) is the bright points only of
+the same photograph, "Gorleston South Pier" by habiloid, CC BY-SA 2.0 (Geograph 6234922), on black, enlarged to twice
+its size with a soft glow added round each. Offered under the same licence.
+
+gorleston_northbank.webp and gorleston_northbank_lights.webp (public/textures/: the port's sheds across the river, and
+their lamps after dark) are cut from "The River Yare seen from Gorleston South Pier" by habiloid, licensed CC BY-SA 2.0
+(https://creativecommons.org/licenses/by-sa/2.0/):
+https://commons.wikimedia.org/wiki/File:The_River_Yare_seen_from_Gorleston_South_Pier_-_geograph.org.uk_-_6235518.jpg
+(from Geograph, photo 6235518). Changes: the band of the sheds cropped out, the sky, the cranes and rigs above the roofs
+and the near foreground made transparent, enlarged to twice its size, colours lifted from dusk to daylight; the lamps
+file is its bright points only, on black, with a soft glow. Both offered under the same licence, CC BY-SA 2.0.
+The script that makes them is source-assets/night.py.

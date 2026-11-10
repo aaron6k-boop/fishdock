@@ -299,3 +299,17 @@ Aaron's phone screenshots still showed generated houses on the Pier Hotel side a
   licensed photograph of that bank from the pier has been lined up yet.
 - Checked: 314 unit tests pass, the end-to-end presets pass, and the views south-west, west, north-west and north from
   the mark were rendered by day and at night (software renderer in the build container, not a phone).
+
+## Stage 11 (10 November 2026, branch `night-lights`): real lamps at night, the north bank, the board fence
+
+- **Lights at night from a real photograph.** The bright points of the dusk photograph of the town (Geograph 6234922:
+  street lamps, lit windows, signs) are hung just in front of the town's sheets and come on as the light goes
+  (`backdrop3d.js`, a def's `lights`). They are the lights that were on in that photograph, no more.
+- **The north bank is a photograph too** (`gorleston_northbank.webp`, Geograph 6235518, habiloid, CC BY-SA 2.0): the
+  port's sheds and offices, with their own lamps after dark. The cranes and jack-up rigs moored there that day are cut
+  away. Lined up by one point (the north pier's light) and the scale of the same camera's other picture: the sheds sit
+  within a degree or two of the map, not exactly.
+- **The brown board wall down the pier is gone.** It was the map's pole fence drawn as a garden's close-boarded fence.
+  None of the map's fences or garden walls are drawn at Gorleston now.
+- Limits: the photographs are about 21 pixels a degree, so the town is soft close up, and walking to the landward end
+  of the pier brings you up to a flat picture. Checked in the build container's software renderer, not on a phone.
