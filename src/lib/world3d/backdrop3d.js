@@ -56,7 +56,7 @@ export function buildBackdrops(group, defs) {
     update({ sun, sunI, sky, skyI }) {
       // (soft daylight in the game: sky about 1, sun about 3. Half from each, so a clear noon is near 1 and an
       // overcast day a little under; dusk and night follow the sky down)
-      c.setRGB(sky.r * skyI * 0.9 + sun.r * sunI * 0.2, sky.g * skyI * 0.9 + sun.g * sunI * 0.2, sky.b * skyI * 0.9 + sun.b * sunI * 0.2);
+      c.setRGB(sky.r * skyI * 1.2 + sun.r * sunI * 0.3, sky.g * skyI * 1.2 + sun.g * sunI * 0.3, sky.b * skyI * 1.2 + sun.b * sunI * 0.3);
       for (const m of mats) m.color.copy(c);
     },
     dispose() { for (const mesh of meshes) { mesh.geometry.dispose(); mesh.material.map?.dispose?.(); mesh.material.dispose(); } },

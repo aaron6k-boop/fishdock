@@ -24,7 +24,10 @@ export const LOCAL = {
       credit: { by: "Christopher Hilton", licence: "CC BY-SA 2.0", url: "https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg" } }],
     // across the harbour mouth: the bank north of the river is a low dune grown over with marram grass (photographs),
     // kept clear of the road and the buildings behind it
-    dunes: (x, z) => z < -85 && z > -175 && x > -140 && x < 80,
+    // (only at the harbour mouth, seaward of x -35: up the river from there the north bank is a low flat quay, brown
+    // piling with grass on top, as Christopher Hilton's photograph from the pier shows (Geograph 7618525, bearing 338
+    // from the camera meets that bank at about x -44). The dune used to run on to x -140 and hid the town behind it)
+    dunes: (x, z) => z < -85 && z > -175 && x > -35 && x < 80,
     // (the pier-head photograph Aaron shared, John Ellis, April 2018: across the harbour mouth the dune is a tall bank, about 8 m, estimated)
     duneH: 8,
     // and along its foot a bank of dark granite boulders in the water, from the end of the north pier round to the sea
