@@ -80,3 +80,26 @@ third person can share it.
 3. The arm rig (collar bone to fingers, twist bones, two-bone IK with a pole) and ten turns of the reel: shown.
 4. Only then: casting, striking and fighting, landing and handling a fish, walking, the camera, third person.
 5. Frame-time measurements on a real PC at 30, 60 and 120 frames a second.
+
+## 5. Third build of the first-person arms (10 November 2026, branch `arms-bs`)
+
+Done, in `public/models/fp_body.glb`, built by `source-assets/blender/make_fp_body_bs.py` on Aaron's PC:
+
+- **The hands are Blender Studio's.** The hands and wrists of the realistic male body: 11,104 points for the pair, with
+  the knuckles, tendons, nails and finger shapes of the sculpt. The finest sculpted level (55,000 points a hand) is
+  baked to a 2048 px normal map, and how shut-in each point is to a shade map used for the creases.
+- **Joints at the knuckles.** The body has no skeleton, so the hand's joints are found from its shape: fingertips as
+  the points furthest along the skin from the forearm, each finger as the surface beyond its web, joints along its
+  middle line at a real hand's proportions. The angler's finger bones are moved to them: the index finger's first
+  segment is now 3.6 cm (it was 2.8), the middle's 4.6 cm. Weights by Blender's bone heat.
+- **Laid out straight at rest**, as the angler's hand was, because the game works its grips out from that pose. The
+  same grips and movements drive it, unchanged.
+- **Skin colour carried across** from the MakeHuman hand, point for nearest point: his tone and where it is redder or
+  paler, softened, with the sculpt's own creases shaded in. It is not a photographed skin for this hand, and the nails
+  are not painted separately.
+- **The sleeves** are the field jacket's, as in the second build.
+
+Not done, from the brief: forearm twist bones and palm bones; painted weights and corrective shapes; a body rig
+driving the arms from the shoulders and chest; authored casting, striking, reeling and landing movements; the test
+scene; third person on the same body; frame-time measurements. The hand is still moved by the old controller, so
+how it moves has not changed, only what it is.
