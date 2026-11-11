@@ -116,6 +116,7 @@ function netTexture() {
 
 // ---- the species modelled in Blender (public/models/fish.glb, source-assets/blender/build_fish.py) ----
 const MODELLED_FISH = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack"]);
+const EARLY_FISH = new Set(["cast", "waiting", "bite"]); // (the phases in which the coming fish is got ready)
 const modelledCache = new Map();
 /** One geometry for a modelled species: its body, fins and eyes as three groups (materials 0, 1 and 2), its uvs the
  *  picture's (turned the way a canvas texture reads them). A fresh copy each time (the fish is bent in place). */
@@ -157,6 +158,7 @@ function genericFishGeometry() {
 }
 
 export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, look = null, local = false, real = false, rail = false, fineHands = false, onSound, onFeel } = {}) {
+  let assetsN = 0; // (new shapes or materials made: see `assets` below)
   const root = new THREE.Group(); world.add(root);
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
   // the person (human3d.js: a realistic person, with the simple figure3d.js figure standing in while it loads): their
@@ -361,7 +363,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const bagGeo = new THREE.LatheGeometry(Array.from({ length: 9 }, (_, i) => { const u = i / 8; return new THREE.Vector2(0.35 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.15 * u) + 0.02, -0.5 * u); }), 18);
   let bag = new THREE.Mesh(bagGeo, mNet); net.add(bag);
   // the nets modelled in Blender (public/models/nets.glb): a drop net at a pier, a landing net elsewhere
-  loadPart("nets").then((sc) => { const b = fitNet(net, sc, venue === "pier" ? "drop" : "landing"); if (b) bag = b; }).catch(() => {});
+  loadPart("nets").then((sc) => { const b = fitNet(net, sc, venue === "pier" ? "drop" : "landing"); if (b) bag = b; assetsN++; }).catch(() => {});
+  loadPart("fish").catch(() => {}); // (fetched with the place, under the loading screen: it used to be fetched as the first fish was hooked)
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1, 6), mMetal); world.add(pole); pole.visible = false;
   // an unhooking mat (a padded, wipe-clean mat: where a fish you'll put back is laid to be looked at and unhooked)
   const mat = new THREE.Group(); world.add(mat); mat.visible = false;
@@ -409,6 +412,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // laid on a mat, held in the hands or sat at the surface without going into anything
   let fishBox = { up: 0.12, down: 0.12, thick: 0.05 };
   function useGeometry(geo, materials) {
+    assetsN++;
     fish.geometry = fishGeo = geo; fishBase = geo.attributes.position.array.slice();
     let up = 0, down = 0, thick = 0;
     for (let i = 0; i < fishBase.length; i += 3) { const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2]; if (u < 0.02 || u > 0.8) continue; up = Math.max(up, y); down = Math.max(down, -y); thick = Math.max(thick, Math.abs(z)); }
@@ -560,7 +564,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       lastKey = key; prevAge = age > 1.2 ? age : -1; seed = rng(hashSeed(`${id}|${info.since}|${info.phase}`));
       P = { strong: seed() < 0.35 + 0.3 * prof.pull, s1: seed() * 10, s2: seed() * 10, taps: null, side: seed() < 0.5 ? -1 : 1 };
       if (info.phase === "landing" || info.phase === "hooked") { const d = info.ev?.type === "catch" ? info.ev.data || {} : hintFish || {}; setFish(d.species || null, d.lengthCm || null, d.weightKg || null); }
-      else if (info.phase === "bite" && hintFish) setFish(hintFish.species, hintFish.lengthCm, null);
+      // (the fish that is coming is got ready while the bait is still going out or sitting there: its picture read,
+      // its shape and skin made, its shaders built. Left to the bite, all of that landed on the frames of the strike)
+      else if (EARLY_FISH.has(info.phase) && hintFish) setFish(hintFish.species, hintFish.lengthCm, null);
       if (info.phase === "landing") landStart = fightPos ? fightPos.clone() : nearAt.clone().lerp(castAt, 0.25);
     }
     const crossed = (m) => prevAge < m && age >= m;
@@ -1591,7 +1597,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     setFight(f) { fightIn = f ? { ...f, at: performance.now() } : null; },
     /** where the camera looks (world yaw, pitch): your rod in first person follows the view */
     setView(yaw, pitch) { viewIn = { yaw, pitch }; },
-    setHint(h) { hintFish = h || null; },
+    setHint(h) { const was = hintFish; hintFish = h || null; if (hintFish && (hintFish.species !== was?.species || hintFish.lengthCm !== was?.lengthCm) && EARLY_FISH.has(lastKey.split("|")[0])) setFish(hintFish.species, hintFish.lengthCm, null); },
+    /** Goes up whenever this angler gets new shapes or materials (a fish made ready, the net fitted): world.js sends them to the graphics card then, ahead of their first appearance. */
+    get assets() { return assetsN; },
     setName(n) { const old = tag; const s = label(n || "Angler", local ? "#7ee8de" : "#ffffff"); s.position.copy(old.position); s.visible = old.visible; root.remove(old); old.material.map.dispose(); old.material.dispose(); root.add(s); tag = s; },
     place,
     /** Walking about (walker.js state, world coordinates), or null to stand at the spot again. */

@@ -123,6 +123,20 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // a GPU timer query round each frame where the browser offers one (Chromium on a PC; not Safari). The answer comes
   // back a few frames later; the last 60 are kept for perf()
   const gl = renderer.getContext(), tq = gl.getExtension("EXT_disjoint_timer_query_webgl2"), gpuT = new Float32Array(60); let gpuN = 0, qs = [];
+  // ---- ahead of time: shaders built and textures sent for things that exist but have not been drawn yet ----
+  // (three.js does both the first time a thing is actually drawn, which for a fish, a net or a light that comes on at a
+  // bite is in the middle of the action. Given the object, or nothing for the whole scene.)
+  let warmAt = 0, warmSum = 0, frameTap = null;
+  function warm(root = scene) {
+    try {
+      // (built for what the scene is really drawn into. With post-processing on that is the composer's target, not
+      // the screen, and a shader for one is not the shader for the other: built for the screen, as this used to be at
+      // start-up, every one of them was built a second time on the frame its object first appeared)
+      const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
+      try { if (root === scene) renderer.compile(scene, camera); else renderer.compile(root, camera, scene); } finally { if (rt) renderer.setRenderTarget(prev); }
+      root.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "alphaMap", "emissiveMap"]) { const t = m[k]; if (t?.isTexture && t.image && (t.image.width || t.image.data) && !renderer.properties.get(t).__webglTexture) renderer.initTexture(t); } });
+    } catch { /* (a driver that won't: they are built as they are met, as before) */ }
+  }
   function drawFrame() {
     sharpen(); renderer.info.reset();
     let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
@@ -145,7 +159,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   if (Q.sea) env.setFftSea(true, renderer);
   // (every material's shader compiled now, in parallel where the driver allows, rather than the first time its object
   // comes into view: the first look round used to stall on each new shader)
-  try { const pc = renderer.compileAsync?.(scene, camera); pc?.catch?.(() => {}); } catch { /* (a driver that can't: the shaders compile as they are met) */ }
+  warm(); // (see warm below: for the target the scene is really drawn into)
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
@@ -620,7 +634,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     // (a little early is fine: the screen's own beat decides when it shows, so this only skips every other one at 30)
     if (fpsCap && last && ts - last < 1000 / fpsCap - 3) return;
     const dt = Math.min(0.1, (ts - (last || ts)) / 1000); last = ts;
-    if (dt > 0) ft[ftN++ % 240] = dt * 1000;
+    if (dt > 0) { ft[ftN++ % 240] = dt * 1000; if (frameTap) { const me = anglers.get(localId), k = me?.out?.kept; frameTap(dt * 1000, { phase: W ? "walking" : k && k !== "gone" ? `fish ${k}` : me?.out?.phase || "-", programs: renderer.info.programs?.length || 0, textures: renderer.info.memory.textures, gpu: gpuN ? +gpuT[(gpuN - 1) % 60].toFixed(2) : null }); } }
     // (the resolution is changed before this frame is drawn, never after: resizing the canvas clears it, and done after
     // drawing, the blank canvas was what the phone showed for that frame, a grey flash mid-fight)
     pace(ts, dt);
@@ -775,6 +789,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (L2) sprayLight.setRGB(...L2.skyColour).multiplyScalar(L2.skyIntensity * 0.34).add(tmpSprayC.copy(env.sun.color).multiplyScalar(L2.sunIntensity * 0.26)); else sprayLight.setRGB(1, 1, 1);
       spray.update(t, dt || 0, sea, (x, z) => waveHeight(x, z, t, sea), sprayLight, renderer.domElement.height / renderer.getPixelRatio(), camera.fov);
     }
+    // anything an angler has just been given (the coming fish, a net) goes to the graphics card now, shaders and
+    // textures, while it is still out of sight: not on the frame it first appears
+    { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum) { warmSum = sum; warm(); } } // (the whole scene: a fish and a net live in the world, not under their angler)
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
@@ -966,6 +983,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (pose?.spotAt) { const x = anglers.get(id); remote.delete(id); if (x) { x.a.setWalk(null); x.a.place({ ...x.a.spot, at: pose.at, face: pose.face, edge: pose.edge, cast: pose.cast }); } return; }
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },
+    /** Build every shader and send every texture the scene has, drawn yet or not (the loading screen calls this once the files are in). */
+    warm() { warm(scene); },
+    /** Every frame's time (ms) with what you were doing and the graphics card's running counts, to `cb`; null stops it. For the frame log (frameLog.js). */
+    tapFrames(cb) { frameTap = cb || null; },
     /** Frame pacing on or off (off while the loading screen is up). */
     setPacing(on) { pacing = !!on; late = 0; easyFor = 0; },
     /** What the graphics card holds so far: while these still change from frame to frame, the place is still arriving. */

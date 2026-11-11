@@ -29,6 +29,8 @@ export function biteDelay(species, rnd = Math.random) {
 /** Seconds of reeling a fish needs (holding the reel), from how long that kind and size of fish fights. */
 export const reelNeeded = (species, lengthCm) => Math.max(3, Math.round(fightSeconds(species, lengthCm) * 0.6 * 10) / 10);
 /** One step of reeling: holding gains line (less while the fish surges); letting go, the fish takes some back. */
+/** The page hears about the fight on every third of its twenty steps a second (the 3D view reads every one). */
+export const FIGHT_UI_EVERY = 3;
 export function reelStep(progress, dt, holding, { need = 6, surge = 0 } = {}) {
   const v = holding ? (1 - 0.6 * surge) / need : -0.12 * (0.5 + surge);
   return Math.max(0, Math.min(1, progress + v * dt));
@@ -41,6 +43,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
   const autoplayRef = useRef(false); autoplayRef.current = autoplay;
   const holding = useRef(false), timers = useRef([]), reelRef = useRef(0), fish = useRef({ species, name, lengthCm });
   // tapping the reel: recent tap times, the fight's state (reelModel.js), assisted winding on or off, the drag
+  const live = useRef(null), tickN = useRef(0), flagsWas = useRef("");
   const taps = useRef([]), pending = useRef(0), fightRef = useRef(null), assistOn = useRef(false), dragRef = useRef(DRAG.standard), tapN = useRef(0);
   const [fight, setFight] = useState(null), [opts, setOptsNow] = useState(loadReelOpts), [note, setNote] = useState("");
   const optsRef = useRef(opts); optsRef.current = opts;
@@ -74,7 +77,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
 
   // the fight: tapping winds line in against the fish (reelModel.js), ten steps a second
   useEffect(() => {
-    if (last?.type !== "hooked") { reelRef.current = 0; setReel(0); holding.current = false; assistOn.current = false; taps.current = []; fightRef.current = null; setFight(null); return undefined; }
+    if (last?.type !== "hooked") { reelRef.current = 0; setReel(0); holding.current = false; assistOn.current = false; taps.current = []; fightRef.current = null; live.current = null; setFight(null); return undefined; }
     const f = fish.current, castEv = [...events].reverse().find((e) => e.type === "cast");
     fightRef.current = createFight({ species: f.species, lengthCm: f.lengthCm, startM: castEv?.data?.dist || 30, mode: optsRef.current.advanced ? "advanced" : "standard", seed: Math.floor(last.t % 100000) });
     let prev = performance.now(); pending.current = 0;
@@ -84,8 +87,14 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
       const assisted = assistOn.current || autoplayRef.current || (holding.current && optsRef.current.holdReel !== false);
       const n = pending.current; pending.current = 0;
       const s = fightStep(fightRef.current, dt, { taps: n, rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
-      fightRef.current = s; reelRef.current = s.progress; setReel(s.progress);
-      setFight({ progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina });
+      fightRef.current = s; reelRef.current = s.progress;
+      const view = { progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina };
+      // (the 3D view reads this itself every frame, fightLive below. The page is only told six or seven times a second,
+      // or at once when something it shows as a word changes: told all twenty, React drew the whole screen again
+      // twenty times a second through every fight, between the frames and never in step with them)
+      live.current = view;
+      const flags = `${s.near}|${s.running}|${s.taking}|${s.slipping}|${s.mode}|${assisted}|${!!s.out}`;
+      if (++tickN.current % FIGHT_UI_EVERY === 0 || flags !== flagsWas.current) { flagsWas.current = flags; setReel(s.progress); setFight(view); }
       if (s.out) { clearInterval(id); say(s.out === "broke" ? "The line broke. Ease the drag off when it runs." : "The hook came free. Keep the line tight."); add("lost", { why: s.out }); return; }
       if (s.near && autoplayRef.current) { clearInterval(id); land(); }
     }, 50);
@@ -98,6 +107,8 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
   function land() { if (last?.type === "hooked" || fightRef.current) { fightRef.current = null; add("catch", catchData()); } }
   return {
     events, reel, autoplay, last, fight, note, opts,
+    /** The fight as it is this instant (a ref: read it, don't render from it). null when no fish is on. */
+    fightLive: live,
     /** cast: optionally { dist (m), aim (radians from straight out), power (0..1) } from the 3D view's aim */
     cast: (d) => add("cast", d && Number.isFinite(d.dist) ? { dist: Math.round(d.dist * 10) / 10, aim: Math.round((d.aim || 0) * 1000) / 1000 } : null),
     strike: () => {

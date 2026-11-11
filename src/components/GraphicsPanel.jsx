@@ -3,6 +3,7 @@
 // detail too (the sea's mesh, cloud shading, the people's textures, shadow quality), which needs the place built
 // again: your fishing carries on, but someone walking about goes back to their spot. The rest change at once.
 import { useEffect, useState } from "react";
+import { createFrameLog, reportText } from "../lib/frameLog.js";
 
 export const PRESETS = [["auto", "Auto"], ["performance", "Low"], ["balanced", "Medium"], ["high", "High"], ["ultra", "Ultra"]];
 const NAME = Object.fromEntries(PRESETS);
@@ -106,6 +107,25 @@ export default function GraphicsPanel({ view, setOpts, world, onClose, scene = n
 // live site and a PR preview alike, on the same PC)
 export const devMode = () => { try { if (/\bdev=1\b/.test(location.hash + location.search)) localStorage.setItem("fishdock.dev", "1"); return (typeof __FD_FILM__ !== "undefined" && __FD_FILM__ === true) || /FishDockDesktop\/\d/.test(navigator.userAgent) || localStorage.getItem("fishdock.dev") === "1"; } catch { return false; } };
 const PRESET_ORDER = ["performance", "balanced", "high", "ultra"];
+// ---- the catch recording (frameLog.js): kept here, outside any component, so it runs on while the panel is closed ----
+const catchRec = { cur: null, text: null, onDone: null };
+function stopCatchRec(world) {
+  const r = catchRec.cur; if (!r) return; catchRec.cur = null; r.world?.tapFrames?.(null); clearTimeout(r.timer); try { r.po?.disconnect(); } catch { /* not offered */ }
+  const w = r.world || world, last = w?.perf?.(), g = w?.gfx || {};
+  const where = navigator.userAgent.match(/FishDockDesktop\/[\d.]+/)?.[0] || (/iPhone|iPad/.test(navigator.userAgent) ? "iOS browser" : /Android/.test(navigator.userAgent) ? "Android browser" : "browser");
+  const head = `FishDock catch recording · ${last?.gpuName || "unknown GPU"} · ${where} · window ${innerWidth}x${innerHeight} @${devicePixelRatio}x · drawn at ${last?.res?.join("x") || "?"} · preset ${NAME[last?.preset] || last?.preset || "?"}`;
+  const extra = `long tasks (the page busy for over 50 ms): ${r.po ? `${r.long.n}, ${Math.round(r.long.ms)} ms in all, longest ${Math.round(r.long.max)} ms` : "not reported by this browser"} · memory: ${performance.memory ? `${Math.round(r.mem0 / 1e6)} MB at the start, ${Math.round(performance.memory.usedJSHeapSize / 1e6)} MB at the end` : "not reported by this browser"} · resolution at the end ${g.dpr?.toFixed?.(2) ?? "?"}x`;
+  catchRec.text = r.log.frames.length ? reportText(head, r.log.report(), extra) : `${head}\nNo frames were recorded.`;
+  catchRec.onDone?.(catchRec.text);
+}
+function startCatchRec(world) {
+  if (!world?.tapFrames || catchRec.cur) return false;
+  const log = createFrameLog(), long = { n: 0, ms: 0, max: 0 }; let po = null;
+  try { po = new PerformanceObserver((l) => { for (const e of l.getEntries()) { long.n++; long.ms += e.duration; long.max = Math.max(long.max, e.duration); } }); po.observe({ type: "longtask" }); } catch { po = null; }
+  catchRec.cur = { world, log, long, po, mem0: performance.memory?.usedJSHeapSize || 0, timer: setTimeout(() => stopCatchRec(world), 120000) };
+  catchRec.text = null; world.tapFrames((ms, info) => log.frame(ms, info));
+  return true;
+}
 function DevDiagnostics({ world, view, setOpts, scene }) {
   const [p, setP] = useState(null), [d, setD] = useState(null), [bench, setBench] = useState(null), [running, setRunning] = useState(false);
   useEffect(() => { const t = setInterval(() => { setP(world?.perf?.() || null); setD(world?.diag?.() || null); }, 1000); return () => clearInterval(t); }, [world]);
@@ -140,6 +160,12 @@ function DevDiagnostics({ world, view, setOpts, scene }) {
       setRunning(false);
     }
   };
+  // ---- record a catch: every frame from now until you stop (or two minutes), summed up by what you were doing ----
+  // (the recording carries on with this panel closed: it is kept outside the component, catchRec below)
+  const [rec, setRec] = useState(catchRec.text), [recOn, setRecOn] = useState(!!catchRec.cur);
+  useEffect(() => { catchRec.onDone = (t) => { setRec(t); setRecOn(false); }; return () => { catchRec.onDone = null; }; }, []);
+  const stopRec = () => stopCatchRec(world);
+  const startRec = () => { if (startCatchRec(world)) { setRec(null); setRecOn(true); } };
   const text = () => {
     const head = `FishDock benchmark · ${p?.gpuName || "unknown GPU"} · ${navigator.userAgent.match(/FishDockDesktop\/[\d.]+/)?.[0] || "browser"} · window ${innerWidth}x${innerHeight} @${devicePixelRatio}x · scene: Gorleston, clear afternoon, 16 kph, from the spot\npreset | frames | avg fps | p50 ms | p95 ms | p99 ms | 1% low fps | GPU ms | draws | tris | tex MB | drawn at`;
     return [head, ...(bench || []).map((r) => `${NAME[r.q]} | ${r.frames} | ${r.fps} | ${r.p50} | ${r.p95} | ${r.p99} | ${r.low1} | ${r.gpu ?? "n/a"} | ${r.calls} | ${r.tris} | ${r.texMB} | ${r.res?.join("x")}`)].join("\n");
@@ -160,6 +186,12 @@ you at ${d.at ? d.at.join(", ") : "-"} · ${d.phase || "-"}`}</pre> : null}
         {bench?.length ? <button type="button" className="ft-pill" onClick={() => navigator.clipboard?.writeText(text()).catch(() => {})}>Copy results</button> : null}
       </div>
       {bench?.length ? <pre className="gfx-pre">{text()}</pre> : null}
+      <div className="cam-row">
+        <button type="button" className={`ft-pill${recOn ? " on" : ""}`} disabled={running} onClick={recOn ? stopRec : startRec}>{recOn ? "Stop recording" : "Record a catch"}</button>
+        {rec ? <button type="button" className="ft-pill" onClick={() => navigator.clipboard?.writeText(rec).catch(() => {})}>Copy recording</button> : null}
+      </div>
+      <span className="gfx-why">{recOn ? "Recording every frame. Close this panel, cast, catch a fish and look at it, then come back and stop (it stops by itself after two minutes)." : "Record a catch: start, close this panel, fish as usual, then stop. It says how smooth each part was (waiting, the strike, the fight, landing, the fish in hand) and what was being built or sent when a frame ran long."}</span>
+      {rec ? <pre className="gfx-pre">{rec}</pre> : null}
       <span className="gfx-why">Measured on this machine, in this window. GPU time needs a browser that offers the timer (Chrome and the launcher do; Safari doesn't).</span>
     </div>
   );
