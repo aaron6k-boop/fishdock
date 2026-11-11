@@ -68,3 +68,12 @@ longer subdivided on loading (13,584 triangles instead of 54,336).
 
 These are counts, not frame rates. How much faster a frame is depends on the graphics card: run the benchmark above
 on production and on the preview to see it.
+
+### 11 November 2026: the shadow map drawn once a frame
+
+Measured pass by pass (every draw counted by the target it lands in). With ambient occlusion on (High and Ultra)
+three.js was drawing the sun's shadow map twice a frame, once for the picture and once for the occlusion's own pass:
+on Ultra at Gorleston 741,506 triangles in 175 draw calls into a 4096 by 4096 map, now 371,946 in 89. The same two
+views as above, on High: 1,913,235 triangles down to 1,699,835 and 1,402,713 down to 1,189,313; draw calls 389 to 307
+and 332 to 250. On a phone-sized screen the finest shadow map is 3072 across instead of 4096 (9.4 million pixels to
+fill instead of 16.8 million). Counts again, not frame rates.
