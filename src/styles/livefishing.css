@@ -353,6 +353,14 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .w3d.is-waiting .w3d-canvas { opacity: 0; }
 .w3d.is-waiting .fish-tray, .w3d.is-waiting .walk-actions, .w3d.is-waiting .joystick-zone { visibility: hidden; }
 .w3d-loading { background: transparent; }
+/* the loading screen: the whole stage covered until the place is in and running smoothly (loadGate.js) */
+.w3d-loading-full { background: radial-gradient(120% 90% at 50% 20%, #12303d 0%, #0a1820 55%, #060d12 100%); z-index: 6; }
+.w3d-loading-full .w3d-load-card { background: none; min-width: min(300px, 78vw); gap: 12px; font-size: 16px; }
+.w3d-load-bar { width: 100%; height: 8px; border-radius: 999px; background: #ffffff1f; overflow: hidden; }
+.w3d-load-bar i { display: block; height: 100%; border-radius: 999px; background: var(--action, #3fd0c0); transition: width .25s ease-out; }
+.w3d-load-pct { font-size: 13.5px; color: #dfe8ee; } .w3d-load-pct b { font-size: 15px; color: #fff; }
+.w3d-load-what { font-size: 12.5px; color: #9fb3bf; }
+@media (prefers-reduced-motion: reduce) { .w3d-load-bar i { transition: none; } }
 .w3d-load-card { display: grid; gap: 10px; justify-items: center; padding: 14px 18px; border-radius: 14px; background: #0a141bcc; color: #fff; font-size: 14px; }
 .w3d-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; cursor: grab; }
 .w3d-canvas:active { cursor: grabbing; }
