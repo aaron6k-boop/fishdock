@@ -18,7 +18,7 @@ not been used as a reference yet.
 
 ## The probe
 
-`phaseprobe.mjs` (kept with the session's working files) plays one whole catch in a browser: stand, cast, wait, bite,
+`tools/phase-probe.mjs` plays one whole catch in a browser: stand, cast, wait, bite,
 strike, fight with repeated taps on Reel, landing, the fish on the mat. It counts, by phase, every `linkProgram` (a
 shader built) with the shader's kind, every texture and buffer sent, every framebuffer made, every file fetched, and
 every time React committed a redraw of the page. Same script against the live build (d479bc8) and this branch.
