@@ -289,6 +289,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // looks from (eased, so a step up or a jump doesn't jolt it), the footsteps' stride, and a glide between views ----
   let followAt = 0, pivotY = null, pivotXZ = null, gait = { d: 0 }, camBlend = null, clockT = 0; // (clockT: the scene's clock, so a filmed glide is exact)
   const WALK_FOV = 62;
+  // (first person on an upright phone: the view is narrow across, 37 degrees at the old 1.15, and your own hands, a
+  // forearm's length from your eye, filled a third of it and looked enormous. Wider, they take the share of the view
+  // they do of your own, and more of the pier shows either side)
+  const FP_TALL = 1.27;
   /** Glide the camera from where it is now to wherever the next frames put it, over `sec` seconds. */
   function blendCamera(sec = 0.7) { camBlend = reduceMotion ? null : { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, t0: clockT, sec }; }
   // (a long way round takes a little longer: the glide back to your spot turns at most about 150° a second)
@@ -542,7 +546,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
           if (landShot.framed) for (let i = 0; i < 6; i++) look.step(0.5);
         }
         // the view widens a little for the shot and narrows back as you return (no jump in zoom)
-        const normalFov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1), shotFov = (landShot.wide ? 60 : 52) * (camera.aspect < 0.8 ? 1.12 : 1);
+        const normalFov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? FP_TALL : 1), shotFov = (landShot.wide ? 60 : 52) * (camera.aspect < 0.8 ? 1.12 : 1);
         landShot.fov = landShot.fov ?? normalFov; landShot.fov += ((landing ? shotFov : normalFov) - landShot.fov) * (1 - Math.exp(-dt * 3));
         camera.position.copy(camPos); camera.fov = landShot.fov; camera.updateProjectionMatrix();
         const d2 = new THREE.Vector3(Math.sin(look.yaw) * Math.cos(look.pitch), Math.sin(look.pitch), -Math.cos(look.yaw) * Math.cos(look.pitch));
@@ -589,7 +593,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (camOverride) camPos.copy(camOverride); // test hook only: a fixed viewpoint for visual checks
     camera.position.copy(camPos);
     // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
-    camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? 1.15 : 1) * jumpZoom; camera.updateProjectionMatrix();
+    camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? FP_TALL : 1) * jumpZoom; camera.updateProjectionMatrix();
     const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     camera.lookAt(camOverride && lookOverride ? lookOverride : camera.position.clone().add(d));
     for (const [id, x] of anglers) x.a.setFirstPerson((mode === "first" || mode === "free") && id === (focus?.a.id));
