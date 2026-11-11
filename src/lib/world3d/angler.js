@@ -538,6 +538,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let ropeHeld = false, handsNow = [new THREE.Vector3(), new THREE.Vector3()]; // where the hands are (local), for the drop net's rope
   let walking = null; // walking about (walker.js): where, which way, how fast, the stride
   let tagOff = false;
+  let headHand = null; // which hand has the head of a fish held up (0 left, 1 right)
   let landStage = null, landWater = null; // the drop net's stage while landing (for the hands): up | rod | pick | lower | lead | haul | in
   let dropRig = null, ropePull = null, releaseInfo = null, releaseRope = null, matOn = false, releasePole = false, prevKt = -1; // the drop net's rope: over the rail where, hanging or not; which hand is pulling and how far through the pull
   const rodS = { butt: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0), key: "", until: 0, ok: false }; // the rod eased from one way of holding it to the next
@@ -1249,6 +1250,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     }
     if (ph === "lost") { lean = 0.05; lookAtW = rigAt ? rigAt.clone() : null; }
     let kneel = 0;
+    if (!keptPose?.lift) headHand = null;
     if (keptPose?.centre && (kept?.state === "inspect" || (kept?.state === "release" && keptPose.lift))) {
       // both hands under it while it's carried (one behind the head, one by the tail), then one hand resting on its side
       // while it lies on the mat; crouched down over it, looking at it
@@ -1261,11 +1263,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // (one hand under it behind the head, cupped round the belly; the other closed round the wrist of its tail, as
         // anyone holds a fish to look at it: two flat palms under it read as a tray)
         const wrist = toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * (fishLen < 0.45 ? 0.9 : 0.86)));
-        hands[0] = { at: under(fishLen < 0.45 ? 0.24 : 0.3), axis: d, palm: upL, kind: "fish" };
+        // (whichever hand is on the head's side takes the head, the other the tail: with the left always at the head,
+        // a fish lying head to your right had the two forearms crossed under it)
+        const hx = under(fishLen < 0.45 ? 0.24 : 0.3).x - wrist.x; if (headHand == null || Math.abs(hx) > 0.1) headHand = hx > 0 ? 1 : 0; // (kept until the fish is well turned the other way: no changing hands as it swings through end-on)
+        const hd = headHand, tl = 1 - hd;
+        hands[hd] = { at: under(fishLen < 0.45 ? 0.24 : 0.3), axis: d, palm: upL, kind: "fish" };
         // (a small fish lies across two cupped hands: its tail's wrist is thinner than a finger, and a hand closed round
         // that stood open beside it like a claw. A bigger one is held by the wrist of the tail, as before)
-        if (fishLen < 0.45) hands[1] = { at: under(0.78), axis: d, palm: upL, kind: "fish" };
-        else hands[1] = { at: wrist, axis: d, palm: upL, kind: "tailwrist", R: Math.max(0.008, halfDepth() * 0.32) }; }
+        if (fishLen < 0.45) hands[tl] = { at: under(0.78), axis: d, palm: upL, kind: "fish" };
+        else hands[tl] = { at: wrist, axis: d, palm: upL, kind: "tailwrist", R: Math.max(0.008, halfDepth() * 0.32) }; }
       else { hands[1] = { at: toLocal(keptPose.centre).add(V3(0.02, halfThick() + 0.02, 0.03)), axis: d, palm: V3(0, -1, 0), kind: "fish" }; hands[0] = null; }
       lookAtW = keptPose.centre.clone(); kneel = 1; crouch = 0.6; lean = keptPose.lift ? 0.06 : 0.42; brace = 0; // (upright while holding it out, so your head stays clear of it)
       // the shoulders turned towards it (it's off to one side lifting it from the net, in front on the mat), and bent
