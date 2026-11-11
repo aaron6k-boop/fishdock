@@ -6,7 +6,7 @@
 import bpy, bmesh, os, math, random
 from mathutils import Vector, Matrix
 ROOT = r"C:\Users\aaron\Documents\FishDock-assets"
-TAG = globals().get("TAG", "f")
+TAG = globals().get("TAG", "g")
 exec(open(os.path.join(ROOT, "scripts", "grip_lib5.py")).read())
 OUT = os.path.join(ROOT, "renders", "v4"); os.makedirs(OUT, exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=os.path.join(ROOT, "source", "people", "fp_body_bs_c.blend"))
@@ -102,8 +102,13 @@ for s in "lr":
     prevN = None
     rows = [ring_at(d) for d in ds]
     # (the shoulder's end closed over in a dome: looking down your own arm you saw into the open top of the sleeve)
+    # (and the sleeve carried on 40 cm past the shoulder before it closes. The game lays the upper arm back from the
+    # elbow towards the shoulder at its own length: reaching down over the rail the elbow is further from the shoulder
+    # than that, and the sleeve's end hung in the middle of the view. Carried on, it leaves the view by its edge)
+    TAIL = 0.4
+    for k_ in range(1, 11): rows.append(ring_at(top + TAIL * k_ / 10, 0.0, 0.0, True))
     for a_ in (0.35, 0.7, 1.0, 1.25, 1.45):
-        rows.append(ring_at(top + 0.075 * math.sin(a_), r_base(top, Lf) * (1 - math.cos(a_)), 0.0, True))
+        rows.append(ring_at(top + TAIL + 0.075 * math.sin(a_), r_base(top, Lf) * (1 - math.cos(a_)), 0.0, True))
     DOME.append([q[0] for q in rows[-1]])
     # the cuff turned in on itself: its edge, then a lining back up inside
     prevN = None
