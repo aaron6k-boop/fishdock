@@ -35,6 +35,8 @@ export const QUALITY3D = {
   // (sea: the spectrum sea, fftSea.js: the wind sea simulated from a wave spectrum on the graphics card)
   ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021, sea: 1 },
 };
+/** A phone-sized screen (its short side, in CSS pixels). */
+export const phoneScreen = (scr = typeof screen !== "undefined" ? screen : null) => !!scr && Math.min(scr.width, scr.height) <= 520;
 export function autoQuality3d() {
   try {
     // iPhone Safari reports no memory and only a few cores, which put every iPhone (even the newest) on the lowest
@@ -115,6 +117,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (env.fftSea) env.simulate(simT); // (the spectrum sea's passes count in the frame's GPU time)
     if (env.reflections) { if (!noReflAt--) { noRefl = [...scene.getObjectsByProperty("name", "fdNoReflect"), ...scene.getObjectsByProperty("noReflect", true)]; noReflAt = 120; } env.reflect(renderer, scene, camera, noRefl); }
     if (post) { post.setFade(dipAt == null ? 1 : Math.min(1, Math.max(0.02, (clockT - dipAt) / 0.35))); if (dipAt != null && clockT - dipAt > 0.35) dipAt = null; }
+    // (the sun's shadow map is drawn once a frame, by the first drawing of the scene below. Left to itself three.js
+    // draws it again in every drawing of the scene, and with ambient occlusion on there are two: the picture, then the
+    // occlusion's own pass, so every shadow caster went into a map of up to 4096 by 4096 twice a frame. The mirror,
+    // drawn before this with some things hidden, never draws it)
+    renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
     if (post) post.render(); else renderer.render(scene, camera);
     if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); qs.push(q); }
     // (collect the answers that are ready, oldest first; a disjoint event, as a change of GPU clock, throws them away)
@@ -760,7 +767,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   }
   function resize() {
     const w = canvas.clientWidth || canvas.parentElement?.clientWidth || 1, h = canvas.clientHeight || canvas.parentElement?.clientHeight || 1;
-    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    // (only when the size or sharpness has changed: setting a canvas's size, even to what it already is, throws its
+    // drawing buffer away and makes a new one, and a step in resolution had already done that once)
+    const pr = renderer.getPixelRatio(); if (canvas.width !== Math.floor(w * pr) || canvas.height !== Math.floor(h * pr)) renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
     post?.setSize(w, h); env?.resizeReflections?.(renderer);
   }
   resize();
@@ -788,7 +798,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       const was = G.shadows;
       if (o.shadows != null) G.shadows = Math.max(0, Math.min(2, o.shadows | 0));
       if (o.shadowDist != null) G.shadowDist = [20, 30, 45, 80].includes(+o.shadowDist) ? +o.shadowDist : 30; setShadowReach(G.shadowDist);
-      const size = [0, 2048, 4096][G.shadows];
+      // (the finest map is 4096 across: 16.8 million pixels of shadow drawn every frame, where a phone's whole picture
+      // on High is about one million. Out to 30 m that is a shadow pixel every 1.5 cm, finer than a phone's screen can
+      // show; a phone gets 3072, every 2 cm and a little over half the pixels to fill)
+      const size = [0, 2048, phoneScreen() && G.shadowDist <= 30 ? 3072 : 4096][G.shadows];
       if (size && sun.shadow.mapSize.x !== size) { sun.shadow.map?.dispose(); sun.shadow.map = null; sun.shadow.mapSize.set(size, size); }
       const c = sun.shadow.camera, d = G.shadowDist; if (c.right !== d) { Object.assign(c, { left: -d, right: d, top: d, bottom: -d, far: Math.max(160, d * 3) }); c.updateProjectionMatrix(); }
       // (the map's texels grow with the box: the biases grow with them, or the wider boxes show acne on the deck)
