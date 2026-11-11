@@ -34,6 +34,7 @@ const pressed = async () => page.evaluate(() => document.querySelector(".gfx-pre
 
 await page.goto(`${base}/#try/gorleston-south-pier/cod/3d`);
 await page.waitForSelector(".w3d canvas", { timeout: 150000 });
+await page.waitForSelector(".w3d.is-ready", { timeout: 150000 }); // (the loading screen has gone: the place is in and settled)
 await sleep(12000);
 ok(await canvasAlive(), "the pier is drawn");
 

@@ -21,6 +21,7 @@ import { shotFor } from "./landCam.js";
 import { createPost } from "./post.js";
 import { setPeopleDetail } from "./human3d.js";
 import { FILM } from "./film.js";
+import { stepDown, recallPace, rememberPace } from "../pacing.js";
 
 // dpr: the most pixels per screen pixel; ss: the least (a computer's 1x screen is drawn sharper than its pixels and
 // scaled down, which smooths the fine edges of railings, rods and lines); floor: the least the frame pacing drops to;
@@ -35,6 +36,17 @@ export const QUALITY3D = {
   // (sea: the spectrum sea, fftSea.js: the wind sea simulated from a wave spectrum on the graphics card)
   ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021, sea: 1 },
 };
+/**
+ * Every model and texture the world fetches goes through three.js's one loading manager: tell `on(loaded, total)` as
+ * each starts and finishes (the loading screen's count of files). Returns a function that stops it.
+ */
+export function trackLoads(on) {
+  const m = THREE.DefaultLoadingManager, was = [m.onStart, m.onProgress, m.onLoad, m.onError];
+  let loaded = 0, total = 0;
+  const say = (_url, l, t) => { if (l != null) { loaded = l; total = t; } on(loaded, total); };
+  m.onStart = say; m.onProgress = say; m.onLoad = () => on(Math.max(loaded, total), total); m.onError = () => on(loaded, total);
+  return () => { [m.onStart, m.onProgress, m.onLoad, m.onError] = was; };
+}
 /** A phone-sized screen (its short side, in CSS pixels). */
 export const phoneScreen = (scr = typeof screen !== "undefined" ? screen : null) => !!scr && Math.min(scr.width, scr.height) <= 520;
 export function autoQuality3d() {
@@ -581,12 +593,22 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // phone, or a busy moment, sent the picture down to one pixel per pixel for good, which is what made it look blocky.
   // It never goes below the setting's floor; at the floor, the ambient occlusion goes first)
   let dprFloor = Math.min(dprMax, Q.floor || 1), dprNow = dprMax, late = 0, paceAt = 0, easyFor = 0;
+  // (where this device settled on this setting last time: it starts there, so a phone that can't hold the setting's
+  // full sharpness doesn't spend the first ten seconds of every visit stuttering its way down to what it can. It still
+  // climbs back when frames are easy)
+  { const was = recallPace(quality); if (was && was < dprNow) { dprNow = Math.max(dprFloor, was); renderer.setPixelRatio(dprNow); } }
+  // (not while the place is still loading: frames are late then for reasons that sharpness has nothing to do with, and
+  // counting them took the resolution and the ambient occlusion down before you had seen a thing. World3D turns it on
+  // when the loading screen goes)
+  let pacing = true;
   function pace(ts, dt) {
+    if (!pacing) { late = 0; paceAt = ts; return; }
     late = late * 0.96 + (dt > (Q.late || 0.036) ? 1 : 0) * 0.04;
-    if (ts - paceAt < 2000) return; paceAt = ts;
-    if (late > 0.4 && dprNow > dprFloor) { dprNow = Math.max(dprFloor, dprNow - 0.25); renderer.setPixelRatio(dprNow); resize(); late = 0.2; easyFor = 0; }
+    // (looked at every two seconds; every 1.2 when nearly every frame is late, and then a bigger step: pacing.js)
+    if (ts - paceAt < (late > 0.8 ? 1200 : 2000)) return; paceAt = ts;
+    if (late > 0.4 && dprNow > dprFloor) { dprNow = stepDown(dprNow, dprFloor, late); renderer.setPixelRatio(dprNow); resize(); rememberPace(quality, dprNow); late = 0.2; easyFor = 0; }
     else if (late > 0.4 && post?.dropAO()) { late = 0.2; easyFor = 0; }
-    else if (late < 0.05 && dprNow < dprMax) { easyFor += 2; if (easyFor >= (Q.easy || 20)) { dprNow = Math.min(dprMax, dprNow + 0.25); renderer.setPixelRatio(dprNow); resize(); easyFor = 0; } }
+    else if (late < 0.05 && dprNow < dprMax) { easyFor += 2; if (easyFor >= (Q.easy || 20)) { dprNow = Math.min(dprMax, dprNow + 0.25); renderer.setPixelRatio(dprNow); resize(); rememberPace(quality, dprNow); easyFor = 0; } }
     else easyFor = 0;
   }
   // ---- frame-rate limit (Settings → Graphics: 30, 60 or as fast as the screen goes) and the frame-time record ----
@@ -944,6 +966,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       if (pose?.spotAt) { const x = anglers.get(id); remote.delete(id); if (x) { x.a.setWalk(null); x.a.place({ ...x.a.spot, at: pose.at, face: pose.face, edge: pose.edge, cast: pose.cast }); } return; }
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },
+    /** Frame pacing on or off (off while the loading screen is up). */
+    setPacing(on) { pacing = !!on; late = 0; easyFor = 0; },
+    /** What the graphics card holds so far: while these still change from frame to frame, the place is still arriving. */
+    loadInfo() { return { programs: renderer.info.programs?.length || 0, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries }; },
     /** The rod-tip lights: "auto" (green in the dark), "on" or "off". */
     setTipLight(m) { tipMode = m === "on" || m === "off" ? m : "auto"; },
     /** Your head torch: "off", "white", "red" or "green". */

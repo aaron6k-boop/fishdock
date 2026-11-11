@@ -11,6 +11,7 @@ import { landCamOn, fishCamOf } from "../lib/viewPrefs.js";
 import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
 import { effectiveGfx } from "./GraphicsPanel.jsx";
 import { localFor } from "../lib/world3d/localDetail.js";
+import { createLoadGate } from "../lib/loadGate.js";
 import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/sceneAudio.js";
 
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
@@ -38,6 +39,8 @@ export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringif
 const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onReel = null, tipLight = "auto", onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
+  // the loading screen: the place is held back until its files are in and the graphics card has settled (loadGate.js)
+  const [shown, setShown] = useState(false), [pct, setPct] = useState(2), [files, setFiles] = useState([0, 0]);
   // the phone can take the 3D drawing away (low memory, the browser in the background): when it gives it back the
   // view is rebuilt, with a plain "restoring" message meanwhile rather than a black screen
   const [gen, setGen] = useState(0), [lost, setLost] = useState(false), [about, setAbout] = useState(false);
@@ -90,13 +93,16 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   // ---- start the renderer (and three.js) once per place ----
   useEffect(() => {
     if (real === undefined) return undefined;
-    let gone = false, w = null;
+    setPct(6); // (the place itself has arrived: three.js and the world are next)
+    let gone = false, w = null, untrack = null;
     (async () => {
       try {
         const mod = await import("../lib/world3d/world.js");
         if (gone) return;
         const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
         const q = quality === "auto" ? mod.autoQuality3d() : quality;
+        let gate = createLoadGate(); setShown(false); setPct(10); setFiles([0, 0]);
+        untrack = mod.trackLoads((l, t) => gate.files(l, t));
         w = mod.createWorld(canvas.current, {
           venue, quality: q, reduceMotion: reduce, real, pano: panoOn ? pano : null, trackJumps: loadView().track,
           onFeel: (n, d) => props.current.feel?.(n, d),
@@ -113,7 +119,9 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
         if (canvas.current && w.spawn) { canvas.current.dataset.spawn = JSON.stringify({ safe: w.spawn.spots.length, report: w.spawn.report.filter((r) => r.problem) }); canvas.current.dataset.me = JSON.stringify(w.mySpot); }
         if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
         let keptWas = null, heardAt = 0, busyWas = null;
+        gate.built(); w.setPacing(false); let pctWas = -1;
         w.onFrame(({ outs, view, walk: wk, kept, localId }) => {
+          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (gate.ready) { gate = null; untrack?.(); untrack = null; w.setPacing(true); if (!gone) setShown(true); } }
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
@@ -133,7 +141,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();
-    return () => { gone = true; w?.dispose(); W.current = null; setReady(false); };
+    return () => { gone = true; untrack?.(); w?.dispose(); W.current = null; setReady(false); setShown(false); };
   }, [venue, quality, real, panoOn, gen]);
 
   useEffect(() => { W.current?.setFight(fight); }, [fight, ready]);
@@ -215,9 +223,22 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   }), [mode, walk]);
 
   return (
-    <div ref={wrap} className={`w3d ${className}${ready && !lost ? " is-ready" : " is-waiting"}`}>
+    <div ref={wrap} className={`w3d ${className}${ready && shown && !lost ? " is-ready" : " is-waiting"}`}>
       <canvas ref={canvas} className="w3d-canvas" tabIndex={0} aria-label="3D view: drag to look round, pinch to zoom, double tap to face your rod" />
-      {(!ready || lost) && !failed ? <div className="fs-loading w3d-loading" role="status"><div className="w3d-load-card"><b>{lost ? "Restoring the 3D view" : `Setting up ${real ? placeName || "the place" : "the view"}`}</b><span className="loading-dots" aria-hidden="true" /></div></div> : null}
+      {(!ready || !shown || lost) && !failed ? (
+        <div className={`fs-loading w3d-loading${lost ? "" : " w3d-loading-full"}`} role="status" aria-live="polite">
+          <div className="w3d-load-card">
+            <b>{lost ? "Restoring the 3D view" : `Loading ${real ? placeName || "the place" : "the view"}`}</b>
+            {lost ? <span className="loading-dots" aria-hidden="true" /> : (
+              <>
+                <div className="w3d-load-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ width: `${pct}%` }} /></div>
+                <span className="w3d-load-pct"><b className="num">{pct}%</b> loaded, {100 - pct}% to go</span>
+                <span className="w3d-load-what">{pct < 15 ? "Fetching the place" : pct < 85 ? `Fetching models and textures${files[1] ? `: ${files[0]} of ${files[1]}` : ""}` : "Getting the graphics ready"}</span>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
       {failed ? <div className="w3d-fail">This browser can't draw the 3D view. The photo view still works.</div> : null}
       <div className="w3d-compass" aria-label={`Facing ${compassPoint(heading)}`} title="Compass"><span style={{ transform: `rotate(${-heading}deg)` }}><b aria-hidden="true" /></span><i>{compassPoint(heading)}</i></div>
       {pano ? <div className="w3d-src" role="group" aria-label="What to show"><button type="button" className={`ft-pill${panoOn ? " on" : ""}`} onClick={() => setUsePano(true)}>Real 360° photo</button><button type="button" className={`ft-pill${!panoOn ? " on" : ""}`} onClick={() => setUsePano(false)}>Map model</button></div> : null}
