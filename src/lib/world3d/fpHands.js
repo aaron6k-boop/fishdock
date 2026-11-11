@@ -596,7 +596,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
     const ang = (j, ql) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(ql).w), 0, 1));
     const fq = S.fingers.map(local), tq = local(S.thumb);
     // (Qh as the grips here have it: the hand bone's own turn, from the turn of the hand's frame)
-    return { Ph: V(...A.Ph), Qh: new THREE.Quaternion(...A.Qh).multiply(S.frameInv).multiply(S.handW), f: S.fingers.map((ch, a2) => ch.map((j, k) => ang(j, fq[a2][k]))), t: [...S.thumb.map((j, k) => ang(j, tq[k])), 0], q: [...fq, tq] };
+    return { elbow: A.elbow ? V(...A.elbow) : null, Ph: V(...A.Ph), Qh: new THREE.Quaternion(...A.Qh).multiply(S.frameInv).multiply(S.handW), f: S.fingers.map((ch, a2) => ch.map((j, k) => ang(j, fq[a2][k]))), t: [...S.thumb.map((j, k) => ang(j, tq[k])), 0], q: [...fq, tq] };
   }
   const madeGrip = (S, kind) => { const key = "made" + kind + S.i; if (!solved.has(key)) solved.set(key, authored(S, kind)); return solved.get(key); };
   function solveGrip(S, kind, side, Fin) {
@@ -886,7 +886,11 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // the forearm: straight back from the wrist, turned towards where the arm comes from by no more than a wrist can bend
       const back = S.M.y.clone().applyQuaternion(Qw).negate(), toEl = group.localToWorld(elbow.clone()).sub(Pw).normalize();
       const ang = back.angleTo(toEl), lim = kind === "crank" ? (TUNE.wristLimCrank ?? 1.25) : kind === "seat" ? (TUNE.wristLimSeat ?? 0.95) : TUNE.wristLim; // (on the rod the wrist bends well back too, so the forearm can come from the elbow out at your side with the rod up for a cast, rather than following the butt across the view) // (cupping the knob, the wrist bends back a long way, as a real one does winding: held near straight, the forearm came straight up from under the hand like a raised fist)
-      const dir = ang > lim ? back.clone().lerp(toEl, lim / ang).normalize() : toEl;
+      let dir = ang > lim ? back.clone().lerp(toEl, lim / ang).normalize() : toEl;
+      // (a grip made in Blender says where its forearm comes from: on the rod, the wrist dropped towards the little
+      // finger as it is with a rod in the hand. The forearm keeps to that, turned towards where the arm really comes
+      // from by a few degrees at most: free to follow the elbow anywhere, the wrist bent as no wrist does)
+      if (G.elbow) { const pref = G.elbow.clone().applyQuaternion(sq).normalize(), a2 = pref.angleTo(toEl), l2 = TUNE.wristFree ?? 0.22; dir = a2 > l2 ? pref.lerp(toEl, l2 / a2).normalize() : toEl; }
       const Ew = Pw.clone().addScaledVector(dir, S.len);
       place2(S, Pw, Ew, Qw);
       S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, f[a][k]))));
@@ -921,6 +925,8 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
     body: sides.every((S) => !!S.up),
     /** where shoulder i is (world): the upper arm comes from there */
     shoulder(i, w) { sides[i].shoulder.copy(w); },
+    /** the arm's lengths (m): shoulder to elbow, elbow to wrist */
+    reach(i) { return { upper: sides[i].up?.len ?? 0.27, fore: sides[i].len }; },
     /** where the sleeve covers the forearm from: the wrist and the way along the forearm to the hand (world) */
     cuff(i, wristW, dirW) { CUT.uFdW.value[i].copy(wristW); CUT.uFdDir.value[i].copy(dirW); },
     /** hand i at `pos` with frame `quat` (the group's space), its fingers curled as `curl`, the elbow towards `elbow`;
@@ -1120,13 +1126,14 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       // first moments, a forearm across the view; so they wait for them, a few seconds at most on a slow connection)
       // (nothing in either hand, as when you crouch by the landed fish before picking it up: the arms are put away, as
       // in any first-person game; hanging by your sides they filled the bottom of the view looking down at the deck)
+      const shL = [null, null]; // (each shoulder, in the angler's own space)
       const empty = !specs[0] && !specs[1];
       { const wait = empty || ((!real || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock)) && performance.now() - born < 90000);
         if (real) real.root.visible = !wait; for (const h of hands) { h.sleeve.visible = !wait; h.upper.visible = !wait; } } // (the sleeves too: without their hands they were two empty blue tubes)
       // (the shoulders: beside and below the eye, a little behind it, turning with the view's heading but not its pitch,
       // as your shoulders do when you look down)
       if (real?.body) { const fl = V(vf.x, 0, vf.z); if (fl.lengthSq() < 1e-6) fl.set(0, 0, -1); fl.normalize(); const rt = V(vr.x, 0, vr.z).normalize();
-        for (let i = 0; i < 2; i++) real.shoulder(i, group.localToWorld(eye.clone().addScaledVector(rt, hands[i].s * 0.2).add(V(0, -0.27, 0)).addScaledVector(fl, -0.14))); }
+        for (let i = 0; i < 2; i++) { shL[i] = eye.clone().addScaledVector(rt, hands[i].s * 0.2).add(V(0, -0.25, 0)).addScaledVector(fl, -0.1); real.shoulder(i, group.localToWorld(shL[i].clone())); } }
       for (let i = 0; i < 2; i++) {
         const h = hands[i], spec = specs[i];
         // the elbow: fixed in the view, below and out to the side, out of sight
@@ -1165,7 +1172,12 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // behind the hand, out of the view)
           const ax = spec.axis.clone().normalize(), fwd = ax.dot(vf);
           if (fwd < 0.3) { ax.addScaledVector(vf, 0.3 - fwd).normalize(); }
-          elbow.copy(spec.at).addScaledVector(ax, -0.24).addScaledVector(vu, -0.14).addScaledVector(vr, (TUNE_ELBOW.seatOut ?? 0.24) * h.s);
+          elbow.copy(spec.at).addScaledVector(ax, -0.24).addScaledVector(vu, -0.14).addScaledVector(vr, (TUNE_ELBOW.seatOut ?? 0.24) * h.s);          // (with the modelled arms: where an arm of this length, from this shoulder to this hand, has its elbow, hanging
+          // below and a little out from the line between them. Set by the rod alone it was wherever the rod's axis
+          // put it, the upper arm then made up to fit)
+          if (real?.body && shL[i]) { const L = real.reach(i), sh = shL[i], wr0 = spec.at.clone().addScaledVector(vu, 0.07), sd = wr0.clone().sub(sh), d = Math.min(sd.length(), L.upper + L.fore - 0.012), n = sd.clone().normalize();
+            const x = (L.upper * L.upper - L.fore * L.fore + d * d) / (2 * d), hgt = Math.sqrt(Math.max(0, L.upper * L.upper - x * x));
+            const pole = V(0, -0.85, 0).addScaledVector(vr, 0.5 * h.s); pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
         }
         let want;
         if (spec) {

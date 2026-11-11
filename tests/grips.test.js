@@ -34,6 +34,8 @@ test("on the rod the wrist is above and to the right, the hand over the handle f
   // (the grip's frame: y up, z to the tip, so x is to your left)
   const [x, y] = AUTHORED.seat.Ph;
   assert.ok(x < 0 && y > 0);
+  // (and the forearm comes from behind the reel: its elbow back along the rod from the wrist)
+  assert.ok(AUTHORED.seat.elbow[2] < -0.5);
 });
 
 test("the fingers are closed: the first two joints of each finger holding the rod are well bent", () => {

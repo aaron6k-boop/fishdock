@@ -1573,7 +1573,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // where the reel sits in your view (right, up, forward of the eye, metres): low and a little right of the middle, far
   // enough out that both hands and the reel's handle going round are in the picture above the controls (it was lower
   // and nearer: the reel hand was half under the Reel button)
-  const FPR = (typeof window !== "undefined" && FILM && window.__fdFpr) || { x: 0.07, y: -0.1, z: 0.54 };
+  const FPR = (typeof window !== "undefined" && FILM && window.__fdFpr) || { x: 0.06, y: -0.135, z: 0.47 }; // (the reel 47 cm ahead of the eye and 13 cm below the line of sight: where bent arms hold a rod. At 54 cm and 10 cm it was held out at arm's length at shoulder height, further than the arms reach)
   function fpEye() { return new THREE.Vector3(stepNow + body.x, eyeH - leanNow * 0.25 - stoopNow * 0.55 + Math.sin(tNow * 1.4) * 0.006 + body.y, -0.08 - leanNow * 0.85 - stoopNow * 0.12 + body.z); } // (stooping: down to the net on the deck, rather than an arm stretched a metre to it)
   // the reel's handle for your taps (reelHandle.js)
   // ---- the reel's handle ----
