@@ -6,7 +6,9 @@
 //   frame [x, y, z, w]; bones: each finger bone's turn from rest, in the hand's own frame (x across the knuckles, y along the fingers).
 // The grip's frame: "seat" has its origin on the rod's axis at the reel's stem, z to the rod's tip, y up (the reel
 // hangs below); "crank" has it at the middle of the knob, x along the knob out from the handle's arm; "ropeg" (a
-// fist round the drop net's 11 mm rope, one for each hand) has it on the rope, x down the rope, the thumb's side up.
+// fist round the drop net's 11 mm rope, one for each hand) has it on the rope, x down the rope, the thumb's side up;
+// "butt_l" (the left hand round the rod's butt, the pulling hand of a cast: make_butt_grip.py) has it on the rod's
+// axis in the middle of the hand, z to the tip; the hand is free to turn about the rod.
 export const AUTHORED = {
  "seat": {
   "side": "r",
@@ -434,6 +436,112 @@ export const AUTHORED = {
     -0.135965,
     -0.088654,
     0.929455
+   ]
+  }
+ },
+ "butt_l": {
+  "side": "l",
+  "Ph": [
+   -0.033,
+   -0.08502,
+   -0.02652
+  ],
+  "Qh": [
+   0.10799,
+   0.69874,
+   0.10884,
+   0.69876
+  ],
+  "bones": {
+   "index_01_l": [
+    0.598351,
+    0.064465,
+    0.000169,
+    0.798636
+   ],
+   "index_02_l": [
+    0.865346,
+    0.09323,
+    0.000244,
+    0.492428
+   ],
+   "index_03_l": [
+    0.953302,
+    0.102707,
+    0.000269,
+    0.28402
+   ],
+   "middle_01_l": [
+    0.686003,
+    -0.109312,
+    -2.3e-05,
+    0.719341
+   ],
+   "middle_02_l": [
+    0.930896,
+    -0.148335,
+    -3e-05,
+    0.33381
+   ],
+   "middle_03_l": [
+    0.98739,
+    -0.157339,
+    -3.2e-05,
+    -0.017448
+   ],
+   "ring_01_l": [
+    0.642203,
+    -0.187906,
+    -0.000125,
+    0.743146
+   ],
+   "ring_02_l": [
+    0.945178,
+    -0.276555,
+    -0.000184,
+    0.173654
+   ],
+   "ring_03_l": [
+    0.959431,
+    -0.280724,
+    -0.000187,
+    0.026183
+   ],
+   "pinky_01_l": [
+    0.677011,
+    -0.291946,
+    -0.000244,
+    0.675591
+   ],
+   "pinky_02_l": [
+    0.857267,
+    -0.369679,
+    -0.00031,
+    0.358371
+   ],
+   "pinky_03_l": [
+    0.857267,
+    -0.369679,
+    -0.00031,
+    0.358371
+   ],
+   "thumb_01_l": [
+    -0.040109,
+    0.073048,
+    -0.070119,
+    0.994052
+   ],
+   "thumb_02_l": [
+    -0.321053,
+    -0.010432,
+    -0.042882,
+    0.946032
+   ],
+   "thumb_03_l": [
+    -0.669109,
+    -0.126862,
+    0.002096,
+    0.732397
    ]
   }
  }
