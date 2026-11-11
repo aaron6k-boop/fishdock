@@ -36,7 +36,7 @@ export function loadView() {
 }
 export function saveView(v) { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch { /* no storage */ } }
 
-const World3D = forwardRef(function World3D({ fight = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onReel = null, tipLight = "auto", onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
+const World3D = forwardRef(function World3D({ fight = null, fightLive = null, spotId = null, placeName = "", startMode = "first", feel = null, onTap, onReel = null, tipLight = "auto", onWalk, onKept, onBusy, onFishTap, onPose, onHear, venue = "pier", anglers = [], light, cond, facing = 180, quality = "auto", now = Date.now, sound = false, onPhase, onLanded, children, className = "" }, ref) {
   const wrap = useRef(null), canvas = useRef(null), W = useRef(null);
   const [ready, setReady] = useState(false), [failed, setFailed] = useState(false);
   // the loading screen: the place is held back until its files are in and the graphics card has settled (loadGate.js)
@@ -53,7 +53,7 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
   const [heading, setHeading] = useState(0), [mode, setMode] = useState("first"), [others, setOthers] = useState([]);
   const [walk, setWalk] = useState(null); // { on, canFish, sprint } while walking about
   useEffect(() => { props.current.onWalk?.(walk); }, [walk]);
-  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, onReel, fight, feel, onWalk, onKept, onBusy, onFishTap, onPose, onHear };
+  const props = useRef({}); props.current = { anglers, onPhase, onLanded, sound, facing: spotId ? 0 : facing, now, onTap, onReel, fight, fightLive, feel, onWalk, onKept, onBusy, onFishTap, onPose, onHear };
   const phases = useRef({});
   // ---- a real 360° photo near the mark (Mapillary), when there is one and it's switched on ----
   const [pano, setPano] = useState(null), [usePano, setUsePano] = useState(true);
@@ -119,9 +119,10 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
         if (canvas.current && w.spawn) { canvas.current.dataset.spawn = JSON.stringify({ safe: w.spawn.spots.length, report: w.spawn.report.filter((r) => r.problem) }); canvas.current.dataset.me = JSON.stringify(w.mySpot); }
         if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
         let keptWas = null, heardAt = 0, busyWas = null;
-        gate.built(); w.setPacing(false); let pctWas = -1;
+        gate.built(); w.setPacing(false); let pctWas = -1; let liveWas = null, warmed = false;
         w.onFrame(({ outs, view, walk: wk, kept, localId }) => {
-          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (gate.ready) { gate = null; untrack?.(); untrack = null; w.setPacing(true); if (!gone) setShown(true); } }
+          { const fl = props.current.fightLive; if (fl && fl.current !== liveWas) { liveWas = fl.current; w.setFight(liveWas); } } // (each new step of the fight, the frame it arrives)
+          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (!warmed && p >= 85) { warmed = true; w.warm(); } /* (the files are in: everything not yet drawn is built now, under the loading screen) */ if (gate.ready) { gate = null; untrack?.(); untrack = null; w.setPacing(true); if (!gone) setShown(true); } }
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
@@ -144,7 +145,8 @@ const World3D = forwardRef(function World3D({ fight = null, spotId = null, place
     return () => { gone = true; untrack?.(); w?.dispose(); W.current = null; setReady(false); setShown(false); };
   }, [venue, quality, real, panoOn, gen]);
 
-  useEffect(() => { W.current?.setFight(fight); }, [fight, ready]);
+  // (with a live fight to read, the frame loop below hands it to the world every frame; without one, as it changes)
+  useEffect(() => { if (!fightLive) W.current?.setFight(fight); }, [fight, fightLive, ready]);
   useEffect(() => { W.current?.setTipLight(tipLight); }, [tipLight, ready]);
   useEffect(() => { W.current?.setAnglers(anglers); setOthers(anglers.filter((a) => !a.local).map((a) => ({ id: a.id, name: a.name }))); }, [anglers, ready]);
   useEffect(() => { if (ready) W.current?.setEnv({ light, cond, facing: facingNow }); }, [ready, JSON.stringify(light), JSON.stringify(cond), facingNow]); // eslint-disable-line react-hooks/exhaustive-deps

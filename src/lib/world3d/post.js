@@ -133,6 +133,8 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
     /** the picture's brightness, 0 (black) to 1: a cut in the landing shot comes up from black over a few frames */
     setFade(v) { grade.uniforms.uFade.value = Math.max(0, Math.min(1, +v || 0)); },
     /** frames running late even at the lowest sharpness: drop the ambient occlusion first */
+    /** What the scene is drawn into (not the screen): shaders are built differently for it, so anything building them ahead of time must build them for this. */
+    get target() { return composer.renderTarget1; },
     dropAO() { if (ao?.enabled) { ao.enabled = false; aoLevel = 0; return true; } return false; },
     dispose() { composer.passes.forEach((p) => p.dispose?.()); composer.dispose(); },
   };
