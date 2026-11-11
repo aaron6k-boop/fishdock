@@ -509,6 +509,11 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .walk-prompt { display: flex; align-items: center; gap: 10px; padding: 10px 18px 10px 10px; border-radius: 14px; border: 0; background: #0a141be6; color: #fff; font-weight: 700; font-size: 16px; box-shadow: 0 6px 20px #0008; animation: prompt-in .25s ease both; }
 .walk-prompt .key { background: #fff; color: #0a141b; border-radius: 8px; padding: 4px 8px; font-size: 12px; }
 @keyframes prompt-in { from { transform: scale(.85); opacity: 0; } }
+/* over the live 3D picture nothing blurs what is behind it. Each blurred chip, button and label made the phone read
+   the picture back and blur it again every frame the picture changed, which over a 3D view is every frame. They keep
+   their dark glass look with a slightly more solid fill instead */
+.stage3d .fs-chip, .stage3d .live-badge, .stage3d .fs-btn, .stage3d .ft-label, .stage3d .ft-pill, .stage3d .demo-ctl, .stage3d .arrive-label { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.stage3d .fs-chip:not([class*="on"]):not(.invite-btn):not(.live), .stage3d .fs-btn:not(.on):not(.live), .stage3d .ft-label, .stage3d .ft-pill:not(.on) { background-color: #0a141bd9; }
 /* the keyboard hints need a wide window: in a narrow one the one line ran off both sides and under the Cast button */
 @media (max-width: 640px) { .w3d-keys { display: none; } }
 /* a party on a phone: its top bar wraps to a second row (Invite a friend, the mic), and a message sat on top of it */

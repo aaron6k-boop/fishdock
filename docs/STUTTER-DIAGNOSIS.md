@@ -13,8 +13,32 @@ often the page redraws itself. A hitch on a real device is one of those happenin
 Real frame times (p50, p95, p99, 1% low, long frames, GPU time) have to come from the devices themselves. For that
 there is now **Record a catch** (below), which measures exactly the sequence the brief lists.
 
-The 55-second screen recording mentioned in the brief did not arrive with the message (only the text did), so it has
-not been used as a reference yet.
+## The recording (iPhone, live build, 11 November 00:47)
+
+The 55-second screen recording arrived afterwards and was measured with `tools/recording-stalls.py`. A phone records
+at 60 frames a second whatever the game manages; where the game missed a frame the recording holds the same picture
+twice, and since the sea never stops moving, a repeated frame of sea is a frame the game did not draw.
+
+    1206x2622, 54.6 s, 3259 recorded frames, 2745 new game frames, 514 repeats
+    game frame interval: p50 16.7 ms, p95 33.3 ms, p99 66.7 ms, worst 850 ms; average 50.3 frames a second
+    gaps over 50 ms: 34; over 100 ms: 20; over 200 ms: 10
+
+So the phone is mostly at 60 and the trouble is stalls, not a low frame rate. The stalls, against what was on screen:
+
+| When | Stall | What was happening | Cause |
+| --- | --- | --- | --- |
+| 13.0 s | 367 ms | the strike | the fish being made (picture read, shape, skin): cause 2 |
+| 21.2 s | 850 ms, then 250 ms | mid-fight, the fish first coming into view | its shaders built on first sight: cause 2 |
+| 24.0 s | 167 ms | fight | not identified |
+| 31.6 to 35.0 s | eleven of 83 to 467 ms | the landing: the view turns to the deck, net and box appear | twelve shaders built at the landing: cause 2 (but see below) |
+| 39.9 and 40.5 s | 400 and 500 ms | "have a look", the panel opening | **not confirmed** (see below) |
+
+A caution on the last two rows: once the view is on the deck there is no moving sea in it, and a camera holding
+still over concrete also gives repeated frames. Those two rows may overstate. The stalls while the view is on the sea
+(the strike, the fight) are sound. Nothing was found in the code that loads or builds anything when the panel opens;
+Record a catch on the phone will say whether a frame really ran long there and what was built in it.
+
+The same script on a new recording of this branch is the before-and-after for the phone.
 
 ## The probe
 
@@ -74,7 +98,13 @@ targets are thrown away and made again in one frame. That cannot be avoided for 
 - a device's settled resolution is remembered, so a phone does not step down again on every visit (merged 10 November);
 - a step no longer reallocates the drawing buffer twice (merged 10 November).
 
-### 4. The shadow map was drawn twice a frame
+### 4. Every control over the 3D view blurred the picture behind it
+
+The chips, buttons and labels drawn over the 3D view each used a background blur. Over a picture that changes every
+frame, each one makes the phone read that part of the picture back and blur it again, every frame. They now have a
+slightly more solid dark fill and no blur. This is a known cost of that effect rather than one measured here.
+
+### 5. The shadow map was drawn twice a frame
 
 Found and fixed on 10 November (PR #94): 741,506 triangles in 175 draw calls into a 4096 map every frame on Ultra, now
 371,946 in 89.

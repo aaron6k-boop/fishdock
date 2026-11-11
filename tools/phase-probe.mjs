@@ -7,7 +7,7 @@ const base = process.argv[2] || "http://localhost:8818", tag = process.argv[3] |
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--enable-precise-memory-info", "--js-flags=--expose-gc"] });
 const ctx = await browser.newContext({ viewport: { width: 900, height: 600 } });
 await ctx.addInitScript(() => {
-  localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "high" })); localStorage.setItem("fishdock.demoFish", "pick");
+  localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "high" })); localStorage.setItem("fishdock.demoFish", "pick"); localStorage.setItem("fishdock.reel", JSON.stringify({ assisted: true, advanced: false, holdReel: true })); // (assisted: one tap winds steadily, so the probe always lands its fish)
   const L = window.__log = []; const T = () => Math.round(performance.now());
   const P = WebGL2RenderingContext.prototype;
   const wrap = (name, fn) => { const f = P[name]; P[name] = function (...a) { try { fn.apply(this, a); } catch {} return f.apply(this, a); }; };
@@ -44,19 +44,20 @@ await page.evaluate(() => { const c = Array.from(document.querySelectorAll("butt
 let hooked = false; for (let i = 0; i < 400 && !hooked; i++) { if (await has(".ft-strike")) { if (!marks.some((m) => m[1] === "bite")) await mark("bite"); await pdown(".ft-strike"); } if (await has(".ft-reel")) hooked = true; else { if (i % 40 === 39 && await has(".ft-cast")) { const b = await page.locator(".ft-cast").boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await sleep(800); await page.mouse.up(); await sleep(4000); await page.evaluate(() => { const c = Array.from(document.querySelectorAll("button.chip")).find((x) => /bite/i.test(x.textContent)); c?.click(); }); } await sleep(150); } }
 if (!hooked) { console.log("never hooked"); await browser.close(); process.exit(2); }
 await mark("hooked-fight"); let landed = false, landing = false;
-for (let i = 0; i < 900 && !landed; i++) {
-  if (await has(".ft-reel")) await pdown(".ft-reel");
+await pdown(".ft-reel");
+for (let i = 0; i < 1500 && !landed; i++) {
   if (await has(".ft-land")) { if (!landing) { landing = true; await mark("landing"); } await pdown(".ft-land"); }
-  const lab = await label(); const prompt = await page.evaluate(() => document.querySelector(".w3d-prompt")?.textContent || "");
-  if (/landed|have a look/i.test(prompt + lab)) landed = true;
+  const lab = await label();
   if (!landing && /Landing/i.test(lab)) { landing = true; await mark("landing"); }
-  if (!(await has(".ft-reel")) && !(await has(".ft-land")) && /cast again/i.test(lab)) { console.log("lost the fish:", lab); break; }
-  await sleep(220);
+  if (await has(".walk-prompt")) landed = true;
+  if (!landing && !(await has(".ft-reel")) && !(await has(".ft-land")) && /cast again/i.test(lab)) { console.log("lost the fish:", lab); break; }
+  if (i % 12 === 11 && await has(".ft-reel")) await pdown(".ft-reel");
+  await sleep(250);
 }
-await mark(landed ? "on-the-mat" : "ended"); await sleep(4000);
-// tap the fish prompt to inspect, then open whatever panel it offers
-await page.evaluate(() => document.querySelector(".w3d-prompt")?.click()); { const c = await page.locator(".w3d canvas").boundingBox(); await page.mouse.click(c.x + c.width / 2, c.y + c.height / 2); }
-await mark("inspect"); await sleep(6000);
+await mark(landed ? "on-the-mat" : "ended"); await sleep(5000);
+if (landed) { await page.evaluate(() => document.querySelector(".walk-prompt")?.click()); await mark("look-and-panel"); await sleep(9000);
+  console.log("  panel:", await page.evaluate(() => (document.querySelector(".catch-card")?.innerText || "none").replace(/\n/g, " / ").slice(0, 140)));
+  await page.evaluate(() => Array.from(document.querySelectorAll(".catch-card button")).find((b) => /Put it back/i.test(b.textContent))?.click()); await mark("put-back"); await sleep(8000); }
 console.log("  buttons now:", (await page.evaluate(() => Array.from(document.querySelectorAll("button")).filter((b) => b.offsetParent).map((b) => (b.textContent.trim() || b.getAttribute("aria-label") || "").slice(0, 24)).filter(Boolean).join(" | "))).slice(0, 400));
 await mark("end"); const { profile } = await cdp.send("Profiler.stop");
 const log = await page.evaluate(() => window.__log);
