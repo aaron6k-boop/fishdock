@@ -1205,7 +1205,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     };
     // (each hand's grip lies along the rope where that hand is: towards the other hand if that's the one nearer the
     // net, else straight to the net)
-    const ropeSocks = (hs, knotL, rd) => { hs.forEach((hh, i) => { const o = hs[1 - i], X = o.at.distanceTo(knotL) < hh.at.distanceTo(knotL) - 0.03 ? o.at.clone().sub(hh.at) : knotL.clone().sub(hh.at); if (X.lengthSq() < 1e-4) X.copy(rd); X.normalize();
+    const ropeSocks = (hs, knotL, rd) => { hs.forEach((hh, i) => { const o = hs[1 - i], X = o.at.distanceTo(knotL) < hh.at.distanceTo(knotL) - 0.03 ? o.at.clone().sub(hh.at) : knotL.clone().sub(hh.at); if (X.lengthSq() < 1e-4) X.copy(rd); X.normalize(); if (ROPE_FLIP) X.negate();
       const Y = V3(0, 0, 1).addScaledVector(X, -X.z); if (Y.lengthSq() < 1e-6) Y.set(0, 1, 0); Y.normalize(); hh.sock = { pos: hh.at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, X.clone().cross(Y))) }; }); };
     let lean = 0, brace = 0, crouch = 0, twist = 0, idleMode = "hang", lookAtW = null, fpRope = false;
     const tension = ph === "hooked" ? clamp(P.tension || 0.6, 0, 1.6) : 0;
@@ -1633,6 +1633,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // where the reel sits in your view (right, up, forward of the eye, metres): low and a little right of the middle, far
   // enough out that both hands and the reel's handle going round are in the picture above the controls (it was lower
   // and nearer: the reel hand was half under the Reel button)
+const ROPE_FLIP = typeof window !== "undefined" && FILM && window.__fdRopeFlip != null ? !!window.__fdRopeFlip : false;
 const FPROD = (typeof window !== "undefined" && FILM && window.__fdRod) || { de: 0.2, dsw: 0.15 }; // (13 November: the rod held up at about 40 degrees, as a rod is held waiting for a bite, so you see it and your forearm from the side. At 11 degrees it pointed away from you and its butt, and the forearm along it, came straight at your eye)
 const FPR = (typeof window !== "undefined" && FILM && window.__fdFpr) || { x: 0.08, y: -0.24, z: 0.55 }; /* (12 November: further out and lower, so the forearm runs in from the corner of the picture as it does in other first-person fishing games) */ // (the reel 47 cm ahead of the eye and 13 cm below the line of sight: where bent arms hold a rod. At 54 cm and 10 cm it was held out at arm's length at shoulder height, further than the arms reach)
   function fpEye() { return new THREE.Vector3(stepNow + body.x, eyeH - leanNow * 0.25 - stoopNow * 0.55 + Math.sin(tNow * 1.4) * 0.006 + body.y, -0.08 - leanNow * 0.85 - stoopNow * 0.12 + body.z); } // (stooping: down to the net on the deck, rather than an arm stretched a metre to it)

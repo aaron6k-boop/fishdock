@@ -628,10 +628,16 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
   // finger and thumb and the handle's arm comes out at the thumb's side. From your own eye you see the back of a
   // closed hand, as you do of your own winding a reel. The pinch grip made for the knob held it by the fingertips
   // with the first finger and thumb arched in a ring, which from above read as a claw)
-  const KNOB_FIST = TUNE.knobFist === false || !AUTHORED.ropeg_l ? null : { ...AUTHORED.ropeg_l, Ph: [TUNE.knobFistX ?? 0.03, AUTHORED.ropeg_l.Ph[1], AUTHORED.ropeg_l.Ph[2]] };
+  // (the fists made for the rope, with the thumb turned in across the first finger: 0.6 rad about the hand's length and
+  // 0.6 about the palm's facing, mirrored for the right hand. As made, the thumb stood off the first finger and from
+  // the thumb's side, which is the side you see hauling a rope, the two made a ring you could see through)
+  const FIST = {}; for (const [sd, sg] of [["l", 1], ["r", -1]]) { const g = AUTHORED["ropeg_" + sd]; if (!g) continue;
+    const ty = TUNE.thumbIn ?? 0.6, tz = TUNE.thumbAcross ?? -0.6, R = new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), tz * sg).multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), ty * sg));
+    FIST["ropeg_" + sd] = { ...g, bones: Object.fromEntries(Object.entries(g.bones).map(([n, q]) => [n, n.startsWith("thumb") ? R.clone().multiply(new THREE.Quaternion(...q)).toArray() : q])) }; }
+  const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [TUNE.knobFistX ?? 0.03, FIST.ropeg_l.Ph[1], FIST.ropeg_l.Ph[2]] };
   function authored(S, kind) {
     if (TUNE.authored === false) return null;
-    const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : null) ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
+    const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : null) ?? FIST[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
     const fr = S.frameInv.clone().invert(), dW = (name) => fr.clone().multiply(new THREE.Quaternion(...A.bones[name])).multiply(S.frameInv); // (given in the hand's own frame; here in the model's space as the hand rests)
     const local = (ch) => { let above = null; return ch.map((j, k) => { const pose = dW(j.b.name).multiply(j.w0), par = k > 0 && j.b.parent === ch[k - 1].b ? above : j.pw0; above = pose; return par.clone().invert().multiply(pose); }); };
     const ang = (j, ql) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(ql).w), 0, 1));
@@ -946,7 +952,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // (a rope running through the hand: every finger eased open a little, the thumb with them)
       // (a fist seen from the thumb's side, as you see your own on a rope: the first finger closed further and the
       // thumb laid over it. As made, the thumb's tip met the first finger's tip and left a ring you could see through)
-      if ((kind === "ropeg" || kind === "crank") && G.q) { const fi = TUNE.fistIdx ?? [0.3, 0.8, 0.6], ft = TUNE.fistThumb ?? [0.5, 0.9, 0.9];
+      if ((kind === "ropeg" || kind === "crank") && G.q) { const fi = TUNE.fistIdx ?? [0.3, 0.8, 0.6], ft = TUNE.fistThumb ?? [0, 0, 0];
         S.fingers.forEach((ch, n) => ch.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, (fi[k] || 0) * (n ? TUNE.fistRest ?? 0.4 : 1))))); S.thumb.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, ft[k] || 0))); }
       if (loose > 0) [...S.fingers, S.thumb].forEach((ch) => ch.forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(loose, 0, 1) * (TUNE.looseK ?? 0) * [0.22, 0.3, 0.3][k])));
       if (trigger > 0) S.fingers[0].forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(trigger, 0, 1) * [0.55, 0.8, 0.85][k]));
