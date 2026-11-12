@@ -235,7 +235,11 @@ function curvature(geo) {
 
 // a model with fewer points than this is coarse: its fingers are a few flat sides each and are subdivided once on loading
 const DENSE_POINTS = 6000;
+// (13 November: the skin's shading turned down. The folds at the knuckles were darkened to two thirds and reddened, with
+// veins, blotches and freckles over that; on a phone at dusk it read as bony, mottled hands)
+const SKF = (v) => v.toFixed(3);
 function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
+  const SKT = (typeof window !== "undefined" && FILM && window.__fdSkin) || {}, SK = { fold: SKF(SKT.fold ?? 0.25), blotch: SKF(SKT.blotch ?? 0.25), vein: SKF(SKT.vein ?? 0), freckle: SKF(SKT.freckle ?? 0) };
   const root = cloneSkinned(scene); root.updateMatrixWorld(true);
   const bone = (n) => root.getObjectByName(n);
   const wp = (o) => o.getWorldPosition(V()), wq = (o) => o.getWorldQuaternion(new THREE.Quaternion());
@@ -307,18 +311,18 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
         .replace("#include <color_fragment>", `#include <color_fragment>
           ${gloves ? "" : `{ float cr = smoothstep(0.0, 1.0, vCurv), cv = smoothstep(0.0, 1.0, -vCurv);
             // folds darker and warmer (blood close under thin skin), ridges a touch paler and drier
-            diffuseColor.rgb *= mix(vec3(1.0), vec3(0.64, 0.48, 0.45), cr * 0.95);
+            diffuseColor.rgb *= mix(vec3(1.0), vec3(0.64, 0.48, 0.45), cr * ${SK.fold});
             diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 1.0, 0.95), cv * 0.7);
             // faint uneven colour across the skin, as real skin has (redder in patches, paler in others)
             #ifdef USE_MAP
               vec2 bq = vMapUv * 38.0; float bn = fract(sin(dot(floor(bq), vec2(12.9898, 78.233))) * 43758.5453);
               vec2 bf = fract(bq); bf = bf * bf * (3.0 - 2.0 * bf);
               float b2 = mix(mix(bn, fract(sin(dot(floor(bq) + vec2(1, 0), vec2(12.9898, 78.233))) * 43758.5453), bf.x), mix(fract(sin(dot(floor(bq) + vec2(0, 1), vec2(12.9898, 78.233))) * 43758.5453), fract(sin(dot(floor(bq) + vec2(1, 1), vec2(12.9898, 78.233))) * 43758.5453), bf.x), bf.y);
-              diffuseColor.rgb *= mix(vec3(1.0), vec3(1.05, 0.94, 0.93), (b2 - 0.5) * 1.1);
+              diffuseColor.rgb *= mix(vec3(1.0), vec3(1.05, 0.94, 0.93), (b2 - 0.5) * ${SK.blotch});
               // (fine freckling and the faint blue-green of veins under thin skin, in soft, broken lines)
               vec2 vq = vMapUv * vec2(90.0, 30.0); float vv = abs(sin(vq.x + sin(vq.y * 1.7) * 1.3 + b2 * 3.0));
-              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.92, 1.02), smoothstep(0.12, 0.0, vv) * 0.35 * (1.0 - cr));
-              float fr = fract(sin(dot(floor(vMapUv * 700.0), vec2(41.3, 289.1))) * 9137.7); diffuseColor.rgb *= 1.0 - step(0.985, fr) * 0.12;
+              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.86, 0.92, 1.02), smoothstep(0.12, 0.0, vv) * ${SK.vein} * (1.0 - cr));
+              float fr = fract(sin(dot(floor(vMapUv * 700.0), vec2(41.3, 289.1))) * 9137.7); diffuseColor.rgb *= 1.0 - step(0.985, fr) * ${SK.freckle};
             #endif
           }`}`)
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
@@ -334,7 +338,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
         reflectedLight.indirectDiffuse += ${gloves ? "vec3(0.10, 0.11, 0.13) * rim * 0.5" : "diffuseColor.rgb * vec3(0.9, 0.42, 0.32) * rim * 0.15"} * fdLit;
         ${gloves ? "" : "reflectedLight.directDiffuse *= vec3(1.0, 0.96, 0.93);"} }`);
     };
-    mt.customProgramCacheKey = () => "fdskin9" + (gloves ? "g" : "") + (baked ? "b" : "");
+    mt.customProgramCacheKey = () => "fdskin10" + SK.fold + (gloves ? "g" : "") + (baked ? "b" : "");
   });
   const sides = SIDES.map((sfx, i) => {
     const s = i ? 1 : -1, hand = bone("hand_" + sfx), fore = bone("lowerarm_" + sfx);
@@ -1226,7 +1230,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // (from the knob itself, not from your eye: back towards you, down and out to the side, a forearm's length away.
         // Placed from the eye, the elbow stayed at the same height whatever the reel did, so when you looked down and the
         // reel sank in the view the forearm ran flat in from the edge of the screen)
-        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(vf, -(TUNE_ELBOW.crankBack ?? 0.1)).addScaledVector(V().crossVectors(vr, vf).normalize(), -(TUNE_ELBOW.crankDown ?? 0.13)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.22) * h.s);
+        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(vf, -(TUNE_ELBOW.crankBack ?? 0.08)).addScaledVector(V().crossVectors(vr, vf).normalize(), -(TUNE_ELBOW.crankDown ?? 0.04)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.3) * h.s);
         if (spec?.kind === "crank" && spec.hub) elbow.addScaledVector(tmpV.copy(spec.at).sub(spec.hub), TUNE_ELBOW.follow ?? 0.3);
         // (the arm comes in to the reel seat from behind and out to the side at about 45 degrees, as it does holding a spinning
         // rod: the handle lies diagonally across the palm, the butt along the forearm further back)

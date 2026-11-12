@@ -1687,7 +1687,7 @@ const FPR = (typeof window !== "undefined" && FILM && window.__fdFpr) || { x: 0.
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
     setFirstPerson(on) {
       if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on && !tagOff; feetShadow.visible = !fp && !walking?.air;
-      if (fp && !fpv) { const L = fig.look || {}; fpv = createFpHands({ gloves: !!L.gloves, skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48, fine: !!fineHands }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
+      if (fp && !fpv) { const L = fig.look || {}; fpv = createFpHands({ gloves: !!L.gloves || !!(FILM && typeof window !== "undefined" && window.__fdGloves), skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48, fine: !!fineHands }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
       fpv?.show(fp);
     },
     /** the name label over their head (hidden for your own angler in the landing shot) */
