@@ -8,6 +8,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { weather } from "./textures3d.js";
 
 export const MODELS_BASE = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/models/"; // (__fdAssetBase: set only by a self-contained preview page, its files beside it)
+const MODEL_V = typeof __BUILD_ID__ !== "undefined" && !(typeof window !== "undefined" && window.__fdAssetBase) ? "?v=" + __BUILD_ID__ : "";
 let loader = null;
 const files = new Map();
 
@@ -16,7 +17,9 @@ export function loadPart(name) {
   if (typeof document === "undefined") return Promise.reject(new Error("no document"));
   if (!files.has(name)) {
     loader ||= new GLTFLoader();
-    const p = loader.loadAsync(MODELS_BASE + name + ".glb").then((g) => g.scene);
+    // (the build's id on the address: the models keep their file names from one build to the next and are kept by
+    // the browser for a week, so a phone that had fetched fp_body.glb went on drawing the old hands under new code)
+    const p = loader.loadAsync(MODELS_BASE + name + ".glb" + MODEL_V).then((g) => g.scene);
     p.catch(() => files.delete(name));
     files.set(name, p);
   }
