@@ -934,6 +934,9 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       if (G.q) [...S.fingers, S.thumb].forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(G.q[a][k])));
       // (the first finger let go of the line and held out straight over the spool, as it is while the line runs off a
       // fixed-spool reel: the other three and the thumb keep hold of the rod)
+      // (on the reel's knob the thumb and first two fingers do the holding; the other two are folded into the palm as
+      // they are in a hand winding a reel. Left out straight they stood up beside the reel like an open claw)
+      if (kind === "crank" && G.q) { const F = madeGrip(S, "ropeg"); if (F) for (const a of [2, 3]) S.fingers[a].forEach((j, k) => j.b.quaternion.slerp(F.q[a][k], TUNE.crankTuck ?? 0.8)); }
       // (a rope running through the hand: every finger eased open a little, the thumb with them)
       if (loose > 0) [...S.fingers, S.thumb].forEach((ch) => ch.forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(loose, 0, 1) * [0.22, 0.3, 0.3][k])));
       if (trigger > 0) S.fingers[0].forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(trigger, 0, 1) * [0.55, 0.8, 0.85][k]));
@@ -1067,7 +1070,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
   const sleeveMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.78, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, roughnessMap: D0?.cloth.rough || null, normalScale: new THREE.Vector2(0.4, 0.4) });
   // (the cloth's soft pale edge as a cheap rim term rather than three's sheen lobe: the sleeves fill a third of the view
   // in first person, and the physical material's extra lobe cost a phone frames in the fight)
-  sleeveMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "{ float rim = pow(1. - abs(dot(normalize(vViewPosition), normal)), 3.); outgoingLight += vec3(.55, .6, .68)*rim*.18*min(1., totalDiffuse.g*6.); /* (only as the light on the cloth allows: a fixed part of it glowed at night) */ }\n#include <opaque_fragment>"); };
+  sleeveMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .17) discard; /* (cloth right at your eye isn't drawn: an upper arm passing your face as you haul a rope, or the sleeve beyond the shoulder, blacked the whole picture out for a frame) */ { float rim = pow(1. - abs(dot(normalize(vViewPosition), normal)), 3.); outgoingLight += vec3(.55, .6, .68)*rim*.18*min(1., totalDiffuse.g*6.); /* (only as the light on the cloth allows: a fixed part of it glowed at night) */ }\n#include <opaque_fragment>"); };
   if (D0) { D0.cloth.normal.repeat.set(16, 30); D0.cloth.rough.repeat.set(16, 30); } // (a finer weave: coarser, it read as stripes close up)
   const hemMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(coatHex).multiplyScalar(0.62), roughness: 0.9, side: THREE.DoubleSide, normalMap: D0?.cloth.normal || null, normalScale: new THREE.Vector2(0.8, 0.8) });
   const built = buildHand(gloves, skinHex);
