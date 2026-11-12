@@ -106,21 +106,29 @@ def hand(side):
         od = (oP - hh) @ u; m = (np.abs(od - dd) < 0.006) & (np.linalg.norm(oP - hh, axis=1) < 0.2)
         if m.sum() < 8: return None
         q = oP[m]; cc = q.mean(0); return cc, np.linalg.norm((q - cc) - np.outer((q - cc) @ u, u), axis=1).mean()
-    # (the old forearm's own outline 5 cm above the wrist: its middle, and how far it reaches in each direction. The
-    # rings reach that outline by 4 cm up, so the heel of the hand narrows to a wrist as a real one does)
-    od = (oP - hh) @ u; sl = oP[(np.abs(od - 0.05) < 0.008) & (np.linalg.norm(oP - hh, axis=1) < 0.2)]; lat = lambda v: v - u * (v @ u)
-    ce = lat(sl.mean(0) - hh); slr = (sl - hh) - np.outer((sl - hh) @ u, u) - ce; cl = lat(c0 - hh); reach = lambda rn: max(float((slr @ rn).max()) * 0.9, 0.015)
-    END = 0.1; rings = [0.1, 0.2, 0.3, 0.42, 0.6, 0.8, 1.0]; newP, newN, newUV, newW, idxmap = [], [], [], [], []; nb = len(P2)
+    # (the old arm's own outline at each height above the wrist: its middle, and how far it reaches in each direction.
+    # Each ring takes the old arm's outline at its own height, and is fully on it 1.5 cm up: the heel of the hand
+    # narrows straight to a wrist, as a real one does, and the wrist and forearm keep the shape the old arm had)
+    od = (oP - hh) @ u; near = (np.linalg.norm(oP - hh, axis=1) < 0.2) & ((oW * np.isin(oJ, [J[n_] for n_ in names if n_.startswith(('thumb', 'index', 'middle', 'ring', 'pinky'))])).sum(1) < 0.02); # (not the old thumb's root, which lies beside the wrist)
+    lat = lambda v: v - u * (v @ u); cl = lat(c0 - hh)
+    def outline(dd):
+        w_ = 0.007
+        while ((np.abs(od - dd) < w_) & near).sum() < 12: w_ *= 1.5
+        sl = oP[(np.abs(od - dd) < w_) & near]; q = (sl - hh) - np.outer((sl - hh) @ u, u); ce_ = q.mean(0); return ce_, q - ce_
+    OUT = {}
+    END = 0.1; rings = [0.06, 0.12, 0.2, 0.3, 0.42, 0.6, 0.8, 1.0]; newP, newN, newUV, newW, idxmap = [], [], [], [], []; nb = len(P2)
     # (the forearm takes its colour from one plain patch of the picture, PATCH, painted below with the heel of the hand's
     # own colour: the open edge's own places in the picture run along the edge of the drawn skin and smeared)
     mp = {}
     for i in lp: mp[int(i)] = nb + len(newP); newP.append(P2[i]); newN.append(N2[i]); newUV.append(PATCH); newW.append(W2[i])
     idxmap.append(mp); heel.append(UV[(d > -0.03) & (d < 0.0)])
     for tk in rings:
-        mp = {}
+        mp = {}; dm = float(np.mean(d[lp]) + (END - np.mean(d[lp])) * tk); key_ = round(max(dm, 0.012), 3); pass
+        if key_ not in OUT: OUT[key_] = outline(key_)
+        ce, slr = OUT[key_]
         for i in lp:  # (each point of the open edge goes up the arm from where it is, so the slanted edge can't fold over)
-            rad = lat(P2[i] - c0); r_ = np.linalg.norm(rad); rn = rad / (r_ + 1e-9); dk = d[i] + (END - d[i]) * tk; x_ = min(1.0, tk / 0.42); sm = x_ * x_ * (3 - 2 * x_)
-            q = hh + u * dk + cl + (ce - cl) * sm + rn * (r_ + (reach(rn) - r_) * sm)
+            rad = lat(P2[i] - c0); r_ = np.linalg.norm(rad); rn = rad / (r_ + 1e-9); dk = d[i] + (END - d[i]) * tk; x_ = min(1.0, max(0.0, (dk - d[i]) / 0.015)); sm = x_ * x_ * (3 - 2 * x_)
+            q = hh + u * dk + cl + (ce - cl) * sm + rn * (r_ + (max(float((slr @ rn).max()), 0.012) * 0.96 - r_) * sm)
             w = W2[i].copy(); tt = np.clip((dk - 0.015) / 0.04, 0, 1); hi, ti = J[f'hand_{s}'], J[f'lowerarm_twist_{s}']; tot = w.sum(); w[:] = 0; w[hi] = tot * (1 - tt); w[ti] = tot * tt
             mp[int(i)] = nb + len(newP); newP.append(q); newN.append(rn); newUV.append(PATCH); newW.append(w)
         idxmap.append(mp)
@@ -148,7 +156,7 @@ lum = a @ np.array([0.3, 0.59, 0.11]); a = a + 0.3 * (lum[..., None] - a)  # (a 
 hc = at_uv(Image.fromarray(np.clip(a, 0, 255).astype('u1')), np.concatenate(heel)).mean(0); a[int(0.94 * 1024):, :int(0.06 * 1024)] = hc; print('forearm colour', np.round(hc))
 col = Image.fromarray(np.clip(a, 0, 255).astype('u1'))
 nm = np.asarray(Image.open(f'{GDIR}/textures/hands_normal.png').convert('RGB').resize((1024, 1024), Image.LANCZOS), dtype=np.float64) / 255 * 2 - 1
-nm[..., :2] *= 0.3; nm /= np.linalg.norm(nm, axis=2, keepdims=True); nm[int(0.94 * 1024):, :int(0.06 * 1024)] = [0, 0, 1]; nm = Image.fromarray(((nm + 1) / 2 * 255).round().astype('u1'))
+nm[..., :2] *= 0.55; nm /= np.linalg.norm(nm, axis=2, keepdims=True); nm[int(0.94 * 1024):, :int(0.06 * 1024)] = [0, 0, 1]; nm = Image.fromarray(((nm + 1) / 2 * 255).round().astype('u1'))
 orm = np.asarray(Image.open(f'{GDIR}/textures/hands_occlusionRoughnessMetallic.png').convert('RGB').resize((512, 512), Image.LANCZOS)).copy(); orm[..., 2] = 0
 orm = Image.fromarray(orm)
 def webp(im, q): b = io.BytesIO(); im.save(b, 'WEBP', quality=q, method=6); return b.getvalue()
