@@ -234,7 +234,7 @@ function curvature(geo) {
 }
 
 // a model with fewer points than this is coarse: its fingers are a few flat sides each and are subdivided once on loading
-const DENSE_POINTS = 6000;
+const DENSE_POINTS = 4000; // (the Godot XR hands are 4,686 points for the pair and are used as they come)
 // (13 November: the skin's shading turned down. The folds at the knuckles were darkened to two thirds and reddened, with
 // veins, blotches and freckles over that; on a phone at dusk it read as bony, mottled hands)
 const SKF = (v) => v.toFixed(3);
