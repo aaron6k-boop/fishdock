@@ -5,7 +5,8 @@
 //   side: which hand ("r" or "l"); Ph: the wrist in the grip's frame (metres); Qh: the hand's frame in the grip's
 //   frame [x, y, z, w]; bones: each finger bone's turn from rest, in the hand's own frame (x across the knuckles, y along the fingers).
 // The grip's frame: "seat" has its origin on the rod's axis at the reel's stem, z to the rod's tip, y up (the reel
-// hangs below); "crank" has it at the middle of the knob, x along the knob out from the handle's arm; "ropeg" (a
+// hangs below); "crank" (the knob held by its sides between the thumb and the first two fingers, the palm towards the
+// reel, the other two fingers folded: make_knob_grip.py) has it at the middle of the knob, x along the knob out from the handle's arm; "ropeg" (a
 // fist round the drop net's 11 mm rope, one for each hand) has it on the rope, x down the rope, the thumb's side up;
 // "butt_l" (the left hand round the rod's butt, the pulling hand of a cast: make_butt_grip.py) has it on the rod's
 // axis in the middle of the hand, z to the tip; the hand is free to turn about the rod.
@@ -124,106 +125,106 @@ export const AUTHORED = {
  "crank": {
   "side": "l",
   "Ph": [
-   0.07595,
-   0.07967,
-   -0.0674
+   0.048,
+   -0.078,
+   0.012
   ],
   "Qh": [
-   0.84384,
-   -0.20768,
-   0.11801,
-   0.48049
+   -0.02287,
+   -0.70671,
+   0.02203,
+   0.70679
   ],
   "bones": {
    "index_01_l": [
-    0.257777,
-    0.023248,
-    -0.01679,
-    0.965778
+    0.606635,
+    0.065357,
+    0.000172,
+    0.79229
    ],
    "index_02_l": [
-    0.728404,
-    0.065651,
-    -0.011712,
-    0.681894
+    0.866456,
+    0.09335,
+    0.000244,
+    0.49045
    ],
    "index_03_l": [
-    0.923443,
-    0.08322,
-    -0.006296,
-    0.374549
+    0.870427,
+    0.093778,
+    0.000246,
+    0.483285
    ],
    "middle_01_l": [
-    0.288729,
-    -0.046009,
-    -1e-05,
-    0.956305
+    0.634778,
+    -0.10115,
+    -2.1e-05,
+    0.766045
    ],
    "middle_02_l": [
-    0.863723,
-    -0.137633,
-    -3.1e-05,
-    0.484809
+    0.891338,
+    -0.142031,
+    -2.9e-05,
+    0.430514
    ],
    "middle_03_l": [
-    0.985135,
-    -0.15698,
-    -3.5e-05,
-    0.069755
+    0.895015,
+    -0.142617,
+    -2.9e-05,
+    0.422621
    ],
    "ring_01_l": [
-    0.470791,
-    -0.115765,
-    0.038085,
-    0.873787
+    0.603997,
+    -0.176727,
+    -0.000117,
+    0.777146
    ],
    "ring_02_l": [
-    0.906594,
-    -0.222854,
-    0.015507,
-    0.358027
+    0.956108,
+    -0.279752,
+    -0.000186,
+    0.087156
    ],
    "ring_03_l": [
-    0.968731,
-    -0.238104,
-    -0.003177,
-    -0.06969
+    0.886703,
+    -0.259445,
+    -0.000172,
+    -0.382684
    ],
    "pinky_01_l": [
-    0.518476,
-    -0.166834,
-    0.080264,
-    0.834809
+    0.602432,
+    -0.259786,
+    -0.000216,
+    0.75471
    ],
    "pinky_02_l": [
-    0.919543,
-    -0.295743,
-    0.024597,
-    0.257627
+    0.916023,
+    -0.395014,
+    -0.000329,
+    0.069757
    ],
    "pinky_03_l": [
-    0.934497,
-    -0.300498,
-    -0.018502,
-    -0.189931
+    0.857269,
+    -0.369678,
+    -0.000308,
+    -0.358368
    ],
    "thumb_01_l": [
-    -0.379338,
-    0.005346,
-    -0.107286,
-    0.919001
+    0.095784,
+    0.240538,
+    -0.151781,
+    0.953902
    ],
    "thumb_02_l": [
-    -0.647477,
-    -0.062671,
-    -0.058947,
-    0.757208
+    -0.473386,
+    0.090271,
+    -0.01131,
+    0.876145
    ],
    "thumb_03_l": [
-    -0.875309,
-    -0.132518,
-    0.005231,
-    0.465181
+    -0.855262,
+    -0.086672,
+    0.128792,
+    0.49438
    ]
   }
  },

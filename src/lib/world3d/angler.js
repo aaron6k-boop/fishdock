@@ -1422,10 +1422,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // (and both hands on the one rope, one below the other, in front of you: each reaching towards its own side of
         // the rim left two open hands in the air at the edges of the picture and the rope hanging between them from
         // nothing)
-        const top = c.clone().add(V3(0, 0.72 * net.scale.x, 0)), mid = V3(E.x - 0.08, E.y - 0.3, E.z - 0.34), rd2 = top.clone().sub(mid).normalize();
-        at.copy(mid).addScaledVector(rd2, hh === hands[1] ? 0.17 : 0);
-        const X = rd2.clone(), Y = V3(0, 0, 1).addScaledVector(rd2, -rd2.z).normalize();
-        hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, X.clone().cross(Y))) };
+        // (so now the hand goes out towards the rim as far as the arm reaches, closed as it will be on it, and takes
+        // hold when the hoop comes within reach: closed on a rope that isn't drawn there, the two hands were held up
+        // in front of you like claws, on Aaron's review of 12 November)
+        if (toH.length() > reach + 0.3) { hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
+        at.copy(sh).addScaledVector(toH.normalize(), reach);
+        hh.at = at; hh.kind = "rope"; hh.loose = 0.5; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
         continue;
       }
       hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };

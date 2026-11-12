@@ -936,7 +936,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // fixed-spool reel: the other three and the thumb keep hold of the rod)
       // (on the reel's knob the thumb and first two fingers do the holding; the other two are folded into the palm as
       // they are in a hand winding a reel. Left out straight they stood up beside the reel like an open claw)
-      if (kind === "crank" && G.q) { const F = madeGrip(S, "ropeg"); if (F) for (const a of [2, 3]) S.fingers[a].forEach((j, k) => j.b.quaternion.slerp(F.q[a][k], TUNE.crankTuck ?? 0.8)); }
+      if (kind === "crank" && G.q) { const F = madeGrip(S, "ropeg"); if (F) for (const a of [2, 3]) S.fingers[a].forEach((j, k) => j.b.quaternion.slerp(F.q[a][k], TUNE.crankTuck ?? 0)); } // (the grip itself folds them now)
       // (a rope running through the hand: every finger eased open a little, the thumb with them)
       if (loose > 0) [...S.fingers, S.thumb].forEach((ch) => ch.forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(loose, 0, 1) * [0.22, 0.3, 0.3][k])));
       if (trigger > 0) S.fingers[0].forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(trigger, 0, 1) * [0.55, 0.8, 0.85][k]));
@@ -1247,6 +1247,8 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           const fromAway = h.kind == null && want.kind != null;
           h.from = h.cur ? { pos: fromAway ? want.pos.clone().addScaledVector(vu, -0.12) : h.cur.pos.clone(), quat: fromAway ? want.quat.clone() : h.cur.quat.clone(), curl: h.curlNow } : null;
           h.kind = want.kind; h.u = h.from ? 0 : 1; h.curlTo = gripOf(want.kind);
+          // (reaching for the net's hoop the hand is already closing as it comes: opened flat first, two spread hands hung in the picture for a moment as you stooped)
+          if (want.kind === "hoop" && h.from) h.from.curl = { ...h.curlTo, made: 0.6 };
         }
         h.u = Math.min(1, h.u + dt / 0.3);
         const e = ease(h.u);
