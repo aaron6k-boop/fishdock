@@ -638,7 +638,9 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
   const FIST = {}; for (const [sd, sg] of [["l", 1], ["r", -1]]) { const g = AUTHORED["ropeg_" + sd]; if (!g) continue;
     const ty = TUNE.thumbIn ?? 0.6, tz = TUNE.thumbAcross ?? -0.6, R = new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), tz * sg).multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), ty * sg));
     FIST["ropeg_" + sd] = { ...g, bones: Object.fromEntries(Object.entries(g.bones).map(([n, q]) => [n, n.startsWith("thumb") ? R.clone().multiply(new THREE.Quaternion(...q)).toArray() : q])) }; }
-  const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [TUNE.knobFistX ?? 0.03, FIST.ropeg_l.Ph[1], FIST.ropeg_l.Ph[2]] };
+  // (13 November: the hand turned thumb up, palm to the reel, the knob between the thumb and the curled first finger, as a
+  // reel is wound. With the fist round the knob's own length you saw the flat back of the hand and no fingers)
+  const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [0, -0.03, -0.09], Qh: [0.44587, -0.47507, -0.5191, 0.55321] };
   function authored(S, kind) {
     if (TUNE.authored === false) return null;
     const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : null) ?? FIST[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
@@ -1230,7 +1232,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // (from the knob itself, not from your eye: back towards you, down and out to the side, a forearm's length away.
         // Placed from the eye, the elbow stayed at the same height whatever the reel did, so when you looked down and the
         // reel sank in the view the forearm ran flat in from the edge of the screen)
-        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(vf, -(TUNE_ELBOW.crankBack ?? 0.08)).addScaledVector(V().crossVectors(vr, vf).normalize(), -(TUNE_ELBOW.crankDown ?? 0.04)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.3) * h.s);
+        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(vf, -(TUNE_ELBOW.crankBack ?? 0.12)).addScaledVector(V().crossVectors(vr, vf).normalize(), -(TUNE_ELBOW.crankDown ?? 0.2)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.12) * h.s);
         if (spec?.kind === "crank" && spec.hub) elbow.addScaledVector(tmpV.copy(spec.at).sub(spec.hub), TUNE_ELBOW.follow ?? 0.3);
         // (the arm comes in to the reel seat from behind and out to the side at about 45 degrees, as it does holding a spinning
         // rod: the handle lies diagonally across the palm, the butt along the forearm further back)
