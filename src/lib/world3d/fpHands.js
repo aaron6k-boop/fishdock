@@ -624,9 +624,14 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
   // onto the real shapes there (source-assets/blender/grips), and brought in as they were made: where the wrist is and
   // how the hand is turned in the grip's frame, and every finger bone's turn from rest. Each bone's turn is given in
   // the hand's own frame, so it is put back through the bone above it to get the bone's own turn.
+  // (the reel's knob in a closed hand: the fist made for the rope, moved 3 cm along so the knob lies under the first
+  // finger and thumb and the handle's arm comes out at the thumb's side. From your own eye you see the back of a
+  // closed hand, as you do of your own winding a reel. The pinch grip made for the knob held it by the fingertips
+  // with the first finger and thumb arched in a ring, which from above read as a claw)
+  const KNOB_FIST = TUNE.knobFist === false || !AUTHORED.ropeg_l ? null : { ...AUTHORED.ropeg_l, Ph: [TUNE.knobFistX ?? 0.03, AUTHORED.ropeg_l.Ph[1], AUTHORED.ropeg_l.Ph[2]] };
   function authored(S, kind) {
     if (TUNE.authored === false) return null;
-    const A = AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
+    const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : null) ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
     const fr = S.frameInv.clone().invert(), dW = (name) => fr.clone().multiply(new THREE.Quaternion(...A.bones[name])).multiply(S.frameInv); // (given in the hand's own frame; here in the model's space as the hand rests)
     const local = (ch) => { let above = null; return ch.map((j, k) => { const pose = dW(j.b.name).multiply(j.w0), par = k > 0 && j.b.parent === ch[k - 1].b ? above : j.pw0; above = pose; return par.clone().invert().multiply(pose); }); };
     const ang = (j, ql) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(ql).w), 0, 1));
@@ -900,8 +905,8 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
         // (a rope through the fist turns the same way, about its own length)
         const ax = free === "z" ? "z" : "x";
         const bk = S.M.y.clone().normalize().applyQuaternion(G.Qh).negate(); bk[ax] = 0; const fe = Fin.clone(); fe[ax] = 0;
-        if (bk.lengthSq() > 1e-6 && fe.lengthSq() > 1e-6) { bk.normalize(); fe.normalize(); const want = Math.atan2(bk.clone().cross(fe)[ax], bk.dot(fe)) * (TUNE.crankFollow ?? ((TUNE.crankStyle ?? "cup") === "cup" ? 0.9 : 0.3));
-          const R0 = S.crankRoll ?? want; let d = want - R0; d = Math.atan2(Math.sin(d), Math.cos(d)); S.crankRoll = R0 + d * Math.min(1, dt * 14); roll = S.crankRoll + roll * (TUNE.crankRollExtra ?? 0); }
+        if (bk.lengthSq() > 1e-6 && fe.lengthSq() > 1e-6) { bk.normalize(); fe.normalize(); let want = Math.atan2(bk.clone().cross(fe)[ax], bk.dot(fe)) * (TUNE.crankFollow ?? ((TUNE.crankStyle ?? "cup") === "cup" ? 0.9 : 0.3));
+          if (kind === "ropeg") want += (S.i ? 1 : -1) * (TUNE.ropeRoll ?? 0); const R0 = S.crankRoll ?? want; let d = want - R0; d = Math.atan2(Math.sin(d), Math.cos(d)); S.crankRoll = R0 + d * Math.min(1, dt * 14); roll = S.crankRoll + roll * (TUNE.crankRollExtra ?? 0); }
       }
       const sq = gq.clone().multiply(quat); if (roll) sq.multiply(new THREE.Quaternion().setFromAxisAngle(free === "z" ? V(0, 0, 1) : V(1, 0, 0), roll));
       const sp = group.localToWorld(pos.clone());
@@ -939,7 +944,11 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // they are in a hand winding a reel. Left out straight they stood up beside the reel like an open claw)
       if (kind === "crank" && G.q) { const F = madeGrip(S, "ropeg"); if (F) for (const a of [2, 3]) S.fingers[a].forEach((j, k) => j.b.quaternion.slerp(F.q[a][k], TUNE.crankTuck ?? 0)); } // (the grip itself folds them now)
       // (a rope running through the hand: every finger eased open a little, the thumb with them)
-      if (loose > 0) [...S.fingers, S.thumb].forEach((ch) => ch.forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(loose, 0, 1) * [0.22, 0.3, 0.3][k])));
+      // (a fist seen from the thumb's side, as you see your own on a rope: the first finger closed further and the
+      // thumb laid over it. As made, the thumb's tip met the first finger's tip and left a ring you could see through)
+      if ((kind === "ropeg" || kind === "crank") && G.q) { const fi = TUNE.fistIdx ?? [0.3, 0.8, 0.6], ft = TUNE.fistThumb ?? [0.5, 0.9, 0.9];
+        S.fingers.forEach((ch, n) => ch.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, (fi[k] || 0) * (n ? TUNE.fistRest ?? 0.4 : 1))))); S.thumb.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, ft[k] || 0))); }
+      if (loose > 0) [...S.fingers, S.thumb].forEach((ch) => ch.forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(loose, 0, 1) * (TUNE.looseK ?? 0) * [0.22, 0.3, 0.3][k])));
       if (trigger > 0) S.fingers[0].forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(trigger, 0, 1) * [0.55, 0.8, 0.85][k]));
       // (to or from such a grip the bones ease by their own turns, from where each was: the finger angles the other
       // holds go by only come close to a made grip, and going by them the fingers jumped as the change began)
@@ -1176,14 +1185,17 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         if (real) real.root.visible = !wait; for (const h of hands) { h.sleeve.visible = !wait; h.upper.visible = !wait; } } // (the sleeves too: without their hands they were two empty blue tubes)
       // (the shoulders: beside and below the eye, a little behind it, turning with the view's heading but not its pitch,
       // as your shoulders do when you look down)
-      if (real?.body) { const fl = V(vf.x, 0, vf.z); if (fl.lengthSq() < 1e-6) fl.set(0, 0, -1); fl.normalize(); const rt = V(vr.x, 0, vr.z).normalize();
-        for (let i = 0; i < 2; i++) { const h = hands[i], onRod = ["seat", "crank", "butt"].includes(specs[i]?.kind) ? 1 : 0, kS = (h.shK = (h.shK ?? onRod) + (onRod - (h.shK ?? onRod)) * Math.min(1, dt * 5)),
+      if (real?.body) { const fl = V(vf.x, 0, vf.z); if (fl.lengthSq() < 1e-6) fl.set(0, 0, -1); fl.normalize(); const rt = V(vr.x, 0, vr.z).normalize(), vuS = V().crossVectors(vr, vf).normalize();
+        for (let i = 0; i < 2; i++) { const h = hands[i], onRod = ["seat", "crank", "butt"].includes(specs[i]?.kind) ? 1 - clamp(specs[i].anat || 0, 0, 1) : 0, /* (anat: through a cast the shoulders are where shoulders are; set forward for the hold, the upper arm stood up the side of the picture as the hands went back) */ kS = (h.shK = (h.shK ?? onRod) + (onRod - (h.shK ?? onRod)) * Math.min(1, dt * 5)),
             // (with the rod in your hands the shoulders are set lower and further forward than a real shoulder is from a real
             // eye, as first-person games set their arms: from the true place the forearm came straight at the eye and
             // showed end on, a fat stump with the cuff for a cap; from here it is seen from the side, running in from the
             // bottom corner. On a rope or the net, hands low and close, they are where they really are: set forward there
             // the upper arm stood up the side of the picture)
-            sh = eye.clone().addScaledVector(rt, h.s * lerp(0.2, TUNE_ELBOW.shX ?? 0.26, kS)).add(V(0, lerp(-0.25, TUNE_ELBOW.shY ?? -0.45, kS), 0)).addScaledVector(fl, lerp(-0.1, TUNE_ELBOW.shZ ?? 0.1, kS));
+            sh = eye.clone().addScaledVector(rt, h.s * 0.2).add(V(0, -0.25, 0)).addScaledVector(fl, -0.1)
+              // (13 November: set in the view's own frame, turning with its pitch as the rod in your hands does. Set level, looking
+              // down brought the upper arms up both sides of the picture)
+              .lerp(eye.clone().addScaledVector(vr, h.s * (TUNE_ELBOW.shX ?? 0.22)).addScaledVector(vuS, TUNE_ELBOW.shY ?? -0.55).addScaledVector(vf, TUNE_ELBOW.shZ ?? 0.22), kS);
           // (the shoulder isn't fixed to the chest: the collar bone lets it come forward a few centimetres with a long
           // reach, and up as the hand goes above it. Without that an arm at full stretch stopped short of what it held)
           const at = specs[i]?.at, want = tmpV.set(0, 0, 0);
@@ -1208,7 +1220,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // (from the knob itself, not from your eye: back towards you, down and out to the side, a forearm's length away.
         // Placed from the eye, the elbow stayed at the same height whatever the reel did, so when you looked down and the
         // reel sank in the view the forearm ran flat in from the edge of the screen)
-        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(fh, -(TUNE_ELBOW.crankBack ?? 0.17)).add(V(0, -(TUNE_ELBOW.crankDown ?? 0.17), 0)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.14) * h.s);
+        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(vf, -(TUNE_ELBOW.crankBack ?? 0.1)).addScaledVector(V().crossVectors(vr, vf).normalize(), -(TUNE_ELBOW.crankDown ?? 0.13)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.22) * h.s);
         if (spec?.kind === "crank" && spec.hub) elbow.addScaledVector(tmpV.copy(spec.at).sub(spec.hub), TUNE_ELBOW.follow ?? 0.3);
         // (the arm comes in to the reel seat from behind and out to the side at about 45 degrees, as it does holding a spinning
         // rod: the handle lies diagonally across the palm, the butt along the forearm further back)
@@ -1233,7 +1245,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // put it, the upper arm then made up to fit)
           if (real?.body && shL[i]) { const L = real.reach(i), sh = shL[i], wr0 = spec.at.clone().addScaledVector(vu, 0.07), sd = wr0.clone().sub(sh), d = Math.min(sd.length(), L.upper + L.fore - 0.012), n = sd.clone().normalize();
             const x = (L.upper * L.upper - L.fore * L.fore + d * d) / (2 * d), hgt = Math.sqrt(Math.max(0, L.upper * L.upper - x * x));
-            const pole = V(0, TUNE_ELBOW.seatPoleY ?? -0.6, 0).addScaledVector(vr, (TUNE_ELBOW.seatPoleX ?? 0.8) * h.s); pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
+            const pole = V().crossVectors(vr, vf).normalize().multiplyScalar(TUNE_ELBOW.seatPoleY ?? -1).addScaledVector(vr, (TUNE_ELBOW.seatPoleX ?? 0.3) * h.s); pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
         }
         let want;
         if (spec) {
