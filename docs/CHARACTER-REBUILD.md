@@ -98,6 +98,17 @@ Also in this stage: the skin's weights round each knuckle and across the thumb's
 neighbours (`ease_fp_weights.py`; 1,850 of the hand's 6,640 places). A bare fist's knuckles are a little less angular
 for it. It is a small change, shown before and after in the PR; the mesh, bones and maps are the same.
 
+A second screenshot from Aaron's phone showed the sleeve was still a stump after the elbow was lowered: the forearm
+still pointed almost straight back at the eye. A shoulder in its real place, beside and behind the eye, can only reach
+a hand held ahead of the face with an arm that comes straight at you. So while a hand is on the rod, the reel or the
+butt, the arms are set as first-person games set them: the shoulders are 45 cm below the eye, 10 cm ahead of it and
+26 cm out to each side (eased in and out), the rod elbow swings out as well as down, and the reel is held 56 cm ahead
+of the eye and 20 cm below it (it was 47 and 13.5). The forearm now comes in from the bottom corner and is seen from
+the side. This is a viewmodel placement, not anatomy. On the rope and the net the shoulders go back to their real
+place, because the forward position put the upper arm up the side of the picture there.
+
+After this change `tests/e2e/presets.mjs` was run again (all 56 checks passed) and every recording was made again.
+
 ## Not done
 
 - The hand mesh is the same one. Its measurements are right and it bends cleanly at the wrist, so it was kept. Its
@@ -110,6 +121,7 @@ for it. It is a small change, shown before and after in the PR; the mesh, bones 
 - The left hand is below the picture at the moment of release: looking ahead you see it on the butt in the wind-up
   and not again until it comes to the reel.
 - Line is not drawn from the spool to the first finger and up through the rings at the reel.
+- For a frame or so as the hands change over on the rope a dark patch of sleeve shows at the left edge.
 - No torso or legs in first person: looking straight down you see the deck, not your body.
 - The first-person arms and the third-person angler are still separate models. The cast now moves the rod the same
   way in both; other moves are not shared.
