@@ -71,3 +71,11 @@ test("swimming off: away and then down, never backwards or up", () => {
   assert.ok(prev.dist > 2 && prev.depth > 1, "well away and out of sight");
   assert.equal(swimAway(0.2, 0.5).depth, 0, "along the top first, where it can be seen");
 });
+
+import { bodyWave as _bw, bodyWaveSlope as _bs } from "../src/lib/fishMotion.js";
+test("the body wave's slope is the wave's own rate of change along the body", () => {
+  for (const o of [{}, { tempo: 1.4, flex: 0.7, beat: 0.5, curl: 0.3 }]) for (const u of [0, 0.3, 0.8, 1]) for (const t of [0, 0.37, 2.1]) {
+    const fd = (_bw(u + 1e-5, t, o) - _bw(u - 1e-5, t, o)) / 2e-5;
+    assert.ok(Math.abs(fd - _bs(u, t, o)) < 1e-5, `u ${u} t ${t}: ${fd} vs ${_bs(u, t, o)}`);
+  }
+});

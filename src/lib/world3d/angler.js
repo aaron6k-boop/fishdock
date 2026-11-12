@@ -10,7 +10,7 @@ import { phaseAt, DUR, lineState } from "../liveEvents.js";
 import { biteTaps, fightProfile, fightStyle, fishLoad, landingTimes, landingTech } from "../sceneActors.js";
 import { fishShape, buildFishMesh, bodyWidth } from "../fish3d.js";
 import { hasArt, artUrl } from "../../data/fishart.js";
-import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway } from "../fishMotion.js";
+import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway, bodyWaveSlope } from "../fishMotion.js";
 import { fishMaterials, donorOf, paintSkin } from "./fishLook.js";
 import { castPoint, dirOf } from "./spots.js";
 import { createPerson } from "./human3d.js";
@@ -407,7 +407,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   else part(new THREE.SphereGeometry(0.03, 8, 6), mMetal, 0, 0, 0, rig);
   // the fish's skin (fishLook.js): a wet body with its scales' relief, thin fins light comes through, glassy eyes
   let mats = fishMaterials(null);
-  let fishGeo = genericFishGeometry(), fishBase = fishGeo.attributes.position.array.slice();
+  // (the fish's shape and its normals as made: each frame the bend shears both, poseFish. The normals used to be worked
+  // out again from every triangle each frame, a sixth of the script's time in a fight)
+  const baseNormals = (g) => { if (!g.attributes.normal) g.computeVertexNormals(); return g.attributes.normal.array.slice(); };
+  let fishGeo = genericFishGeometry(), fishBase = fishGeo.attributes.position.array.slice(), fishBaseN = baseNormals(fishGeo);
   const fish = new THREE.Mesh(fishGeo, mats.body); fish.visible = false; fish.castShadow = true; world.add(fish);
   let fishFor = "", fishLen = 0.45, prof = fightProfile(null), load = 1, LT = landingTimes(null, 45, null, venue), tech = "lift";
   // the mesh's own size (in fish lengths): the spine to the back and to the belly, and half its thickness, so it can be
@@ -415,7 +418,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let fishBox = { up: 0.12, down: 0.12, thick: 0.05 };
   function useGeometry(geo, materials) {
     assetsN++;
-    fish.geometry = fishGeo = geo; fishBase = geo.attributes.position.array.slice();
+    fish.geometry = fishGeo = geo; fishBase = geo.attributes.position.array.slice(); fishBaseN = baseNormals(geo);
     let up = 0, down = 0, thick = 0;
     for (let i = 0; i < fishBase.length; i += 3) { const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2]; if (u < 0.02 || u > 0.8) continue; up = Math.max(up, y); down = Math.max(down, -y); thick = Math.max(thick, Math.abs(z)); }
     fishBox = { up: up || 0.12, down: down || 0.12, thick: thick || 0.05 };
@@ -479,12 +482,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const fBase = new THREE.Vector3(), fishQ = new THREE.Quaternion(), mtx = new THREE.Matrix4(), fUp = new THREE.Vector3(), fZ = new THREE.Vector3(), fRef = new THREE.Vector3();
   let fishShown = false;
   function poseFish(at, dir, t, { beat = 1, curl = 0, roll = 0, ease: easeK = 0 } = {}) {
-    const p = fishGeo.attributes.position, a = p.array, wave = { tempo: prof.tempo, flex: prof.flex, beat, curl };
+    const p = fishGeo.attributes.position, a = p.array, na = fishGeo.attributes.normal.array, wave = { tempo: prof.tempo, flex: prof.flex, beat, curl };
     for (let i = 0; i < a.length; i += 3) {
       const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2];
       a[i] = u * fishLen; a[i + 1] = y * fishLen; a[i + 2] = (z + bodyWave(u, t, wave)) * fishLen;
+      // (z goes to z + w(u): a normal (nx, ny, nz) goes to (nx - w'(u) nz, ny, nz), made unit again)
+      const nz = fishBaseN[i + 2], nx = fishBaseN[i] - bodyWaveSlope(u, t, wave) * nz, ny = fishBaseN[i + 1], nl = 1 / (Math.hypot(nx, ny, nz) || 1);
+      na[i] = nx * nl; na[i + 1] = ny * nl; na[i + 2] = nz * nl;
     }
-    p.needsUpdate = true; fishGeo.computeVertexNormals();
+    p.needsUpdate = true; fishGeo.attributes.normal.needsUpdate = true;
     const x = fBase.copy(dir).normalize();
     const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]), w = clamp((Math.abs(x.y) - 0.6) / 0.37, 0, 1);
     fRef.set(0, 1, 0).multiplyScalar(1 - w).addScaledVector(side, w);
