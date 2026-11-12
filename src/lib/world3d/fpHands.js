@@ -59,6 +59,7 @@ const channelOf = (kind) => CHANNEL[kind] || CHANNEL.fist;
 // elbow and forearm follow (a real arm winds from the elbow, the wrist taking the rest); ease: how far the fingers
 // loosen a little once the handle's been still a moment
 const CRANK = { roll: -1.1, follow: 0.55, ease: 0.16 };
+const lerp = (a, b, k) => a + (b - a) * k;
 const TUNE_ELBOW = (typeof window !== "undefined" && FILM && window.__fdElbow) || {};
 if (typeof window !== "undefined" && FILM) window.__fdHands = { GRIPS, CHANNEL, CRANK };
 
@@ -1176,7 +1177,13 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       // (the shoulders: beside and below the eye, a little behind it, turning with the view's heading but not its pitch,
       // as your shoulders do when you look down)
       if (real?.body) { const fl = V(vf.x, 0, vf.z); if (fl.lengthSq() < 1e-6) fl.set(0, 0, -1); fl.normalize(); const rt = V(vr.x, 0, vr.z).normalize();
-        for (let i = 0; i < 2; i++) { const h = hands[i], sh = eye.clone().addScaledVector(rt, h.s * 0.2).add(V(0, -0.25, 0)).addScaledVector(fl, -0.1);
+        for (let i = 0; i < 2; i++) { const h = hands[i], onRod = ["seat", "crank", "butt"].includes(specs[i]?.kind) ? 1 : 0, kS = (h.shK = (h.shK ?? onRod) + (onRod - (h.shK ?? onRod)) * Math.min(1, dt * 5)),
+            // (with the rod in your hands the shoulders are set lower and further forward than a real shoulder is from a real
+            // eye, as first-person games set their arms: from the true place the forearm came straight at the eye and
+            // showed end on, a fat stump with the cuff for a cap; from here it is seen from the side, running in from the
+            // bottom corner. On a rope or the net, hands low and close, they are where they really are: set forward there
+            // the upper arm stood up the side of the picture)
+            sh = eye.clone().addScaledVector(rt, h.s * lerp(0.2, TUNE_ELBOW.shX ?? 0.26, kS)).add(V(0, lerp(-0.25, TUNE_ELBOW.shY ?? -0.45, kS), 0)).addScaledVector(fl, lerp(-0.1, TUNE_ELBOW.shZ ?? 0.1, kS));
           // (the shoulder isn't fixed to the chest: the collar bone lets it come forward a few centimetres with a long
           // reach, and up as the hand goes above it. Without that an arm at full stretch stopped short of what it held)
           const at = specs[i]?.at, want = tmpV.set(0, 0, 0);
@@ -1226,7 +1233,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // put it, the upper arm then made up to fit)
           if (real?.body && shL[i]) { const L = real.reach(i), sh = shL[i], wr0 = spec.at.clone().addScaledVector(vu, 0.07), sd = wr0.clone().sub(sh), d = Math.min(sd.length(), L.upper + L.fore - 0.012), n = sd.clone().normalize();
             const x = (L.upper * L.upper - L.fore * L.fore + d * d) / (2 * d), hgt = Math.sqrt(Math.max(0, L.upper * L.upper - x * x));
-            const pole = V(0, -0.85, 0).addScaledVector(vr, 0.5 * h.s); pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
+            const pole = V(0, TUNE_ELBOW.seatPoleY ?? -0.6, 0).addScaledVector(vr, (TUNE_ELBOW.seatPoleX ?? 0.8) * h.s); pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
         }
         let want;
         if (spec) {
