@@ -122,9 +122,10 @@ up, you see the backs of both hands, and each forearm runs up from a bottom corn
 - The cast's wind-up takes the hands back out past the right edge of the picture; held in beside the eye, the elbow and upper arm crossed the picture.
 - Fists are closed further at the first finger and thumb.
 
-Still wrong after this stage: hauling the net's rope. The fists are seen from the thumb's side and the thumb and first
-finger still leave a ring; a hand changing its hold opens with the fingers spread. That grip needs making again in
-Blender with the thumb laid across the first finger.
+Hauling the net's rope: the fists made for the rope had the thumb standing off the first finger, and from the thumb's
+side, which is the side you see, the two made a ring. The thumb is now turned in across the first finger (in the game's
+code, on top of the grip made in Blender; the Blender grip itself has not been made again). A hand sliding along the
+rope to a new hold still opens with its fingers spread.
 
 ## Not done
 
