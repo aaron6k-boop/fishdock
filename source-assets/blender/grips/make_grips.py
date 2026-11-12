@@ -1,7 +1,7 @@
 # ---- the two hand grips the game brings in (src/lib/world3d/grips.js) ----
 # Run in Blender 5.x:  blender --background --factory-startup --python make_grips.py
 # It loads the arms model (public/models/fp_body.glb, kept on the asset machine as exports/fp_body_bs_c.glb), poses
-# each hand onto the shape it holds and writes exports/grips_v14.json, six check renders of each grip in
+# each hand onto the shape it holds and writes exports/grips_v15.json, six check renders of each grip in
 # renders/grips/ and source/grip_lab.blend. Paste the json into grips.js (AUTHORED).
 #   seat: the right hand round a 29 mm handle, the reel's stem between the middle and ring fingers at their roots.
 #         Each finger is closed joint by joint until its skin touches (grip_lib.close_onto).
@@ -97,7 +97,7 @@ sy = -sd; sz = t; sx = sy.cross(sz).normalized()
 record("seat", H, s0, sx, sy, sz)
 side = t.cross(H.p).normalized()
 for name, d in (("above", sy), ("right", sx), ("left", -sx), ("below", -sy + sz * 0.3), ("eye", sy * 0.8 - sz * 0.9 - sx * 0.1), ("tip", sz + sy * 0.3)):
-    shoot(cam, s0, d, 0.36, os.path.join(OUT, f"g14_seat_{name}.png"), up=sy)
+    shoot(cam, s0, d, 0.36, os.path.join(OUT, f"g15_seat_{name}.png"), up=sy)
 for o in objs: bpy.data.objects.remove(o, do_unlink=True)
 
 # ---------------- the left hand on the reel's knob ----------------
@@ -111,7 +111,8 @@ AX = {}
 for fn, bend in (("index", (30, 62, 40)), ("middle", (34, 64, 40))):
     ax = L.flex_axis(L.bones[fn][0]); AX[fn] = ax
     for pb, a in zip(L.bones[fn], bend): L.turn(pb, ax, math.radians(a))
-ka = L.rad.copy()                                      # along the knuckles, towards the thumb's side (where the handle's arm is)
+SKEW = math.radians(globals().get('SKEW_DEG', 24))
+ka = (L.rad * math.cos(SKEW) + L.f * math.sin(SKEW)).normalized()   # across the fingers on a slant: the reel's end towards the fingertips, so the forearm, coming in from out to the side, runs straight into the hand with the wrist unbent
 seg = lambda k: L.points([L.bones[fn][k].name for fn in ("index", "middle")])
 P1, P2, P3 = seg(0), seg(1), seg(2)
 mid = sum(P3, Vector((0, 0, 0))) / len(P3)
@@ -206,7 +207,7 @@ kx = -ka; ky = (nav - kx * nav.dot(kx)).normalized(); kz = kx.cross(ky).normaliz
 print("RIG", [round(v, 4) for row in rig.matrix_world for v in row], "parents", {pb.name: pb.parent.name for pb in [L.bones[f][0] for f in FINGERS + ["thumb"]]})
 record("crank", L, kc, kx, ky, kz)
 for name, d in (("palm", L.p), ("back", -L.p), ("axis", kx), ("side", kz), ("pinch", ky), ("under", -ky + kz * 0.4)):
-    shoot(cam, kc, d, 0.3, os.path.join(OUT, f"g14_knob_{name}.png"))
-json.dump(EXPORT, open(os.path.join(ROOT, "exports", "grips_v14.json"), "w"), indent=1)
+    shoot(cam, kc, d, 0.3, os.path.join(OUT, f"g15_knob_{name}.png"))
+json.dump(EXPORT, open(os.path.join(ROOT, "exports", "grips_v15.json"), "w"), indent=1)
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(ROOT, "source", "grip_lab.blend"))
 print("GRIPS DONE")

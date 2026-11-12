@@ -34,6 +34,8 @@ test("on the rod the wrist is above and to the right, the hand over the handle f
   // (the grip's frame: y up, z to the tip, so x is to your left)
   const [x, y] = AUTHORED.seat.Ph;
   assert.ok(x < 0 && y > 0);
+  // (and the forearm comes from behind the reel: its elbow back along the rod from the wrist)
+  assert.ok(AUTHORED.seat.elbow[2] < -0.5);
 });
 
 test("the fingers are closed: the first two joints of each finger holding the rod are well bent", () => {
@@ -42,4 +44,12 @@ test("the fingers are closed: the first two joints of each finger holding the ro
     const b = bend(AUTHORED.seat.bones[`${f}_01_r`]) + bend(AUTHORED.seat.bones[`${f}_02_r`]);
     assert.ok(b > 100, `${f} bends ${b.toFixed(0)} degrees over its first two joints`);
   }
+});
+
+test("the cast's pulling hand has its own grip: the left, round the butt, its thumb's side to the tip", () => {
+  const g = AUTHORED.butt_l;
+  assert.equal(g.side, "l");
+  // (every finger closed round a bar: the first two joints well bent)
+  const bend = (q) => (2 * Math.acos(Math.min(1, Math.abs(q[3]))) * 180) / Math.PI;
+  for (const f of ["index", "middle", "ring", "pinky"]) assert.ok(bend(g.bones[`${f}_01_l`]) + bend(g.bones[`${f}_02_l`]) > 100, f);
 });

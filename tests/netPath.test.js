@@ -21,3 +21,12 @@ test("drop net over the rail: the bag never through it, ends where it should", (
     }
   }
 });
+
+test("drop net over the rail with its bag slumped: the hoop is lifted to the chest, not the face", () => {
+  const rail = { x: 0, y: 1.12, z: -0.5 }, deck = { x: -0.6, y: 0.2, z: -0.2 }, water = { x: -0.3, y: -4, z: -1.4 }, n = { x: 0, z: -1 };
+  let top = -9, full = -9;
+  for (let i = 0; i <= 200; i++) { top = Math.max(top, overRail(rail, 1, water, deck, i / 200, n, 0.3).y); full = Math.max(full, overRail(rail, 1, water, deck, i / 200, n).y); }
+  // (an eye 1.62 m up: the hoop a quarter of a metre below it, where hanging its full depth it was level with it)
+  assert.ok(top < 1.4 && top >= rail.y + 0.1, `hoop rises to ${top.toFixed(2)} m`);
+  assert.ok(full > 1.55);
+});

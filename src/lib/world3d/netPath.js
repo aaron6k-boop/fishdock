@@ -5,8 +5,10 @@
  *  The bag is soft mesh and follows the hoop over the rail, as a real one is lifted over; the hoop held no higher than
  *  that, never over your head. (A curve from the deck to the water dipped through the rail; straight up from the deck
  *  first brought it up past your face.) */
-export function overRail(railPt, ns, a, b, f, n = null) {
-  const top = Math.max(railPt.y + 0.1 + 0.36 * ns, Math.min(a.y, b.y) + 0.05); // (the bag's bottom clear of the top rail too, not dragged through it)
+export function overRail(railPt, ns, a, b, f, n = null, bag = 1) {
+  // (bag: how much of its depth the bag hangs below the hoop as it crosses. Slumped over the rail as a wet net is
+  // dragged across it, the hoop need only be lifted to your chest, not to your face)
+  const top = Math.max(railPt.y + 0.1 + 0.36 * ns * bag, Math.min(a.y, b.y) + 0.05); // (the bag's bottom clear of the top rail too, not dragged through it)
   let dx = b.x - a.x, dz = b.z - a.z; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
   // (where the way from a to b crosses the rail's line: n is the way out over the water, square to the rail)
   const nx = n ? n.x : dx, nz = n ? n.z : dz, dn = dx * nx + dz * nz;
