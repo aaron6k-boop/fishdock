@@ -534,6 +534,46 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
 
   // ---- materials ----
   const stoneTex = canvasTex(256, 256, (g, w, h) => { speckle(g, w, h, "#8e8b84", 0.18, 3000); g.strokeStyle = "rgba(40,36,30,.35)"; g.lineWidth = 2; for (let y = 0; y <= h; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); for (let x = (y / 64) % 2 ? 0 : 64; x < w; x += 128) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 64); g.stroke(); } } }, [4, 30]);
+  // ---- sand as a beach has it: wet and dark where the sea has been, drying paler up the beach, rippled by the wind,
+  // with pebbles and bits of shell. Worked out from where each point is (world x, z and its height above the water's
+  // rest), so nothing repeats; in rain the whole beach goes wet. Not Trimingham's or Gorleston's own sand: how sand
+  // looks in general ----
+  const sandWet = { value: 0 };
+  function sandLook(mat, wet) {
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uSandWet = wet;
+      sh.vertexShader = "varying vec3 vSandW;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvSandW = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+      sh.fragmentShader = `varying vec3 vSandW; uniform float uSandWet; float fdSandWet = 0.0;
+        float fdSH(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float fdSN(vec2 p) { vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f); return mix(mix(fdSH(i), fdSH(i + vec2(1.0, 0.0)), u.x), mix(fdSH(i + vec2(0.0, 1.0)), fdSH(i + vec2(1.0, 1.0)), u.x), u.y); }
+        float fdRipple(vec2 p) { float w = fdSN(p * 0.9) * 5.0 + fdSN(p * 0.23) * 9.0; return sin(dot(p, vec2(0.34, 0.94)) * 46.0 + w); }
+      ` + sh.fragmentShader
+        .replace("#include <map_fragment>", `#include <map_fragment>
+        {
+          vec2 sp = vSandW.xz; float big = fdSN(sp * 0.07), mid = fdSN(sp * 0.6 + 7.0), fine = fdSN(sp * 9.0);
+          // the strand: wet to about half a metre above the water's rest, its edge ragged; all of it in rain
+          fdSandWet = max(1.0 - smoothstep(0.25, 0.7, vSandW.y + (big - 0.5) * 0.5 + (mid - 0.5) * 0.12), uSandWet * 0.85);
+          diffuseColor.rgb *= 0.86 + 0.2 * big + 0.1 * (mid - 0.5) + 0.07 * (fine - 0.5);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.56, 0.5, 0.44), fdSandWet);
+          // pebbles and shell: about twenty to the square metre, most of them small and dark, a few pale
+          float near = 1.0 - smoothstep(14.0, 32.0, length(vViewPosition));
+          if (near > 0.0) { vec2 q = sp * 11.0, ci = floor(q), cf = fract(q); float h = fdSH(ci + 3.1), r = 0.04 + 0.14 * fdSH(ci + 9.7) * fdSH(ci + 4.4);
+            float dot_ = 1.0 - smoothstep(r * 0.7, r, length(cf - vec2(0.2) - 0.6 * vec2(fdSH(ci + 1.3), fdSH(ci + 5.9))));
+            vec3 pc = h > 0.93 ? vec3(0.93, 0.9, 0.84) : mix(vec3(0.3, 0.29, 0.28), vec3(0.52, 0.44, 0.36), fdSH(ci + 2.2));
+            diffuseColor.rgb = mix(diffuseColor.rgb, pc * (1.0 - 0.3 * fdSandWet), dot_ * step(0.72, h) * near); }
+        }`)
+        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, mix(0.5, 0.78, uSandWet), fdSandWet * 0.85); // (rain-wet sand is dark and dull; only the strand the sea has just left has a sheen)`)
+        .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+        { // wind ripples a hand's width apart on the dry sand, close by (further off they would only shimmer)
+          float rn = (1.0 - smoothstep(6.0, 22.0, length(vViewPosition))) * (1.0 - fdSandWet * 0.75);
+          if (rn > 0.01) { vec2 sp = vSandW.xz; float e = 0.012, h0 = fdRipple(sp), hx = fdRipple(sp + vec2(e, 0.0)), hz = fdRipple(sp + vec2(0.0, e));
+            normal = normalize(normal - (viewMatrix * vec4(hx - h0, 0.0, hz - h0, 0.0)).xyz * (0.11 / e) * 0.012 * rn); }
+        }`);
+    };
+    mat.customProgramCacheKey = () => "fdsand3";
+    return mat;
+  }
   const sandTex = canvasTex(256, 256, (g, w, h) => speckle(g, w, h, "#c9b48a", 0.22, 5000, 1.5), [60, 30]);
   const grassTex = canvasTex(256, 256, (g, w, h) => { speckle(g, w, h, "#4d6b33", 0.25, 6000, 2); }, [80, 40]);
   const M = {
@@ -541,7 +581,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     wall: new THREE.MeshStandardMaterial({ color: 0x6f6b63, roughness: 0.95 }),
     weed: new THREE.MeshStandardMaterial({ color: 0x2f3a24, roughness: 1 }),
     rail: new THREE.MeshStandardMaterial({ color: 0x2a5a7a, roughness: 0.5, metalness: 0.4 }),
-    sand: new THREE.MeshStandardMaterial({ map: sandTex, roughness: 1 }),
+    sand: sandLook(new THREE.MeshStandardMaterial({ map: sandTex, roughness: 1 }), sandWet),
     grass: new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }),
     cliff: new THREE.MeshStandardMaterial({ color: 0x8a7a5e, roughness: 1, flatShading: true }),
     far: new THREE.MeshStandardMaterial({ color: 0x5f6f58, roughness: 1, flatShading: true }),
@@ -752,6 +792,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     for (const pl of pointLights) { pl.intensity = lampOn * (pl.userData.cd || 60); pl.visible = lampOn > 0.02; }
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     for (let i = 0; i < 4; i++) { const q = lampSpots[i]; wU.uLamps.value[i].set(q ? q[0] : 0, q ? q[1] : 0, q ? q[2] : 0, q ? lampOn : 0); }
+    sandWet.value = Math.min(1, st.rain * 1.4);
     if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain (wetLook.js)
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
@@ -865,6 +906,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     setRipples(list) { for (let i = 0; i < 8; i++) { const r = list[i]; wU.uRip.value[i].set(r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0); } },
     update(t, dt, cam) {
       real?.skyline?.update(t);
+      if (real?.deckWet?.clock) real.deckWet.clock.value = t % 600; // (the rain's rings in the puddles, wetLook.js)
       real?.treesUpdate?.(t, cam, wind, windDir); // (the trees' level of detail by distance, and their wind)
       if (real?.beacons) { const nt = cur ? Math.min(1, cur.night + cur.dusk * 0.6) : 0; for (const b of real.beacons) b(t, nt); }
       U.uTime.value = t; wU.uCam.value.set(Math.round(cam.position.x / 4) * 4, 0, Math.round(cam.position.z / 4) * 4);

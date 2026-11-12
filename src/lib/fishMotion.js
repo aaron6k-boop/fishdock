@@ -21,6 +21,13 @@ export function bodyWave(u, t, { tempo = 1, flex = 1, beat = 1, curl = 0 } = {})
   return wave + curl * u * u;
 }
 
+/** The slope of bodyWave along the body (d/du), for turning the fish's normals with its bend without working them
+ *  out again from the triangles every frame. */
+export function bodyWaveSlope(u, t, { tempo = 1, flex = 1, beat = 1, curl = 0 } = {}) {
+  const th = t * 9 * tempo - u * 5.2, k = 0.11 * beat * flex;
+  return k * (Math.cos(th) * -5.2 * (0.18 + 0.82 * u * u) + Math.sin(th) * 1.64 * u) + 2 * curl * u;
+}
+
 // ---- turning ----
 /** A heading (radians) turned towards `want` at most `rate` radians a second: a fish turns, it never flips round. */
 export function turnToward(cur, want, rate, dt) {

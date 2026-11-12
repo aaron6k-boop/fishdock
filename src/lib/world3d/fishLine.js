@@ -27,6 +27,7 @@ export function fishLine(nRings, opts = {}) {
   const src = new Float32Array(NP * 3);
   const mesh = fatLine(src, NP, opts);
   const v3 = () => new THREE.Vector3();
+  let lineBase = null, lineK = 0; const LINE_HOT = new THREE.Color(0xff5a3c);
   // filled by the caller each frame, in the world's space
   const rings = Array.from({ length: nRings }, () => ({ c: v3(), ax: v3(), r: 0.005 }));
   const tip = { c: v3(), ax: v3(), r: 0.002 };
@@ -125,6 +126,9 @@ export function fishLine(nRings, opts = {}) {
     feed += (o.wound || 0) - Math.max(0, payRate) * dt;
     const seg = L / (NF - 1), last = NF - 1;
     const dist = o.freeEnd ? 0 : endV.distanceTo(tc);
+    // (the line warms towards red as its tension nears where the drag gives: you can read the fight off the line itself,
+    // as well as off the ring round the button)
+    { const U = mesh.material?.uniforms?.uColor; if (U) { lineBase ||= U.value.clone(); const k = Math.max(0, Math.min(1, ((o.tension || 0) - 0.5) / 0.3)); lineK += (k - lineK) * 0.15; U.value.copy(lineBase).lerp(LINE_HOT, lineK * 0.75); } }
     const taut = !o.freeEnd && dist >= L * 0.9995;
     if (taut) {
       // pulled tighter than its length: straight from the tip to the fish, humming

@@ -27,7 +27,9 @@ export function burstStrength(rise, energy, r = 0.5) {
  * and how fast the crown leaves (m/s). size: a rig about .6, a landed fish .9, a big one 1.4; mult: more of it. Pure. */
 export function splashPlan(size = 0.6, mult = 1) {
   const s = Math.max(0.1, Math.min(2, size)), m = Math.max(0.2, Math.min(4, mult));
-  return { crown: Math.round((16 + 30 * s) * m), jet: Math.round((2 + 4 * s) * Math.min(m, 2)), mist: Math.round((3 + 5 * s) * Math.min(m, 2)), speed: 1.5 + 1.9 * Math.sqrt(s) };
+  // (13 November: about twice the water. From the rail a splash was a few dots and a faint puff; a lead going in throws
+  // a crown you can see from 30 m, a fine sheet of spray inside it, and leaves a patch of white on the water)
+  return { crown: Math.min(360, Math.round((30 + 52 * s) * m)), jet: Math.round((4 + 8 * s) * Math.min(m, 2)), mist: Math.round((6 + 9 * s) * Math.min(m, 2)), foam: Math.round((4 + 6 * s) * Math.min(m, 2)), speed: 1.7 + 2.2 * Math.sqrt(s) };
 }
 
 /** Thin a list of [x, z, ox, oz] (a point on the rocks' seaward edge and the way out to sea from it) to one every `gap` metres. Pure. */
@@ -78,7 +80,8 @@ export function createRockSpray(scene, edge = []) {
   const points = new THREE.Points(geo, mat); points.frustumCulled = false; points.renderOrder = 4; points.name = "fdRockSpray"; points.userData.kind = "spray and splashes";
   scene.add(points);
   let head = 0;
-  const put = (k, x, y, z, vx, vy, vz, sz, lf, gr = 0) => { const i = head++ % N; pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z; vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz; age[i] = 0; life[i] = lf; size[i] = sz; kind[i] = k; grow[i] = gr; seed[i] = Math.random() + (k ? 2 : 0); fade[i] = 0; };
+  const afloat = new Uint8Array(N); // (white left lying on the water: it rides the surface and does not fall)
+  const put = (k, x, y, z, vx, vy, vz, sz, lf, gr = 0, fl = 0) => { const i = head++ % N; afloat[i] = fl; pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z; vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz; age[i] = 0; life[i] = lf; size[i] = sz; kind[i] = k; grow[i] = gr; seed[i] = Math.random() + (k ? 2 : 0); fade[i] = 0; };
   /** A burst at (x, y, z): strength 0 to 1; (dx, dz) the way the water was going (the spray carries on that way). */
   function burst(x, y, z, strength, dx = 0, dz = 0, spread = 1.1) {
     const s = Math.max(0.05, Math.min(1, strength)), n = Math.round(6 + 12 * s), y0 = Math.max(0, y);
@@ -106,9 +109,13 @@ export function createRockSpray(scene, edge = []) {
       const a = Math.random() * Math.PI * 2, el = (55 + 25 * Math.random()) * Math.PI / 180, sp = P.speed * (0.45 + 0.75 * Math.random()), r0 = 0.05 + 0.12 * s * Math.random();
       let vx = Math.cos(a) * Math.cos(el) * sp, vz = Math.sin(a) * Math.cos(el) * sp; const vy = Math.sin(el) * sp;
       if (up) { vx = vx * 0.45 + up.x * sp * 0.75; vz = vz * 0.45 + up.z * sp * 0.75; }
-      put(1, x + Math.cos(a) * r0, y0, z + Math.sin(a) * r0, vx, vy * (up ? 1.25 : 1), vz, (0.024 + 0.05 * Math.random() * Math.random()) * k, 3);
+      put(1, x + Math.cos(a) * r0, y0, z + Math.sin(a) * r0, vx, vy * (up ? 1.25 : 1), vz, (0.03 + 0.075 * Math.random() * Math.random()) * k, 3);
     }
     for (let q = 0; q < P.jet; q++) put(1, x + (Math.random() - 0.5) * 0.06, y0, z + (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.35 + (up ? up.x * 0.8 : 0), P.speed * (1.15 + 0.5 * Math.random()), (Math.random() - 0.5) * 0.35 + (up ? up.z * 0.8 : 0), (0.035 + 0.04 * Math.random()) * k, 3);
+    // the sheet inside the crown: fine spray going up and a little out, that hangs a moment
+    for (let q = 0; q < P.mist; q++) { const a = Math.random() * Math.PI * 2, sp = 0.5 + 0.9 * Math.random(); put(0, x + Math.cos(a) * 0.12 * s, y0 + 0.05, z + Math.sin(a) * 0.12 * s, Math.cos(a) * sp + (up ? up.x * 1.2 : 0), (1.6 + 2.6 * Math.random()) * Math.sqrt(s), Math.sin(a) * sp + (up ? up.z * 1.2 : 0), (0.2 + 0.22 * Math.random()) * Math.sqrt(s), 0.35 + 0.3 * Math.random(), 1.6 * s); }
+    // the white it leaves on the water: low puffs spreading out from where it went in, lasting a second or two
+    if (!up) for (let q = 0; q < (P.foam || 0); q++) { const a = Math.random() * Math.PI * 2, r1 = (0.1 + 0.35 * Math.random()) * s, sp = 0.15 + 0.3 * Math.random(); put(0, x + Math.cos(a) * r1, y0 + 0.06, z + Math.sin(a) * r1, Math.cos(a) * sp, 0.35, Math.sin(a) * sp, (0.3 + 0.3 * Math.random()) * Math.sqrt(s), 1.4 + 1.2 * Math.random(), 0.45 * s, 1); }
     for (let q = 0; q < P.mist; q++) { const a = Math.random() * Math.PI * 2, sp = 0.25 + 0.5 * Math.random(); put(0, x + Math.cos(a) * 0.1 * s, y0 + 0.03, z + Math.sin(a) * 0.1 * s, Math.cos(a) * sp + (up ? up.x * 1.2 : 0), 0.5 + 1.1 * Math.random() * Math.sqrt(s), Math.sin(a) * sp + (up ? up.z * 1.2 : 0), (0.24 + 0.26 * Math.random()) * s, 0.3 + 0.35 * Math.random(), 1.3 * s); }
   }
   let E = [];
@@ -145,9 +152,10 @@ export function createRockSpray(scene, edge = []) {
           fade[i] = Math.min(1, age[i] * 30) * Math.min(1, (life[i] - age[i]) * 4);
         } else {
           // mist: soon stopped by the air, then sinking slowly and going with the wind as it spreads and thins
-          vel[i * 3] = (vel[i * 3] - wx) * dragM + wx; vel[i * 3 + 2] = (vel[i * 3 + 2] - wz) * dragM + wz; vel[i * 3 + 1] = vel[i * 3 + 1] * dragM - 4.2 * dt;
+          if (afloat[i]) { vel[i * 3] *= dragM; vel[i * 3 + 2] *= dragM; vel[i * 3 + 1] = 0; pos[i * 3 + 1] = (heightAt ? heightAt(pos[i * 3], pos[i * 3 + 2]) : 0) + 0.06; }
+          else { vel[i * 3] = (vel[i * 3] - wx) * dragM + wx; vel[i * 3 + 2] = (vel[i * 3 + 2] - wz) * dragM + wz; vel[i * 3 + 1] = vel[i * 3 + 1] * dragM - 4.2 * dt; }
           const u = age[i] / life[i];
-          size[i] += dt * grow[i]; fade[i] = Math.min(1, age[i] * 10) * Math.pow(1 - u, 1.35) * 0.9;
+          size[i] += dt * grow[i]; fade[i] = Math.min(1, age[i] * 10) * Math.pow(1 - u, 1.35) * (afloat[i] ? 0.55 : 0.9);
         }
         pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
       }
