@@ -34,5 +34,5 @@ test("a bigger splash throws more, faster, and a small one still throws somethin
 });
 test("no splash can use up the whole pool of points", () => {
   const big = splashPlan(5, 10);
-  assert.ok(big.crown + big.jet + big.mist < SPRAY.max / 3, JSON.stringify(big));
+  assert.ok(big.crown + big.jet + big.mist * 2 + big.foam < SPRAY.max / 3, JSON.stringify(big)); // (the mist is thrown twice: the sheet and the puff)
 });

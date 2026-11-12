@@ -14,7 +14,7 @@ import { loadPart, weatherPierProps } from "./glbParts.js";
 import { buildSkyline } from "./skyline.js";
 import { localFor } from "./localDetail.js";
 import { LANDMARK_BUILDERS } from "./landmarks3d.js";
-import { WET_PREP, WET_DARKEN, wetRough } from "./wetLook.js";
+import { WET_PREP, WET_DARKEN, WET_NORMAL, wetRough } from "./wetLook.js";
 import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
@@ -58,7 +58,7 @@ function segIndex(segs, cell = 8) {
 export const PIER_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/pier_concrete_"; // (__fdAssetBase: only a self-contained preview page sets it, its files beside it; the app leaves it unset)
 const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
 function pierConcrete(mat, quality = 1, axis = 0) {
-  const wet = { value: 0 };
+  const wet = { value: 0, clock: { value: 0 } }; // (clock: seconds, for the rain's rings in the puddles; environment.js keeps both)
   if (typeof document === "undefined") return wet;
   const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t;
@@ -68,10 +68,10 @@ function pierConcrete(mat, quality = 1, axis = 0) {
     nor.repeat.set(PHOTO_TILE, PHOTO_TILE); rough.repeat.set(PHOTO_TILE, PHOTO_TILE);
     mat.normalMap = nor; mat.roughnessMap = rough; mat.normalScale.set(0.9, 0.9);
     mat.onBeforeCompile = (sh) => {
-      sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWet = wet; sh.uniforms.pWorn = { value: worn }; sh.uniforms.pNoise = { value: noise };
+      sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWet = wet; sh.uniforms.uWetT = wet.clock; sh.uniforms.pWorn = { value: worn }; sh.uniforms.pNoise = { value: noise };
       sh.uniforms.uAxis = { value: new THREE.Vector2(Math.cos(axis), Math.sin(axis)) };
       sh.vertexShader = "attribute float aDamp;\nvarying float vDamp;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvDamp = aDamp;");
-      sh.fragmentShader = "uniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
+      sh.fragmentShader = (quality < 1 ? "" : "#define FD_WET_RINGS\n") + "uniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform float uWetT;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
         .replace("#include <map_fragment>", `#include <map_fragment>
         ${WET_PREP}
         {
@@ -118,9 +118,11 @@ function pierConcrete(mat, quality = 1, axis = 0) {
           diffuseColor.rgb *= ${WET_DARKEN};
         }`)
         .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`);
+        roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`)
+        .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+        ${WET_NORMAL}`);
     };
-    mat.customProgramCacheKey = () => "fdpier5" + (quality < 1 ? "p" : quality < 2 ? "b" : "");
+    mat.customProgramCacheKey = () => "fdpier6" + (quality < 1 ? "p" : quality < 2 ? "b" : "");
     mat.needsUpdate = true;
   }).catch(() => {});
   return wet;
