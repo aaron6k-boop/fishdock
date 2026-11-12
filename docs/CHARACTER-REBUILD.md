@@ -127,6 +127,27 @@ side, which is the side you see, the two made a ring. The thumb is now turned in
 code, on top of the grip made in Blender; the Blender grip itself has not been made again). A hand sliding along the
 rope to a new hold still opens with its fingers spread.
 
+## Fifth stage (12 November, evening): different hands
+
+Aaron's phone screenshots of the live hold still showed poor hands, and asked whether a free model would do better.
+The Blender Studio hand looks good open but does not close: in a fist its fingers leave a hollow and the knuckles
+splay. Three free hands were posed the same way beside it (`hand_candidates.jpg`); all three close into a solid fist.
+
+The hands are now the Godot XR Tools hand models (CC0, by DigitalN8m4r3, Miodrag Sejic; github.com/GodotVR/godot-xr-tools,
+`addons/godot-xr-tools/hands`). `source-assets/tools/retarget_fp_hands.py` fits them to this game's own arm skeleton:
+each Godot finger bone is laid along the matching bone of ours and stretched to its length, the palm is stretched in
+its own plane so the knuckles land on ours, the heel is drawn in to meet the wrist, the flat cap above the wrist is
+taken off and the open edge carried up the forearm into the cuff. The bones, their rest places, the sleeve and every
+grip are unchanged. The skin picture is Godot's, brought to the old skin's overall colour with its wrinkles and relief
+turned down. 4,312 points and 7,340 triangles for the pair (the old skin was 11,085 and 13,184).
+
+Also in this stage: the winding hand is thumb up with the knob between thumb and curled first finger; the skin's
+shading of folds, veins and freckles is turned down; skin under the cuff is cut 5 cm above the wrist.
+
+Not done in this stage: the grips were made for the old, thinner fingers and have not been made again, so fingertips
+sink a little into the rod and reel in places; the forearm between wrist and cuff is one plain colour; the Godot glove
+mesh is not used (Gloves in the look picker recolours this hand).
+
 ## Not done
 
 - The hand mesh is the same one. Its measurements are right and it bends cleanly at the wrist, so it was kept. Its
