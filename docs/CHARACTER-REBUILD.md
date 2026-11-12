@@ -109,6 +109,23 @@ place, because the forward position put the upper arm up the side of the picture
 
 After this change `tests/e2e/presets.mjs` was run again (all 56 checks passed) and every recording was made again.
 
+## Fourth stage (12 November, after it went live): the hold reworked
+
+Aaron's verdict on the live build was that the arm and hand were worse. At full phone size he was right: the left hand
+pinched the knob with the first finger and thumb arched in a ring, the right hand read as a lump, and the forearm came
+in level from the right edge. Frames from *The Angler* were looked at again at full size. There the rod is held well
+up, you see the backs of both hands, and each forearm runs up from a bottom corner in line with what it holds.
+
+- The rod is held at about 40 degrees (it was 11). At 11 its butt, and the forearm along it, pointed at the eye.
+- The rod-hold shoulders and elbows are set in the view's own frame, so the arms keep their place as you look up and down.
+- The left hand on the knob is the fist made for the rope, moved 3 cm along the knob. From your own eye it is the back of a closed hand. The pinch grip is no longer used.
+- The cast's wind-up takes the hands back out past the right edge of the picture; held in beside the eye, the elbow and upper arm crossed the picture.
+- Fists are closed further at the first finger and thumb.
+
+Still wrong after this stage: hauling the net's rope. The fists are seen from the thumb's side and the thumb and first
+finger still leave a ring; a hand changing its hold opens with the fingers spread. That grip needs making again in
+Blender with the thumb laid across the first finger.
+
 ## Not done
 
 - The hand mesh is the same one. Its measurements are right and it bends cleanly at the wrist, so it was kept. Its
