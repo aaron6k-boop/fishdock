@@ -925,7 +925,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // (a grip made in Blender says where its forearm comes from: on the rod, the wrist dropped towards the little
       // finger as it is with a rod in the hand. The forearm keeps to that, turned towards where the arm really comes
       // from by a few degrees at most: free to follow the elbow anywhere, the wrist bent as no wrist does)
-      if (G.elbow) { const pref = G.elbow.clone().applyQuaternion(sq).normalize(), a2 = pref.angleTo(toEl), l2 = (TUNE.wristFree ?? 0.22) + wristFree; dir = a2 > l2 ? pref.lerp(toEl, l2 / a2).normalize() : toEl; }
+      if (G.elbow) { const pref = G.elbow.clone().applyQuaternion(sq).normalize(), a2 = pref.angleTo(toEl), l2 = (TUNE.wristFree ?? 1.2) + wristFree; /* (free enough for the forearm to come up from an elbow down by your ribs, along the rod's butt. Kept within 13 degrees of the grip's own line, the elbow was held up level with your eye, 11 cm above the wrist, and the sleeve came at you end on) */ dir = a2 > l2 ? pref.lerp(toEl, l2 / a2).normalize() : toEl; }
       const Ew = Pw.clone().addScaledVector(dir, S.len);
       place2(S, Pw, Ew, Qw);
       S.fingers.forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(j.rest).multiply(qa.setFromAxisAngle(j.axis, f[a][k]))));
