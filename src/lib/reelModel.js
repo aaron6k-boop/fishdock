@@ -11,7 +11,7 @@
 import { fightProfile, fightSeconds } from "./sceneActors.js";
 import { DUR } from "./liveEvents.js";
 
-export const REEL = { window: 0.8, sweet: 4, turnsPerTap: 0.5, assistedRate: 3.6, nearAt: 0.93, slackFree: 6, breakAfter: 0.9 };
+export const REEL = { window: 0.8, sweet: 4, turnsPerTap: 0.5, assistedRate: 3.6, nearAt: 0.93, slackFree: 6, breakAfter: 0.9, dashAt: 0.78 };
 export const DRAG = { min: 0.45, max: 1.05, standard: 0.78, step: 0.08 };
 
 /** Taps a second, from the times (ms) of recent taps. */
@@ -74,7 +74,7 @@ export function createFight({ species = null, lengthCm = 40, startM = 30, mode =
     species, lengthCm, startM: Math.max(3, startM), mode, seed,
     pull: p.pull * size, tempo: p.tempo, long: p.long * Math.sqrt(size) / st.tire, need: fightSeconds(species, lengthCm), runs, heads, style: st, size,
     progress: 0, dist: Math.max(3, startM), tension: 0, slipping: false, near: false, out: null, drag: DRAG.standard,
-    age: 0, slack: 0, over: 0, turns: 0, fishPull: 0, running: false, taking: false, dir: 0, shake: 0, dive: 0, stamina: 1,
+    age: 0, slack: 0, over: 0, turns: 0, fishPull: 0, running: false, taking: false, dir: 0, shake: 0, dive: 0, stamina: 1, dashed: false,
   };
 }
 
@@ -128,6 +128,12 @@ export function fightStep(s0, dt, input = {}) {
   if (s.slipping) dp -= (tension - s.drag + 0.08 + 0.25 * (running ? 1 : 0)) * span * 2.4 * dt; // the fish takes line
   if (rate < 0.3 && !input.assisted) dp -= span * 0.22 * pullN * dt; // not winding: it slowly swims off
   const was = s.progress; s.progress = Math.max(0, Math.min(1, s.progress + dp));
+  // one last dash when it first comes close and sees the wall or the net: a short, hard run the other way from where it
+  // was heading (most fish are lost here, and it is the moment anglers remember). Once only; smaller for a tired fish
+  if (!s.dashed && s.progress >= REEL.dashAt && was < REEL.dashAt) {
+    s.dashed = true; const len = (0.9 + 0.7 * Math.sqrt(s.size || 1)) * Math.min(1.3, (s.style?.runs?.[1] ?? 1.5) / 1.5);
+    s.runs = [[s.age + 0.25, s.age + 0.25 + len, 1.05, s.dir > 0 ? -1 : 1], ...s.runs.filter(([a, b]) => b < s.age || a > s.age + 0.25 + len)];
+  }
   s.dist = s.startM * (1 - s.progress);
   s.turns += taps * REEL.turnsPerTap; // the handle turns with each tap, exactly
   s.taking = s.progress < was - 1e-9; s.running = running && s.taking; // (line actually going out: at the very start, with none won yet, there's none to take)

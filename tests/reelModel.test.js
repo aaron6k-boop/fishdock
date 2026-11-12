@@ -116,3 +116,15 @@ test("a bigger fish of the same kind pulls harder and takes longer", () => {
   assert.ok(mean(big, "tension") > mean(small, "tension") + 0.05, `big ${mean(big, "tension").toFixed(2)} vs small ${mean(small, "tension").toFixed(2)}`);
   assert.ok(big.length > small.length * 1.3, `big ${big.length} steps vs small ${small.length}`);
 });
+
+test("a fish makes one last dash when it first comes close", () => {
+  let s = createFight({ species: "bass", lengthCm: 60, startM: 40, seed: 5 }); const tap = tapper(4); let dashedAt = null, runAfter = false;
+  for (let t = 0; t < 120 && !s.near && !s.out; t += 0.05) {
+    s = fightStep(s, 0.05, tap(0.05));
+    if (s.dashed && dashedAt == null) { dashedAt = s.age; assert.ok(s.progress >= REEL.dashAt); }
+    if (dashedAt != null && s.age > dashedAt + 0.5 && s.age < dashedAt + 1.2 && s.fishPull > 0) runAfter = runAfter || s.runs.some(([a, b]) => s.age >= a && s.age < b);
+  }
+  assert.ok(dashedAt != null, "it dashed"); assert.ok(runAfter, "and that dash is a run");
+  assert.ok(s.near, "and it can still be landed");
+  assert.equal(s.runs.filter((r) => r[2] === 1.05).length, 1, "once only");
+});

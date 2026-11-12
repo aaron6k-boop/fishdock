@@ -88,7 +88,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
       const n = pending.current; pending.current = 0;
       const s = fightStep(fightRef.current, dt, { taps: n, rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
       fightRef.current = s; reelRef.current = s.progress;
-      const view = { progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina };
+      const view = { progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, dashed: !!s.dashed, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina };
       // (the 3D view reads this itself every frame, fightLive below. The page is only told six or seven times a second,
       // or at once when something it shows as a word changes: told all twenty, React drew the whole screen again
       // twenty times a second through every fight, between the frames and never in step with them)
