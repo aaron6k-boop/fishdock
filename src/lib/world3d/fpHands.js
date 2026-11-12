@@ -247,7 +247,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
   // the forearms are only drawn from the wrist to a little way inside the sleeve: beyond that the sleeve (a separate,
   // looser tube) covers them, and the skin used to show through it wherever the arm was thicker than the sleeve
   let skinRaw = null;
-  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.086 } };
+  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.05 } };
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = false;
