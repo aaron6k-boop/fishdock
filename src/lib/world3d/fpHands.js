@@ -1232,7 +1232,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // (from the knob itself, not from your eye: back towards you, down and out to the side, a forearm's length away.
         // Placed from the eye, the elbow stayed at the same height whatever the reel did, so when you looked down and the
         // reel sank in the view the forearm ran flat in from the edge of the screen)
-        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(vf, -(TUNE_ELBOW.crankBack ?? 0.12)).addScaledVector(V().crossVectors(vr, vf).normalize(), -(TUNE_ELBOW.crankDown ?? 0.2)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.12) * h.s);
+        if (spec?.kind === "crank") elbow.copy(spec.at).addScaledVector(vf, -(TUNE_ELBOW.crankBack ?? 0.1)).addScaledVector(V().crossVectors(vr, vf).normalize(), -(TUNE_ELBOW.crankDown ?? 0.24)).addScaledVector(vr, (TUNE_ELBOW.crankOut ?? 0.02) * h.s);
         if (spec?.kind === "crank" && spec.hub) elbow.addScaledVector(tmpV.copy(spec.at).sub(spec.hub), TUNE_ELBOW.follow ?? 0.3);
         // (the arm comes in to the reel seat from behind and out to the side at about 45 degrees, as it does holding a spinning
         // rod: the handle lies diagonally across the palm, the butt along the forearm further back)
