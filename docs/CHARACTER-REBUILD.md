@@ -81,13 +81,30 @@ What the second brief asked for, in its order, and what was done about each.
    of the game allocates about 70 to 76 KB here; `main` measured between 70 and 185 KB in the same test, too
    scattered to say the arms changed it. Nothing has been measured on an iPhone or a PC with a graphics card.
 
+## Third stage (12 November): checked against other games and real anglers
+
+Aaron's phone screenshot showed the rod arm's sleeve end on, like a stump, and an open hand under the reel. Frames
+were then looked at in the browser from *Call of the Wild: The Angler* (a no-commentary gameplay video on YouTube:
+waiting, reeling and playing a fish in first person) and from "Spinning from the Pier - Sea Fishing UK" (a real angler
+casting and retrieving, filmed from the side). What they show, and what was changed to match:
+
+| Seen in the references | In the game before | Now |
+| --- | --- | --- |
+| The right forearm comes up from the bottom right corner and the rod carries on its line; the elbow is below the hand. | The elbow was held level with your eye, 11 cm above the wrist; the sleeve came at you end on. | The elbow is by the ribs, 9 cm below the wrist; the forearm lies along the butt. |
+| The left forearm comes up from the bottom left to meet the reel; the left hand is closed on the knob, its back and thumb to you. | The knob lay across two hooked fingers, the forearm came from straight below, four fingers stood up beside the reel. | The knob is held by its sides between the thumb and first two fingers, the palm towards the reel, the other two fingers folded (`make_knob_grip.py`). |
+| Hands only show when they are doing something. | Stooping for the net, both hands were held up half closed on a rope that isn't drawn there. | The hands go out to the hoop's rim as far as the arms reach and take hold of it; well out of reach they come away. |
+
+Also in this stage: the skin's weights round each knuckle and across the thumb's web were averaged with their
+neighbours (`ease_fp_weights.py`; 1,850 of the hand's 6,640 places). A bare fist's knuckles are a little less angular
+for it. It is a small change, shown before and after in the PR; the mesh, bones and maps are the same.
+
 ## Not done
 
 - The hand mesh is the same one. Its measurements are right and it bends cleanly at the wrist, so it was kept. Its
-  weak points are a bare tight fist (angular knuckles, a stretched thumb web) and blocky colour on the palm; no
-  corrective shapes or palm bones have been added and the skin weights have not been repainted.
-- The reeling hand holds the knob by the fingertips. A real hand closes its thumb and first finger further round
-  it. The grip needs making again in Blender; it has not been.
+  weak points are a bare tight fist (the knuckles are still somewhat angular and the thumb's web still stretches,
+  after the weights were eased) and blocky colour on the palm; no corrective shapes or palm bones have been added.
+- Other games show less arm than this does on an upright phone: The Angler's hands take up about a third of a wide
+  screen's height. The view here has not been changed again.
 - With an arm at full stretch, or where a wrist would have to bend too far, the upper arm's top end still comes away
   from the shoulder (by 20 to 35 cm in places while landing). It is out of the picture when it happens.
 - The left hand is below the picture at the moment of release: looking ahead you see it on the butt in the wind-up
