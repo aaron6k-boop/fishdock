@@ -27,6 +27,19 @@ async function call(method, path, body) {
   return b;
 }
 export const startParty = (o) => call("POST", "", o);
+// ---- public places: the game at one of FishDock's marks puts you in that mark's room, no joining anyone ----
+const PUB_KEY = "fishdock.public.v1";
+const readPub = () => { try { return JSON.parse(localStorage.getItem(PUB_KEY) || "{}") || {}; } catch { return {}; } };
+/** This phone's place in a mark's public room ({ code, key }), if it has one. */
+export const publicSeat = (mark) => readPub()[mark] || null;
+export function forgetPublic(mark) { const all = readPub(); delete all[mark]; try { localStorage.setItem(PUB_KEY, JSON.stringify(all)); } catch { /* ignore */ } }
+/** Into the mark's room with a free spot; kept on this phone so coming back is the same you. */
+export async function joinPublic(mark, { venue, name, outfit, look } = {}) {
+  const r = await call("POST", "/public", { mark, venue, name, outfit, look });
+  const all = readPub(); all[mark] = { code: r.code, key: r.member.key, at: Date.now() };
+  try { localStorage.setItem(PUB_KEY, JSON.stringify(all)); } catch { /* the seat lasts this visit */ }
+  return all[mark];
+}
 export const previewParty = (code, { secret, viaCode } = {}) => call("GET", `/${code}?${secret ? `s=${encodeURIComponent(secret)}` : ""}${viaCode ? "&via=code" : ""}`);
 export const joinParty = (code, o) => call("POST", `/${code}/join`, o);
 export async function uploadPartyPhoto(code, key, blob) {
