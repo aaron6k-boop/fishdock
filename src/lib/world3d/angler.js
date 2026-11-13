@@ -400,9 +400,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     for (let y = 0; y < 64; y++) for (let x = 0; x < 32; x++) { const t = ((x / 32) * 3 + y / 64 * 3) % 1, k = Math.sin(t * Math.PI), v = 0.45 + 0.55 * Math.pow(k, 0.6); img.data.set([34 * v + 9, 35 * v + 9, 38 * v + 10, 255], (y * 32 + x) * 4); } /* (black rope) */
     g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
-  const ropes = [0, 1, 2, 3, 4, 5, 6, 7].map(() => { // (6 and 7: the rope through each fist, first person)
+  const ropes = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => { // (6 and 7: the rope through each fist, first person)
     const map = ropeTex ? ropeTex.clone() : null; if (map) map.needsUpdate = true;
-    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 8, 1, true), new THREE.MeshStandardMaterial({ color: map ? 0xffffff : 0x1c1d20, map, bumpMap: map, bumpScale: 0.6, roughness: 0.8 }));
+    // (0 to 2, the net's bridles: thin green cord, 4 mm, as on the nets sold; the rope you haul is 1 cm)
+    const br = k < 3, r = new THREE.Mesh(new THREE.CylinderGeometry(br ? 0.002 : 0.005, br ? 0.002 : 0.005, 1, 8, 1, true), new THREE.MeshStandardMaterial({ color: br ? 0x2f4a36 : map ? 0xffffff : 0x1c1d20, map: br ? null : map, bumpMap: br ? null : map, bumpScale: 0.6, roughness: 0.8 }));
     r.onBeforeRender = () => { if (map) map.repeat.set(1, Math.max(1, r.scale.y / 0.035)); }; // (a strand round every 3.5 cm, whatever the length)
     world.add(r); r.visible = false; return r;
   });
