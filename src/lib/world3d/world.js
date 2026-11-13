@@ -782,7 +782,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const meK = anglers.get(localId);
     if (meK?.inspect && meK.out) {
       const key = meK.out.info?.since;
-      if (meK.out.landed && meK.keptFor !== key) { meK.keptFor = key; meK.a.keepFish("deck"); }
+      if (meK.out.landed && meK.keptFor !== key) { meK.keptFor = key; meK.a.keepFish("deck", "line"); }
       if (meK.out.kept && meK.out.kept !== "gone") kept = { state: meK.out.kept };
     }
     const view = updateCamera(t, dt || 0.016);
