@@ -145,8 +145,8 @@ function scaleNormalMap() {
  * eyes (glassy). `map` is the skin (picture or painted); `aspect` the picture's height over its width (the scales are
  * drawn round, not stretched); `len` the fish's length in metres (a small fish's scales are fine enough not to show).
  */
-export function fishMaterials(species, { map = null, aspect = 320 / 480, len = 0.45 } = {}) {
-  const K = lookOf(species);
+export function fishMaterials(species, { map = null, aspect = 320 / 480, len = 0.45, look = null } = {}) {
+  const K = { ...lookOf(species), ...(look || {}) }; // (look: to make a given kind of skin, for building its shaders ahead)
   const body = new THREE.MeshPhysicalMaterial({
     map, color: map ? 0xffffff : 0xb8c0c4, roughness: K.rough, metalness: 0.05 + K.silver * 0.3, side: THREE.DoubleSide, alphaTest: 0.5,
     clearcoat: 0.35 + 0.6 * K.slime, clearcoatRoughness: 0.08 + 0.1 * (1 - K.slime), // (the wet sheen, brightest at a glancing angle)

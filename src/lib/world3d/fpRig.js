@@ -106,8 +106,14 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // angle, fabric.js. Until 13 November it was one flat colour: "just some blue", Aaron said)
   const coatMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.78, metalness: 0, sheen: 0.55, sheenRoughness: 0.6, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xffffff), 0.35) });
   // (cloth right at your eye isn't drawn: the collar and the shoulders sit around the camera)
-  coatMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .16) discard;\n#include <opaque_fragment>"); };
+  // (and further off when you look down past your arms at a net or the deck below the rail: from above, the sleeves
+  // between your shoulders and elbows are right under your eye, and filled half the picture in the 13 November
+  // recording, hauling the drop net and putting the cod back. Your forearms and hands still show)
+  const nearCut = { value: 0.16 };
+  coatMat.onBeforeCompile = (sh) => { sh.uniforms.fpNearCut = nearCut; sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut) discard;\n#include <opaque_fragment>"); };
   clothe(coatMat);
+  // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)
+  skinMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .07) discard;\n#include <opaque_fragment>"); };
   for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(DIM); liveMats.add(m); }
   let R = null, failed = false;
   const hands = [0, 1].map((i) => ({ side: i ? "R" : "L", kind: undefined, cur: null, from: null, u: 1, want: null, fing: null, fingFrom: null, cyl: null, wrist: null }));
@@ -266,6 +272,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     pose(o) {
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
+      { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0; nearCut.value += (0.16 + 0.17 * down - nearCut.value) * Math.min(1, dt * 6); }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)

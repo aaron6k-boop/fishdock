@@ -171,6 +171,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const feetShadow = contactShadow(1.0, 0.85, 0.75); root.add(feetShadow);
   // your forearms and hands in first person (only ever your own angler's are needed: made the first time they're shown)
   let fpv = null;
+  // (your own first-person arms: made as soon as you're here, not the first time you switch to first person: made
+  // then, loading and building them stopped the game for over a second, the 13 November recording at 11 s. Counted as
+  // an asset once loaded, so the world builds their shaders while the place is still loading)
+  let fpvCounted = false;
+  function makeFpv() { if (fpv) return; const L = fig.look || {}; fpv = createFpRig({ gloves: !!L.gloves || !!(FILM && typeof window !== "undefined" && window.__fdGloves), skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48 }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
   const part = (geo, mat, x, y, z, parent = root) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
   const tagY = fig.look.height + 0.3;
   let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, tagY, 0); root.add(tag);
@@ -420,6 +425,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const baseNormals = (g) => { if (!g.attributes.normal) g.computeVertexNormals(); return g.attributes.normal.array.slice(); };
   let fishGeo = genericFishGeometry(), fishBase = fishGeo.attributes.position.array.slice(), fishBaseN = baseNormals(fishGeo);
   const fish = new THREE.Mesh(fishGeo, mats.body); fish.visible = false; fish.castShadow = true; world.add(fish);
+  // (every kind of fish skin, made once, hidden, so the world builds their shaders while the place loads: a skin with
+  // or without its picture, with or without scales, silver or not. Each new kind had its shaders built on the frame it
+  // first showed, mid-game: a fish got ready while you waited stopped the game for two seconds, the 13 November
+  // recording at 24 s)
+  if (local) { const g = new THREE.Group(); g.name = "fdNoReflect"; g.visible = false; world.add(g);
+    const geo = new THREE.PlaneGeometry(0.01, 0.01), pic = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1); pic.needsUpdate = true;
+    for (const silver of [0, 0.4]) for (const scales of [0, 90]) for (const map of [null, pic]) { const m = fishMaterials(null, { map, len: 0.45, look: { silver, scales } }); for (const k of ["body", "fin", "eye"]) { const o = new THREE.Mesh(geo, m[k]); o.castShadow = true; g.add(o); } } }
   let fishFor = "", fishLen = 0.45, prof = fightProfile(null), load = 1, LT = landingTimes(null, 45, null, venue), tech = "lift";
   // the mesh's own size (in fish lengths): the spine to the back and to the belly, and half its thickness, so it can be
   // laid on a mat, held in the hands or sat at the surface without going into anything
@@ -576,6 +588,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const pts = Array.from({ length: NSEG + 1 }, () => new THREE.Vector3());
 
   function frame(t, now, dt, env) {
+    if (fpv && !fpvCounted && fpv.ready) { fpvCounted = true; assetsN++; } // (your arms loaded: their shaders built with the rest)
     root.updateMatrixWorld(true); tNow = t;
     reel.userData.slipping = false;
     const info = phaseAt(events, now);
@@ -1761,6 +1774,7 @@ const FPR = { get x() { return filmSet("__fdFpr")?.x ?? holdView().x; }, get y()
   }
   function tipWorld() { root.updateMatrixWorld(true); return toWorld(pts[NSEG]); }
 
+  if (local) makeFpv(); // (made now, hidden until you look through your own eyes)
   return {
     id, root,
     get local() { return local; },
@@ -1796,7 +1810,7 @@ const FPR = { get x() { return filmSet("__fdFpr")?.x ?? holdView().x; }, get y()
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
     setFirstPerson(on) {
       if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on && !tagOff; feetShadow.visible = !fp && !walking?.air;
-      if (fp && !fpv) { const L = fig.look || {}; fpv = createFpRig({ gloves: !!L.gloves || !!(FILM && typeof window !== "undefined" && window.__fdGloves), skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48 }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
+      if (fp && !fpv) makeFpv();
       fpv?.show(fp);
     },
     /** the name label over their head (hidden for your own angler in the landing shot) */
