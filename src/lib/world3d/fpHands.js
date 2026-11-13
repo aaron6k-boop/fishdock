@@ -45,7 +45,7 @@ const GRIPS = {
   // (the ring and little fingers tucked in under the hand, out of the way of the reel: they were left spread over it)
   crank: { f: [[1.0, 1.1, 0.7], [1.1, 1.2, 0.8], [1.5, 1.6, 1.0], [1.6, 1.6, 1.05]], t: [0.6, 0.5, 0.35], spread: 0.0 },
   fist: { f: [[1.25, 1.35, 0.9], [1.3, 1.4, 0.9], [1.35, 1.4, 0.95], [1.4, 1.4, 0.95]], t: [0.6, 0.5, 0.35], spread: 0.0, made: 1 }, // (made: the fist made in Blender, grips.js "ropeg", is what the real hands close to; these angles are for the plain hands)
-  fish: { f: [[0.55, 0.5, 0.3], [0.6, 0.55, 0.32], [0.65, 0.58, 0.34], [0.7, 0.6, 0.36]], t: [0.3, 0.25, 0.15], spread: 0.03 },
+  fish: { f: [[0.7, 0.62, 0.38], [0.74, 0.66, 0.4], [0.78, 0.68, 0.42], [0.82, 0.7, 0.44]], t: [0.3, 0.25, 0.15], spread: 0.03, close: 0.85 }, // (13 November: cupped further and the fingers together under the fish: the fitted hands' longer fingers, fanned out as they rest, held it like an open offering)
   open: { f: [[0.2, 0.25, 0.15], [0.22, 0.28, 0.16], [0.25, 0.3, 0.18], [0.3, 0.32, 0.2]], t: [0.2, 0.15, 0.1], spread: 0.08 }, // (open, fingers loosely apart: the hands that have just let a fish go) // (cupped up round its belly, as you support a fish, not flat and stiff under it)
 };
 let BETA = 1.0; export const _tune = (o) => { if (o.beta != null) BETA = o.beta; };
@@ -247,7 +247,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
   // the forearms are only drawn from the wrist to a little way inside the sleeve: beyond that the sleeve (a separate,
   // looser tube) covers them, and the skin used to show through it wherever the arm was thicker than the sleeve
   let skinRaw = null;
-  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.05 } };
+  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.035 } };
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = false;
@@ -271,6 +271,12 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
     // tendons it folds in, there it's darker and a little redder; over the knuckles and the tendons it stands out and
     // catches the light. Without it the hand read as one smooth, evenly coloured piece of plastic)
     try { o.geometry.setAttribute("fdCurv", new THREE.Float32BufferAttribute(curvature(o.geometry), 1)); } catch (e) { console.warn("fp arms: no curvature", e?.message || e); }
+    // (13 November: which arm each point of skin belongs to, by the bone that moves it most, so each arm is cut only at
+    // its own sleeve. Taken from whichever wrist was nearer, a hand held close to the other arm's wrist, as both are
+    // under a small fish, had holes cut in it by the other sleeve)
+    let sided = false;
+    try { const g = o.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, nm = o.skeleton?.bones?.map((b) => b.name) || [];
+      if (si && sw && nm.length) { const sd = new Float32Array(si.count); for (let k = 0; k < si.count; k++) { let best = 0, bw = -1; for (let c = 0; c < 4; c++) { const wv = sw.getComponent(k, c); if (wv > bw) { bw = wv; best = si.getComponent(k, c); } } sd[k] = /_r$/.test(nm[best] || "") ? 1 : 0; } g.setAttribute("fdSide", new THREE.Float32BufferAttribute(sd, 1)); sided = true; } } catch (e) { console.warn("fp arms: no sides", e?.message || e); }
     // (a plain opaque skin material: the export marks it see-through and physical, neither of which a hand needs)
     const src = o.material, D = detailMaps();
     // (the second build of the arms: the skin has a sheet of its own with its relief and roughness baked for it in Blender,
@@ -305,8 +311,8 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
             }
           #endif`);
       }
-      sh.vertexShader = "attribute float fdCurv; varying float vCurv; varying vec3 vFdW;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvFdW = (modelMatrix * vec4(transformed, 1.0)).xyz; vCurv = fdCurv;");
-      sh.fragmentShader = "varying float vCurv; varying vec3 vFdW; uniform vec3 uFdW[2]; uniform vec3 uFdDir[2]; uniform float uFdCut; uniform float uFdDim;\n" + sh.fragmentShader
+      sh.vertexShader = (sided ? "#define FD_SIDED\nattribute float fdSide; varying float vSide;\n" : "") + "attribute float fdCurv; varying float vCurv; varying vec3 vFdW;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\nvFdW = (modelMatrix * vec4(transformed, 1.0)).xyz; vCurv = fdCurv;" + (sided ? " vSide = fdSide;" : ""));
+      sh.fragmentShader = (sided ? "#define FD_SIDED\nvarying float vSide;\n" : "") + "varying float vCurv; varying vec3 vFdW; uniform vec3 uFdW[2]; uniform vec3 uFdDir[2]; uniform float uFdCut; uniform float uFdDim;\n" + sh.fragmentShader
         .replace("#include <opaque_fragment>", "outgoingLight *= uFdDim;\n#include <opaque_fragment>")
         .replace("#include <color_fragment>", `#include <color_fragment>
           ${gloves ? "" : `{ float cr = smoothstep(0.0, 1.0, vCurv), cv = smoothstep(0.0, 1.0, -vCurv);
@@ -329,7 +335,12 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
           ${gloves ? "" : "roughnessFactor = clamp(roughnessFactor + 0.12 * smoothstep(0.0, 1.0, vCurv) - 0.06 * smoothstep(0.0, 1.0, -vCurv), 0.3, 1.0);"}`)
         .replace("void main() {", `void main() {
           { vec3 a = vFdW - uFdW[0], b = vFdW - uFdW[1]; float ta = dot(a, uFdDir[0]), tb = dot(b, uFdDir[1]);
-            float t = dot(a, a) < dot(b, b) ? ta : tb; if (t < -uFdCut) discard; }`)
+            #ifdef FD_SIDED
+              float t = vSide > 0.5 ? tb : ta;
+            #else
+              float t = dot(a, a) < dot(b, b) ? ta : tb;
+            #endif
+            if (t < -uFdCut) discard; }`)
         .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
       { float rim = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.6);
         // (as bright as the light that is falling on the skin, no brighter: added as a fixed glow, it was the only thing
@@ -640,16 +651,37 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
     FIST["ropeg_" + sd] = { ...g, bones: Object.fromEntries(Object.entries(g.bones).map(([n, q]) => [n, n.startsWith("thumb") ? R.clone().multiply(new THREE.Quaternion(...q)).toArray() : q])) }; }
   // (13 November: the hand turned thumb up, palm to the reel, the knob between the thumb and the curled first finger, as a
   // reel is wound. With the fist round the knob's own length you saw the flat back of the hand and no fingers)
-  const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [0, -0.03, -0.09], Qh: [0.44587, -0.47507, -0.5191, 0.55321] };
+  // (13 November: the rod hand laid down along the rod, turned 0.85 rad about the line across the rod at the reel, so the
+  // wrist sits just above the butt and the forearm runs back along it, as a rod is held. As made, the wrist stood 8 cm
+  // above the rod with the hand arched down on to it, and the forearm came in across the rod)
+  const SEAT_LAID = (() => { const g = AUTHORED.seat; if (!g || TUNE.seatLaid === false) return null; const R = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), TUNE.seatTilt ?? -0.85);
+    const { elbow: _e, ...rest } = g; return { ...rest, Ph: V(...g.Ph).applyQuaternion(R).toArray(), Qh: R.clone().multiply(new THREE.Quaternion(...g.Qh)).toArray() }; })();
+  const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [0, -0.03, -0.105], Qh: [0.44587, -0.47507, -0.5191, 0.55321] };
   function authored(S, kind) {
     if (TUNE.authored === false) return null;
-    const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : null) ?? FIST[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
+    const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : kind === "seat" ? SEAT_LAID : null) ?? FIST[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
     const fr = S.frameInv.clone().invert(), dW = (name) => fr.clone().multiply(new THREE.Quaternion(...A.bones[name])).multiply(S.frameInv); // (given in the hand's own frame; here in the model's space as the hand rests)
     const local = (ch) => { let above = null; return ch.map((j, k) => { const pose = dW(j.b.name).multiply(j.w0), par = k > 0 && j.b.parent === ch[k - 1].b ? above : j.pw0; above = pose; return par.clone().invert().multiply(pose); }); };
     const ang = (j, ql) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(ql).w), 0, 1));
     const fq = S.fingers.map(local), tq = local(S.thumb);
     // (Qh as the grips here have it: the hand bone's own turn, from the turn of the hand's frame)
     return { elbow: A.elbow ? V(...A.elbow) : null, Ph: V(...A.Ph), Qh: new THREE.Quaternion(...A.Qh).multiply(S.frameInv).multiply(S.handW), f: S.fingers.map((ch, a2) => ch.map((j, k) => ang(j, fq[a2][k]))), t: [...S.thumb.map((j, k) => ang(j, tq[k])), 0], q: [...fq, tq] };
+  }
+  // ---- closeGaps: fingers turned in alongside the middle finger, by k of the way ----
+  const cgA = V(), cgB = V(), cgC = V(), cgD = V(), cgN = V(), cgQ = new THREE.Quaternion(), cgP = new THREE.Quaternion();
+  function closeGaps(S, k) {
+    root.updateMatrixWorld(true);
+    const M0 = S.fingers[1][0].b, M1 = S.fingers[1][1].b; M0.getWorldPosition(cgA); M1.getWorldPosition(cgB); const dm = cgB.clone().sub(cgA).normalize();
+    for (const n of [0, 2, 3]) {
+      const j0 = S.fingers[n][0].b, j1 = S.fingers[n][1].b; j0.getWorldPosition(cgC); j1.getWorldPosition(cgD);
+      const lat = cgC.clone().sub(cgA); lat.addScaledVector(dm, -lat.dot(dm)); const gap = lat.length(); if (gap < 1e-4) continue; lat.multiplyScalar(1 / gap);
+      const df = cgD.clone().sub(cgC).normalize();
+      // (how far the finger leans out from the middle finger across the hand, beyond running parallel to it)
+      const out = Math.asin(clamp(df.dot(lat), -1, 1)) - Math.asin(clamp(dm.dot(lat), -1, 1)); if (out <= 0) continue;
+      cgN.crossVectors(df, lat).normalize(); if (cgN.lengthSq() < 0.5) continue;
+      cgQ.setFromAxisAngle(cgN, -out * k); // (about df x lat a positive turn takes the finger out towards lat: so back the other way) j0.parent.getWorldQuaternion(cgP);
+      j0.quaternion.premultiply(cgP.clone().invert().multiply(cgQ).multiply(cgP)); j0.updateMatrixWorld(true);
+    }
   }
   const madeGrip = (S, kind) => { const key = "made" + kind + S.i; if (!solved.has(key)) solved.set(key, authored(S, kind)); return solved.get(key); };
   function solveGrip(S, kind, side, Fin) {
@@ -938,7 +970,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       }
       // the forearm: straight back from the wrist, turned towards where the arm comes from by no more than a wrist can bend
       const back = S.M.y.clone().applyQuaternion(Qw).negate(), toEl = elbowFor(S, Pw, group.localToWorld(elbow.clone())).sub(Pw).normalize();
-      const ang = back.angleTo(toEl), lim = kind === "crank" ? (TUNE.wristLimCrank ?? 1.25) : kind === "seat" ? (TUNE.wristLimSeat ?? 0.95) : TUNE.wristLim; // (on the rod the wrist bends well back too, so the forearm can come from the elbow out at your side with the rod up for a cast, rather than following the butt across the view) // (cupping the knob, the wrist bends back a long way, as a real one does winding: held near straight, the forearm came straight up from under the hand like a raised fist)
+      const ang = back.angleTo(toEl), lim = kind === "crank" ? (TUNE.wristLimCrank ?? 1.25) : kind === "seat" ? (TUNE.wristLimSeat ?? 0.4) + (TUNE.wristLimCast ?? 0.55) * clamp(wristFree, 0, 1) : TUNE.wristLim; // (13 November: holding the rod, the wrist within 23 degrees of straight, the forearm lying back along the butt as a rod is held; at 54 it went to the limit, bent down and towards the little finger at once, and read as a kink. Through a cast (wristFree, 0 to 1) it is free to 54 again, so the forearm can come from your side with the rod back) // (on the rod the wrist bends well back too, so the forearm can come from the elbow out at your side with the rod up for a cast, rather than following the butt across the view) // (cupping the knob, the wrist bends back a long way, as a real one does winding: held near straight, the forearm came straight up from under the hand like a raised fist)
       let dir = ang > lim ? back.clone().lerp(toEl, lim / ang).normalize() : toEl;
       // (a grip made in Blender says where its forearm comes from: on the rod, the wrist dropped towards the little
       // finger as it is with a rod in the hand. The forearm keeps to that, turned towards where the arm really comes
@@ -958,10 +990,14 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // (a rope running through the hand: every finger eased open a little, the thumb with them)
       // (a fist seen from the thumb's side, as you see your own on a rope: the first finger closed further and the
       // thumb laid over it. As made, the thumb's tip met the first finger's tip and left a ring you could see through)
-      if ((kind === "ropeg" || kind === "crank") && G.q) { const fi = TUNE.fistIdx ?? [0.3, 0.8, 0.6], ft = TUNE.fistThumb ?? [0, 0, 0];
-        S.fingers.forEach((ch, n) => ch.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, (fi[k] || 0) * (n ? TUNE.fistRest ?? 0.4 : 1))))); S.thumb.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, ft[k] || 0))); }
+      if ((kind === "ropeg" || kind === "crank") && G.q) { const rp = kind === "ropeg", fi = TUNE.fistIdx ?? (rp ? [0.75, 1.25, 0.9] : [0.3, 0.8, 0.6]), ft = TUNE.fistThumb ?? [0, 0, 0]; /* (the rope: the longer fingers of the fitted hands closed further, they stood out straight below it) */
+        S.fingers.forEach((ch, n) => ch.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, (fi[k] || 0) * (n ? TUNE.fistRest ?? (rp ? 0.75 : 0.4) : 1))))); S.thumb.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, ft[k] || 0))); }
       if (loose > 0) [...S.fingers, S.thumb].forEach((ch) => ch.forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(loose, 0, 1) * (TUNE.looseK ?? 0) * [0.22, 0.3, 0.3][k])));
       if (trigger > 0) S.fingers[0].forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(trigger, 0, 1) * [0.55, 0.8, 0.85][k]));
+      // (13 November: closed round the rope or the knob, the fingers pressed together, as in a real fist: the slimmer
+      // fitted fingers keep our skeleton's spacing at the knuckles, and closed as they were made they stood apart with
+      // gaps between them. Each is turned about the back of the hand until it runs alongside the middle finger)
+      if ((kind === "ropeg" || kind === "crank") && (TUNE.fistAdd ?? 1) > 0) closeGaps(S, (TUNE.fistAdd ?? 1) * (kind === "crank" ? 0.6 : 1));
       // (to or from such a grip the bones ease by their own turns, from where each was: the finger angles the other
       // holds go by only come close to a made grip, and going by them the fingers jumped as the change began)
       if (fromQ && eq < 1) [...S.fingers, S.thumb].forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.copy(fromQ[a][k].clone().slerp(j.b.quaternion, eq))));
@@ -973,7 +1009,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       }
       if (typeof window !== "undefined" && FILM) {
         const ix = S.fingers[0], md = S.fingers[1], hk = wp(ix[0].b).lerp(wp(ix[1].b), 0.5).lerp(wp(md[0].b).lerp(wp(md[1].b), 0.5), 0.5);
-        (window.__fdSock ||= {})[i] = { kind, sock: sp.toArray().map((v) => +v.toFixed(3)), hook: hk.toArray().map((v) => +v.toFixed(3)), d: +hk.distanceTo(sp).toFixed(3), tips: [0, 1].map((a) => { const c = S.fingers[a][2]; return +wp(c.b).add(V(0, 1, 0).applyQuaternion(wq(c.b)).multiplyScalar(c.len)).distanceTo(sp).toFixed(3); }),
+        (window.__fdSock ||= {})[i] = { kind, sock: sp.toArray().map((v) => +v.toFixed(3)), sq: sq.toArray(), hook: hk.toArray().map((v) => +v.toFixed(3)), d: +hk.distanceTo(sp).toFixed(3), tips: [0, 1].map((a) => { const c = S.fingers[a][2]; return +wp(c.b).add(V(0, 1, 0).applyQuaternion(wq(c.b)).multiplyScalar(c.len)).distanceTo(sp).toFixed(3); }),
           // (on the knob: the nearest the index and middle fingers' pads come to its surface; 0 is touching)
           pad: kind === "crank" ? +Math.min(...[0, 1].map((a) => { const c = S.fingers[a][2], t2 = wp(c.b).add(V(0, 1, 0).applyQuaternion(wq(c.b)).multiplyScalar(c.len)); const ax = V(1, 0, 0).applyQuaternion(sq); return segSeg(t2, t2.clone().add(V(0, 1e-5, 0)), sp, ax, GRIP.knobLen) - GRIP.knobR - 0.007; })).toFixed(3) : null };
       }
@@ -992,6 +1028,8 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
     shoulder(i, w) { sides[i].shoulder.copy(w); sides[i].shoulderSet = true; },
     /** the arm's lengths (m): shoulder to elbow, elbow to wrist */
     reach(i) { return { upper: sides[i].up?.len ?? 0.27, fore: sides[i].len }; },
+    /** where arm i's elbow will be for the wrist at `p` (the group's space), the elbow drawn towards `hint` */
+    elbowAt(i, group, p, hint) { return group.worldToLocal(elbowFor(sides[i], group.localToWorld(p.clone()), group.localToWorld(hint.clone()))); },
     /** where the sleeve covers the forearm from: the wrist and the way along the forearm to the hand (world) */
     cuff(i, wristW, dirW) { CUT.uFdW.value[i].copy(wristW); CUT.uFdDir.value[i].copy(dirW); },
     /** hand i at `pos` with frame `quat` (the group's space), its fingers curled as `curl`, the elbow towards `elbow`;
@@ -1036,6 +1074,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // (a closed hand with nothing worked out for it to close round, on the net's hoop or a pole: the fist made in
       // Blender, eased to as the hand closes, in place of fingers each curled on its own with the thumb left out)
       if (curl?.made > 0 && !A) { const F = madeGrip(S, "ropeg"); if (F) [...S.fingers, S.thumb].forEach((ch, a) => ch.forEach((j, k) => j.b.quaternion.slerp(F.q[a][k], clamp(curl.made, 0, 1)))); }
+      if (curl?.close > 0 && !A) closeGaps(S, clamp(curl.close, 0, 1)); // (fingers together, as under a fish: closeGaps)
       root.updateMatrixWorld(true);
     },
   };
@@ -1161,6 +1200,16 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
       const X = Y.clone().cross(Z).normalize();
       return new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(X, Y, Z));
     }
+    if (spec.kind === "fish" && (spec.palm?.y ?? 0) > 0.5 && (TUNE_ELBOW.fishFlat ?? true)) {
+      // (13 November: a fish held up to look at: the palm under its belly, the fingers carrying on from the forearm and
+      // tipped down towards level by no more than a wrist bends back easily. Laid with the fingers across the fish
+      // whatever way the forearm came, the wrist bent back 60 to 95 degrees and the hand stood up like a wave)
+      const F = reach.clone().normalize(), Fh = V(F.x, 0, F.z); if (Fh.lengthSq() < 1e-6) Fh.set(0, 0, -1); Fh.normalize();
+      const el = F.angleTo(Fh), lim = TUNE_ELBOW.fishWrist ?? 0.5, Y = Fh.clone();
+      if (el > lim) { const k = V().crossVectors(F, Fh); if (k.lengthSq() > 1e-8) Y.copy(F).applyAxisAngle(k.normalize(), lim); }
+      const Z = V(0, 1, 0).addScaledVector(Y, -Y.y).normalize(), X = Y.clone().cross(Z).normalize();
+      return new THREE.Quaternion().setFromRotationMatrix(m4.makeBasis(X, Y, Z));
+    }
     // a handle across the palm, diagonally (as a rod's handle lies in a hand): the palm towards `palm`, the thumb up
     // the handle (the left hand is the mirror image: its thumb is on its -x side)
     const Z = (spec.palm || V(0, 0, 1)).clone(); Z.addScaledVector(ax, -Z.dot(ax)); if (Z.lengthSq() < 1e-6) Z.set(0, 1, 0).addScaledVector(ax, -ax.y); Z.normalize();
@@ -1222,7 +1271,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         // wherever you look. Fixed in the view, the elbows swung under the fish as you looked down at it and the two
         // forearms ran together or crossed)
         if ((spec?.kind === "fish" || spec?.kind === "tailwrist") && (spec.palm?.y ?? 0) > 0.5 /* (held up, palm under it: not the hand laid on a fish on the mat) */) { const fl = tmpV.set(vf.x, 0, vf.z); if (fl.lengthSq() < 1e-6) fl.set(0, 0, -1); fl.normalize(); const rx = vr.x, rz = vr.z, rl = Math.hypot(rx, rz) || 1;
-          elbow.copy(spec.at).addScaledVector(fl, -0.2).add(V((rx / rl) * h.s * 0.17, -0.2, (rz / rl) * h.s * 0.17)); }
+          const fo = TUNE_ELBOW.fishOut ?? 0.24; elbow.copy(spec.at).addScaledVector(fl, -(TUNE_ELBOW.fishBack ?? 0.2)).add(V((rx / rl) * h.s * fo, -(TUNE_ELBOW.fishDown ?? 0.1), (rz / rl) * h.s * fo)); } // (13 November: out and a little higher, the forearms nearer level under the fish: 20 cm down and 17 out, they rose steeply to it and the wrists bent right back)
         // (holding the rod at the reel, the forearm lies back along the rod's butt, just under it)
         // (winding: the elbow and forearm go a little way round with the knob, the wrist turning for the rest, rather
         // than the hand going round on the end of a still arm)
@@ -1257,11 +1306,20 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // put it, the upper arm then made up to fit)
           if (real?.body && shL[i]) { const L = real.reach(i), sh = shL[i], wr0 = spec.at.clone().addScaledVector(vu, 0.07), sd = wr0.clone().sub(sh), d = Math.min(sd.length(), L.upper + L.fore - 0.012), n = sd.clone().normalize();
             const x = (L.upper * L.upper - L.fore * L.fore + d * d) / (2 * d), hgt = Math.sqrt(Math.max(0, L.upper * L.upper - x * x));
-            const pole = V().crossVectors(vr, vf).normalize().multiplyScalar(TUNE_ELBOW.seatPoleY ?? -1).addScaledVector(vr, (TUNE_ELBOW.seatPoleX ?? 0.3) * h.s); pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
+            const pole = V().crossVectors(vr, vf).normalize().multiplyScalar(TUNE_ELBOW.seatPoleY ?? -1).addScaledVector(vr, (TUNE_ELBOW.seatPoleX ?? 0.3) * h.s); // (13 November: a rod is held with the forearm lying along its butt, the wrist straight: the elbow goes as near as
+            // this arm allows to the point a forearm's length back down the rod from the hand. Set down and out by the view
+            // alone, the forearm came in across the rod and the wrist was bent a right angle)
+            { const k = TUNE_ELBOW.seatAlong ?? 1; if (k > 0) { const bd = ax.clone().multiplyScalar(-1); // (back down the butt; or, part of the way, the way the grip was made to have the forearm leave the hand: up off the butt, the wrist quite straight)
+              if (spec.sock?.quat) bd.lerp(V(-0.1191, 0.6771, -0.7261).applyQuaternion(spec.sock.quat), TUNE_ELBOW.seatAuth ?? 0).normalize();
+              const back = spec.at.clone().addScaledVector(bd, L.fore).addScaledVector(vu, -(TUNE_ELBOW.seatUnder ?? 0)).sub(sh).normalize(); pole.normalize().lerp(back, k); } }
+            pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
         }
         let want;
         if (spec) {
-          const quat = frameFor(h, spec, elbow);
+          let quat = frameFor(h, spec, elbow);
+          // (a fish held up: the hand's turn worked out again from where the elbow will really be, an arm's length from
+          // the shoulder; from the elbow asked for, the forearm rose much more steeply than the hand was set for)
+          if (real?.body && real.elbowAt && spec.kind === "fish" && (spec.palm?.y ?? 0) > 0.5) for (let it = 0; it < 2; it++) { const c0 = channelOf(spec.kind).clone(); if (h.s < 0) c0.x = -c0.x; quat = frameFor(h, spec, real.elbowAt(i, group, spec.at.clone().sub(c0.applyQuaternion(quat)), elbow)); }
           const ch = channelOf(spec.kind).clone(); if (h.s < 0) ch.x = -ch.x;
           const pos = spec.at.clone().sub(ch.applyQuaternion(quat));
           want = { pos, quat, kind: spec.kind };
@@ -1289,7 +1347,7 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
         h.mesh.position.copy(pos); h.mesh.quaternion.copy(quat);
         // the fingers and thumb, curled for the grip
         const from = h.from?.curl || h.curlTo, to = h.curlTo;
-        const curl = { f: to.f.map((row, a) => row.map((v, b) => from.f[a][b] + (v - from.f[a][b]) * e)), t: to.t.map((v, b) => from.t[b] + (v - from.t[b]) * e), spread: from.spread + (to.spread - from.spread) * e, made: (from.made || 0) + ((to.made || 0) - (from.made || 0)) * e };
+        const curl = { f: to.f.map((row, a) => row.map((v, b) => from.f[a][b] + (v - from.f[a][b]) * e)), t: to.t.map((v, b) => from.t[b] + (v - from.t[b]) * e), spread: from.spread + (to.spread - from.spread) * e, made: (from.made || 0) + ((to.made || 0) - (from.made || 0)) * e, close: (from.close || 0) + ((to.close || 0) - (from.close || 0)) * e };
         // (winding, the grip's firm; the handle still a moment, the fingers ease a little on the knob, and firm again as
         // it turns: never a jump, as it follows the handle's own speed)
         if (want.kind === "crank" && spec?.spin != null) {
