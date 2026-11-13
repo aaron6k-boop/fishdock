@@ -1,7 +1,7 @@
 // ---- FishParty: the Durable Object that holds one Fish Together party (see server/party.js) ----
 // Its sockets use Cloudflare's hibernation API, so a quiet party costs nothing while nobody is sending. The party's
 // storage is deleted a day after it ends.
-import { PartyHost } from "../server/party.js";
+import { PartyHost, BOARD } from "../server/party.js";
 
 // (a plain class with the (state, env) constructor: fetch and the hibernation API don't need the RPC base class, and
 // this way the Worker entry still imports in Node for tests)
@@ -16,6 +16,8 @@ export class FishParty {
         send: (ws, text) => { try { ws.send(text); } catch { /* gone */ } },
         close: (ws, code, why) => { try { ws.close(code, why); } catch { /* gone */ } },
       },
+      // (a public place's count of anglers, to the board the map reads)
+      (r) => env.PARTY.get(env.PARTY.idFromName(BOARD)).fetch(new Request("https://party.internal/board", { method: "POST", body: JSON.stringify(r) })),
     );
   }
   async fetch(request) {

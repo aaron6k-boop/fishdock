@@ -165,5 +165,6 @@ export function firstSpecies(spot, chosen = null) {
   if (chosen && ok(chosen)) return chosen;
   return spot.species.find((x) => ok(x.id))?.id || (spot.kind === "sea" ? "cod" : "perch");
 }
-/** The 3D game's link for a spot: #play/<spot>, with /p<n> for a chosen fishing position (a random fish each cast). */
-export const fishHereLink = (spot, species, point = null) => { void species; return `#play/${spot.id}${point ? `/p${point}` : ""}`; };
+/** The 3D game's link for a spot: #play/<spot>, with /<fish> when one's chosen (otherwise a random fish each cast) and
+ * /p<n> for a chosen fishing position (src/lib/playRoute.js reads it). */
+export const fishHereLink = (spot, species, point = null) => `#play/${spot.id}${species && firstSpecies(spot, species) === species ? `/${species}` : ""}${point ? `/p${point}` : ""}`;

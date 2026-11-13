@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { SPOTS, spotById } from "../src/data/spots.js";
 import { speciesById } from "../src/data/species.js";
 import { SCENE_CHECKS } from "../src/data/scenes.js";
+import { parsePlay, parsePlayMap } from "../src/lib/playRoute.js";
 import { mapSpots, mapSpotById, TYPES, SCENES, typeOf, filterSpots, matchedOn, randomSpot, clusterSpots, expandZoom, clusterType, toPixel, CLUSTER, favsOf, toggleFav, loadRecent, addRecent, firstSpecies, fishHereLink } from "../src/lib/spotMap.js";
 
 const memory = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
@@ -115,13 +116,19 @@ test("favourites and recent spots: only documented marks, kept on this phone, ne
   assert.deepEqual(loadRecent({ getItem() { throw new Error("blocked"); } }), [], "storage blocked: nothing, no error");
 });
 
-test("Fish here opens the game at that spot and the chosen position (a random fish each cast)", () => {
+test("Fish here opens the game at that spot: a random fish each cast unless one's chosen, and the chosen position", () => {
   const deal = mapSpotById("deal-pier"), wye = mapSpotById("river-wye-ross");
   assert.equal(fishHereLink(deal, null), "#play/deal-pier");
-  assert.equal(fishHereLink(deal, "mackerel", 3), "#play/deal-pier/p3");
+  assert.equal(fishHereLink(deal, null, 3), "#play/deal-pier/p3");
+  assert.equal(fishHereLink(deal, "mackerel", 3), "#play/deal-pier/mackerel/p3");
+  assert.equal(fishHereLink(deal, "perch"), "#play/deal-pier", "a fish the game can't put there isn't asked for");
   assert.equal(firstSpecies(deal, "perch"), "whiting", "no freshwater fish off a pier");
   assert.equal(speciesById(firstSpecies(wye)).type === "sea", false);
-  // the link is one the app's own route reads (App.jsx playRoute)
-  const m = fishHereLink(deal, "mackerel", 2).match(/^#\/?play(?:\/([a-z0-9-]+))?(?:\/p([1-4]))?$/);
-  assert.deepEqual([m[1], m[2]], ["deal-pier", "2"]);
+  // the links are ones the app's own route reads (App.jsx, src/lib/playRoute.js)
+  assert.deepEqual(parsePlay(fishHereLink(deal, "mackerel", 2)), { place: "deal-pier", species: "mackerel", fish: true, view3d: true, point: 2 });
+  assert.deepEqual(parsePlay(fishHereLink(deal, null, 2)), { place: "deal-pier", species: null, fish: false, view3d: true, point: 2 });
+  assert.deepEqual(parsePlay("#play"), { place: null, species: null, fish: false, view3d: true, point: null });
+  assert.equal(parsePlay("#play/map"), null, "the map isn't a place"); assert.equal(parsePlay("#play/map/deal-pier"), null);
+  assert.deepEqual(parsePlayMap("#play/map/deal-pier"), { spot: "deal-pier" }); assert.deepEqual(parsePlayMap("#play/map"), { spot: null });
+  assert.equal(parsePlayMap("#play/deal-pier"), null);
 });

@@ -44,7 +44,7 @@ const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { win
 
 /** A time today that gives the chosen light at this place, found from the real sun. */
 
-export default function TryLive({ initialPlace, initialSpecies, initialPoint = null }) {
+export default function TryLive({ initialPlace, initialSpecies, chosenFish = false, initialPoint = null }) {
   // the chips offer the demo places, but a link to any documented mark opens that mark (never a different place)
   const [placeId, setPlaceId] = useState(initialPlace && (initialPlace === GORLESTON.id || spotById(initialPlace)) ? initialPlace : GORLESTON.id);
   const place = placeOf(placeId);
@@ -56,7 +56,8 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   // which fish the demo catches: a different one each cast (the default), or the one you choose below
   // (a random fish every time the game opens; choosing one lasts this visit. The choice used to be remembered, so a
   // fish picked once to test came back every time)
-  const [randomFish, setRandomFish] = useState(true);
+  // (a fish chosen on the map, #play/<place>/<fish>, is the one you'll catch)
+  const [randomFish, setRandomFish] = useState(!(chosenFish && speciesById(initialSpecies)));
   const setFishMode = (random) => setRandomFish(random);
   const [photos, setPhotos] = useState(null);
   const [pick, setPick] = useState(0);
@@ -198,7 +199,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const overlay = (
     <>
       <div className="fs-top">
-              {fromMap ? <a className="fs-chip map-back" href={`#map/${placeId}`} aria-label="Back to map" title="Back to map"><Icon name="back" /><Icon name="explore" /></a> : null}
+              {fromMap ? <a className="fs-chip map-back" href={`#play/map/${placeId}`} aria-label="Back to the map" title="Back to the map"><Icon name="back" /><Icon name="explore" /></a> : null}
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${fishLabel} at ${place.name}: change`}>{fishLabel}</button>
               {others.length ? <span className="fs-chip here-chip" title={others.map((m) => m.name).join(", ")}><Icon name="users" />{others.length + 1} here</span> : null}
@@ -222,7 +223,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D onWindIn={vf.windIn} fightLive={vf.fightLive} tipLight={tipLight} onReel={{ tap: () => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }, hold: vf.hold }} menu={[{ key: "diary", label: `Your diary${diaryList.length ? ` (${diaryList.length})` : ""}`, icon: "book", onClick: () => { setDiaryList(readDiary()); setDiaryOpen(true); } }, { key: "name", label: name ? `Your name: ${name}` : "Choose your name", icon: "person", onClick: () => { setNameDraft(name || ""); setNaming(true); } }, { key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo poseBus={poseBus} onPose={sendPose} toasts={toasts} onDecide={(what, ev) => { if (ev?.id) { setOutcome(String(ev.id), what); setDiaryList(readDiary()); } }} onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} fightLive={vf.fightLive} tipLight={tipLight} onReel={{ tap: () => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }, hold: vf.hold }} menu={[{ key: "diary", label: `Your diary${diaryList.length ? ` (${diaryList.length})` : ""}`, icon: "book", onClick: () => { setDiaryList(readDiary()); setDiaryOpen(true); } }, { key: "name", label: name ? `Your name: ${name}` : "Choose your name", icon: "person", onClick: () => { setNameDraft(name || ""); setNaming(true); } }, { key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: "Choose another place", icon: "explore", onClick: () => { location.hash = `#play/map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo poseBus={poseBus} onPose={sendPose} toasts={toasts} onDecide={(what, ev) => { if (ev?.id) { setOutcome(String(ev.id), what); setDiaryList(readDiary()); } }} onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (

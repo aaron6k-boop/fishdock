@@ -5,6 +5,7 @@ import { SPOTS, spotById } from "./data/spots.js";
 import { SPECIES, speciesById } from "./data/species.js";
 import { getConditions, getTides, getRiver, PREVIEW, track } from "./lib/api.js";
 import { tideModel } from "./lib/tides.js";
+import { parsePlay, parsePlayMap } from "./lib/playRoute.js";
 import { nationAt, setDistanceUnit } from "./lib/geo.js";
 import { activeSession, onSessionChange, recoverSession } from "./lib/session.js";
 import { restore } from "./lib/account.js";
@@ -27,6 +28,7 @@ const TryLive = lazy(() => import("./pages/TryLive.jsx"));
 const Together = lazy(() => import("./pages/Together.jsx"));
 const Party = lazy(() => import("./pages/Party.jsx"));
 const SpotMap = lazy(() => import("./pages/SpotMap.jsx"));
+const GameMap = lazy(() => import("./pages/SpotMap.jsx").then((m) => ({ default: m.GameMap })));
 
 const TABS = [
   { id: "home", label: "Home", icon: "home" },
@@ -72,7 +74,9 @@ const watchToken = () => (location.hash.match(/^#\/?watch\/([A-Za-z0-9_-]{30,64}
 // The labelled demo of the Live Fishing View: #try, #try/<place>, #try/<place>/<species>, and /3d on the end opens
 // the 360° 3D view; /p<n> after it starts at fishing position n (chosen on the UK spot map).
 // #play (#play/<place>, /p<n>): the game itself, straight into the 3D view, no demo labels: the one link to give people
-const playRoute = () => { const m = location.hash.match(/^#\/?play(?:\/([a-z0-9-]+))?(?:\/p([1-4]))?$/); return m ? { place: m[1] || null, species: null, view3d: true, point: m[2] ? +m[2] : null } : null; };
+const playRoute = () => parsePlay(location.hash);
+/** The game's own map for choosing a place (#play/map, #play/map/<place>): no app round it, no introduction. */
+const playMapRoute = () => parsePlayMap(location.hash);
 const tryRoute = () => playRoute() || (() => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?(?:\/p([1-4]))?$/); return m ? { place: m[1] === "3d" ? null : m[1] || null, species: m[2] === "3d" ? null : m[2] || null, view3d: !!m[3], point: m[3] && m[4] ? Number(m[4]) : null } : null; })();
 // Fish Together: #together (start, join, continue) and a party, #party/<code>/<secret> (or /code, or just the code to
 // come back to one this phone has joined).
@@ -82,14 +86,15 @@ export default function Root() {
   const [tg, setTg] = useState(togetherRoute), [party, setParty] = useState(partyRoute);
   useEffect(() => { const on = () => { setTg(togetherRoute()); setParty((p) => { const n = partyRoute(); return n && p && n.code === p.code ? p : n; }); }; addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
   const [token, setToken] = useState(watchToken);
-  const [demo, setDemo] = useState(tryRoute);
-  useEffect(() => { const on = () => { setToken(watchToken()); setDemo((d) => { const n = tryRoute(); return n && d ? d : n; }); }; addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
-  useEffect(() => { if (token || demo || tg || party) applyTheme(loadSettings().theme); }, [token, !!demo, tg, !!party]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [demo, setDemo] = useState(tryRoute), [gmap, setGmap] = useState(playMapRoute);
+  useEffect(() => { const on = () => { setToken(watchToken()); setGmap((g) => { const n = playMapRoute(); return n && g && n.spot === g.spot ? g : n; }); setDemo((d) => { const n = tryRoute(); return n && d && (!n.place || n.place === d.place) && (!n.species || n.species === d.species) ? d : n; }); }; addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
+  useEffect(() => { if (token || demo || gmap || tg || party) applyTheme(loadSettings().theme); }, [token, !!demo, !!gmap, tg, !!party]); // eslint-disable-line react-hooks/exhaustive-deps
   const wait = <div className="watch-shell"><div className="watch-msg"><span className="loading-dots" aria-label="Loading" /></div></div>;
   if (token) return <Suspense fallback={wait}><Watch token={token} /></Suspense>;
   if (party) return <Suspense fallback={wait}><Party key={party.code} code={party.code} secret={party.secret} /></Suspense>;
   if (tg) return <Suspense fallback={wait}><Together /></Suspense>;
-  if (demo) return <Suspense fallback={wait}><TryLive initialPlace={demo.place} initialSpecies={demo.species} initialPoint={demo.point} /></Suspense>;
+  if (gmap) return <Suspense fallback={wait}><GameMap spot={gmap.spot} /></Suspense>;
+  if (demo) return <Suspense fallback={wait}><TryLive key={`${demo.place}|${demo.species}|${demo.point}`} initialPlace={demo.place} initialSpecies={demo.species} chosenFish={!!demo.fish} initialPoint={demo.point} /></Suspense>;
   return <App />;
 }
 

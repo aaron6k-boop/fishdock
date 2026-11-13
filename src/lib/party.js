@@ -40,6 +40,8 @@ export async function joinPublic(mark, { venue, name, outfit, look } = {}) {
   try { localStorage.setItem(PUB_KEY, JSON.stringify(all)); } catch { /* the seat lasts this visit */ }
   return all[mark];
 }
+/** How many are fishing each place now ({ mark: n }, only places with someone), or null when it can't be had. */
+export async function fishingNow() { try { return (await call("GET", "/public")).counts || {}; } catch { return null; } }
 export const previewParty = (code, { secret, viaCode } = {}) => call("GET", `/${code}?${secret ? `s=${encodeURIComponent(secret)}` : ""}${viaCode ? "&via=code" : ""}`);
 export const joinParty = (code, o) => call("POST", `/${code}/join`, o);
 export async function uploadPartyPhoto(code, key, blob) {
