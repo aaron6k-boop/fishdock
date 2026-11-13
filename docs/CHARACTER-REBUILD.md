@@ -163,6 +163,53 @@ Not done: the grips were made for an earlier hand and have not been made again; 
 last joint of each finger is laid on our shorter one); the leather-glove model also downloaded ("Fps arms" by DJMaesen,
 CC BY 4.0) is not used yet, as it has no bones and needs binding.
 
+## Seventh stage (13 November): a proper rig in Blender instead of hand patches
+
+Aaron asked for the procedural fixes to stop and for the arms and hands to be rigged and animated in Blender, with
+the equipment driving the hand contact. Work so far, all of it in Blender on Aaron's PC (the files are in
+`~/Documents/FishDock-assets/rig`, the scripts that make them in `~/Documents/FishDock-assets/queue` and `scripts`):
+
+- **Character.** The Blender Studio Human Base Meshes realistic male (CC0), the same body family as the hands, at
+  full size with its shape keys removed and one level of its sculpted detail applied (42,342 points).
+- **Rig.** A Rigify human rig fitted to that body from measured joint positions: spine, chest, neck, head,
+  clavicles, upper arms, elbows, two forearm segments that share the twist, wrists, palms, three joints for every
+  finger and the thumb. 410 bones, 73 that bend the skin; skin weights from the bones and checked by closing a fist.
+  Each finger's hinge is set from that finger's own curl, so every finger closes straight into the palm. Arm IK with
+  stretch switched off, so an arm can never be pulled longer than it is, and an elbow target for each arm.
+- **Jacket.** Made from the rigged body itself (cut at the waist and 6 cm above each wrist, given a 3 mm thickness),
+  so it bends with the same bones and nothing has to be stuck on by the camera.
+- **Equipment.** The game's own rod handle and reel (`rodkit.blend`) at full size on a 12 ft rod, reel seat 45 cm from
+  the butt, the handle's crank turning about its real axis, knob 5.8 cm from it.
+- **Motion capture.** Three Mixamo clips already used by the third-person anglers (fishing idle, cast, pulling a
+  rope) are retargeted to the rig bone by bone, correcting for the two skeletons' different rest poses. The idle gives
+  the spine, chest and shoulders a natural stance; the cast is the base for Gate 3.
+- **Two rig faults found and fixed on the way.** (1) The fingers' hinges: Rigify works out a finger's bend axis from
+  its resting curve, and this body's fingers are nearly straight at rest, so a knuckle bent a finger largely sideways
+  (up to 96% of the movement on the left hand). Every finger and thumb chain now bends about the bone's own X axis,
+  laid along the knuckles' line; each knuckle now moves its finger into the palm (sideways drift 0.2 or less) and a
+  closed hand is a proper fist. This, not the grip code, is why every earlier grip looked like a claw. (2) Stretch:
+  Rigify's IK bones keep a small stretch value of their own even with the arm's stretch setting off, so an arm could
+  be pulled about 10% longer to reach a target out of reach. That value is now zero, and every solve measures both arm
+  bones against their rest length (1.000 on every run since).
+- **Grips (Gate 1, in progress).** The rod is put where the first-person view holds it and within reach: reel seat
+  about 33 cm ahead of the eye and 30 cm below it, rod up 35 to 45 degrees, so the reel and both hands sit at the
+  bottom of the picture at the game's own field of view on a phone and on a wide screen. Each arm reaches its grip by
+  IK from its own shoulder with the elbow bent (about 110 to 135 degrees). The grips come from a search over the hand's
+  real skin, deformed by the same bone weights the game uses: the handle tried across the palm at many angles and
+  places, every finger closed at each, and the place kept where the palm and fingers wrap it with nothing going inside;
+  likewise the knob across the first two fingers with the thumb opposite. Every candidate is scored on contact and on
+  the wrist and forearm staying inside natural limits (bend towards the palm up to 55 degrees, back 45, towards the
+  thumb 15, towards the little finger 30; the forearm turned no more than 85 degrees palm down or 75 palm up).
+
+Pipeline the game will use once the rig is exported (one path, replacing `createFpHands` behind the same interface):
+authored clip for the state, blended between states, then the equipment's attachment points (right hand on the reel
+seat, left hand on the knob as the crank turns it), arm IK from the shoulders with the elbow targets, the finger pose
+for the grip, and the final skeleton. The older hand solvers stay in the code until the new rig passes the same
+end-to-end checks; then they are removed.
+
+Gates, each shown to Aaron before the next starts: 1 static grip, 2 ten reel turns, 3 the two-handed cast, 4 a full
+catch in the game.
+
 ## Not done
 
 - The hand mesh is the same one. Its measurements are right and it bends cleanly at the wrist, so it was kept. Its
