@@ -703,6 +703,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       get programs() { const by = {}; for (const p of renderer.info.programs || []) { const k = `${p.name}|${(p.cacheKey || "").length}`; (by[p.name] ||= { n: 0, used: 0, keys: new Set() }).n++; by[p.name].used += p.usedTimes; by[p.name].keys.add(p.cacheKey); void k; } return Object.entries(by).map(([name, v]) => ({ name, n: v.n, used: v.used })).sort((a, b) => b.n - a.n); },
       programKeys(name) { return (renderer.info.programs || []).filter((p) => p.name === name).map((p) => p.cacheKey); },
       splash(x, z, size = 0.6, mult = 1) { const y = waveHeight(x, z, film ? film.t : 0, { ...env.waveState(), kind }); splash(new THREE.Vector3(x, y, z), size, mult); ripple(new THREE.Vector3(x, y, z), Math.min(1, size)); },
+      /** (checks) n frames of ms each, as a phone would make them, drawn only at the end; each(i) after every frame */
+      frames(n, ms, each = null) { if (!film) this.freeze(); for (let i = 0; i < n; i++) { film.t += ms / 1000; film.now += ms; tick(film.t, film.now, ms / 1000, i === n - 1); each?.(i); } },
       step(ms, single = false) { if (!film) return; const n = single ? 1 : Math.max(1, Math.ceil(ms / 50)); for (let i = 0; i < n; i++) { film.t += ms / n / 1000; film.now += ms / n; tick(film.t, film.now, ms / n / 1000, i === n - 1); } },
       get mode() { return mode; },
       // for visual checks: the weather and light as given (eased in: step the clock a few seconds after)
