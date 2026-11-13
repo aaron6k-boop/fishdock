@@ -21,6 +21,7 @@ import InviteHere from "../components/InviteHere.jsx";
 import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
 import { saveLook } from "../lib/world3d/people.js";
 import { landedCatches } from "../lib/landed.js";
+import { playerName, setPlayerName, cleanName, addCatch, setOutcome, diary as readDiary, summary as diarySummary } from "../lib/diary.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
 import { spotById } from "../data/spots.js";
@@ -76,6 +77,10 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const [sheet, setSheet] = useState(false);
   const [invite, setInvite] = useState(false);
   const [lookOpen, setLookOpen] = useState(false), [look, setLookNow] = useState(myLook);
+  // ---- your fishing name (asked the first time you play) and your diary of the fish you've landed ----
+  const [name, setName] = useState(playerName), [naming, setNaming] = useState(() => !playerName()), [nameDraft, setNameDraft] = useState(() => playerName() || "");
+  const [diaryOpen, setDiaryOpen] = useState(false), [diaryList, setDiaryList] = useState(readDiary);
+  const saveName = () => { const n = setPlayerName(nameDraft); if (n) { setName(n); setNaming(false); } };
   const setLook = (v) => { setLookNow(v); saveLook(v); };
   const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
   const [view3d, setView3d] = useState(() => /\/3d(\/p[1-4])?$/.test(location.hash) || /^#\/?play/.test(location.hash)); // the 360° 3D view (#play opens straight into it)
@@ -152,6 +157,8 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
 
   const venue = from === "auto" ? venueOf(place) : from;
   const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
+  // (each fish landed goes in your diary once, with the place; keeping it or putting it back is added when you choose)
+  useEffect(() => { let added = false; for (const e of catches) if (e?.id && e.data?.species && !diaryList.some((d) => d.id === String(e.id))) { addCatch({ id: String(e.id), species: e.data.species, name: e.data.name || speciesById(e.data.species)?.name, lengthCm: e.data.lengthCm, weightKg: e.data.weightKg, place: placeId, placeName: place.name.replace(/ \(.*\)$/, ""), at: e.t || Date.now() }); added = true; } if (added) setDiaryList(readDiary()); }, [catches.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: (placeId === initialPlace && point) || 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length, look, placeId, point]); // eslint-disable-line react-hooks/exhaustive-deps
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (
@@ -180,7 +187,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D onWindIn={vf.windIn} fightLive={vf.fightLive} tipLight={tipLight} onReel={{ tap: () => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }, hold: vf.hold }} menu={[{ key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} fightLive={vf.fightLive} tipLight={tipLight} onReel={{ tap: () => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }, hold: vf.hold }} menu={[{ key: "diary", label: `Your diary${diaryList.length ? ` (${diaryList.length})` : ""}`, icon: "book", onClick: () => { setDiaryList(readDiary()); setDiaryOpen(true); } }, { key: "name", label: name ? `Your name: ${name}` : "Choose your name", icon: "person", onClick: () => { setNameDraft(name || ""); setNaming(true); } }, { key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onDecide={(what, ev) => { if (ev?.id) { setOutcome(String(ev.id), what); setDiaryList(readDiary()); } }} onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (
@@ -197,6 +204,43 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
               <button type="button" className="xbtn sheet-x" onClick={() => setLookOpen(false)} aria-label="Close"><Icon name="close" /></button>
             </div>
             <section className="watch-sec"><LookPicker value={look} onChange={setLook} /></section>
+          </aside>
+        </> : null}
+        {naming ? <>
+          <div className="sheet-scrim" onClick={() => { if (name) setNaming(false); }} />
+          <aside className="watch-panel sheet open name-sheet" aria-label="Your fishing name">
+            <div className="sheet-head"><div className="try-head"><h1>{name ? "Your fishing name" : "Before you start: your name"}</h1><p className="small muted">What other anglers see you as when they're fishing the same place. 2 to 20 letters or numbers. Kept on this phone; you can change it from the menu.</p></div>
+              {name ? <button type="button" className="xbtn sheet-x" onClick={() => setNaming(false)} aria-label="Close"><Icon name="close" /></button> : null}</div>
+            <section className="watch-sec">
+              <form className="name-form" onSubmit={(e) => { e.preventDefault(); saveName(); }}>
+                <input type="text" value={nameDraft} maxLength={24} autoFocus placeholder="Your name" aria-label="Your fishing name" onChange={(e) => setNameDraft(e.target.value)} />
+                <button type="submit" className="btn primary" disabled={!cleanName(nameDraft)}>{name ? "Save" : "Start fishing"}</button>
+              </form>
+              {nameDraft && !cleanName(nameDraft) ? <p className="tiny">2 to 20 letters, numbers, spaces, hyphens or apostrophes.</p> : null}
+            </section>
+          </aside>
+        </> : null}
+        {diaryOpen ? <>
+          <div className="sheet-scrim" onClick={() => setDiaryOpen(false)} />
+          <aside className="watch-panel sheet open diary-sheet" aria-label="Your diary">
+            <div className="sheet-head"><div className="try-head"><h1>{name ? `${name}'s diary` : "Your diary"}</h1><p className="small muted">Every fish you've landed in the game, on this phone. Game catches, never real records.</p></div>
+              <button type="button" className="xbtn sheet-x" onClick={() => setDiaryOpen(false)} aria-label="Close"><Icon name="close" /></button></div>
+            {(() => { const s = diarySummary(diaryList); return (<>
+              <section className="watch-sec diary-totals">
+                <div><b>{s.count}</b><span>fish</span></div><div><b>{s.kinds}</b><span>kinds</span></div><div><b>{s.biggest ? `${s.biggest.lengthCm} cm` : "-"}</b><span>{s.biggest ? `biggest: ${s.biggest.name}` : "biggest"}</span></div>
+              </section>
+              {s.days.length ? s.days.map((d) => (
+                <section key={d.day} className="watch-sec">
+                  <div className="card-h"><h2>{new Date(d.at).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h2><span className="aside">{d.list.length}</span></div>
+                  <div className="list">{d.list.map((e) => (
+                    <div key={e.id} className="li diary-li">
+                      {hasArt(e.species) ? <img src={artUrl(e.species, "s")} alt="" className="diary-art" /> : <span className="diary-art ph"><Icon name="fish" /></span>}
+                      <span className="grow"><span className="t">{e.name}{e.lengthCm ? `, ${e.lengthCm} cm` : ""}</span><span className="s">{[e.placeName, new Date(e.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), e.outcome === "kept" ? "kept" : e.outcome === "released" ? "put back" : null].filter(Boolean).join(" · ")}</span></span>
+                    </div>
+                  ))}</div>
+                </section>
+              )) : <section className="watch-sec"><p className="small">Nothing yet: cast out and land your first fish.</p></section>}
+            </>); })()}
           </aside>
         </> : null}
         <InviteHere open={invite} onClose={() => setInvite(false)} markId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} />
