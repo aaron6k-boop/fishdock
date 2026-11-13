@@ -19,6 +19,7 @@ import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { loadModel } from "./glbParts.js";
 import { RIG } from "./fpRigData.js";
+import { clothe } from "./fabric.js";
 import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "./fpIk.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -101,9 +102,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   const group = new THREE.Group(); group.name = "fp-rig"; group.visible = false;
   const root = new THREE.Group(); root.name = "fp-rig-root"; group.add(root);
   const skinMat = new THREE.MeshStandardMaterial({ color: gloves ? 0x2b2e34 : skinHex, roughness: gloves ? 0.72 : 0.55, metalness: 0 });
-  const coatMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.86, metalness: 0 });
+  // (the coat: an outdoor jacket's ripstop nylon, its weave and creases and the soft sheen cloth has at a glancing
+  // angle, fabric.js. Until 13 November it was one flat colour: "just some blue", Aaron said)
+  const coatMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.78, metalness: 0, sheen: 0.55, sheenRoughness: 0.6, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xffffff), 0.35) });
   // (cloth right at your eye isn't drawn: the collar and the shoulders sit around the camera)
   coatMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .16) discard;\n#include <opaque_fragment>"); };
+  clothe(coatMat);
   for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(DIM); liveMats.add(m); }
   let R = null, failed = false;
   const hands = [0, 1].map((i) => ({ side: i ? "R" : "L", kind: undefined, cur: null, from: null, u: 1, want: null, fing: null, fingFrom: null, cyl: null, wrist: null }));
