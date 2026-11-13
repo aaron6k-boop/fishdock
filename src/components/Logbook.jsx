@@ -3,7 +3,7 @@
 // records; levels and badges are for the record of what you've done, and never open or close anywhere.
 import { useMemo, useState } from "react";
 import { Icon } from "./ui.jsx";
-import { progress } from "../lib/progress.js";
+import { progress, CHALLENGE_XP } from "../lib/progress.js";
 import { summary as diarySummary } from "../lib/diary.js";
 import { SPECIES } from "../data/species.js";
 import { hasArt, artUrl } from "../data/fishart.js";
@@ -45,6 +45,11 @@ export default function Logbook({ list, name, onClose }) {
         <section className="watch-sec">
           <LevelBar p={p} />
           <p className="tiny muted lvl-how">{p.xp.toLocaleString("en-GB")} XP. Bigger fish earn more, with medals for big ones of their kind, a bonus for a new kind and for a personal best. The same kind again the same day earns a little less each time.</p>
+        </section>
+        <section className="watch-sec">
+          <div className="card-h"><h2>Today's challenges</h2><span className="aside">{p.today.filter((c) => c.done).length} of {p.today.length} · {CHALLENGE_XP} XP each</span></div>
+          <ul className="log-today">{p.today.map((c) => <li key={c.id} className={c.done ? "done" : ""}><Icon name={c.done ? "check" : "target"} /><span>{c.name}</span></li>)}</ul>
+          <p className="tiny muted">Three new ones every day.</p>
         </section>
         <section className="watch-sec diary-totals">
           <div><b>{s.count}</b><span>fish</span></div><div><b>{p.stats.kinds} / {book.length}</b><span>kinds</span></div><div><b>{got} / {p.badges.length}</b><span>badges</span></div>

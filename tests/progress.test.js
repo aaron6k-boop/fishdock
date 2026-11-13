@@ -1,7 +1,7 @@
 // ---- the game's levels, XP, medals and badges (src/lib/progress.js) ----
 import test from "node:test";
 import assert from "node:assert/strict";
-import { medalFor, levelFor, xpToReach, replay, progress, afterCatch, BADGES } from "../src/lib/progress.js";
+import { medalFor, levelFor, xpToReach, replay, progress, afterCatch, BADGES, challengesFor, challengeDays, CHALLENGES, CHALLENGE_XP } from "../src/lib/progress.js";
 
 const T0 = Date.UTC(2026, 10, 13, 18);
 const fish = (id, species, lengthCm, at = T0, more = {}) => ({ id, species, name: species, lengthCm, at, place: "gorleston-south-pier", outcome: null, ...more });
@@ -61,7 +61,7 @@ test("the logbook: totals, species book with bests and medals, badges with when 
   assert.ok(got.first.got && got.first.at === T0 + 1000); assert.ok(got.places3.got); assert.ok(got.night.got); assert.ok(got.rough.got);
   assert.ok(got.gold.got); assert.ok(got.specimen.got, "a 90 cm cod is a specimen (usual 55)"); assert.equal(got.kinds5.got, false);
   assert.equal(p.badges.length, BADGES.length);
-  assert.equal(p.xp, p.rows.reduce((a, r) => a + r.xp, 0));
+  assert.equal(p.xp, p.rows.reduce((a, r) => a + r.xp, 0) + p.challengeXp, "the catches' XP and the challenges'");
   assert.deepEqual(progress([]).level, 1);
 });
 
@@ -72,4 +72,41 @@ test("after a catch: what it earned, a level gained, and new badges", () => {
   assert.equal(r.levelUp, true); assert.ok(r.badges.some((b) => b.id === "specimen"));
   const again = afterCatch([fish("b", "cod", 90, T0 + 1000), ...before], fish("c", "cod", 50, T0 + 2000));
   assert.equal(again.first, false); assert.equal(again.best, false); assert.equal(again.badges.length, 0);
+});
+
+test("three challenges a day: the same all day, different days differ, worth XP once done, for good", () => {
+  const day = Date.UTC(2026, 10, 14, 10), later = day + 5 * 3600e3, next = day + 86400e3;
+  const ids = (t) => challengesFor(t).map((c) => c.id);
+  assert.equal(ids(day).length, 3); assert.equal(new Set(ids(day)).size, 3);
+  assert.deepEqual(ids(day), ids(later), "the same all day");
+  const many = new Set(Array.from({ length: 30 }, (_, i) => ids(day + i * 86400e3).join()));
+  assert.ok(many.size > 20, "they change from day to day");
+  for (let i = 0; i < 60; i++) for (const id of ids(day + i * 86400e3)) assert.ok(CHALLENGES.some((c) => c.id === id));
+  // a day where every challenge can be done: 5 fish, 3 kinds, medals, put back, two places, a new kind, a best
+  const t = (m) => day + m * 60e3, list = [
+    fish("f5", "cod", 90, t(50), { outcome: "released", place: "cromer-pier" }), fish("f4", "cod", 60, t(40), { outcome: "released" }),
+    fish("f3", "bass", 56, t(30), { outcome: "released" }), fish("f2", "dab", 24, t(20)), fish("f1", "whiting", 30, t(10)),
+  ];
+  const p = progress(list, later);
+  assert.equal(p.today.length, 3); assert.ok(p.today.every((c) => c.done), JSON.stringify(p.today));
+  assert.equal(p.challengeXp, 3 * CHALLENGE_XP);
+  // nothing caught today: today's three, none done yet, no bonus
+  const quiet = progress([], next); assert.equal(quiet.today.length, 3); assert.ok(quiet.today.every((c) => !c.done)); assert.equal(quiet.challengeXp, 0);
+  // the day's record keeps them: tomorrow, yesterday's still count
+  assert.equal(progress(list, next).challengeXp, 3 * CHALLENGE_XP);
+  assert.equal(challengeDays(replay(list)).length, 1);
+});
+
+test("after a catch: a challenge it completes is named once", () => {
+  const day = Date.UTC(2026, 10, 14, 10);
+  const want = challengesFor(day).map((c) => c.id);
+  // land fish one by one until each of today's challenges that a plain run of catches can finish is done, once each
+  let list = [], seen = [];
+  const kinds = ["whiting", "dab", "bass", "cod", "pouting", "mackerel"];
+  for (let i = 0; i < 6; i++) {
+    const e = fish(`c${i}`, kinds[i], i === 2 ? 60 : 26, day + i * 60e3, { place: i === 3 ? "cromer-pier" : "gorleston-south-pier", outcome: "released" });
+    const r = afterCatch(list, e); seen.push(...r.challenges.map((c) => c.id)); list = [e, ...list];
+  }
+  assert.equal(new Set(seen).size, seen.length, "each named once");
+  for (const id of seen) assert.ok(want.includes(id));
 });

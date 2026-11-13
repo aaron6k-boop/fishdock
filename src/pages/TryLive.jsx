@@ -23,7 +23,7 @@ import { saveLook } from "../lib/world3d/people.js";
 import { landedCatches } from "../lib/landed.js";
 import { useParty, joinPublic, publicSeat, forgetPublic, momentText } from "../lib/party.js";
 import { playerName, setPlayerName, cleanName, addCatch, setOutcome, diary as readDiary } from "../lib/diary.js";
-import { progress, afterCatch, medalFor } from "../lib/progress.js";
+import { progress, afterCatch, medalFor, CHALLENGE_XP } from "../lib/progress.js";
 import { drawFish } from "../lib/fishDraw.js";
 import { FILM } from "../lib/world3d/film.js";
 import Logbook, { LevelBar } from "../components/Logbook.jsx";
@@ -206,10 +206,13 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
     const entry = addCatch({ id: String(e.id), species: e.data.species, name: e.data.name || speciesById(e.data.species)?.name, lengthCm: e.data.lengthCm, weightKg: e.data.weightKg, place: placeId, placeName: place.name.replace(/ \(.*\)$/, ""), at: e.t || Date.now(), night: lightNow.sunAlt < -6, rough: (c?.precipMm || 0) > 0.2 || (c?.windKph || 0) >= 35 });
     if (entry) { rewards.current.set(entry.id, afterCatch(before, entry)); before = [entry, ...before]; } added = true; } if (added) setDiaryList(readDiary()); }, [catches.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const prog = useMemo(() => progress(diaryList), [diaryList]);
-  const reward = (id) => { const r = rewards.current.get(String(id)); if (!r) return; rewards.current.delete(String(id));
-    const e = diaryList.find((d) => d.id === String(id)), what = `${r.medal ? `${r.medal.name.toLowerCase()} ` : ""}${(e?.name || "fish").toLowerCase()}`;
+  // (worked out again once you've decided, so a put-back counts towards the day's challenges)
+  const reward = (id) => { if (!rewards.current.has(String(id))) return; rewards.current.delete(String(id));
+    const all = readDiary(), e = all.find((d) => d.id === String(id)); if (!e) return;
+    const r = afterCatch(all.filter((d) => d.id !== e.id), e, Date.now()), what = `${r.medal ? `${r.medal.name.toLowerCase()} ` : ""}${(e.name || "fish").toLowerCase()}`;
     toast(`+${r.xp} XP · ${what[0].toUpperCase()}${what.slice(1)}${r.first ? " · New kind" : r.best ? " · Your biggest" : ""}`, "good");
     if (r.levelUp) toast(`Level ${r.level} reached`, "good");
+    for (const c of r.challenges) toast(`Challenge done: ${c.name} (+${CHALLENGE_XP} XP)`, "good");
     for (const b of r.badges.slice(0, 2)) toast(`Badge: ${b.name}`, "good"); };
   const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: meRoom?.spot || (placeId === initialPlace && point) || 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }, ...others.map((m) => ({ id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, look: m.look || null, local: false, inspect: false, real: false, events: Proom.events.filter((e) => e.who === m.id), fishHint: null }))], [events, sp.id, length, look, placeId, point, meRoom?.spot, others, Proom.events]); // eslint-disable-line react-hooks/exhaustive-deps
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)

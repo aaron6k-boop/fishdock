@@ -645,3 +645,9 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .lvl-ring b { position: relative; font-size: 13px; font-weight: 800; }
 .fs-chip.lvl-chip { padding: 2px; min-width: 0; }
 .w3d-toast.good { border-color: #8ee6c988; white-space: normal; max-width: min(86vw, 360px); text-align: center; border-radius: 14px; }
+.log-today { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.log-today li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: #ffffff0a; font-size: 14px; }
+.log-today li svg { width: 18px; height: 18px; flex: none; opacity: .6; }
+.log-today li.done { background: #2fbf9a1f; }
+.log-today li.done svg { color: #8ee6c9; opacity: 1; }
+.log-today li.done span { opacity: .85; }
