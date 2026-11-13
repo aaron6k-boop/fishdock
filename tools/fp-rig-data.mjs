@@ -32,7 +32,12 @@ function quat(m) { // (three's Quaternion.setFromRotationMatrix, from a row-majo
 const inv4 = (M) => { const R = rot3(M), Rt = T3(R), t = [M[0][3], M[1][3], M[2][3]], ti = apply3(Rt, t).map((v) => -v); return [[...Rt[0], ti[0]], [...Rt[1], ti[1]], [...Rt[2], ti[2]], [0, 0, 0, 1]]; };
 const mul4 = (A, B) => A.map((row, i) => [0, 1, 2, 3].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j] + row[3] * B[3][j]));
 /** a Blender transform (4x4, row major) as the game's { p, q } */
-const pq = (M) => ({ p: R6(C([M[0][3], M[1][3], M[2][3]])), q: R6(quat(conj(norm3(rot3(M))))) });
+// (a bone keeps Blender's own axes in the glTF file: the exporter turns the whole skeleton from z up to y up at its
+// root and leaves each bone's frame as it is, so a bone's turn in the game is the y-up turn applied to Blender's, not
+// Blender's carried over both sides. Written both sides at first, every hand came out a quarter turn about its own x
+// axis: in the right place, the fingers pointing the wrong way. The hand frames below (loc, cyl, flat) are in the hand
+// bone's own frame and so stay as Blender has them)
+const pq = (M) => ({ p: R6(C([M[0][3], M[1][3], M[2][3]])), q: R6(quat(mul3(Cm, norm3(rot3(M))))) });
 
 // ---- the right hand on the reel seat: Gate 1's grip, from the rod's frame (butt) moved to the seat (the reel) ----
 const seatT = [[1, 0, 0, 0], [0, 1, 0, meta.seat], [0, 0, 1, 0], [0, 0, 0, 1]];
@@ -51,8 +56,8 @@ const hubG = C([hub[0], hub[1] + meta.seat, hub[2]]), rad = last.reduce((s2, r) 
 const reel = { hub: R6(hubG), r: r6(rad) };
 // ---- the palm's frame in each hand, and the handle-sized grips ----
 const loc = {}, cyl = {}, flat = {};
-for (const S of ["L", "R"]) { const g = grips["pole_" + S]; loc[S] = { k: R6(C(g.kn)), palm: R6(C(g.pn)), along: R6(C(g.an)) }; flat[S] = { c: R6(C(g.c.map((v, i) => v - g.pn[i] * (g.r + 0.0015)))) }; }
-for (const name of ["rope", "hoop", "pole", "butt", "tail"]) { cyl[name] = { r: grips[name + "_L"].r }; for (const S of ["L", "R"]) { const g = grips[name + "_" + S]; cyl[name][S] = { c: R6(C(g.c)), d: R6(C(g.d)), pn: R6(C(g.pn)) }; } }
+for (const S of ["L", "R"]) { const g = grips["pole_" + S]; loc[S] = { k: R6(g.kn), palm: R6(g.pn), along: R6(g.an) }; flat[S] = { c: R6(g.c.map((v, i) => v - g.pn[i] * (g.r + 0.0015))) }; }
+for (const name of ["rope", "hoop", "pole", "butt", "tail"]) { cyl[name] = { r: grips[name + "_L"].r }; for (const S of ["L", "R"]) { const g = grips[name + "_" + S]; cyl[name][S] = { c: R6(g.c), d: R6(g.d), pn: R6(g.pn) }; } }
 // ---- the eye: where Gate 1 placed the rod from and Blender's first-person views were taken from (the eyes of the
 // model as it stands in the hold), in the model's own frame; the game finds it in the head bone's frame from the hold clip, so it moves with the head ----
 // ---- the hold and the cast: where the reel is from the eye, level, facing ahead (x right, y up, z ahead, metres) and
