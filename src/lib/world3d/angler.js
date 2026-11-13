@@ -393,7 +393,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     for (let y = 0; y < 64; y++) for (let x = 0; x < 32; x++) { const t = ((x / 32) * 3 + y / 64 * 3) % 1, k = Math.sin(t * Math.PI), v = 0.45 + 0.55 * Math.pow(k, 0.6); img.data.set([34 * v + 9, 35 * v + 9, 38 * v + 10, 255], (y * 32 + x) * 4); } /* (black rope) */
     g.putImageData(img, 0, 0); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
-  const ropes = [0, 1, 2, 3, 4, 5].map(() => {
+  const ropes = [0, 1, 2, 3, 4, 5, 6, 7].map(() => { // (6 and 7: the rope through each fist, first person)
     const map = ropeTex ? ropeTex.clone() : null; if (map) map.needsUpdate = true;
     const r = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 8, 1, true), new THREE.MeshStandardMaterial({ color: map ? 0xffffff : 0x1c1d20, map, bumpMap: map, bumpScale: 0.6, roughness: 0.8 }));
     r.onBeforeRender = () => { if (map) map.repeat.set(1, Math.max(1, r.scale.y / 0.035)); }; // (a strand round every 3.5 cm, whatever the length)
@@ -544,6 +544,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // (release), or kept (gone: the catch card shows it)
   let kept = null, matOut = false;
   let ropeHeld = false, handsNow = [new THREE.Vector3(), new THREE.Vector3()]; // where the hands are (local), for the drop net's rope
+  let fistEnds = [null, null]; // (first person: where the rope goes into and comes out of each fist, local)
   let walking = null; // walking about (walker.js): where, which way, how fast, the stride
   let tagOff = false;
   let headHand = null; // which hand has the head of a fish held up (0 left, 1 right)
@@ -1439,6 +1440,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
     }
     if (fp && ropeHeld === false && hands.some((h) => h?.kind === "rope")) { handsNow = hands.map((h, i) => (h ? h.at.clone() : handsNow[i])); ropeHeld = true; } // (the rope runs to where the hands were just put)
+    // (13 November: the rope runs straight through each fist, along the line the fist was closed round, and bends just
+    // outside the hand. Drawn straight from hand to hand, it bent at the middle of each fist, and the slack to the deck
+    // came out between the fingers of the lower hand, which then looked spread round nothing)
+    fistEnds = hands.map((h, i) => { if (!fp || h?.kind !== "rope" || !h.sock) return null; const A = V3(1, 0, 0).applyQuaternion(h.sock.quat).multiplyScalar(0.04); return [handsNow[i].clone().add(A), handsNow[i].clone().sub(A)]; });
     // first person: your hands (fpHands.js) take hold of the same things, placed from the same eye and view as the rod
     if (fp && fpv) {
       const vw = fpView || viewVecs();
@@ -1584,7 +1589,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (matOn) matOut = true;
     mat.visible = matOn || (matOut && !walking);
     if (mat.visible) { mat.position.copy(toWorld(matAtL())); mat.rotation.y = root.rotation.y; }
-    net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r) => (r.visible = net.visible && !netIdle && (tech === "dropnet" || ropesOn)));
+    net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r, i) => (r.visible = i < 6 && net.visible && !netIdle && (tech === "dropnet" || ropesOn))); // (6 and 7, through the fists, only where they are placed, below)
     if (net.visible) {
       net.position.copy(netAt);
       if ((tech === "net" || releasePole) && poleFrom) between(pole, poleFrom, netAt, 1);
@@ -1599,9 +1604,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           fig.group.updateMatrixWorld(true);
           const hw = [0, 1].map((i) => { if (fp) return toWorld(handsNow[i]); const h = fig.hand(i); return h ? fig.group.localToWorld(h) : toWorld(handsNow[i]); }); // (in first person, through the hands you see on it)
           const hm = hw[0].clone().lerp(hw[1], 0.5);
-          if (fpRope) { const lo = hw[0].distanceToSquared(knot) < hw[1].distanceToSquared(knot) ? hw[0] : hw[1], hi = lo === hw[0] ? hw[1] : hw[0]; /* (lo: the hand nearer the net along the rope, whichever is higher) */ between(ropes[3], hi, lo, 1); between(ropes[4], lo, knot, 1); between(ropes[5], hi, coil, 1); } // (first person, leaning out over the rail: through both hands and straight down to the net)
-          else { between(ropes[3], hm, dropRig.railPt, 1); between(ropes[4], dropRig.railPt, knot, 1); between(ropes[5], hm, coil, 1); }
-        } else { between(ropes[3], knot, coil, 1); ropes[4].visible = false; ropes[5].visible = false; }
+          if (fpRope) { const li = hw[0].distanceToSquared(knot) < hw[1].distanceToSquared(knot) ? 0 : 1, lo = hw[li], hi = hw[1 - li]; /* (lo: the hand nearer the net along the rope, whichever is higher) */
+            // (each fist's two ends: towards the other hand or the net, and away; the rope straight between them)
+            const ends = (k, to) => { const E2 = fistEnds[k]; if (!E2) return [hw[k], hw[k]]; const a = toWorld(E2[0].clone()), b = toWorld(E2[1].clone()); return a.distanceToSquared(to) < b.distanceToSquared(to) ? [a, b] : [b, a]; };
+            const [hiF, hiB] = ends(1 - li, lo), [loB, loF] = ends(li, hi);
+            between(ropes[3], hiF, loB, 1); between(ropes[4], loF, knot, 1); between(ropes[5], hiB, coil, 1);
+            ropes[6].visible = ropes[7].visible = ropes[3].visible; between(ropes[6], hiB, hiF, 1); between(ropes[7], loB, loF, 1); } // (first person, leaning out over the rail: through both hands and straight down to the net)
+          else { between(ropes[3], hm, dropRig.railPt, 1); between(ropes[4], dropRig.railPt, knot, 1); between(ropes[5], hm, coil, 1); ropes[6].visible = ropes[7].visible = false; }
+        } else { between(ropes[3], knot, coil, 1); ropes[4].visible = false; ropes[5].visible = false; ropes[6].visible = ropes[7].visible = false; }
       }
     }
     prevAge = age;
