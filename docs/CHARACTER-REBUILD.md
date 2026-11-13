@@ -204,6 +204,14 @@ the equipment driving the hand contact. Work so far, all of it in Blender on Aar
   45, towards the thumb 15, towards the little finger 30; the forearm turned no more than 85 degrees palm down or 75
   palm up).
 
+Gate 1 as it stands (`rig/gate1_v12.blend`): all four right fingers curl round the reel seat (middle joints 40 to 106
+degrees), the stem between the middle and ring fingers with 7 mm to spare, the thumb along the top; the left hand's
+first two fingers wrap the knob, the ring and little fingers curl into the hand behind it; nothing goes into the
+equipment by more than about 1 mm. Right wrist 34 degrees back and 12 towards the little finger, forearm turned 53
+palm up, elbow 107; left wrist nearly straight, forearm turned 52 palm down, elbow 144. Still to come: the jacket has
+cuffs but no folds; on a wide screen the hands sit just under the frame at the game's current first-person view angle
+(7 degrees down), so when the rig goes into the game the first-person view should start about 15 degrees down.
+
 Pipeline the game will use once the rig is exported (one path, replacing `createFpHands` behind the same interface):
 authored clip for the state, blended between states, then the equipment's attachment points (right hand on the reel
 seat, left hand on the knob as the crank turns it), arm IK from the shoulders with the elbow targets, the finger pose

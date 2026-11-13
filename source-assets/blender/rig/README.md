@@ -15,6 +15,8 @@ helpers in `lib/` from the working folder's `scripts/` (copy them there first).
 | `06/07_jacket_chest_*.py` | The jacket's chest smoothed and held just outside the body |
 | `08a/08b_*mixamo*.py` | The Mixamo fishing idle (already used by the third-person anglers) retargeted onto the rig for the spine, chest and shoulders (`rig/mocap_idle.blend`) |
 | `09_gate1_grips.py` | Gate 1: the static hold. Grasp search on the hand's real skin (each finger scored on touching and on curling round the handle), the reel's hang round the handle searched with the middle and ring fingers parting round the stem, the rod placed within reach and in view, both arms by IK, the crank and the left hand's grip chosen together (`rig/gate1_v11.blend`, `rig/gate1_v11.json`) |
+| `11_gate1_left_fingers.py` | The left hand's ring and little fingers curled as a relaxed hand curls them, clear of the knob, crank and reel (`rig/gate1_v12.blend`) |
+| `12_jacket_cuffs.py` | The last 3.5 cm of each sleeve made a cuff standing 4 mm proud |
 | `10_gate1_renders.py` | The Gate 1 renders: first person as the game frames it, front, side, over the shoulder, each hand from five sides |
 | `check_finger_hinges.py` | Which way each finger moves when its knuckle bends |
 | `drafts/` | Not run yet: ten turns of the reel (Gate 2) and the export to `.glb` |
