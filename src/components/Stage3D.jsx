@@ -14,7 +14,7 @@ const TORCHES = ["off", "white", "red", "green"], TORCH_NAMES = { off: "Off", wh
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, fightLive = null, tipLight = "auto", toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts }) {
+export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, fightLive = null, tipLight = "auto", toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts, onDecide = null }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState(() => (loadView().fishCam === "third" ? "third" : "first")), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -91,12 +91,12 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   const releaseMsg = useRef(null), keptPrev = useRef(null);
   useEffect(() => { if (keptPrev.current === "release" && kept !== "release" && releaseMsg.current) { say(releaseMsg.current); releaseMsg.current = null; } keptPrev.current = kept; }, [kept]); // eslint-disable-line react-hooks/exhaustive-deps
   const openInspect = () => { if (!landed) return; w.current?.inspectFish(true); setLooking(true); };
-  const keepIt = () => { w.current?.keepFish(); setLooking(false); if (landed) { setCard({ ev: landed.ev, key: landed.key, who: null }); setTimeout(() => setCard((c) => (c?.ev === landed.ev ? null : c)), 8000); } setLanded(null); };
+  const keepIt = () => { w.current?.keepFish(); setLooking(false); onDecide?.("kept", landed?.ev); if (landed) { setCard({ ev: landed.ev, key: landed.key, who: null }); setTimeout(() => setCard((c) => (c?.ev === landed.ev ? null : c)), 8000); } setLanded(null); };
   // (how it goes back depends on the place and the fish: a fish heavy enough to have been netted off a high pier is
   // lowered in the drop net; a light one, swung up on the line, is let go by hand over the rail. Only the walk down a
   // beach to the water is shortened, and the page says so)
   const putBack = () => {
-    w.current?.releaseFish(); setLooking(false); const d = landed?.ev?.data || {}, sp = speciesById(d.species), off = sp ? `: the ${sp.name.toLowerCase()} swims off` : "";
+    w.current?.releaseFish(); setLooking(false); onDecide?.("released", landed?.ev); const d = landed?.ev?.data || {}, sp = speciesById(d.species), off = sp ? `: the ${sp.name.toLowerCase()} swims off` : "";
     const netted = venue === "pier" && landingTech(d.species, d.lengthCm, d.weightKg, "pier") === "dropnet";
     releaseMsg.current = venue === "pier" ? (netted ? `Lowered back to the water in the drop net${off}.` : `Let go over the rail${off}.`) : venue === "beach" ? `Back into the shallows (shortened)${off}.` : `Back in the landing net at the water's edge${off}.`; setLanded(null);
   };
