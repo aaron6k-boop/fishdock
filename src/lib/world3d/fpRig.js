@@ -210,8 +210,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       const ik = twoBone(shW, target.pos, A.L1, A.L2, pole.clone().applyAxisAngle(ax, a)), w = wristAngles(shW, ik.elbow, ik.wrist, target.quat, loc[S], S);
       let c = limitsPen(w) * 4 + (Math.abs(w.flex) + Math.abs(w.rad)) * 0.02 + Math.abs(a) * 0.25 + angDiff(a, h.turnTo ?? 0) * 0.6;
       // (a hand out past the rail, on the drop net's rope: the forearm comes over the top rail, never through it)
-      if (rail) { const e = ik.elbow.clone().applyMatrix4(MgInv), wr = ik.wrist.clone().applyMatrix4(MgInv);
-        if (wr.z < rail.z + 0.04 && e.z > rail.z) { const t = (rail.z - wr.z) / (e.z - wr.z), y = wr.y + (e.y - wr.y) * t; if (y < rail.y + 0.08) c += (rail.y + 0.08 - y) * 60; } }
+      // (and the upper arm and the elbow kept off the rail too: they went 7 cm into it in the railing test)
+      if (rail) { const sh = shW.clone().applyMatrix4(MgInv), e = ik.elbow.clone().applyMatrix4(MgInv), wr = ik.wrist.clone().applyMatrix4(MgInv);
+        for (const [a0, b0, r] of [[wr, e, 0.045], [e, sh, 0.055]]) {
+          if (a0.z < rail.z + 0.04 && b0.z > rail.z) { const t = (rail.z - a0.z) / (b0.z - a0.z), y = a0.y + (b0.y - a0.y) * t; if (y < rail.y + 0.08) c += (rail.y + 0.08 - y) * 60; }
+          const dy = b0.y - a0.y, dz = b0.z - a0.z, l2 = dy * dy + dz * dz, u = l2 ? clamp(((rail.y - a0.y) * dy + (rail.z - a0.z) * dz) / l2, 0, 1) : 0, d = Math.hypot(a0.y + dy * u - rail.y, a0.z + dz * u - rail.z);
+          if (d < r + 0.04) c += (r + 0.04 - d) * 80; } }
       if (!best || c < best.c) best = { c, a };
     }
     return best.a;
