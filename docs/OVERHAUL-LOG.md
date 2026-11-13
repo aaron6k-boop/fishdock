@@ -386,3 +386,27 @@ Aaron: "The biggest issue is the arms and the hands. Can you remodel them comple
   The file is 1.2 MB (it was 0.66 MB). `source-assets/blender/make_fp_body_hd.py` is the script.
 - Checked: unit tests, the end-to-end presets, and stills waiting, fighting, holding and releasing a fish (software
   renderer in the build container, not a phone; no frame rates or load times measured).
+
+## Arms steady (13 November 2026, branch `arm-steady`)
+
+**Wrong.** Aaron: "weird vibrating stuttering" of the arms when the game first loads. Measured at 60 frames a second on
+the film clock: once the rod was fully in your hands, the pick-up blend (`inHand` in `angler.js`) stepped down 2% and
+back up every other frame, so the rod and both hands shook about a millimetre 30 times a second; every hand and
+forearm reversed direction on every frame (232 a second). Going through a whole catch the same way found snaps: the
+rod and both hands 15 cm in a frame as the rod is picked up on a bite (the smoothing between ways of holding the rod
+ended before it had caught up), the left hand 41 cm taking the fish, the right hand 30 cm as the rod is put down to
+land, and the left forearm 16 cm in a cast (the elbow's bend side flipping).
+
+**Changed.** `inHand` settles once it's there; the rod's smoothing catches up gradually instead of ending; a hand whose
+target jumps blends over to it (measured from the body, so turning your head is never a jump); putting the rod down to
+land is smoothed; the way an elbow points moves over rather than jumping, and an elbow never swings round the
+shoulder-to-hand line quicker than 8 radians a second (14 in a cast).
+
+**Checked.** `tools/arm-steady.mjs` (new): the opening and a whole catch at 60 frames a second. Holding the rod, 0
+reversals in 358 frames (was every frame). Biggest move of a hand or forearm in one frame outside the cast 84 mm (was
+413), in the cast 63 mm (was 165). `fpRig.test.js`'s gates still pass (11). Before-and-after film of the opening hold
+and a bite pick-up, frame for frame on the film clock (sent in the conversation). Software rendering: right for the
+motion, not proof of how smoothly a phone runs.
+
+**Left.** The landing's left forearm still moves 5 to 8 cm a frame for a few frames as the elbow swings round to take the
+fish (a quick but continuous move). Not yet checked on Aaron's phone.
