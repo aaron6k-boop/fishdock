@@ -22,6 +22,7 @@ import { fitRodReel, buildRod, rodWet } from "./rodKit.js";
 import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
 import { contactShadow } from "./contactShadow.js";
 import { FILM } from "./film.js";
+const SWING_TP = new THREE.Vector3(0.05, 1.25, -0.42), SWING_FP = new THREE.Vector3(0.08, 1.0, -0.52); // (where a fish swung up by hand arrives: seen from outside, and in your own view)
 const OVER_BAG = 0.3, OVER_FLAT = 0.7; // (the drop net crossing the rail: how much of the bag hangs below the hoop, and how slumped it is drawn)
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -795,7 +796,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       else if (crossed(T1)) { splashCb?.(surf, 0.9 + prof.splashy * 0.5); rippleCb?.(surf, 0.8); onSound?.("bigsplash", surf); }
       // the fish is there all along: a shape coming up through the water, then breaking the surface (never popping in)
       showFish = true;
-      const hand = toWorld(new THREE.Vector3(0.05, 1.25, -0.42));
+      // (where a fish swung in comes to your hand: in first person lower and further out, at arm's length below your
+      // eye, so looking down at it you see it in your hand rather than your own sleeve against the lens)
+      const hand = toWorld(fp ? SWING_FP.clone() : SWING_TP.clone());
       if (tech === "lift") {
         // swung up on the line: head first, hanging under the tip, swinging, then in over the rail
         if (age >= T1 && age < T2) { const f = ease(seg(age, T1, T2)); rigAt = surf.clone().lerp(tip.clone().add(new THREE.Vector3(0, -1.2, 0)), f); pitch = 1.1 + 0.15 * f; }
@@ -953,7 +956,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // recording at 40 s, the fish and the view jumping from the rail to the deck in one frame)
           matOn = true;
           const T_TAKE = 0.6, T_LAY = 1.9, f = ease(seg(kt, T_TAKE, T_LAY));
-          const hang = toWorld(new THREE.Vector3(0.05, 1.25, -0.42)), down = new THREE.Vector3(0, -1, 0), centre0 = hang.clone().addScaledVector(down, fishLen * 0.5);
+          const hang = toWorld(fp ? SWING_FP.clone() : SWING_TP.clone()), down = new THREE.Vector3(0, -1, 0), centre0 = hang.clone().addScaledVector(down, fishLen * 0.5);
           if (kept.from === "line" && kt < T_LAY) { const c = centre0.clone().lerp(onMat, f); c.y += Math.sin(f * Math.PI) * 0.06; keptPose = poseD(c, down.clone().lerp(side.clone().negate(), f).normalize(), lerp(0, LIE, f), { beat: 0.5 * (1 - f) + 0.1, curl: Math.sin(kt * 7) * 0.12 * (1 - f), lift: true }); keptPose.take = kt < T_TAKE; }
           else { keptPose = pose(onMat, LIE, { beat: 0.08, curl: Math.max(0, Math.sin(kt * 1.7)) ** 8 * 0.5 }); keptPose.rest = true; } // (then a hand resting on it, as when you've looked at it: the arms didn't vanish from round it)
           if (kept.from === "line" && crossed2(kt, T_LAY - 0.05)) onSound?.("mat", onMat);
@@ -1707,7 +1710,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // (first person, picking the fish or the net up off the deck to look at it or put it back: you stoop to the deck and
     // step towards it, as when landing. Standing still, the hands' targets were a metre and more from the shoulders and
     // the arms were drawn that long, sleeves straight across the view: the 8 November recording at 48 s)
-    const lowH = fp && (kept?.state === "release" || kept?.state === "inspect" || kept?.state === "deck") && handsNow ? Math.min(handsNow[0].y, handsNow[1].y) : 9;
+    // (laying a fish you've just taken on the mat too, but not while one hand still has the rod, putting it in its rest:
+    // stooping and stepping towards that, the view went down through your own arm)
+    const lowH = fp && (kept?.state === "release" || kept?.state === "inspect" || (kept?.state === "deck" && keptPose && !keptPose.take)) && handsNow ? Math.min(handsNow[0].y, handsNow[1].y) : 9;
     // (not with the rope in your hands: those are placed from your eye, so stooping lowered them and they the eye, down to the deck)
     const deckReach = lowH < 0.85 && !ropeHeld, reachX = deckReach ? (handsNow[0].x + handsNow[1].x) / 2 : 0;
     { const st = deckReach ? clamp((0.85 - lowH) * 1.1, 0, 1) : fp && ph === "landing" && (landStage === "pick" || landStage === "in") ? fpCrouch : 0; stoopNow += (st - stoopNow) * (1 - Math.exp(-dt * 3));

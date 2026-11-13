@@ -103,7 +103,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   const skinMat = new THREE.MeshStandardMaterial({ color: gloves ? 0x2b2e34 : skinHex, roughness: gloves ? 0.72 : 0.55, metalness: 0 });
   const coatMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.86, metalness: 0 });
   // (cloth right at your eye isn't drawn: the collar and the shoulders sit around the camera)
-  coatMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .13) discard;\n#include <opaque_fragment>"); };
+  coatMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .16) discard;\n#include <opaque_fragment>"); };
   for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(DIM); liveMats.add(m); }
   let R = null, failed = false;
   const hands = [0, 1].map((i) => ({ side: i ? "R" : "L", kind: undefined, cur: null, from: null, u: 1, want: null, fing: null, fingFrom: null, cyl: null, wrist: null }));
