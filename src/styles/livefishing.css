@@ -600,3 +600,48 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .diary-li { gap: 10px; align-items: center; }
 .diary-art { width: 54px; height: 32px; object-fit: contain; flex: none; }
 .diary-art.ph { display: inline-flex; align-items: center; justify-content: center; opacity: .6; }
+
+/* ---- levels, medals and the logbook (src/components/Logbook.jsx, src/lib/progress.js) ---- */
+.lvl { display: flex; align-items: center; gap: 8px; }
+.lvl-n { flex: none; min-width: 30px; height: 30px; padding: 0 6px; border-radius: 15px; display: grid; place-items: center; font-weight: 800; font-size: 15px; background: #2fbf9a; color: #062a22; }
+.lvl-track { position: relative; flex: 1; height: 8px; border-radius: 4px; background: #ffffff24; overflow: hidden; min-width: 60px; }
+.lvl-track i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, #2fbf9a, #8ee6c9); }
+.lvl-need { flex: none; font-size: 12.5px; opacity: .8; }
+.lvl-how { margin: 8px 0 0; }
+.lvl.compact { gap: 6px; }
+.lvl.compact .lvl-n { min-width: 22px; height: 22px; font-size: 12.5px; border-radius: 11px; }
+.lvl.compact .lvl-track { width: 38px; min-width: 38px; flex: none; height: 5px; }
+.fs-chip.lvl-chip { padding-left: 4px; }
+.medal { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; vertical-align: 1px; color: #1b1405; }
+.medal.m-bronze { background: #d39a64; }
+.medal.m-silver { background: #cfd6dc; }
+.medal.m-gold { background: #f2c94c; }
+.medal.m-specimen { background: linear-gradient(90deg, #8ee6c9, #9cc8ff); }
+.log-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #ffffff1f; vertical-align: 1px; }
+.log-xp { flex: none; font-weight: 700; font-size: 13px; color: #8ee6c9; }
+.log-tabs { margin: 4px 16px 0; }
+.log-tabs button.on { background: var(--action-soft, #2fbf9a33); color: var(--action, #8ee6c9); border-color: color-mix(in srgb, var(--action, #2fbf9a) 55%, transparent); }
+.log-book { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.log-kind { display: flex; flex-direction: column; gap: 3px; padding: 8px; border-radius: 12px; background: #ffffff0d; min-width: 0; }
+.log-kind img { width: 100%; height: 44px; object-fit: contain; }
+.log-kind .t { font-weight: 700; font-size: 13.5px; }
+.log-kind .s { font-size: 12px; opacity: .8; }
+.log-kind.none img { filter: grayscale(1) brightness(.35); opacity: .7; }
+.log-kind.none .t { opacity: .6; }
+.log-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.log-badge { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 12px; background: #ffffff0a; opacity: .55; min-width: 0; }
+.log-badge.got { opacity: 1; background: #2fbf9a1f; }
+.log-badge .ic svg { width: 18px; height: 18px; }
+.log-badge.got .ic { color: #8ee6c9; }
+.log-badge .t { font-weight: 700; font-size: 13.5px; }
+.log-badge .s { font-size: 12px; opacity: .8; }
+.fl-rate { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 2px 0 8px; }
+.fl-rate .log-tag { margin-left: 0; }
+.lvl-ring { position: relative; display: grid; place-items: center; width: 30px; height: 30px; }
+.lvl-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lvl-ring circle { fill: none; stroke-width: 3.5; }
+.lvl-ring .bg { stroke: #ffffff2e; }
+.lvl-ring .fg { stroke: #2fbf9a; stroke-linecap: round; }
+.lvl-ring b { position: relative; font-size: 13px; font-weight: 800; }
+.fs-chip.lvl-chip { padding: 2px; min-width: 0; }
+.w3d-toast.good { border-color: #8ee6c988; white-space: normal; max-width: min(86vw, 360px); text-align: center; border-radius: 14px; }

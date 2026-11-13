@@ -14,7 +14,7 @@ const TORCHES = ["off", "white", "red", "green"], TORCH_NAMES = { off: "Off", wh
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, fightLive = null, tipLight = "auto", toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts, onDecide = null }) {
+export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, fightLive = null, tipLight = "auto", toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts, onDecide = null, rateCatch = null }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState(() => (loadView().fishCam === "third" ? "third" : "first")), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -174,7 +174,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
           </>
         ) : null}
         {landed && kept === "deck" && !looking ? <div className="walk-top"><button type="button" className="walk-prompt" onClick={openInspect}><span className="key">Tap</span>Your fish is landed: have a look</button></div> : null}
-        {looking && landed ? <FishLook ev={landed.ev} demo={demo} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
+        {looking && landed ? <FishLook ev={landed.ev} demo={demo} rate={rateCatch?.(landed.ev)} onKeep={keepIt} onRelease={putBack} onClose={() => { w.current?.inspectFish(false); setLooking(false); }} /> : null}
         {/* one menu for everything that isn't fishing or walking (top right): the page's own items (your angler, sound,
             settings, inviting a friend), the camera, emotes, watching a friend, and the view's settings */}
         {/* the menu closes with a tap anywhere else (and by itself when a fish bites: see onPhase) */}
@@ -265,7 +265,7 @@ function Joystick({ onMove, size = "m", float = false }) {
 // A small card at first (the fish stays in view above it): what it is, its size, Keep it and Put it back. The minimum
 // size and any rule or safety point (catchInfo.js) are always shown; how to tell it and the rest of the note wait
 // under "More about this fish"
-function FishLook({ ev, demo, onKeep, onRelease, onClose }) {
+function FishLook({ ev, demo, rate = null, onKeep, onRelease, onClose }) {
   const d = ev?.data || {}, sp = speciesById(d.species), info = catchInfo(sp);
   const [more, setMore] = useState(false);
   const len = d.lengthCm ? `${d.lengthCm} cm (${(d.lengthCm / 2.54).toFixed(1)} in)` : null, kg = d.weightKg ? `${d.weightKg >= 1 ? d.weightKg.toFixed(1) : d.weightKg.toFixed(2)} kg` : null;
@@ -276,6 +276,7 @@ function FishLook({ ev, demo, onKeep, onRelease, onClose }) {
       {demo ? null : <span className="cc-kicker">Simulated · not a real record</span>}
       <h3>{sp?.name || "Fish"} {sp?.latin ? <i className="tiny muted">{sp.latin}</i> : null}</h3>
       <p className="cc-facts">{[len, kg].filter(Boolean).join(" · ") || "Size not given"}</p>
+      {rate && (rate.medal || rate.first || rate.best) ? <p className="fl-rate">{rate.medal ? <span className={`medal m-${rate.medal.id}`}>{rate.medal.name}</span> : null}{rate.first ? <span className="log-tag">New kind for your book</span> : rate.best ? <span className="log-tag">Your biggest yet</span> : null}</p> : null}
       {info.must.length ? <ul className="fl-must">{info.must.map((m, i) => <li key={i} className={`fl-${m.kind}`}><b>{label[m.kind]}:</b> {m.text}{m.source ? <> <a href={m.source} target="_blank" rel="noopener noreferrer">Source</a></> : null}</li>)}</ul> : null}
       <div className="row">
         <button type="button" className="btn primary" onClick={onKeep}><Icon name="check" />Keep it</button>

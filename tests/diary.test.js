@@ -27,6 +27,8 @@ test("the diary: each landed fish once, newest first, kept or put back, with tot
   setOutcome("c1", "released"); setOutcome("c2", "eaten");
   assert.equal(diary()[1].outcome, "released"); assert.equal(diary()[0].outcome, null);
   const s = summary(); assert.equal(s.count, 2); assert.equal(s.kinds, 2); assert.equal(s.biggest.id, "c2"); assert.equal(s.days.length, 2);
-  for (let i = 0; i < 520; i++) addCatch({ id: `x${i}`, species: "dab", lengthCm: 20 });
-  assert.equal(diary().length, 500, "the newest 500 are kept");
+  for (let i = 0; i < 5020; i++) mem.set("fishdock.diary", JSON.stringify([{ id: `x${i}`, species: "dab", lengthCm: 20, at: i }, ...JSON.parse(mem.get("fishdock.diary") || "[]")].slice(0, 5010)));
+  addCatch({ id: "last", species: "dab", lengthCm: 20 });
+  assert.equal(diary().length, 5000, "the newest 5,000 are kept"); assert.equal(diary()[0].id, "last");
+  addCatch({ id: "n1", species: "cod", lengthCm: 60, night: true, rough: true }); assert.equal(diary()[0].night, true); assert.equal(diary()[0].rough, true);
 });
