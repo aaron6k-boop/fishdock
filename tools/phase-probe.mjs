@@ -30,7 +30,7 @@ await ctx.addInitScript(() => {
 });
 const page = await ctx.newPage(); const errs = []; page.on("pageerror", (e) => errs.push(e.message));
 const cdp = await ctx.newCDPSession(page);
-await page.goto(`${base}/#try/gorleston-south-pier/cod/3d`);
+await page.goto(`${base}/#play/gorleston-south-pier`);
 await page.waitForSelector(".w3d.is-ready", { timeout: 200000 }); await sleep(4000);
 const marks = []; const mark = async (name) => { marks.push([await page.evaluate(() => Math.round(performance.now())), name]); console.log("  ..", name); };
 const label = () => page.evaluate(() => document.querySelector(".ft-label")?.textContent || "");

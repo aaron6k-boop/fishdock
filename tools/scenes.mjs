@@ -41,7 +41,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
 await ctx.addInitScript((g) => { window.__fdFilm = true; localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: g, fishCam: "first" })); }, gfx);
 const page = await ctx.newPage(); const cdp = await ctx.newCDPSession(page);
 page.on("pageerror", (e) => console.log("ERR", e.message));
-await page.goto(`${base}/#try/gorleston-south-pier/cod/3d`);
+await page.goto(`${base}/#play/gorleston-south-pier`);
 await page.waitForFunction(() => window.__fdWorld && window.__fdWorld.play, null, { timeout: 150000 }); await page.waitForTimeout(20000);
 // (the 3D view alone, not the panel beside it)
 const snap = async (name) => { const r = await page.evaluate(() => { const c = document.querySelector(".w3d canvas"); const b = c.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; }); const { data } = await cdp.send("Page.captureScreenshot", { format: "jpeg", quality: 90, clip: { ...r, scale: 1 } }); writeFileSync(`${out}/${name}.jpg`, Buffer.from(data, "base64")); };

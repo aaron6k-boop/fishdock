@@ -98,11 +98,11 @@ export function CatchCard({ ev, photoUrl: own, onClose, compact, onClip, demo = 
         {art ? <img className={`cc-art${own ? " small" : ""}`} src={art} alt="" /> : ph ? <img className={`cc-art photo${own ? " small" : ""}`} src={photoUrl(ph, 500)} alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" /> : null}
       </div>
       <div className="cc-body">
-        <span className="cc-kicker">{demo ? "Demo · not logged" : sim ? `${who ? `${who} · ` : ""}Simulated · not a real record` : `${who ? `${who} · ` : ""}Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
+        <span className="cc-kicker">{demo ? "Virtual fishing" : sim ? `${who ? `${who} · ` : ""}Simulated · not a real record` : `${who ? `${who} · ` : ""}Landed${ev?.t ? ` at ${fmtTime(ev.t)}` : ""}`}</span>
         <h3>{name}</h3>
         <p className="cc-facts">{[fmtLen(d.lengthCm), fmtWeight(d.weightKg)].filter(Boolean).join(" · ") || "Size not logged"}{d.released && !demo && !sim ? " · Released" : ""}</p>
         {d.bait ? <p className="tiny">On {d.bait}</p> : null}
-        <p className="cc-note">{demo ? "Animated for the demo: nothing was caught or logged." : sim ? "Virtual fishing: a simulated fish, kept apart from real catches." : "Animated reconstruction of a logged catch, not a video."}{!own ? (art ? " Picture: FishDock's species picture." : ph ? ` Species photo: ${ph.author}, ${ph.licence}.` : "") : ""}</p>
+        <p className="cc-note">{demo ? "A simulated fish from the game." : sim ? "Virtual fishing: a simulated fish, kept apart from real catches." : "Animated reconstruction of a logged catch, not a video."}{!own ? (art ? " Picture: FishDock's species picture." : ph ? ` Species photo: ${ph.author}, ${ph.licence}.` : "") : ""}</p>
         {onClip ? <button type="button" className="btn small cc-clip" onClick={onClip}><Icon name="play" />Highlight clip</button> : null}
       </div>
     </div>
@@ -344,7 +344,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
         const pw = pic.naturalWidth * k, ph = pic.naturalHeight * k;
         g.drawImage(pic, w * 0.06 + (bw - pw) / 2, h * 0.12 + (bh - ph) / 2, pw, ph);
       }
-      g.fillStyle = "#45d3cb"; g.font = `700 ${Math.round(h * 0.035)}px system-ui, sans-serif`; g.fillText(c.demo ? "DEMO CATCH" : "LANDED", w * 0.65, h * 0.3);
+      g.fillStyle = "#45d3cb"; g.font = `700 ${Math.round(h * 0.035)}px system-ui, sans-serif`; g.fillText(c.demo ? "CAUGHT" : "LANDED", w * 0.65, h * 0.3);
       g.fillStyle = "#fff"; g.font = `800 ${Math.round(h * 0.08)}px system-ui, sans-serif`; g.fillText(c.name, w * 0.65, h * 0.4);
       g.font = `600 ${Math.round(h * 0.04)}px system-ui, sans-serif`; g.fillText(c.facts || "", w * 0.65, h * 0.48);
       if (c.photo) { g.fillStyle = "#c9d6de"; g.font = `600 ${Math.round(h * 0.03)}px system-ui, sans-serif`; g.fillText("Angler's photo", w * 0.06, h * 0.09); }
@@ -352,7 +352,7 @@ const FishingScene = forwardRef(function FishingScene({ scene, events, status, n
     }
     g.fillStyle = "rgba(5,9,12,0.6)"; g.fillRect(0, h - h * 0.07, w, h * 0.07);
     g.fillStyle = "#e6f3f7"; g.font = `600 ${Math.round(h * 0.03)}px system-ui, sans-serif`;
-    g.fillText(c.demo ? "FishDock demo · animated, not a real catch" : "FishDock · animated reconstruction of a logged catch, not video", w * 0.03, h - h * 0.022);
+    g.fillText(c.demo ? "FishDock virtual fishing · a simulated catch" : "FishDock · animated reconstruction of a logged catch, not video", w * 0.03, h - h * 0.022);
   }
 
   useImperativeHandle(ref, () => ({

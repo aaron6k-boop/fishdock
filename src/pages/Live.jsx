@@ -72,7 +72,7 @@ function StartAndHistory() {
           <Icon name="chevron" className="go" />
         </button>
         <button type="button" className="btn primary block big-btn" onClick={() => startSession({ place, species: species || null, gpsAllowed: gps, conditions: snapshot(app), scene: sceneFor() })}><Icon name="play" />Start fishing</button>
-        <a className="btn ghost small" href="#try"><Icon name="play" />Try the live view demo first</a>
+        <a className="btn ghost small" href="#play"><Icon name="play" />Try virtual fishing first</a>
         <a className="btn ghost small" href="#together"><Icon name="users" />Fish Together (Beta)</a>
         <p className="tiny">Keep FishDock open on screen for the best record. Phones pause web apps in the background, so FishDock notes any gaps rather than guessing.</p>
       </section>

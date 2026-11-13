@@ -32,7 +32,7 @@ const press = (sel, text) => page.evaluate(([sel, text]) => { const b = Array.fr
 const canvasAlive = async () => page.evaluate(() => { const c = document.querySelector(".w3d canvas"); return !!c && c.width > 0 && c.height > 0; });
 const pressed = async () => page.evaluate(() => document.querySelector(".gfx-presets button[aria-pressed='true']")?.textContent.trim() || null);
 
-await page.goto(`${base}/#try/gorleston-south-pier/cod/3d`);
+await page.goto(`${base}/#play/gorleston-south-pier`);
 await page.waitForSelector(".w3d canvas", { timeout: 150000 });
 await page.waitForSelector(".w3d.is-ready", { timeout: 150000 }); // (the loading screen has gone: the place is in and settled)
 await sleep(12000);

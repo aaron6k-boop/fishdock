@@ -16,7 +16,7 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 780 }, deviceSc
 await ctx.addInitScript(() => { window.__fdFilm = true; localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "low", fishCam: "first" })); });
 const p = await ctx.newPage(); const cdp = await ctx.newCDPSession(p);
 const errors = []; p.on("pageerror", (e) => { errors.push(e.message); console.log("ERR", e.message); });
-await p.goto(`${base}/#try/gorleston-south-pier/cod/3d`);
+await p.goto(`${base}/#play/gorleston-south-pier`);
 await p.waitForFunction(() => window.__fdWorld && window.__fdWorld.play, null, { timeout: 300000 }); await p.waitForTimeout(12000);
 await p.waitForFunction(() => !document.body.innerText.includes("Loading "), null, { timeout: 120000 }).catch(() => {});
 await p.evaluate(() => { const W = window.__fdWorld; W.freeze(); W.env({ sunAlt: 38, sunAz: 190 }, { cloudPct: 25, windKph: 14, windDir: 40 }); W.step(6000); W.at(null); });

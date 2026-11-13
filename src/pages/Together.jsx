@@ -50,7 +50,7 @@ export default function Together() {
           <a href="/" className="xbtn" aria-label="Back to FishDock"><Icon name="back" /></a>
           <div><h1>Fish Together <span className="beta-pill">Beta</span></h1><p className="small muted">Fish beside friends in a 3D place, or share a real trip with family. Private: only people you invite can join.</p></div>
         </header>
-        {card("alone", "target", "Fish alone", "Cast, strike and reel in, on a photo of a real place or in 3D", () => go("#try"))}
+        {card("alone", "target", "Fish alone", "Cast, strike and reel in, on a photo of a real place or in 3D", () => go("#play"))}
         {card("start", "users", "Fish together", "Start a private party and invite up to three friends")}
         {panel === "start" ? (
           <section className="tg-form">

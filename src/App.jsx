@@ -71,7 +71,9 @@ function navFromHash() {
 const watchToken = () => (location.hash.match(/^#\/?watch\/([A-Za-z0-9_-]{30,64})$/) || [])[1] || null;
 // The labelled demo of the Live Fishing View: #try, #try/<place>, #try/<place>/<species>, and /3d on the end opens
 // the 360° 3D view; /p<n> after it starts at fishing position n (chosen on the UK spot map).
-const tryRoute = () => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?(?:\/p([1-4]))?$/); return m ? { place: m[1] === "3d" ? null : m[1] || null, species: m[2] === "3d" ? null : m[2] || null, view3d: !!m[3], point: m[3] && m[4] ? Number(m[4]) : null } : null; };
+// #play (#play/<place>, /p<n>): the game itself, straight into the 3D view, no demo labels: the one link to give people
+const playRoute = () => { const m = location.hash.match(/^#\/?play(?:\/([a-z0-9-]+))?(?:\/p([1-4]))?$/); return m ? { place: m[1] || null, species: null, view3d: true, point: m[2] ? +m[2] : null } : null; };
+const tryRoute = () => playRoute() || (() => { const m = location.hash.match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?(?:\/p([1-4]))?$/); return m ? { place: m[1] === "3d" ? null : m[1] || null, species: m[2] === "3d" ? null : m[2] || null, view3d: !!m[3], point: m[3] && m[4] ? Number(m[4]) : null } : null; })();
 // Fish Together: #together (start, join, continue) and a party, #party/<code>/<secret> (or /code, or just the code to
 // come back to one this phone has joined).
 const togetherRoute = () => /^#\/?together$/.test(location.hash);
