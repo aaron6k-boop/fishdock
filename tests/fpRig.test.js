@@ -153,6 +153,19 @@ test("the cast: both hands on the rod all the way through, arms never stretched,
   assert.ok(worstLen < 1e-5, "no bone longer or shorter");
 });
 
+test("a hand out over the railing on the drop net's rope: the arm comes over the top rail, not through it", () => {
+  const P = place(-0.6), rail = { y: 1.12, z: -0.42 };
+  // (in the y-z plane, how far a segment comes into the top rail: its radius and the limb's, less their distance)
+  const into = (a, b, r) => { const dy = b.y - a.y, dz = b.z - a.z, l2 = dy * dy + dz * dz, u = Math.max(0, Math.min(1, ((rail.y - a.y) * dy + (rail.z - a.z) * dz) / l2)); return 0.026 + r - Math.hypot(a.y + dy * u - rail.y, a.z + dz * u - rail.z); };
+  let worst = -1;
+  // (the rope runs over the top rail: the hands on it just past the rail, at and a little above its top)
+  for (const [x, y, z] of [[-0.15, 1.2, -0.52], [-0.25, 1.15, -0.5], [-0.1, 1.25, -0.58], [-0.2, 1.3, -0.48]]) {
+    pose(P, [{ at: V(x, y, z), axis: V(0, 1, 0), palm: V(0.3, 0, 1), kind: "rope", rail, sock: { pos: V(x, y, z), quat: new THREE.Quaternion() } }, seatSpec(P)], 30);
+    const A = R.arm.L; worst = Math.max(worst, into(at(A.U), at(A.F), 0.045), into(at(A.F), at(A.H), 0.035));
+  }
+  assert.ok(worst < 0.01, `the left arm ${(worst * 100).toFixed(1)} cm into the top rail`);
+});
+
 test("the other grips: each hand reaches what it holds and its fingers take that grip's shape", () => {
   const P = place(-0.5);
   const cases = [["rope", { at: V(-0.12, 1.15, -0.38), axis: V(0, 1, 0), palm: V(0.3, 0, 1), kind: "rope" }], ["hoop", { at: V(-0.18, 1.05, -0.4), axis: V(0, 0, 1), palm: V(0, -1, 0), kind: "hoop" }],

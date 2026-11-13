@@ -132,8 +132,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // (built for what the scene is really drawn into. With post-processing on that is the composer's target, not
       // the screen, and a shader for one is not the shader for the other: built for the screen, as this used to be at
       // start-up, every one of them was built a second time on the frame its object first appeared)
+      // (the hidden things too, shown for the moment: three.js builds shaders only for what's visible, so the fish, the
+      // unhooking mat, the nets and the splashes, hidden until a catch, had theirs built on the frame each first
+      // appeared, mid-landing. Lights are left as they are: showing one would build every shader for a light that's off)
+      const hidden = []; root.traverse((o) => { if (!o.visible && !o.isLight) { hidden.push(o); o.visible = true; } });
       const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
-      try { if (root === scene) renderer.compile(scene, camera); else renderer.compile(root, camera, scene); } finally { if (rt) renderer.setRenderTarget(prev); }
+      try { if (root === scene) renderer.compile(scene, camera); else renderer.compile(root, camera, scene); } finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
       root.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "alphaMap", "emissiveMap"]) { const t = m[k]; if (t?.isTexture && t.image && (t.image.width || t.image.data) && !renderer.properties.get(t).__webglTexture) renderer.initTexture(t); } });
     } catch { /* (a driver that won't: they are built as they are met, as before) */ }
   }
@@ -778,7 +782,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     const meK = anglers.get(localId);
     if (meK?.inspect && meK.out) {
       const key = meK.out.info?.since;
-      if (meK.out.landed && meK.keptFor !== key) { meK.keptFor = key; meK.a.keepFish("deck"); }
+      if (meK.out.landed && meK.keptFor !== key) { meK.keptFor = key; meK.a.keepFish("deck", "line"); }
       if (meK.out.kept && meK.out.kept !== "gone") kept = { state: meK.out.kept };
     }
     const view = updateCamera(t, dt || 0.016);

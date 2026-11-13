@@ -310,6 +310,39 @@ axes. Nothing else changed: same model, same clips, same code.
 - Filmed in the game at a phone's size, holding and winding with taps (half a turn a tap, four a second): the right
   hand round the reel seat, the left hand's fingers on the knob, going round with it turn after turn.
 
+## Tenth stage (13 November, evening): the railing, the landing, the stalls
+
+Aaron's 55-second iPhone recording of the same day, measured frame by frame (`tools/recording-stalls.py`): about 24
+frames a second on Ultra, with real stops of about half a second as the "have a look" panel opened (43.4 to 43.9 s)
+and as the fish was put back (49.1 to 49.3 s); at 35 to 40 s, leaning on the rail and looking down at the fish, both
+forearms and the rod went through the top rail; at 40 s the fish went from the line to the mat in one frame.
+
+- **The railing, measured.** A railing test (the arms' joints and fingertips and the rod against the top and middle
+  rails, every frame, in centimetres into them) through a fight right at the rail looking about and down over it, a
+  small fish lifted up the wall and a drop-net landing. Before: 19 of 50 fight frames, 55 of 85 lift frames and 38 of
+  110 drop-net frames with something over 1 cm into a rail, up to 7.6 cm (the upper arms). After: 0, 0 and 4 (the
+  hand hauling the rope over the rail, up to 5.6 cm for a moment).
+  - The hold in your view keeps clear of the rail: near the rail line or out past it, the hands go a hand's width over
+    the top rail or are drawn back 10 cm behind it, whichever is the smaller move; the rod is tipped up just enough to
+    cross 6 cm over the rail. Eased, never a jump.
+  - You lean in to watch the fish no further than keeps your eye 34 cm behind the rail line (it was 13 cm, which put
+    the upper arms into the rail). Over the rail with the drop net's rope, your head drops no more than 10 cm, so your
+    shoulders stay over the top rail.
+  - The arm search for a hand past the rail (the rope, the net) keeps the upper arm and the elbow off the rail too, not
+    only the forearm; `tests/fpRig.test.js` holds the arm over the rail on the rope.
+- **The landing of a small fish.** It swings in to your left hand (lower and further out than before, at arm's length
+  under your eye); you hold it there while your right hand puts the rod in its tripod, then carry it down in both hands
+  and lay it on its side on the mat, a hand resting on it after. Put back over the rail, your hands hold the top rail
+  as it goes, fingers round it, rather than lying open on it.
+- **Your hands alive.** In first person the hold lags a quick turn of your head by a centimetre or two and catches up on
+  a spring, and rises and falls a few millimetres as you breathe. None of it while casting.
+- **Stalls.** Shaders are now built ahead for hidden things too (the fish, the mat, the nets, the splashes): three.js
+  builds them only for what's visible, so each was built on the frame it first appeared, mid-landing. A second tap on
+  Keep it or Put it back no longer starts the move over. A replay of a whole catch here, logging the work in each
+  frame, found no shader or texture work in the panel or the release on the Low preset (software drawing), so the
+  phone's own stops still need measuring on the phone ("Record a catch", with `?dev=1`).
+- FPS shows by default (Settings → Graphics → Show FPS turns it off).
+
 ## Not done
 
 - Not looked at on a real phone or PC: the films are from a software renderer and show shape and movement, not

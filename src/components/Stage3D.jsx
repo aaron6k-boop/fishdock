@@ -226,7 +226,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
         {!walk && !busyFishing ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
         {finePointer && !menu ? <div className="w3d-keys" aria-hidden="true">W A S D walk · Shift sprint · Space cast, strike, reel · E land or fish here · drag to look</div> : null}
         {gfxOpen ? <GraphicsPanel view={view} setOpts={setOpts} world={w.current} scene={{ light, cond, facing }} onClose={() => setGfxOpen(false)} /> : null}
-        {view.fpsShow ? <FpsMeter world={w.current} /> : null}
+        {view.fpsShow !== false ? <FpsMeter world={w.current} /> : null /* (on unless it has been turned off: Aaron, 13 November) */}
         {card ? <div className="w3d-card"><CatchCard ev={card.ev} demo={demo} compact photoUrl={catchPhoto?.(card.ev)} onClose={() => setCard(null)} who={card.who} /></div> : null}
       </World3D>
     </div>
