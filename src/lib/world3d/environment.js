@@ -9,7 +9,7 @@ import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
 import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
-import { lightingFor, lampPools, poolLight, lookQuality } from "./skyLook.js";
+import { lightingFor, lampPools, poolLight, lookQuality, fretAndStorm } from "./skyLook.js";
 import { FILM } from "./film.js";
 
 // ---- a display colour back to the linear light that comes out as it after the tone curve (post.js) and exposure:
@@ -37,7 +37,7 @@ vec3 noised(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3. - 2.*f), 
 // (SKYQ 1 shades the clouds, lit on the sun's side and grey beneath; 0, for Performance, leaves that out)
 const GLSL_SKY = /* glsl */`
 uniform vec3 uSunDir, uMoonDir;
-uniform float uDay, uDusk, uNight, uCloud, uRain, uTime, uMoonLight;
+uniform float uDay, uDusk, uNight, uCloud, uRain, uTime, uMoonLight, uFret, uFlash;
 // ---- the clear sky in a direction, with the haze along the horizon (no sun disc, no clouds) ----
 // skyLook.js's horizonColour mirrors the horizon here: the land's haze is the same colour
 vec3 skyBase(vec3 d){
@@ -130,6 +130,10 @@ vec3 skyColour(vec3 d){
     // the sun's glow through thin cloud
     c += vec3(1., .86, .68)*pow(sd, 16.)*(uDay + uDusk*.7)*cl.a*(1. - smoothstep(.7, 1., uCloud))*.3;
   }
+  // a sea fret: the sky all one pale grey, as the air round you is (the horizon's colour all the way up)
+  c = mix(c, skyBase(vec3(d.x, .03, d.z)), uFret*.85);
+  // lightning lighting the cloud from inside, brighter overhead
+  c += vec3(.5, .55, .7)*uFlash*(.35 + .65*smoothstep(-.1, .5, d.y));
   return c;
 }
 // the sky as the water mirrors it: the same colours, with cheaper, softer clouds
@@ -137,7 +141,8 @@ vec3 skyReflect(vec3 d){
   vec3 c = skyBase(d);
   float sd = max(dot(d, uSunDir), 0.);
   vec4 cl = cloudAt(d, 0.);
-  return mix(c, cl.rgb, cl.a) + vec3(1., .86, .68)*pow(sd, 12.)*(uDay + uDusk*.6)*(1. - smoothstep(.6, 1., uCloud))*.2;
+  return mix(mix(c, cl.rgb, cl.a) + vec3(1., .86, .68)*pow(sd, 12.)*(uDay + uDusk*.6)*(1. - smoothstep(.6, 1., uCloud))*.2, skyBase(vec3(d.x, .03, d.z)), uFret*.85)
+    + vec3(.5, .55, .7)*uFlash*.6; // (the fret and the lightning in the water too)
 }`;
 
 const pick = (a, i) => a[((i % a.length) + a.length) % a.length];
@@ -159,7 +164,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   const group = new THREE.Group(); scene.add(group);
   const U = {
     uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(0.3, 0.5, -0.8).normalize() }, uMoonDir: { value: new THREE.Vector3(-0.3, 0.4, -0.8).normalize() },
-    uDay: { value: 1 }, uDusk: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.3 }, uRain: { value: 0 }, uMoonLight: { value: 0.5 },
+    uDay: { value: 1 }, uDusk: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.3 }, uRain: { value: 0 }, uMoonLight: { value: 0.5 }, uFret: { value: 0 }, uFlash: { value: 0 },
     // with post-processing (post.js) the picture is tone mapped once at the end: the sky and sea write the colours
     // they mean to show, so under post they're turned back into linear light at the exposure (world.js sets uExpo)
     uPostLin: { value: post ? 1 : 0 }, uExpo: { value: 1 },
@@ -759,8 +764,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   const EASE = 0.7; // per second
   const lightDir = new THREE.Vector3(0.3, 0.5, -0.8), shadowAt = new THREE.Vector3();
   let look = lightingFor({ day: 1, dusk: 0, night: 0, cloud: 0.3, rain: 0, moonLight: 0 });
+  const bolt = { next: null, pulses: [], flash: 0 }; // (the storm's lightning, update below)
   function apply(st) {
-    U.uDay.value = st.day; U.uDusk.value = st.dusk; U.uNight.value = st.night; U.uCloud.value = st.cloud; U.uRain.value = st.rain; U.uMoonLight.value = st.moonLight;
+    U.uDay.value = st.day; U.uDusk.value = st.dusk; U.uNight.value = st.night; U.uCloud.value = st.cloud; U.uRain.value = st.rain; U.uMoonLight.value = st.moonLight; U.uFret.value = st.fog || 0;
     U.uSunDir.value.copy(st.sunDir); if (typeof window !== "undefined" && FILM && window.__fdSun) U.uSunDir.value.set(...window.__fdSun).normalize(); /* (film only: the sun put where a check needs it) */ U.uMoonDir.value.copy(st.moonDir);
     wind = st.wind; windDir = [st.windDir.x, st.windDir.y];
     wU.uWind.value = st.wind; wU.uWindDir.value.copy(st.windDir).normalize(); wU.uSwell.value = st.swell;
@@ -848,7 +854,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     R.rt?.dispose(); R.rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 0 });
     wU.uRefl.value = R.rt.texture; wU.uReflOn.value = 1;
   }
-  return {
+  const api = {
+    /** (checks) how bright the storm's lightning is just now (0 when there's none), and a strike now, in a storm */
+    get flash() { return bolt.flash; },
+    strike() { bolt.next = 0; },
     reflect, setReflections, resizeReflections: (renderer) => { if (R.rt) sizeReflections(renderer); },
     get reflections() { return R.rt ? (R.every === 1 ? 2 : 1) : 0; },
     group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids, sun, // (sun: its shadows, set by Settings → Graphics)
@@ -890,17 +899,18 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       const toDir = (alt, az) => { const a = (alt * Math.PI) / 180, b = (((az ?? 180) - facing) * Math.PI) / 180; return new THREE.Vector3(Math.sin(b) * Math.cos(a), Math.sin(a), -Math.cos(b) * Math.cos(a)); };
       const sa = light.sunAlt ?? 35, ma = light.moonAlt ?? -10;
       const day = THREE.MathUtils.smoothstep(sa, -2, 12), night = 1 - THREE.MathUtils.smoothstep(sa, -12, -3), dusk = Math.max(0, 1 - day - night);
-      const cloud = cond.cloudPct != null ? cond.cloudPct / 100 : 0.35, r = cond.precipMm > 0 ? Math.min(1, 0.25 + cond.precipMm / 3) : 0;
+      const fs = fretAndStorm(cond); // (sea fret and thunder: a preset's, or the real forecast's visibility and weather code)
+      const cloud = Math.max(cond.cloudPct != null ? cond.cloudPct / 100 : 0.35, fs.fog * 0.92), r = cond.precipMm > 0 ? Math.min(1, 0.25 + cond.precipMm / 3) : 0;
       const w = Math.min(1, Math.max(0, (cond.windKph ?? 12) / 45));
       // the waves run the way the wind blows (it comes from windDir)
       const wb = cond.windDir != null ? (((cond.windDir + 180) - facing) * Math.PI) / 180 : 0.4;
       target = {
-        day, dusk, night, cloud, rain: r, wind: w, moonLight: (light.moonIllum ?? 0.5) * (ma > 0 ? 1 : 0),
+        day, dusk, night, cloud, rain: r, wind: w, moonLight: (light.moonIllum ?? 0.5) * (ma > 0 ? 1 : 0), fog: fs.fog, thunder: fs.thunder,
         sunDir: toDir(Math.max(sa, -6), light.sunAz), moonDir: toDir(Math.max(ma, 2), light.moonAz), windDir: new THREE.Vector2(Math.sin(wb), -Math.cos(wb)),
         swell: venue === "river" || venue === "lake" ? 0 : cond.waveM != null ? Math.min(1, cond.waveM / 1.5) : Math.min(1, 0.15 + w * 0.6),
       };
       if (!cur) { cur = { ...target, sunDir: target.sunDir.clone(), moonDir: target.moonDir.clone(), windDir: target.windDir.clone() }; apply(cur); }
-      return { day, dusk, night, cloud, rain: r, wind: w, moonLight: target.moonLight };
+      return { day, dusk, night, cloud, rain: r, wind: w, moonLight: target.moonLight, fog: fs.fog, thunder: fs.thunder };
     },
     /** ripples: up to 8 [x, z, age seconds, strength] */
     setRipples(list) { for (let i = 0; i < 8; i++) { const r = list[i]; wU.uRip.value[i].set(r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0); } },
@@ -916,11 +926,24 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       if (target && cur) {
         const k = 1 - Math.exp(-dt * EASE);
         let moved = false;
-        for (const key of ["day", "dusk", "night", "cloud", "rain", "wind", "swell", "moonLight"]) { const d = target[key] - cur[key]; if (Math.abs(d) > 1e-4) { cur[key] += d * k; moved = true; } }
+        for (const key of ["day", "dusk", "night", "cloud", "rain", "wind", "swell", "moonLight", "fog", "thunder"]) { const d = target[key] - cur[key]; if (Math.abs(d) > 1e-4) { cur[key] += d * k; moved = true; } }
         for (const key of ["sunDir", "moonDir", "windDir"]) { if (cur[key].distanceTo(target[key]) > 1e-4) { cur[key].lerp(target[key], k); moved = true; } }
         if (moved) apply(cur);
       }
       wildlife?.update(t, dt, { night: cur?.night ?? 0, swell: cur?.swell ?? 0.3 });
+      // ---- lightning in a storm: now and then (every 6 to 30 seconds) the cloud lights from inside in two or three
+      // quick flickers, lighting everything for a moment; the thunder follows as late as the strike is far (a
+      // strike a kilometre off is heard three seconds later: onThunder, for the sound) ----
+      if (cur && cur.thunder > 0.5) {
+        if (bolt.next == null) bolt.next = t + 4 + Math.random() * 10;
+        if (t >= bolt.next) {
+          const far = 0.8 + Math.random() * 7, n = 2 + Math.floor(Math.random() * 2);
+          bolt.pulses = Array.from({ length: n }, (_, i) => [t + i * (0.07 + Math.random() * 0.12), (i ? 0.45 + Math.random() * 0.55 : 1) * (1.3 - far / 9)]);
+          bolt.next = t + 6 + Math.random() * 24; api.onThunder?.(far / 0.343, far);
+        }
+      } else bolt.next = null;
+      { let f = 0; for (const [at, k] of bolt.pulses) { const a = t - at; if (a >= 0 && a < 0.6) f += k * Math.exp(-a * 14); } bolt.flash = Math.min(1.4, f);
+        if (Math.abs(bolt.flash - U.uFlash.value) > 1e-3 || bolt.flash > 0) { U.uFlash.value = bolt.flash; hemi.intensity = look.skyIntensity * (1 + bolt.flash * 3); } }
       if (rainAmt > 0.02) {
         const p = rainGeo.attributes.position, sp = (14 + rainAmt * 10) * dt, sx = -windDir[0] * wind * 6 * dt, sz = -windDir[1] * wind * 6 * dt;
         for (let i = 0; i < RAIN_N; i++) { let y = p.getY(i * 2) - sp; let x = p.getX(i * 2) + sx, z = p.getZ(i * 2) + sz; if (y < -1) { y = 25 + Math.random() * 5; x = (Math.random() - 0.5) * 60; z = (Math.random() - 0.5) * 60; } p.setXYZ(i * 2, x, y, z); p.setXYZ(i * 2 + 1, x + windDir[0] * wind * 0.3, y - 0.45 - rainAmt * 0.3, z + windDir[1] * wind * 0.3); }
@@ -929,4 +952,5 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     },
     dispose() { fft?.dispose(); envSky.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
   };
+  return api;
 }

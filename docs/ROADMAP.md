@@ -1,0 +1,59 @@
+# FishDock game: development roadmap and checkpoint
+
+The working backlog for the game overhaul (Aaron's master brief of 13 November 2026), in the brief's priority order.
+Each stage goes on its own branch as a draft PR; nothing is merged or deployed until Aaron approves it. Updated at the
+end of each working session, so the next one can carry on from here.
+
+## Ground rules
+
+- Realistic British fishing at real places; first person by default, third person and the landing camera kept;
+  repeated tap-to-reel kept. Levels and XP never lock a place or a fish. No microtransactions, gambling or pay-to-win.
+- Only original or properly licensed assets, with their licences recorded.
+- Never invent measurements: performance on Aaron's PC and phone is his to take (`docs/BENCHMARK.md`); the build
+  container draws in software, so its pictures show what the engine draws, not how fast.
+- What this workspace can't do: download sound recordings, 3D models or textures (its network reaches only package
+  registries and GitHub), run Blender, or run a real GPU. Licensed recordings and models have to be added to the repo
+  (or attached in the conversation) to be used.
+
+## Draft PRs waiting for Aaron (13 November 2026)
+
+| PR | Branch | What |
+|---|---|---|
+| #118 | `game-sound` | Sound starts at the first tap (it was silent on an iPhone until switched off and on); bubbles for water, the cast, the tip bell, beach waves, a short outdoor echo, a compressor so it's louder on a phone |
+| #119 | `arm-steady` | The arms' vibration as the game opens (the rod put down 2% and picked up every other frame), and the snaps in a whole catch; `tools/arm-steady.mjs` |
+| #120 | `progression` | Levels, XP, medals, species book, badges, the logbook; fish drawn by place with a natural size spread |
+| (this) | `weather` (on `game-sound`) | Sea fret and storms: fog from a preset or the real forecast's visibility, lightning lighting the cloud and the sea, thunder as late as the strike is far, a foghorn in a fret |
+
+## Backlog, in priority order
+
+1. **Stable performance and critical bugs.** Done this session: the arm vibration (#119). Waiting: Aaron's iPhone
+   "Record a catch" (`?dev=1#play`) for the real stalls at a catch; the gameplay frame-time spikes on a phone are not
+   yet measured there.
+2. **Hands, arms and character animation.** Done: steady hold, no snaps (#119). Next: the landing's left forearm still
+   swings 5 to 8 cm a frame for a few frames taking the fish; the third-person walk (foot planting, stopping, turning);
+   the idle (breathing, weight shifts).
+3. **Rods, reels, line and nets.** Next: rod bend under load per fish and drag, the reel's bail opening for the cast and
+   closing after it, line slack and tension between guides, the drop net's rope swing and bag sag with a fish in it.
+4. **Water and weather.** Done: sea fret and storms (this branch). Next: tide height moving the waterline on the pier
+   wall through the day; the sea state following the real wave height where the marine forecast has it (it does, as
+   `waveM`); wind gusts moving the rain.
+5. **Fish models and behaviour.** Next: per-species fight styles (a bass's runs, a cod's dogged weight, a flatfish
+   flapping flat, a mackerel's quick darts) in `reelModel.js`; fatigue; a big fish's surge at the net.
+6. **Catching and landing gameplay.** Done: medals and fish drawn by place (#120). Next: bite variety (taps, pulls, a
+   slack-liner); hookholds that can come out if the line goes slack.
+7. **Lighting and nearby textures.** Next: before-and-after of the deck and rail materials at the fixed scenes.
+8. **Audio realism.** Done: #118 (synthesised). Needs: licensed field recordings (waves on a pier wall, gulls, reel
+   clicks, drag) added to the repo to go further than synthesis.
+9. **Gameplay depth.** Next: session goals ("land three kinds today"), a tide-and-time bite table per place.
+10. **XP, achievements and statistics.** Done: #120. Next: session history (a visit's catches and XP), statistics
+    page.
+11. **Boats, wildlife and NPCs.** Next: gulls diving at bait fish, a fishing boat leaving the harbour now and then.
+12. **Distant scenery.** Low priority.
+13. **Shop.** Later: game credits from fishing, cosmetic gear only, nothing that locks places.
+
+## Evidence kept
+
+- `tools/arm-steady.mjs`: the arms at 60 frames a second (all checks pass on #119).
+- `tools/scenes.mjs`: the fixed scenes, now 12 (11 sea fret, 12 storm caught in a lightning flash); `ONLY=<pattern>`
+  draws a few.
+- `tools/party-smoke.mjs`: public places and the map's fishing-now count, in workerd.

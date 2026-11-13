@@ -39,6 +39,7 @@ export function ambiencePlan(c = {}) {
     halyard: harbour && w > 0.2 && r < 0.8 ? [14, 48] : null,
     patter: r > 0.15 ? [0.05 / r, 0.35 / r] : null, // big drops on the rail and your jacket, quicker in heavier rain
     wave: sea && c.venue === "beach" ? [6 - w * 2, 12 - w * 4] : null, // waves breaking on the beach, closer together in a blow
+    horn: sea && clamp01(c.fog) > 0.5 ? [30, 60] : null, // a foghorn out at sea in a fret, now and then
   };
 }
 /** A wait (seconds) inside a range, never quite the same twice. */
@@ -183,6 +184,7 @@ function apply() {
   every("halyard", plan.halyard, halyard);
   every("patter", plan.patter, () => drop(r));
   every("wave", plan.wave, () => wave(w));
+  every("horn", plan.horn, horn);
 }
 
 /** Starts the sound (call from a tap). Conditions: kind sea | river | still, wind and rain 0..1, night 0..1. */
@@ -333,6 +335,29 @@ function wave(w = 0.3) {
   burst(2.2 + R(), 3800 + R() * 1200, g * 0.22, 0.45, true, out, up + 0.6); // the backwash: foam fizzing away
   bubbles(10, 900, 4200, g * 0.35, 1.6, up + 0.2, out);
 }
+// a foghorn out at sea in a fret: a long low two-note blast that ends in a grunt, far off and muffled by the fog
+function horn() {
+  const t = ac.currentTime, out = placed(envG, R() * 1.2 - 0.6), len = 2 + R() * 0.8, f = 150 + R() * 30;
+  const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 620; lp.Q.value = 0.8; lp.connect(out);
+  const v = ac.createGain(); v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(0.05, t + 0.35); v.gain.setValueAtTime(0.05, t + len - 0.45); v.gain.linearRampToValueAtTime(0.0001, t + len); v.connect(lp);
+  for (const [k, g] of [[1, 1], [2.01, 0.45], [3.02, 0.2]]) {
+    const o = ac.createOscillator(); o.type = "sawtooth"; const og = ac.createGain(); og.gain.value = g;
+    o.frequency.setValueAtTime(f * k, t); o.frequency.setValueAtTime(f * k, t + len - 0.5); o.frequency.exponentialRampToValueAtTime(f * k * 0.78, t + len); // (the grunt as the air runs out)
+    o.connect(og); og.connect(v); o.start(t); o.stop(t + len + 0.05);
+  }
+}
+// thunder: a strike's crack if it's close, then the long roll, breaking in swells as the sound comes back off the cloud;
+// further away it's later, lower and softer, with no crack at all
+function thunder(delay = 3, far = 3) {
+  const t = ac.currentTime + Math.min(20, delay), near = 1 - Math.min(1, far / 8), out = placed(envG, R() * 1.4 - 0.7), g = 0.05 + 0.12 * near;
+  if (far < 2) burst(0.25, 1800, g * 1.4, 0.6, true, out, Math.min(20, delay));
+  const len = 3 + R() * 3 + far * 0.3, src = ac.createBufferSource(); src.buffer = noiseBuffer(len + 0.5);
+  const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 160 + 240 * near; lp.Q.value = 0.7;
+  const v = ac.createGain(); v.gain.setValueAtTime(0.0001, t);
+  let at = t; for (let i = 0; i < 4 + Math.floor(R() * 4); i++) { at += 0.25 + R() * (len / 5); v.gain.exponentialRampToValueAtTime(Math.max(0.0002, g * (1 - (at - t) / (len + 1)) * (0.5 + R() * 0.7)), at); }
+  v.gain.exponentialRampToValueAtTime(0.0001, t + len);
+  src.connect(lp); lp.connect(v); v.connect(out); src.start(t); src.stop(t + len + 0.3);
+}
 // a big raindrop on the rail, your hood or the deck: a tiny tick somewhere round you
 function drop(r = 0.5) { burst(0.012 + R() * 0.01, 3000 + R() * 3500, (0.008 + r * 0.012) * (0.5 + R()), 3, true, placed(envG, R() * 2 - 1)); }
 // a footstep (stepSound above): the thump, the grit, a crunch of stones on shingle, a hollow knock on boards
@@ -359,6 +384,7 @@ export function play(name, data = null) {
   else if (name === "splash") { burst(0.3 + R() * 0.12, 1000 + R() * 300, 0.3 * v(), 0.7); burst(0.22, 3600 + R() * 600, 0.07 * v(), 0.8, true); bubbles(12 + Math.floor(R() * 8), 500, 3200, 0.08, 0.45, 0.02); }
   else if (name === "bigsplash") { burst(0.8, 800 + R() * 150, 0.6 * v(), 0.5); burst(0.5, 1800, 0.22 * v(), 0.7, false, evG, 0.1); burst(0.45, 4200, 0.08, 0.8, true, evG, 0.1); bubbles(26, 380, 3000, 0.1, 0.9, 0.05); bubbles(10, 1500, 4500, 0.04, 1.2, 0.5); }
   else if (name === "whoosh") cast();
+  else if (name === "thunder") thunder(data?.delay, data?.far);
   // water pouring out of the net as it comes up: a run of drips into the sea below, each a little plink, thinning out
   else if (name === "drip") { for (let i = 0; i < 22; i++) { const at = (i * 80 + R() * 70) / 1000 + (i > 12 ? (i - 12) * 0.06 : 0); bubble(1100 + R() * 2400, 0.06 * (1 - i / 26) * (0.6 + R() * 0.6), at); if (R() < 0.35) burst(0.03, 3000 + R() * 2000, 0.012, 2, true, evG, at); } }
   else if (name === "net") { burst(0.35, 650 + R() * 150, 0.24 * v(), 0.6); burst(0.25, 1500, 0.1, 0.8, true, evG, 0.12); burst(0.12, 900, 0.05, 1.5, true, gearG, 0.05); bubbles(14, 600, 3400, 0.07, 0.6, 0.06); }

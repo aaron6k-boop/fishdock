@@ -18,17 +18,31 @@ export function horizonColour({ day = 1, dusk = 0, night = 0, cloud = 0.3, rain 
   return mix3(clear, grey, smooth(0.5, 1, cloud) * 0.9);
 }
 
+// ---- sea fret and storms, from the conditions ----
+/**
+ * cond: { fog (0..1, a game preset), visibilityM and code (the real forecast: WMO 45 and 48 fog, 95 to 99 thunder),
+ * thunder }. Returns { fog, thunder } (0..1). Fog from visibility: none at 4 km or more, thick at 200 m.
+ */
+export function fretAndStorm(cond = {}) {
+  let fog = Number.isFinite(cond.fog) ? clamp01(cond.fog) : 0;
+  if (Number.isFinite(cond.visibilityM)) fog = Math.max(fog, 1 - smooth(200, 4000, cond.visibilityM));
+  if (cond.code === 45 || cond.code === 48) fog = Math.max(fog, 0.6);
+  const thunder = cond.thunder || (cond.code >= 95 && cond.code <= 99) ? 1 : 0;
+  return { fog, thunder };
+}
+
 // ---- the light: sun (or moon), the sky's light, shadows, haze, exposure ----
 /** st as horizonColour. Returns everything the lights and the renderer need for these conditions. */
 export function lightingFor(st) {
-  const { day = 1, dusk = 0, night = 0, cloud = 0.3, rain = 0, moonLight = 0 } = st;
+  const { day = 1, dusk = 0, night = 0, cloud = 0.3, rain = 0, moonLight = 0, fog = 0 } = st;
   const over = smooth(0.5, 1, cloud); // how overcast
   // how low the sun is (its height as a sine: sunDir.y), where it's known: a sun a few degrees up comes through much
   // more air than one overhead, so it's dimmer and warmer, long before dusk proper (an 8 am sun in November is 8 degrees
   // up and plainly golden; it was lit as white and as hard as noon)
   const low = st.sunDir ? 1 - smooth(0.07, 0.5, Math.max(0, st.sunDir.y)) : 0;
   // direct light: thick cloud all but hides the sun (rain more so), so there's no hard sun glare on wet ground in rain
-  const sunVis = (1 - 0.88 * over) * (1 - 0.5 * rain);
+  // (and in a sea fret the sun is a pale disc you can look at, and then gone)
+  const sunVis = (1 - 0.88 * over) * (1 - 0.5 * rain) * (1 - 0.85 * fog);
   // warm and low at dusk, but a gold, not an orange: the deck still looks like concrete
   let sunColour = sum3([[1, 0.95, 0.88], day], [[1, 0.8, 0.62], dusk], [[0.62, 0.7, 0.88], night]);
   sunColour = mix3(sunColour, [1, 0.8, 0.58], low * day * 0.75);
@@ -48,13 +62,17 @@ export function lightingFor(st) {
   // haze (exponential, the same for the land and the water): further in rain, a little at dusk and at night. Even on a
   // clear day sea air softens the far shore (about a tenth hazed at 500 m, two fifths at a kilometre), so the distant
   // piers and dunes sit back instead of looking as sharp as the deck
-  const fogDensity = (0.00078 + 0.0001 * over + 0.00015 * dusk + 0.00025 * night) + rain * 0.0024; // (a little thicker than it was, so the town and the far shore sit back in the air and glow towards the sun (fogScatter.js), still readable)
+  const fogDensity = (0.00078 + 0.0001 * over + 0.00015 * dusk + 0.00025 * night) + rain * 0.0024 // (a little thicker than it was, so the town and the far shore sit back in the air and glow towards the sun (fogScatter.js), still readable)
+    + fog * fog * 0.024; // (a thick sea fret: the far side of the harbour mouth a ghost at 60 m, gone by 100; the lookout 40 m off still there, greyed)
   // the eye adapts: dusk and night are lifted, a grey day a touch, so nothing is crushed to black
   const exposure = 1 + 0.22 * dusk + 0.5 * night + 0.2 * over * (1 - night) + 0.06 * rain + 0.25 * low * day * (1 - over); // (a grey day lifted more: the eye adapts to it, and at a touch it all read dim and murky on a phone)
   // how strongly the sky shows in reflections (wet ground in rain shows more of it)
   const envIntensity = day * (0.42 + 0.18 * over) * (1 - 0.3 * low * (1 - over)) + (dusk + night) * 0.6 + 0.15 * rain - 0.1 * night; // (the sky in reflections and as fill: less on a clear day, as the sky light above)
   const lampOn = clamp01(night + dusk * 0.35);
-  return { sunColour, sunIntensity, sunVis, skyColour, groundColour, skyIntensity, shadow, fogDensity, fogColour: horizonColour(st), exposure, envIntensity, lampOn };
+  // (the fret's own colour: the day's light scattered every way in it, a pale grey a touch warm, not the sky's blue)
+  const fretGrey = (day + dusk * 0.45 + night * 0.05) * (1 - rain * 0.3);
+  const fogColour = mix3(horizonColour(st), [0.74 * fretGrey, 0.75 * fretGrey, 0.75 * fretGrey], smooth(0, 0.6, fog));
+  return { sunColour, sunIntensity, sunVis, skyColour, groundColour, skyIntensity, shadow: mix(shadow, 0.2, fog), fogDensity, fogColour, exposure: exposure + 0.1 * fog * (1 - night), envIntensity, lampOn };
 }
 
 // ---- lamps: which of a place's lamp posts light the deck round the anglers ----

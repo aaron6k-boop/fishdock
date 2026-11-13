@@ -38,7 +38,10 @@ test("cells: points snap to the 0.05 degree grid; only the cell centre is sent u
 test("shaping: UK times with offset, rounded values, unknowns kept as null", () => {
   const rows = shapeForecast(forecast(3));
   assert.equal(rows.length, 3);
-  assert.deepEqual(rows[0], { t: "2026-10-31T12:00:00+00:00", tempC: 11.2, windKph: 18, gustKph: 31, windDir: 225, pressureHpa: 1012.4, precipMm: 0.2, cloudPct: 70, isDay: 1 });
+  assert.deepEqual(rows[0], { t: "2026-10-31T12:00:00+00:00", tempC: 11.2, windKph: 18, gustKph: 31, windDir: 225, pressureHpa: 1012.4, precipMm: 0.2, cloudPct: 70, isDay: 1, visibilityM: null, code: null });
+  // visibility and the weather code, when the forecast has them (for sea fret and storms in the game)
+  const fog = shapeForecast({ hourly: { time: [Date.UTC(2026, 10, 1, 9) / 1000], visibility: [180.4], weather_code: [45] } });
+  assert.equal(fog[0].visibilityM, 180); assert.equal(fog[0].code, 45);
   assert.equal(rows[1].pressureHpa, null);
   // Summer time: an hour ahead of UTC, written with +01:00.
   const summer = shapeForecast({ hourly: { time: [Date.UTC(2026, 6, 1, 11) / 1000], temperature_2m: [20] } });

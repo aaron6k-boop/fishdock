@@ -103,3 +103,9 @@ test("the beds stay quiet and the sparse sounds never come on a beat", () => {
   assert.ok(gaps.every((g) => g >= gull[0] && g <= gull[1]));
   assert.ok(new Set(gaps.map((g) => g.toFixed(1))).size > 8, "varied waits");
 });
+
+test("a foghorn now and then in a sea fret, never on a clear day or inland", () => {
+  assert.ok(ambiencePlan({ kind: "sea", venue: "pier", fog: 0.8 }).horn);
+  assert.equal(ambiencePlan({ kind: "sea", venue: "pier", fog: 0.2 }).horn, null);
+  assert.equal(ambiencePlan({ kind: "lake", venue: "lake", fog: 1 }).horn, null);
+});
