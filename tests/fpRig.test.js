@@ -110,7 +110,7 @@ test("the hold in the game is Gate 1's hold: the right hand and elbow where Blen
   assert.ok(lengthsKept("R") < 1e-5 && lengthsKept("L") < 1e-5);
 });
 
-test("winding: the left hand goes round with the knob exactly as in Gate 2's turns, wherever you look, arms unstretched", () => {
+test("winding: the left hand and arm go round with the knob as in Gate 2's turns, wherever you look, arms unstretched", () => {
   for (const [pitch, yaw] of [[rigP0(), 0], [-0.12, 0], [-0.75, 0.4], [0.35, -0.5]]) {
     const P = place(pitch, holdView(), yaw);
     for (const row of TURN) {
@@ -118,6 +118,9 @@ test("winding: the left hand goes round with the knob exactly as in Gate 2's tur
       const want = inReel(P, [row.hand_rod[0][3], row.hand_rod[1][3], row.hand_rod[2][3]]);
       assert.ok(at(R.arm.L.H).distanceTo(want) < 0.001, `pitch ${pitch} knob ${row.th}`);
       assert.ok(lengthsKept("L") < 1e-5);
+      // (and the arm as Gate 2 had it: the wrist's bends and the forearm's turn within 5 degrees of Blender's)
+      const A = R.arm.L, w = wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC.L, "L");
+      [w.flex, w.rad, w.pron].forEach((v, k) => assert.ok(Math.abs(v - row.wrist[k]) < 5, `knob ${row.th}: wrist ${k} ${v.toFixed(1)} against Gate 2's ${row.wrist[k]}`));
     }
   }
 });

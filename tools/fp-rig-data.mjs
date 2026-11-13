@@ -41,7 +41,10 @@ const seat = pq(mul4(seatT, meta.rod_grip));
 const N = g2.fpr * g2.revs, last = g2.rows.slice(N - g2.fpr, N);
 const hub = [0, 1, 2].map((i) => last.reduce((s, r) => s + r.knob_rod[i], 0) / last.length);
 const thOf = (k) => { const dy = k[1] - hub[1], dz = k[2] - hub[2]; return ((Math.atan2(dy, -dz) * 180) / Math.PI + 360) % 360; };
-const knob = last.map((r) => { const H = r.hand_rod.map((row) => row.slice()); for (let i = 0; i < 3; i++) H[i][3] -= r.knob_rod[i]; return { th: Math.round(thOf(r.knob_rod) * 100) / 100, ...pq(H) }; }).sort((a, b) => a.th - b.th);
+// (with the elbow where Blender's IK put it at each angle, from the knob in the same frame: the game's IK bends the
+// arm through it, so the forearm turns as Gate 2's did, not only the hand)
+const RWi = inv4(meta.rod_world), inRod = (w) => apply3(rot3(RWi), w).map((v, i) => v + RWi[i][3]);
+const knob = last.map((r) => { const H = r.hand_rod.map((row) => row.slice()); for (let i = 0; i < 3; i++) H[i][3] -= r.knob_rod[i]; const e = inRod(r.elbow); return { th: Math.round(thOf(r.knob_rod) * 100) / 100, ...pq(H), e: R6(C(e.map((v, i) => v - r.knob_rod[i]))) }; }).sort((a, b) => a.th - b.th);
 const reelTh = g2.rows.slice(N - g2.fpr, N + 1).map((r) => Math.round(thOf(r.knob_rod) * 100) / 100);
 // (the knob's own circle in the reel's frame, for drawing the reel where there's no game reel: the rig test page)
 const hubG = C([hub[0], hub[1] + meta.seat, hub[2]]), rad = last.reduce((s2, r) => s2 + Math.hypot(r.knob_rod[1] - hub[1], r.knob_rod[2] - hub[2]), 0) / last.length;

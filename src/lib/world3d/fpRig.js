@@ -157,8 +157,8 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     if (spec.hub) { const rel = spec.sock.pos.clone().sub(spec.hub).applyQuaternion(spec.sock.quat.clone().invert()); th = (Math.atan2(-rel.z, -rel.y) * 180 / Math.PI + 360) % 360; }
     const T = RIG.knob, n = T.length; let i = 0; while (i < n - 1 && T[i + 1].th <= th) i++;
     const a = T[i], b = T[(i + 1) % n], span = ((b.th - a.th) + 360) % 360 || 360, f = clamp((((th - a.th) + 360) % 360) / span, 0, 1);
-    const p = A3(a.p).lerp(A3(b.p), f), q = Q4(a.q).slerp(Q4(b.q), f);
-    return { pos: p.applyQuaternion(kq).add(kp), quat: kq.clone().multiply(q), grip: "hold", th };
+    const p = A3(a.p).lerp(A3(b.p), f), q = Q4(a.q).slerp(Q4(b.q), f), e = A3(a.e).lerp(A3(b.e), f);
+    return { pos: p.applyQuaternion(kq).add(kp), quat: kq.clone().multiply(q), elbow: e.applyQuaternion(kq).add(kp), grip: "hold", th };
   }
   function seatTarget(spec, Mg, qg) {
     const sq = spec.sock.quat.clone().premultiply(qg), sp = spec.sock.pos.clone().applyMatrix4(Mg);
@@ -218,7 +218,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   }
   function solveArm(A, S, target, bodyQ, h, search, dt, rail = null) {
     let shW = A.U.getWorldPosition(V());
-    const pole0 = A.pole.clone().applyQuaternion(bodyQ);
+    const pole0 = target.elbow ? target.elbow.clone().sub(shW) : A.pole.clone().applyQuaternion(bodyQ); // (winding, the elbow where Gate 2 had it at the knob's angle)
     // (where the grip was made in Blender with its arm, the hold and the knob, the elbow is where Blender's IK put
     // it; anywhere else, through a cast or on a rope, it goes where the wrist is most comfortable, moving there
     // smoothly rather than jumping between the turns tried)
@@ -301,7 +301,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
           h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
         }
         h.u = Math.min(1, h.u + dt / BLEND); const e = ease(h.u);
-        const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e) } : want;
+        const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e), elbow: e > 0.999 ? want.elbow : null } : want;
         h.cur = { pos: tgt.pos.clone(), quat: tgt.quat.clone() };
         { const shW = A.U.getWorldPosition(V()); h.short = solveArm(A, S, tgt, bodyQ, h, o.castT != null || !(want.kind === "seat" || want.kind === "crank"), dt, spec?.rail || null).short;
           if (spec && h.short > 0.002) { const arm = shW.clone().sub(camW), ax = arm.clone().cross(tgt.pos.clone().sub(shW)); if (ax.lengthSq() > 1e-10) leanAdd.addScaledVector(ax.normalize(), h.short / Math.max(0.1, arm.length())); }
