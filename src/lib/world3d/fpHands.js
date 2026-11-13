@@ -247,7 +247,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
   // the forearms are only drawn from the wrist to a little way inside the sleeve: beyond that the sleeve (a separate,
   // looser tube) covers them, and the skin used to show through it wherever the arm was thicker than the sleeve
   let skinRaw = null;
-  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.05 } };
+  const CUT = { uFdW: { value: [V(), V()] }, uFdDir: { value: [V(0, 1, 0), V(0, 1, 0)] }, uFdCut: { value: 0.035 } };
   root.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false; o.castShadow = false;
@@ -963,8 +963,8 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
       // (a rope running through the hand: every finger eased open a little, the thumb with them)
       // (a fist seen from the thumb's side, as you see your own on a rope: the first finger closed further and the
       // thumb laid over it. As made, the thumb's tip met the first finger's tip and left a ring you could see through)
-      if ((kind === "ropeg" || kind === "crank") && G.q) { const fi = TUNE.fistIdx ?? [0.3, 0.8, 0.6], ft = TUNE.fistThumb ?? [0, 0, 0];
-        S.fingers.forEach((ch, n) => ch.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, (fi[k] || 0) * (n ? TUNE.fistRest ?? 0.4 : 1))))); S.thumb.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, ft[k] || 0))); }
+      if ((kind === "ropeg" || kind === "crank") && G.q) { const rp = kind === "ropeg", fi = TUNE.fistIdx ?? (rp ? [0.75, 1.25, 0.9] : [0.3, 0.8, 0.6]), ft = TUNE.fistThumb ?? [0, 0, 0]; /* (the rope: the longer fingers of the fitted hands closed further, they stood out straight below it) */
+        S.fingers.forEach((ch, n) => ch.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, (fi[k] || 0) * (n ? TUNE.fistRest ?? (rp ? 0.75 : 0.4) : 1))))); S.thumb.forEach((j, k) => j.b.quaternion.multiply(qa.setFromAxisAngle(j.axis, ft[k] || 0))); }
       if (loose > 0) [...S.fingers, S.thumb].forEach((ch) => ch.forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(loose, 0, 1) * (TUNE.looseK ?? 0) * [0.22, 0.3, 0.3][k])));
       if (trigger > 0) S.fingers[0].forEach((j, k) => j.b.quaternion.slerp(j.rest, clamp(trigger, 0, 1) * [0.55, 0.8, 0.85][k]));
       // (to or from such a grip the bones ease by their own turns, from where each was: the finger angles the other

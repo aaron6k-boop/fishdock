@@ -68,28 +68,38 @@ def fit(S, s):
 # (which of their hands is our left: the one that fits it without turning inside out)
 pair = {'l': 'L', 'r': 'R'} if fit('L', 'l')[3].mean() <= fit('R', 'l')[3].mean() else {'l': 'R', 'r': 'L'}; print('sides', pair)
 
-T = {}; own = {}; STR = []
+T = {}; own = {}; STR = []; FING_THIN, ARM_THIN, PALM_THIN = 0.84, 0.88, 0.88
 for s, S in pair.items():
     sc, RA, tA, res, X, Y = fit(S, s); AL = sc * RA
     # the palm stretched in its own plane so the four knuckles land on ours
     h0 = Y[0]; e1 = Y[2] - h0; e1 /= np.linalg.norm(e1); nn = np.cross(Y[1] - h0, Y[4] - h0); nn /= np.linalg.norm(nn); e2 = np.cross(nn, e1); Q = np.stack([e1, e2, nn], 1)
     xs = ((X[:5] @ AL.T + tA) - h0) @ Q; ys = (Y[:5] - h0) @ Q; M = np.c_[xs[:, :2], np.ones(5)]; sol = np.linalg.lstsq(M, ys[:, :2], rcond=None)[0]
-    B = np.eye(3); B[:2, :2] = sol[:2].T; L2 = Q @ B @ Q.T; tA = L2 @ (tA - h0) + h0 + Q @ np.array([sol[2, 0], sol[2, 1], 0.0]); AL = L2 @ AL
+    B = np.eye(3); B[:2, :2] = sol[:2].T; B[2, 2] = PALM_THIN; L2 = Q @ B @ Q.T; tA = L2 @ (tA - h0) + h0 + Q @ np.array([sol[2, 0], sol[2, 1], 0.0]); AL = L2 @ AL
     print(s, 'scale', round(sc, 3), 'landmark misfit mm', np.round(np.linalg.norm((X @ AL.T + tA) - Y, axis=1) * 1000, 1))
-    def seg(a, c, hb, tb):  # their segment a->c laid on ours hb->tb: turned, stretched along its length
-        dg = AL @ (c - a); lg = np.linalg.norm(dg); dgn = dg / lg; db = tb - hb; lb = np.linalg.norm(db)
-        STR.append(round(lb / lg, 2)); L = rot_to(dgn, db) @ (np.eye(3) + (lb / lg - 1) * np.outer(dgn, dgn)) @ AL; return L, hb - L @ a
+    # (their hand is smaller than our skeleton's and is made 1.24 times bigger to fit its palm; our finger bones are short
+    # for that palm, so along their length the fingers are then shortened again. Left as thick as the palm's scale made
+    # them they were fat, stubby fingers: across their length the fingers, and the hand through its thickness, are
+    # brought back near their own size. tb None: the last joint keeps the stretch of the one before, not our old tip)
+    def seg(a, c, hb, tb, thin=1.0, keep=None):
+        dg = AL @ (c - a); lg = np.linalg.norm(dg); dgn = dg / lg
+        if tb is None: db = keep[0]; k = keep[1]
+        else: db = tb - hb; k = np.linalg.norm(db) / lg
+        STR.append(round(float(k), 2)); L = rot_to(dgn, db) @ (thin * np.eye(3) + (k - thin) * np.outer(dgn, dgn)) @ AL; return L, hb - L @ a, k
     def put(theirs, ours, Lt):
         for n in theirs:
             if n in o: T[n] = Lt; own[n] = ours
     put([f'DEF-hand.{S}'] + [f'DEF-palm.0{k}.{S}' for k in (1, 2, 3, 4)], f'hand_{s}', (AL, tA))
     for a, c in FING + [('thumb', 'thumb')]:
         tj = [f'DEF-{a}.0{k}.{S}' for k in (1, 2, 3)]; tip = tip_of(f'{c}_03_{s}'); ends = [o[tj[1]], o[tj[2]], their_tip(tj[2])]  # (the export's own "_end" joints are not at the fingertips)
+        kk = 1.0
         for k in range(3):
-            put([tj[k]], f'{c}_0{k + 1}_{s}', seg(o[tj[k]], ends[k], head[f'{c}_0{k + 1}_{s}'], head[f'{c}_0{k + 2}_{s}'] if k < 2 else tip))
-    fore = seg(o[f'DEF-forearm.{S}'], o[f'DEF-hand.{S}'], head[f'lowerarm_{s}'], head[f'hand_{s}'])
+            hb = head[f'{c}_0{k + 1}_{s}']
+            if k < 2: L_, t_, kk = seg(o[tj[k]], ends[k], hb, head[f'{c}_0{k + 2}_{s}'], FING_THIN)
+            else: L_, t_, _ = seg(o[tj[k]], ends[k], hb, None, FING_THIN, (tip - hb, max(kk, 0.8)))
+            put([tj[k]], f'{c}_0{k + 1}_{s}', (L_, t_))
+    fore = seg(o[f'DEF-forearm.{S}'], o[f'DEF-hand.{S}'], head[f'lowerarm_{s}'], head[f'hand_{s}'], ARM_THIN)[:2]
     put([f'DEF-forearm.{S}'], f'lowerarm_{s}', fore); put([f'DEF-forearm.{S}.001'], f'lowerarm_twist_{s}', fore)
-    upper = seg(o[f'DEF-upper_arm.{S}'], o[f'DEF-forearm.{S}'], head[f'upperarm_{s}'], head[f'lowerarm_{s}'])
+    upper = seg(o[f'DEF-upper_arm.{S}'], o[f'DEF-forearm.{S}'], head[f'upperarm_{s}'], head[f'lowerarm_{s}'], ARM_THIN)[:2]
     put([f'DEF-upper_arm.{S}', f'DEF-upper_arm.{S}.001', f'DEF-shoulder.{S}'], f'upperarm_{s}', upper)
 
 print('stretches', STR)
