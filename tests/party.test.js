@@ -2,7 +2,7 @@
 // real events, host controls, chat, voice signalling, reconnecting, and the shared leaderboards.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleParty, PartyRoom, standings, validCode, makeCode, makeLongCode, makePin, PARTY } from "../server/party.js";
+import { handleParty, PartyRoom, PublicBoard, standings, validCode, makeCode, makeLongCode, makePin, PARTY } from "../server/party.js";
 import { setup, O, jpeg } from "./helpers/fishdock.js";
 import { localPartyNamespace } from "./helpers/party.js";
 
@@ -489,4 +489,33 @@ test("public places: someone who's closed the game frees their spot after a minu
   for (const n of ["A", "B", "C", "D"]) await room.joinPublic({ name: n }, now);
   assert.equal((await room.joinPublic({ name: "E" }, now + 30e3)).error, "full", "half a minute: still theirs");
   assert.ok((await room.joinPublic({ name: "E" }, now + 61e3)).member, "a minute: free");
+});
+
+test("the map's fishing-now numbers: anglers connected at each public place, by place only, gone when they go", async (t) => {
+  const h = harness(t);
+  const pub = (name, mark = "gorleston-south-pier") => h.c("POST", "/public", { body: { mark, venue: "pier", name } });
+  const now = async () => (await h.c("GET", "/public")).body;
+  assert.deepEqual((await now()).counts, {}, "nobody yet");
+  const a = await pub("Gary"), b = await pub("Aaron"), c = await pub("Sam", "cromer-pier");
+  assert.deepEqual((await now()).counts, {}, "a seat isn't fishing: only someone connected counts");
+  const ga = await h.sock(a.body.code, a.body.member.key), gb = await h.sock(b.body.code, b.body.member.key);
+  await h.sock(c.body.code, c.body.member.key);
+  const got = await now();
+  assert.deepEqual(got.counts, { "gorleston-south-pier": 2, "cromer-pier": 1 });
+  assert.doesNotMatch(JSON.stringify(got), /Gary|Aaron|Sam|spot|key/, "numbers only: no names, no spots");
+  await gb.close(); assert.equal((await now()).counts["gorleston-south-pier"], 1, "one gone");
+  await ga.close(); assert.ok(!("gorleston-south-pier" in (await now()).counts), "nobody left");
+  // the board can't be reached as a party, and private parties never appear on it
+  assert.equal((await h.c("GET", "/~board")).status, 404);
+  const p = await start(h.c); await h.sock(p.body.code, p.body.member.key);
+  assert.deepEqual(Object.keys((await now()).counts), ["cromer-pier"]);
+});
+
+test("the board drops a count that's stopped coming after three hours", () => {
+  const b = new PublicBoard(), t0 = Date.UTC(2026, 10, 13, 20);
+  assert.equal(b.report({ mark: "gorleston-south-pier", code: "ABCDEF", n: 3 }, t0), true);
+  assert.equal(b.report({ mark: "not-a-place", code: "ABCDEG", n: 1 }, t0), false, "only FishDock's places");
+  assert.equal(b.report({ mark: "gorleston-south-pier", code: "nope", n: 1 }, t0), false);
+  assert.deepEqual(b.counts(t0 + 2 * 3600e3), { "gorleston-south-pier": 3 });
+  assert.deepEqual(b.counts(t0 + 3.1 * 3600e3), {});
 });

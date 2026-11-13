@@ -20,6 +20,8 @@
 //   there. Up to four anglers a room; a fifth goes in the mark's next room. Virtual only, no host, no chat and no voice
 //   (strangers); the names people chose, their looks, their fishing and their walking about. Nobody's kept for long:
 //   anyone gone two hours is dropped. Still never anyone's coordinates: the mark is a public place.
+//   The map shows how many are fishing each place now (GET /api/party/public): each public room tells one board its
+//   count of connected anglers when it changes, and the board adds them up by mark. Numbers by place only.
 // - Notices: a line in the chat when someone joins, leaves or is removed ({ sys: "joined" | "left" | "removed" }),
 //   kept with the chat so someone who connects later sees it too. A name only, nothing else about them.
 
@@ -89,7 +91,8 @@ export const makeCode = () => (PARTY.pin ? makePin() : makeLongCode());
  * finds the same rooms (in the six-character form, from the letters and numbers that can't be misread). */
 const PUBLIC_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 export async function publicCode(mark, n) { const h = await sha256Hex(`fishdock-public:${mark}:${n}`); let c = ""; for (let i = 0; i < 6; i++) c += PUBLIC_ALPHABET[parseInt(h.slice(i * 4, i * 4 + 4), 16) % PUBLIC_ALPHABET.length]; return c; }
-export const PUBLIC = { rooms: 8, days: 30, dropAfterMs: 2 * 3600e3 };
+export const PUBLIC = { rooms: 8, days: 30, dropAfterMs: 2 * 3600e3, boardMs: 3 * 3600e3, retellMs: 30 * 60e3 };
+export const BOARD = "~board"; // (the board's own object: not a code anyone can join)
 export const validCode = (c) => typeof c === "string" && /^(?:[0-9]{4}|[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6})$/.test(c);
 const hashKey = (k) => sha256Hex(`party-member|${k}`);
 const nameOf = (v, d) => cleanLine(v, 24) || d;
@@ -416,15 +419,46 @@ export class PartyRoom {
 export { standings } from "../src/lib/partyStats.js";
 
 // ---- the glue between the room and its storage and sockets (shared by the Durable Object and the local server) ----
+// ---- the public places' board: how many are fishing each mark now ----
+// A room's count is kept until it changes, or for three hours (a room with people in tells the board again every half
+// hour, so a count that's stopped coming, from a room that's gone, drops off).
+export class PublicBoard {
+  constructor(s = null) { this.s = s && s.rooms ? s : { rooms: {} }; }
+  report({ mark, code, n }, now) {
+    if (typeof mark !== "string" || !markFor(mark) || !validCode(code) || !Number.isFinite(n)) return false;
+    if (n > 0) this.s.rooms[code] = { mark, n: Math.min(Math.round(n), PARTY.maxAnglers), at: now }; else delete this.s.rooms[code];
+    this.tidy(now); return true;
+  }
+  tidy(now) { for (const [c, r] of Object.entries(this.s.rooms)) if (now - r.at > PUBLIC.boardMs) delete this.s.rooms[c]; }
+  /** { mark: anglers connected now } for every mark with someone fishing it. */
+  counts(now) { this.tidy(now); const out = {}; for (const r of Object.values(this.s.rooms)) out[r.mark] = (out[r.mark] || 0) + r.n; return out; }
+}
+
 export class PartyHost {
   /** store: { get(k), put(k, v), delete(k) }; sockets: { all(): [ws], memberOf(ws), send(ws, text), close(ws, code, why) } */
-  constructor(store, sockets) { this.store = store; this.sockets = sockets; this.room = null; }
+  // (board: how a public room tells the board its count, async ({ mark, code, n }); none in a private party's tests)
+  constructor(store, sockets, board = null) { this.store = store; this.sockets = sockets; this.room = null; this.board = board; this.told = null; }
+  /** A public room's count of connected anglers, to the board, when it's changed (or half an hour on). */
+  async tell(now) {
+    const S = this.room?.s; if (!this.board || !S?.public || !S.place?.mark) return;
+    const n = [...this.room.online.keys()].filter((id) => { const m = S.members[id]; return m && m.role === "angler" && !m.left && !m.kicked; }).length;
+    if (this.told && this.told.n === n && now - this.told.at < PUBLIC.retellMs) return;
+    this.told = { n, at: now };
+    try { await this.board({ mark: S.place.mark, code: S.code, n }); } catch { /* the board's a nicety: fishing goes on */ }
+  }
   async load() { if (!this.room) { const s = await this.store.get("s"); this.room = new PartyRoom(s || null); for (const ws of this.sockets.all()) { const m = this.sockets.memberOf(ws); if (m) this.room.connected(m, Date.now()); } } return this.room; }
   async save() { await this.store.put("s", this.room.s); }
   /** HTTP inside the party: init, info, join, photo. The socket upgrade is answered by the platform. */
   async fetch(request, now = Date.now()) {
-    const room = await this.load();
     const url = new URL(request.url), op = url.pathname.split("/").pop();
+    // (the board: only ever this object, named BOARD, reached from the rooms and the Worker, never by a code)
+    if (op === "board" || op === "counts") {
+      const b = new PublicBoard(await this.store.get("board"));
+      if (op === "counts") return json({ counts: b.counts(now) });
+      if (request.method !== "POST" || !b.report(await request.json(), now)) return json({ error: "bad" }, 400);
+      await this.store.put("board", b.s); return json({ ok: true });
+    }
+    const room = await this.load();
     if (op === "init" && request.method === "POST") {
       // (a code whose party has ended can be given out again: with four digits they would soon run out otherwise)
       if (room.ready && !room.ended(now)) return json({ error: "exists" }, 409);
@@ -483,6 +517,7 @@ export class PartyHost {
     this.sockets.send(ws, JSON.stringify(room.hello(mid, now)));
     this.broadcast({ t: "members", members: room.members() }, ws);
     await this.save();
+    await this.tell(now);
   }
   async onMessage(ws, text, now = Date.now()) {
     const room = await this.load(), mid = this.sockets.memberOf(ws);
@@ -498,6 +533,7 @@ export class PartyHost {
     }
     if (r.save) await this.save();
     for (const who of r.close) for (const s of this.sockets.all()) if (who === "*" || this.sockets.memberOf(s) === who) this.sockets.close(s, 4000, "bye");
+    await this.tell(now);
   }
   async onClose(ws, now = Date.now()) {
     const room = await this.load(), mid = this.sockets.memberOf(ws);
@@ -508,12 +544,15 @@ export class PartyHost {
     const m = room.s.members[mid];
     if (wasOn && m && !m.voice.on) this.broadcast({ t: "voice", who: mid, voice: m.voice }, ws);
     await this.save();
+    await this.tell(now);
   }
   broadcast(msg, except = null) { const text = JSON.stringify(msg); for (const s of this.sockets.all()) if (s !== except) this.sockets.send(s, text); }
 }
 
 // ---- the public routes (the Worker) ----
 // POST /api/party                    start a party (the host)
+// GET  /api/party/public             how many are fishing each public place now ({ counts: { mark: n } })
+// POST /api/party/public             a seat at a public place ({ mark, venue, name, outfit, look })
 // GET  /api/party/<code>?s=<secret>  what a link or code is for, before joining (&via=code for the short code)
 // POST /api/party/<code>/join        join as an angler or a spectator
 // GET  /api/party/<code>/ws?m=<key>  the member's live connection (WebSocket)
@@ -544,6 +583,12 @@ export async function handleParty(request, env, now = Date.now()) {
         return new Response(r.body, { status: r.status, headers: { "content-type": "application/json" } });
       }
       return err(503, "busy", "Couldn't start a party just now. Try again.");
+    }
+    // how many are fishing each public place now, for the map (GET /api/party/public): numbers by place only
+    if (code === "public" && !op && request.method === "GET") {
+      await enforce(db, `party:now:${who}`, PARTY.lookupsPerMinute, now, { windowMs: 60e3 }, "That's a lot of looks. Wait a minute and try again.");
+      const r = await inner(BOARD, "counts");
+      return new Response(r.body, { status: r.ok ? 200 : 502, headers: { "content-type": "application/json", "cache-control": "public, max-age=20" } });
     }
     // a public place: the first of the mark's rooms with a free spot (POST /api/party/public { mark, venue, name, ... })
     if (code === "public" && !op && request.method === "POST") {

@@ -147,6 +147,20 @@ async function main() {
   const after = await api(`/api/party/${code}?s=${fresh?.secret || secret}`);
   ok(after.status === 410, "a closed party can't be opened again", after);
   a.ws.close();
+
+  // ---- a public place: two anglers at the same mark see each other, and the map counts them ----
+  // (a quiet mark, so a run against the live site barely shows; both leave straight away)
+  const mark = "isle-of-whithorn", seat = (name) => api("/api/party/public", { method: "POST", body: JSON.stringify({ mark, venue: "pier", name }) });
+  const p1 = await seat("Smoke A"), p2 = await seat("Smoke B");
+  ok(p1.status === 200 && p2.status === 200 && p1.body.code === p2.body.code, "two anglers at the same place are put in its room, no invite", [p1, p2]);
+  if (p1.status === 200 && p2.status === 200) {
+    const s1 = connect(p1.body.code, p1.body.member.key), s2 = connect(p2.body.code, p2.body.member.key);
+    const h1 = await s1.next((m) => m.t === "hello", "hello"); await s2.next((m) => m.t === "hello", "hello");
+    ok(h1.party.public === true && h1.members.some((m) => m.name === "Smoke B" && m.spot), "each sees the other fishing there", h1.members);
+    let n = 0; for (let i = 0; i < 12 && n < 2; i++) { const r = await api("/api/party/public"); n = r.body?.counts?.[mark] || 0; if (n < 2) await sleep(500); }
+    ok(n >= 2, "the map's fishing-now count includes them", n);
+    s1.send({ t: "leave" }); s2.send({ t: "leave" }); await sleep(300); s1.ws.close(); s2.ws.close();
+  }
 }
 
 main().catch((e) => { ok(false, `stopped: ${e.message}`); }).finally(() => {

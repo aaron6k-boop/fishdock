@@ -147,3 +147,33 @@
 /* ---- Home: the way into the virtual game, set apart from real Live Fishing Mode ---- */
 .quick-main.play { border-color: color-mix(in srgb, var(--beta) 45%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--beta) 18%, var(--card)), var(--card) 70%); }
 .quick-main.play .qm-ico { background: color-mix(in srgb, var(--beta) 24%, transparent); color: var(--beta); }
+
+/* ---- the game's own map (#play/map): the whole screen, no tab bar ---- */
+.smap.game { bottom: 0; }
+.smap.game .smap-card { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* ---- fishing now: a green number on places with people fishing them in the game ---- */
+.smk-now { position: absolute; top: -6px; right: -9px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; background: #1f9d55; color: #fff; border: 2px solid #fff; font: 750 11px/15px var(--font-ui); font-style: normal; text-align: center; box-shadow: 0 1px 4px #0007; pointer-events: none; }
+.smk-c .smk-now { top: -3px; right: -5px; }
+@media (prefers-reduced-motion: no-preference) {
+  .smk.busy .smk-in { animation: smkBusy 2.2s ease-out infinite; }
+  @keyframes smkBusy { 0% { box-shadow: 0 0 0 0 #1f9d5599, 0 2px 6px #0007; } 70%, 100% { box-shadow: 0 0 0 12px #1f9d5500, 0 2px 6px #0007; } }
+}
+.chip.now svg { color: var(--good); }
+.chip.now.on svg { color: inherit; }
+.smap-here { color: var(--good); }
+.smap-now .smap-here svg { color: var(--good); }
+.smap-here-n { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.smap-here-n svg { width: 13px; height: 13px; }
+
+/* ---- the card: small first (the map stays in view), the rest under More ---- */
+.smap-grab { position: absolute; top: 0; left: 50%; width: 72px; height: 22px; margin-left: -36px; padding: 0; border: 0; background: none; z-index: 2; cursor: pointer; }
+.smap-grab::before { content: ""; position: absolute; top: 7px; left: 18px; right: 18px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--text) 35%, transparent); }
+.smap-card.full .smap-grab::before { background: #ffffffaa; }
+.smap-card:not(.full) .smap-body { padding-top: 20px; }
+.smap-card:not(.full) .smap-head { align-items: center; }
+.smap-head > .smk-badge.big { width: 46px; height: 46px; box-shadow: none; }
+.smap-head > .smk-badge.big svg { width: 24px; height: 24px; }
+.smap-mine { margin: 0; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
+.smap-mine svg { width: 16px; height: 16px; color: var(--text-3); flex: none; }
+.smap-f.any > svg { color: var(--action); }

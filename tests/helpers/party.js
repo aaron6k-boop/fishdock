@@ -1,6 +1,6 @@
 // An in-memory stand-in for the Fish Together Durable Object namespace (env.PARTY), for tests and the local server:
 // the same PartyHost as the Worker, with a Map for storage and plain objects for sockets.
-import { PartyHost } from "../../server/party.js";
+import { PartyHost, BOARD } from "../../server/party.js";
 
 export function localPartyNamespace(clock = Date.now) {
   const hosts = new Map();
@@ -10,6 +10,7 @@ export function localPartyNamespace(clock = Date.now) {
       const host = new PartyHost(
         { get: async (k) => (store.has(k) ? structuredClone(store.get(k)) : undefined), put: async (k, v) => { store.set(k, structuredClone(v)); }, delete: async (k) => { store.delete(k); } },
         { all: () => [...sockets.keys()], memberOf: (ws) => sockets.get(ws) || null, send: (ws, t) => ws.send(t), close: (ws, c, w) => { sockets.delete(ws); ws.close?.(c, w); } },
+        (r) => entry(BOARD).host.fetch(new Request("https://party.internal/board", { method: "POST", body: JSON.stringify(r) }), clock()),
       );
       hosts.set(code, { host, sockets, store });
     }
