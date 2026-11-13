@@ -640,7 +640,7 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
     FIST["ropeg_" + sd] = { ...g, bones: Object.fromEntries(Object.entries(g.bones).map(([n, q]) => [n, n.startsWith("thumb") ? R.clone().multiply(new THREE.Quaternion(...q)).toArray() : q])) }; }
   // (13 November: the hand turned thumb up, palm to the reel, the knob between the thumb and the curled first finger, as a
   // reel is wound. With the fist round the knob's own length you saw the flat back of the hand and no fingers)
-  const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [0, -0.03, -0.09], Qh: [0.44587, -0.47507, -0.5191, 0.55321] };
+  const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [0, -0.03, -0.105], Qh: [0.44587, -0.47507, -0.5191, 0.55321] };
   function authored(S, kind) {
     if (TUNE.authored === false) return null;
     const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : null) ?? FIST[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;

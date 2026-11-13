@@ -148,6 +148,21 @@ Not done in this stage: the grips were made for the old, thinner fingers and hav
 sink a little into the rod and reel in places; the forearm between wrist and cuff is one plain colour; the Godot glove
 mesh is not used (Gloves in the look picker recolours this hand).
 
+## Sixth stage (13 November): arms made for first person
+
+The Godot hands stopped at the wrist, and the forearm built for them read as a pale lump on a phone. The arms are now
+based on "Fists (2025) | First Person Animations" by 1Matzh
+(https://sketchfab.com/3d-models/fists-2025-first-person-animations-c7e8f959c4094be991b02213d4e66c20), licensed under
+CC BY 4.0, downloaded by Aaron: realistic hands with their own wrists and forearms. `source-assets/tools/retarget_fp_arms.py`
+lays each of its bones along the matching bone of ours and keeps the hand and 14 cm of forearm (4,752 points, 8,202
+triangles); the bones, sleeve and grips are unchanged. Its colour picture is brought part of the way to the old skin's
+overall colour, because the game tints skin from that. The credit is in Settings, with the other sources, and in the
+model file itself. The hand on the reel's knob sits 1.5 cm further on to it, so the knob no longer shows through.
+
+Not done: the grips were made for an earlier hand and have not been made again; fingertips are a little short (the
+last joint of each finger is laid on our shorter one); the leather-glove model also downloaded ("Fps arms" by DJMaesen,
+CC BY 4.0) is not used yet, as it has no bones and needs binding.
+
 ## Not done
 
 - The hand mesh is the same one. Its measurements are right and it bends cleanly at the wrist, so it was kept. Its
