@@ -277,8 +277,16 @@ hands. The old hand code (`fpHands.js`, `grips.js`) and its models (`fp_body.glb
   data: the hold, winding, the cast, the other grips and looking about, from first person, the front, the side, over
   the shoulder or freely, with the skeleton, the IK targets and joints and the attachment points drawn over it and the
   joint angles read out live.
+- **Cost.** Posing the arms each frame, measured on the film clock over the same catch (hold, cast, winding, landing)
+  in the software-rendered browser here: the rig 0.17 to 0.45 ms a frame on average at a phone's size (the old hands
+  0.31 to 0.51), 0.21 to 0.56 ms at a wide screen's (old 0.09 to 0.46); the cast costs most, both hands' grips being
+  searched for comfort each frame. The model is 1.55 MB with 18,753 points, against 1.07 MB for the old arms. Not
+  measured on a real phone.
 - **Gate 4, a whole catch in the game** (`tools/fp-film.mjs`): the hold and looking about, the cast, winding in a
-  fight and landing with the drop net, filmed frame by frame from the game on a wide screen and an upright phone.
+  fight and landing with the drop net, filmed frame by frame from the game on a wide screen and an upright phone (198
+  frames each, no page errors). Both hands stay on the reel looking about; at the top of the wind-up the right hand is
+  beside your face and fills a corner of the picture; through the follow-through the hands drop to the bottom edge; on
+  the drop net the arms reach over the rail to the ring and the rope.
 
 ## Not done
 
