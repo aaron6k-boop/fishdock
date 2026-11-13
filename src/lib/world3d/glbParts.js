@@ -85,7 +85,11 @@ export function fitNet(net, scene, kind = "drop") {
       if (!o.isMesh) return;
       // the hoop and its weight ring: a dull, pale galvanised finish that reads against dark water from any angle (as
       // polished metal it mirrored the dark sea and vanished at the surface)
-      if (/hoop|weight|ring/i.test(o.name) && !o.morphTargetDictionary) { const m = o.material = o.material.clone(); m.metalness = Math.min(m.metalness ?? 0, 0.35); m.roughness = Math.max(m.roughness ?? 0.5, 0.5); m.color?.setRGB(0.72, 0.74, 0.75); }
+      // (13 November, from Aaron's pictures of pier drop nets: a dark green plastic-coated hoop, a fine translucent
+      // green mesh bag drawn in to a small ring at the bottom, thin cord bridles. It was a pale galvanised hoop and a
+      // coarse, near-solid black grid)
+      if (/hoop/i.test(o.name) && !o.morphTargetDictionary) { const m = o.material = o.material.clone(); m.metalness = 0.12; m.roughness = 0.48; m.color?.setRGB(0.1, 0.2, 0.12); }
+      else if (/weight|ring/i.test(o.name) && !o.morphTargetDictionary) { const m = o.material = o.material.clone(); m.metalness = 0.5; m.roughness = 0.45; m.color?.setRGB(0.32, 0.33, 0.33); }
       if (/bag/.test(o.name) || o.morphTargetDictionary) {
         bag = o;
         // the mesh's cords are in the texture's alpha: seen from both sides, blended (a hard cut-out loses the fine cords
@@ -93,9 +97,12 @@ export function fitNet(net, scene, kind = "drop") {
         const m = o.material = o.material.clone(); m.transparent = true; m.alphaTest = 0.04; m.side = THREE.DoubleSide; m.depthWrite = false;
         // (green knotted nylon, as pier drop nets are sold, with a bigger mesh than a landing net's: the cords were a fine
         // black grid that read as a sieve; cut out more firmly so each cord shows)
-        for (const k of ["map", "alphaMap", "normalMap"]) if (m[k]) { m[k] = m[k].clone(); m[k].repeat.multiplyScalar(0.55); m[k].needsUpdate = true; }
-        m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 5.0, 0.0, 1.0); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.15, 0.14), 0.85);\n#ifdef USE_ALPHAMAP\n{ vec2 q = vAlphaMapUv, e = vec2(0.0032); float a2 = texture2D(alphaMap, q).g; a2 = max(a2, max(max(texture2D(alphaMap, q + vec2(e.x, 0.0)).g, texture2D(alphaMap, q - vec2(e.x, 0.0)).g), max(texture2D(alphaMap, q + vec2(0.0, e.y)).g, texture2D(alphaMap, q - vec2(0.0, e.y)).g))); diffuseColor.a = clamp(max(diffuseColor.a, a2 * 3.0), 0.0, 1.0); diffuseColor.rgb *= 0.75 + 0.35 * texture2D(alphaMap, q).g; }\n#endif"); }; // (the cords thickened, each grown by a few texels: thin, they read as wire, not knotted nylon cord; their middles a shade lighter, rounded)
-        m.customProgramCacheKey = () => "fdnet4"; o.renderOrder = 2;
+        for (const k of ["map", "alphaMap", "normalMap"]) if (m[k]) { m[k] = m[k].clone(); m[k].repeat.multiplyScalar(kind === "landing" ? 0.55 : 1.8); m[k].needsUpdate = true; }
+        if (kind === "landing") m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 5.0, 0.0, 1.0); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05, 0.15, 0.14), 0.85);\n#ifdef USE_ALPHAMAP\n{ vec2 q = vAlphaMapUv, e = vec2(0.0032); float a2 = texture2D(alphaMap, q).g; a2 = max(a2, max(max(texture2D(alphaMap, q + vec2(e.x, 0.0)).g, texture2D(alphaMap, q - vec2(e.x, 0.0)).g), max(texture2D(alphaMap, q + vec2(0.0, e.y)).g, texture2D(alphaMap, q - vec2(0.0, e.y)).g))); diffuseColor.a = clamp(max(diffuseColor.a, a2 * 3.0), 0.0, 1.0); diffuseColor.rgb *= 0.75 + 0.35 * texture2D(alphaMap, q).g; }\n#endif"); }; // (the cords thickened, each grown by a few texels: thin, they read as wire, not knotted nylon cord; their middles a shade lighter, rounded)
+        // (the drop net: a fine mesh you see the water through, the cords thin and green, the bag a little darker where
+        // its folds lie over each other)
+        else m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <alphamap_fragment>", "#include <alphamap_fragment>\ndiffuseColor.a = clamp(diffuseColor.a * 2.4, 0.0, 0.92); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.09, 0.17, 0.12), 0.85);"); };
+        m.customProgramCacheKey = () => (kind === "landing" ? "fdnet4" : "fddrop1"); o.renderOrder = 2;
       }
     });
   }
