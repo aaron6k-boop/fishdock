@@ -197,9 +197,12 @@ the equipment driving the hand contact. Work so far, all of it in Blender on Aar
   IK from its own shoulder with the elbow bent (about 110 to 135 degrees). The grips come from a search over the hand's
   real skin, deformed by the same bone weights the game uses: the handle tried across the palm at many angles and
   places, every finger closed at each, and the place kept where the palm and fingers wrap it with nothing going inside;
-  likewise the knob across the first two fingers with the thumb opposite. Every candidate is scored on contact and on
-  the wrist and forearm staying inside natural limits (bend towards the palm up to 55 degrees, back 45, towards the
-  thumb 15, towards the little finger 30; the forearm turned no more than 85 degrees palm down or 75 palm up).
+  likewise the knob across the first two fingers with the thumb opposite. Each finger is scored on touching and on
+  curling round (a finger laid straight against the handle doesn't count as gripping it); which way round the handle
+  the reel hangs is searched too, with the middle and ring fingers parting round its stem. Every candidate is scored
+  on contact and on the wrist and forearm staying inside natural limits (bend towards the palm up to 55 degrees, back
+  45, towards the thumb 15, towards the little finger 30; the forearm turned no more than 85 degrees palm down or 75
+  palm up).
 
 Pipeline the game will use once the rig is exported (one path, replacing `createFpHands` behind the same interface):
 authored clip for the state, blended between states, then the equipment's attachment points (right hand on the reel

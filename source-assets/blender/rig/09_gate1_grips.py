@@ -1,5 +1,5 @@
 for _f in ("riglib", "griplib", "posing_v3", "skin_v2"): exec(open("C:/Users/aaron/Documents/FishDock-assets/scripts/" + _f + ".py").read())
-# FishDock rig rebuild, Gate 1 (static grip), fifth approach: grasp search. (Fourth approach, kept below: grips from the hand's anatomy.)
+# FishDock rig rebuild, Gate 1 (static grip), fifth approach: grasp search, each finger also scored on how far round the handle or knob it curls. (Fourth approach, kept below: grips from the hand's anatomy.)
 # The hand's skin is deformed here by the same bone weights as Blender's, fast enough to try the handle across the palm
 # at many places and angles and to close every finger at each; the place where the palm and all four fingers wrap the
 # handle with nothing inside wins. Likewise the knob across the first two fingers, with the thumb opposite them. Right hand: the rod handle
@@ -72,7 +72,7 @@ def grasp(S, f, cols, a_rng, b_rng, k3=0.7, keep=0.0028, deep=-0.0012, fixed0=No
             cl = [float(seg_clear(P[i_], cols).min()) for i_ in idx]
             if min(cl) < deep: continue
             touch = sum(1 for x in cl if x < keep); gaps = sum(max(0.0, x) for x in cl)
-            sc_ = touch * 10 - gaps * 400 - (a + b) * 0.004 + (score_extra() if score_extra else 0)
+            sc_ = touch * 10 - gaps * 400 + (a + b) * 0.004 + (score_extra() if score_extra else 0)   # (among equals, the more curled)
             if best is None or sc_ > best[0]: best = (sc_, a, b, c, [round(x, 4) for x in cl])
     if best is None:   # (nothing fits without going in: leave the finger as it was)
         for pb, v in zip(pbs, keep0): pb.rotation_euler.x = v
@@ -127,17 +127,29 @@ def line_clear(P, c, d, r, half=None):
     v = P - c; t = v @ d
     if half is not None: t = np.clip(t, -half, half)
     return np.linalg.norm(v - np.outer(t, d), axis=1) - r
-def grasp_np(pp, clear, a_rng, b_rng, k3=0.7, keep=0.0028, deep=-0.0012):
+WRAP = {}   # (per hand: the handle or knob's axis, and the palm's and the fingers' directions round it)
+def wrap_deg(S, p):
+    """how far round the axis a fingertip has reached, in degrees from the palm's side (90 is where the fingers start,
+    180 the far side, 270 back towards the thumb): a finger curled round the handle, not laid against it"""
+    if S not in WRAP: return 0.0
+    c, d, e_a, e_b = WRAP[S]; w = p - c; w = w - d * (w @ d)
+    return (math.degrees(math.atan2(float(w @ e_b), float(w @ e_a))) + 360) % 360
+def set_wrap(S, c, d, palm_n, along_n):
+    e_a = -palm_n - d * (-palm_n @ d); e_a = e_a / np.linalg.norm(e_a); e_b = along_n - d * (along_n @ d) - e_a * (along_n @ e_a); e_b = e_b / np.linalg.norm(e_b)
+    WRAP[S] = (np.asarray(c), np.asarray(d), e_a, e_b)
+def grasp_np(pp, clear, a_rng, b_rng, k3=0.7, keep=0.0028, deep=-0.0012, S=None):
     best = None
     for a in a_rng:
         for b in b_rng:
             P = fk(pp, (math.radians(a), math.radians(b), math.radians(min(88, b * k3)))); cl_all = clear(P)
             cl = [float(cl_all[sg].min()) if sg.any() else 9.0 for sg in pp["seg"]]
             if min(cl) < deep: continue
-            touch = sum(1 for x in cl if x < keep); gaps = sum(max(0.0, x) for x in cl)
-            sc_ = touch * 10 - gaps * 400 - (a + b) * 0.004
-            if best is None or sc_ > best[0]: best = (sc_, a, b, min(88, b * k3), [round(x, 4) for x in cl])
-    return best or (-60.0, 0, 0, 0, None)
+            touch = sum(1 for x in cl if x < keep); gaps = max(0.0, cl[0]) * 100 + max(0.0, cl[1]) * 400 + max(0.0, cl[2]) * 400
+            wr = wrap_deg(S, P[pp["seg"][2]].mean(0)) if S else 0.0
+            wb = (20 if 170 <= wr <= 300 else 10 if 140 <= wr < 170 else 0) if S else 0
+            sc_ = touch * 10 - gaps + wb - (max(0, 45 - b) * 0.3 if S else 0)
+            if best is None or sc_ > best[0]: best = (sc_, a, b, min(88, b * k3), [round(x, 4) for x in cl], round(wr))
+    return best or (-60.0, 0, 0, 0, None, 0)
 def seat_line(Pts, c0, d, n, r, want=0.0015, half=None):
     """slide the line along n until the nearest of Pts is `want` from its surface"""
     lo, hi = -0.04, 0.08
@@ -160,36 +172,87 @@ for gam in (25, 35, 45, 55, 65):
     for u in (-0.02, -0.01, 0.0, 0.01, 0.02):
         for v in (-0.01, 0.0, 0.01, 0.02, 0.03):
             c0 = mcRc - aRn * 0.03 + kRn * u + aRn * v - pRn * 0.02
-            c = seat_line(PALM_R, c0, d, pRn, RH); clr = lambda P, c=c, d=d: line_clear(P, c, d, RH)
-            g = {f: grasp_np(PPR[f], clr, range(0, 91, 10), range(0, 101, 10)) for f in ("index", "middle", "ring", "pinky")}
+            c = seat_line(PALM_R, c0, d, pRn, RH); clr = lambda P, c=c, d=d: line_clear(P, c, d, RH); set_wrap("R", c, d, pRn, aRn)
+            g = {f: grasp_np(PPR[f], clr, range(0, 91, 10), range(0, 101, 10), S="R") for f in ("index", "middle", "ring", "pinky")}
             palm_touch = int((line_clear(PALM_R, c, d, RH) < 0.003).sum())
             sc_ = sum(x[0] for x in g.values()) + min(palm_touch, 60) * 0.15
             res.append((sc_, gam, u, v, c, d, g, palm_touch))
 res.sort(key=lambda x: -x[0])
-for r_ in res[:5]: print("right try (angle from the knuckles, across, along)", (r_[1], r_[2], r_[3]), "score", round(r_[0], 1), "palm points on it", r_[7], {f: (x[1], x[2], x[4]) for f, x in r_[6].items()})
-_, gamR, uR, vR, cR, dR, gR0, _ = res[0]
-clrR = lambda P: line_clear(P, cR, dR, RH)
-GRn = {}
-for f in ("index", "middle", "ring", "pinky"):
-    a0, b0 = gR0[f][1], gR0[f][2]; GRn[f] = grasp_np(PPR[f], clrR, range(max(0, a0 - 12), min(95, a0 + 13), 3), range(max(0, b0 - 12), min(106, b0 + 13), 3))
-    print("right", f, "(score, knuckle, middle, last, gaps)", GRn[f])
-# (the stem: from the handle's axis towards where the middle and ring fingers meet under it, at their place along it)
-Pm = fk(PPR["middle"], [math.radians(x) for x in GRn["middle"][1:4]])[PPR["middle"]["seg"][1]].mean(0); Pr2 = fk(PPR["ring"], [math.radians(x) for x in GRn["ring"][1:4]])[PPR["ring"]["seg"][1]].mean(0)
-gp = (Pm + Pr2) / 2; vv = gp - cR; s_stem = float(vv @ dR); vv = vv - dR * s_stem; stemdir = vv / np.linalg.norm(vv)
-Yh = Vector(-dR); Zh = Vector(-stemdir); Xh = Yh.cross(Zh).normalized(); Zh = Xh.cross(Yh).normalized()
-C_stem = Vector(cR + dR * s_stem); R_h = Matrix((Xh, Yh, Zh)).transposed().to_4x4(); R_h.translation = C_stem + Yh * (SEAT - 0.004)
-print("right: handle at", round(math.degrees(math.acos(min(1, abs(float(dR @ kRn))))), 1), "deg from the knuckles' line; stem towards", fmt(stemdir))
-# (the thumb: its tip on the handle, pointing up it towards the tip, on the top, away from the stem)
-bestT = None
-for ax_ in range(-30, 41, 10):
-    for az in range(-50, 51, 10):
-        for b in range(0, 61, 10):
-            P = fk(PPR["thumb"], (math.radians(ax_), math.radians(b), math.radians(b * 1.1)), z0=math.radians(az)); cl = clrR(P)
-            if float(cl.min()) < -0.0012: continue
-            tip = P[PPR["thumb"]["seg"][2]]; g = float(cl[PPR["thumb"]["seg"][2]].min()); tc = tip.mean(0)
-            base = P[PPR["thumb"]["seg"][1]].mean(0); fwd = float(((tc - base) / np.linalg.norm(tc - base)) @ dR); top = float((tc - cR) @ (-stemdir))
-            sc_ = -abs(g) * 300 + fwd * 6 + min(top, 0.02) * 200
-            if bestT is None or sc_ > bestT[0]: bestT = (sc_, ax_, az, b, round(g, 4), round(fwd, 2), round(top, 3))
+for r_ in res[:5]: print("right try (angle from the knuckles, across, along)", (r_[1], r_[2], r_[3]), "score", round(r_[0], 1), "palm points on it", r_[7], {f: (x[1], x[2], x[4], x[5]) for f, x in r_[6].items()})
+FING = ("index", "middle", "ring", "pinky"); rad3 = lambda v: [math.radians(x) for x in v]
+def rod_caps_hand(R_h_):
+    """the handle, the reel's stem, foot and body, in the hand's frame"""
+    P_ = lambda x, y, z: np.array(R_h_ @ Vector((x, y, z)))
+    caps = [(P_(0, y0, 0), P_(0, y1, 0), handle_radius((y0 + y1) / 2)) for y0, y1 in ((-0.25, -0.40), (-0.40, -0.43), (-0.43, -0.50), (-0.50, -0.64))]
+    return caps + [(P_(0, -SEAT + 0.002, -0.014), P_(0, -SEAT + 0.010, -0.056), 0.0055), (P_(0, -SEAT - 0.024, -0.016), P_(0, -SEAT + 0.024, -0.016), 0.004), (P_(0, -SEAT - 0.015, -0.076), P_(0, -SEAT + 0.04, -0.076), 0.028)]
+def caps_clear(P, caps):
+    best = np.full(len(P), 9.0)
+    for a_, b_, r_ in caps:
+        ab = b_ - a_; t = np.clip((P - a_) @ ab / max(1e-12, ab @ ab), 0, 1); best = np.minimum(best, np.linalg.norm(P - (a_ + np.outer(t, ab)), axis=1) - r_)
+    return best
+# (the best few places for the handle, each finished: the fingers searched finely against the handle)
+RCANDS = []
+for r_ in res[:8]:
+    _, gam_, u_, v_, c_, d_, g0_, _ = r_
+    clr0 = lambda P, c_=c_, d_=d_: line_clear(P, c_, d_, RH); set_wrap("R", c_, d_, pRn, aRn); G = {}
+    for f in FING:
+        a0, b0 = g0_[f][1], g0_[f][2]; G[f] = grasp_np(PPR[f], clr0, range(max(0, a0 - 12), min(95, a0 + 13), 3), range(max(0, b0 - 12), min(106, b0 + 13), 3), S="R")
+    RCANDS.append(dict(score=sum(x[0] for x in G.values()), key=(gam_, u_, v_), c=c_, d=d_, G=G, wrap=WRAP["R"]))
+    print("right candidate (angle, across, along)", (gam_, u_, v_), round(RCANDS[-1]["score"], 1), {f: (x[1], x[2], x[4], x[5]) for f, x in G.items()})
+# (which way the middle and ring fingers part: a turn about their first joint's own Z axis that moves their tips apart)
+tipm = lambda z: fk(PPR["middle"], (0, 0, 0), z0=math.radians(z))[PPR["middle"]["seg"][2]].mean(0)
+tipr = lambda z: fk(PPR["ring"], (0, 0, 0), z0=math.radians(z))[PPR["ring"]["seg"][2]].mean(0)
+r0 = tipr(0); m0 = tipm(0)
+SG_M = 1 if np.linalg.norm(tipm(5) - r0) > np.linalg.norm(tipm(-5) - r0) else -1
+SG_R = 1 if np.linalg.norm(tipr(5) - m0) > np.linalg.norm(tipr(-5) - m0) else -1
+def stem_frame(C_, psi):
+    """the rod's frame in the hand's for the reel hanging at psi round the handle from the palm's side (90: towards the
+    knuckles, 180: the far side), the stem at the middle and ring fingers' boundary along the handle; None if the
+    middle and ring fingers are not both there"""
+    c_, d_, G = C_["c"], np.asarray(C_["d"]), C_["G"]; _, _, e_a, e_b = C_["wrap"]
+    sd = math.cos(math.radians(psi)) * e_a + math.sin(math.radians(psi)) * e_b
+    ax = {}
+    for f in ("middle", "ring"):
+        P = fk(PPR[f], rad3(G[f][1:4])); w = P - c_; t = w @ d_; w = w - np.outer(t, d_); n_ = np.linalg.norm(w, axis=1) + 1e-9
+        ang = np.degrees(np.arccos(np.clip((w @ sd) / n_, -1, 1))); sel = ang < 25
+        if sel.sum() < 5: return None
+        ax[f] = float(t[sel].mean())
+    s_ = (ax["middle"] + ax["ring"]) / 2
+    Yh = Vector(-d_); Zh = Vector(-sd); Xh = Yh.cross(Zh).normalized(); Zh = Xh.cross(Yh).normalized()
+    Cs = Vector(c_ + d_ * s_); Rh_ = Matrix((Xh, Yh, Zh)).transposed().to_4x4(); Rh_.translation = Cs + Yh * (SEAT - 0.004)
+    return Rh_, sd, s_, Cs
+def stem_spread(C_, Rh_):
+    """the least parting of the middle and ring fingers (degrees) that clears the stem, foot and reel body; and how far
+    in anything still is at the most"""
+    caps = rod_caps_hand(Rh_)[4:]
+    for sp in (0, 3, 6, 9, 12, 15):
+        cl = min(float(caps_clear(fk(PPR["middle"], rad3(C_["G"]["middle"][1:4]), z0=math.radians(SG_M * sp)), caps).min()),
+                 float(caps_clear(fk(PPR["ring"], rad3(C_["G"]["ring"][1:4]), z0=math.radians(SG_R * sp)), caps).min()))
+        oth = min(float(caps_clear(fk(PPR[f], rad3(C_["G"][f][1:4])), caps).min()) for f in ("index", "pinky"))
+        if cl > -0.0008: return sp, min(cl, oth)
+    return 15, min(cl, oth)
+SPREAD = 0
+def take_right(C_, psi, spread=0):
+    global cR, dR, GRn, stemdir, s_stem, R_h, C_stem, clrR, SPREAD
+    fr = stem_frame(C_, psi); R_h, stemdir, s_stem, C_stem = fr
+    cR, dR, GRn, SPREAD = C_["c"], np.asarray(C_["d"]), C_["G"], spread
+    caps_ = rod_caps_hand(R_h); clrR = lambda P: caps_clear(P, caps_); set_wrap("R", cR, dR, pRn, aRn)
+first = next((C_, p_) for C_ in RCANDS for p_ in range(0, 360, 15) if stem_frame(C_, p_))
+take_right(*first)
+def thumb_search_R():
+    """the thumb: its tip on the handle, pointing up it towards the tip, on the top, away from the stem"""
+    best = None; dn = np.asarray(dR)
+    for ax_ in range(-30, 41, 10):
+        for az in range(-50, 51, 10):
+            for b in range(0, 61, 10):
+                P = fk(PPR["thumb"], (math.radians(ax_), math.radians(b), math.radians(b * 1.1)), z0=math.radians(az)); cl = clrR(P)
+                if float(cl.min()) < -0.0012: continue
+                tip = P[PPR["thumb"]["seg"][2]]; g = float(cl[PPR["thumb"]["seg"][2]].min()); tc = tip.mean(0)
+                base = P[PPR["thumb"]["seg"][1]].mean(0); fwd = float(((tc - base) / np.linalg.norm(tc - base)) @ dn); top = float((tc - cR) @ (-stemdir))
+                sc_ = -abs(g) * 300 + fwd * 6 + min(top, 0.02) * 200
+                if best is None or sc_ > best[0]: best = (sc_, ax_, az, b, round(g, 4), round(fwd, 2), round(top, 3))
+    return best or (0, 0, 0, 0, None, 0, 0)
+bestT = thumb_search_R()
 print("right thumb (score, base across, base out, bend, tip gap, along the rod, above the axis)", bestT)
 
 # ---- the left hand on the knob: searched over where the knob lies across the first two fingers ----
@@ -203,8 +266,8 @@ for gam in (-40, -25, -10, 5, 20):
     for lam in (0.3, 0.5, 0.7):
         for v in (-0.014, -0.007, 0.0, 0.007, 0.014):
             c0 = PIPi * (1 - lam) + PIPm * lam + aLn * v
-            c = seat_line(F12, c0, d, pLn, 0.010, half=0.013); clr = lambda P, c=c, d=d: line_clear(P, c, d, 0.010, 0.013)
-            gi = grasp_np(PPL["index"], clr, range(0, 81, 10), range(0, 106, 10)); gm = grasp_np(PPL["middle"], clr, range(0, 81, 10), range(0, 106, 10))
+            c = seat_line(F12, c0, d, pLn, 0.010, half=0.013); clr = lambda P, c=c, d=d: line_clear(P, c, d, 0.010, 0.013); set_wrap("L", c, d, pLn, aLn)
+            gi = grasp_np(PPL["index"], clr, range(0, 81, 10), range(0, 106, 10), S="L"); gm = grasp_np(PPL["middle"], clr, range(0, 81, 10), range(0, 106, 10), S="L")
             Pi = fk(PPL["index"], [math.radians(x) for x in gi[1:4]]); fing = Pi[PPL["index"]["seg"][1]].mean(0)
             def rd(p, c=c, d=d): w = p - c; w = w - d * (w @ d); return w / (np.linalg.norm(w) + 1e-9)
             bt = None
@@ -225,7 +288,7 @@ _, gamL, lamL, vL, cKn, dKn, gi0, gm0, bt0 = resK[0]
 clrL = lambda P: line_clear(P, cKn, dKn, 0.010, 0.013)
 GLn = {}
 for f, g0 in (("index", gi0), ("middle", gm0)):
-    GLn[f] = grasp_np(PPL[f], clrL, range(max(0, g0[1] - 12), min(95, g0[1] + 13), 3), range(max(0, g0[2] - 12), min(106, g0[2] + 13), 3)); print("left", f, GLn[f])
+    GLn[f] = grasp_np(PPL[f], clrL, range(max(0, g0[1] - 12), min(95, g0[1] + 13), 3), range(max(0, g0[2] - 12), min(106, g0[2] + 13), 3), S="L"); print("left", f, GLn[f])
 bestTL = bt0
 
 # ---- the solved finger angles applied to the rig, and checked against Blender's own deformation ----
@@ -245,7 +308,7 @@ for S, PP, clr in (("R", PPR, clrR), ("L", PPL, clrL)):
         out[f] = [round(float(cl_b[sg].min()), 4) if sg.any() else None for sg in PP[f]["seg"]]
     print(S, "gaps measured on Blender's deformation (per bone, m)", out)
 GR = {f: (GRn[f][0], GRn[f][1], GRn[f][2], GRn[f][3]) for f in ("index", "middle", "ring", "pinky")}
-dKl, cKl = Vector(dKn), Vector(cKn); dR = Vector(dR)
+dKl, cKl = Vector(dKn), Vector(cKn)
 
 # ---- the rod within reach and in view; the right arm to it by IK ----
 def rod_world(fwd, down, el_deg, az_deg=10, right=0.07):
@@ -277,6 +340,48 @@ def cols_for(RW_):
     return [H_(-0.025, -0.25), H_(-0.25, -0.40), H_(-0.40, -0.43), H_(-0.43, -0.50), H_(-0.50, -0.64)], stem_, foot_, body_
 def forearm_rod_clear(RW_):
     el, wr = wpos(rig, "DEF-forearm.R"), wpos(rig, "DEF-hand.R"); return seg_dist(el, wr, RW_ @ Vector((0, 0, 0)), RW_ @ Vector((0, -SEAT + 0.07, 0))) - 0.034 - 0.017
+# ---- the right hand's grip chosen with its arm: each finished candidate scored on its fingers and on the best its arm can do ----
+def right_place_best():
+    best = None
+    for fwd in (0.26, 0.29, 0.32, 0.35):
+        for down in (0.26, 0.30, 0.34):
+            for el_deg in (35, 45):
+                for az_deg in (0, 12):
+                    RW_, D_, seat_ = rod_world(fwd, down, el_deg, az_deg); Mh = RW_ @ R_h.inverted()
+                    for out in (0.0, 0.1, 0.2):
+                        set_pole(rig, "R", pole_for("R", Mh.translation, out)); set_hand(rig, "R", Mh)
+                        w_ = wrist("R"); m_ = miss("R", Mh); fc = forearm_rod_clear(RW_); view = math.degrees(math.atan2(down, fwd))
+                        s_ = -limits_pen(*w_) - m_ * 200 - max(0, -fc) * 60 - max(0, view - 46) * 0.1 - abs(w_[1]) * 0.01 - abs(w_[0]) * 0.01
+                        if best is None or s_ > best[0]: best = (s_, [round(x, 1) for x in w_])
+    return best
+def arm_at(fwd, down, el_deg, az_deg):
+    RW_, D_, seat_ = rod_world(fwd, down, el_deg, az_deg); Mh = RW_ @ R_h.inverted(); best = None
+    for out in (0.0, 0.1, 0.2):
+        set_pole(rig, "R", pole_for("R", Mh.translation, out)); set_hand(rig, "R", Mh)
+        w_ = wrist("R"); m_ = miss("R", Mh); fc = forearm_rod_clear(RW_); view = math.degrees(math.atan2(down, fwd))
+        s_ = -limits_pen(*w_) - m_ * 200 - max(0, -fc) * 60 - max(0, view - 46) * 0.1 - abs(w_[1]) * 0.01 - abs(w_[0]) * 0.01
+        if best is None or s_ > best[0]: best = (s_, [round(x, 1) for x in w_])
+    return best
+trials = []
+for ci, C_ in enumerate(RCANDS):
+    for psi in range(0, 360, 15):
+        fr = stem_frame(C_, psi)
+        if not fr: continue
+        sp, cl = stem_spread(C_, fr[0]); take_right(C_, psi, sp); a_ = arm_at(0.30, 0.30, 40, 6)
+        tot = C_["score"] + 4 * a_[0] - max(0, -cl - 0.0008) * 1500 - sp * 0.3
+        trials.append((tot, ci, psi, sp, round(cl, 4), a_))
+trials.sort(key=lambda x: -x[0])
+for t_ in trials[:8]: print("right grip (candidate, reel round the handle, fingers parted)", (RCANDS[t_[1]]["key"], t_[2], t_[3]), "stem clearance", t_[4], "wrist (palm, thumb, turn, elbow)", t_[5][1], "total", round(t_[0], 2))
+choice = None
+for t_ in trials[:4]:
+    C_ = RCANDS[t_[1]]; take_right(C_, t_[2], t_[3]); ps = right_place_best(); tot = t_[0] - 4 * t_[5][0] + 4 * ps[0]
+    if choice is None or tot > choice[0]: choice = (tot, t_[1], t_[2], t_[3], ps)
+take_right(RCANDS[choice[1]], choice[2], choice[3]); bestT = thumb_search_R()
+print("right chosen", RCANDS[choice[1]]["key"], "reel at", choice[2], "deg round from the palm, fingers parted", choice[3], "deg; best arm", choice[4])
+GR = {f: (GRn[f][0], GRn[f][1], GRn[f][2], GRn[f][3]) for f in FING}
+for f in FING: apply("R", f, *GRn[f][1:4], z=(SG_M * SPREAD if f == "middle" else SG_R * SPREAD if f == "ring" else 0))
+apply("R", "thumb", bestT[1], bestT[3], bestT[3] * 1.1, bestT[2]); bpy.context.view_layer.update()
+print("right fingers", {f: GRn[f][1:] for f in FING}, "thumb", bestT, "stem towards", fmt(stemdir))
 place = []
 for fwd in (0.26, 0.29, 0.32, 0.35):
     for down in (0.26, 0.30, 0.34):
@@ -347,24 +452,24 @@ for f_ in ("middle", "ring"):
     pb = rig.pose.bones[f"f_{f_}.01.R"]; d0 = tipd(); pb.rotation_euler.z = math.radians(5); bpy.context.view_layer.update(); d1 = tipd(); pb.rotation_euler.z = 0; bpy.context.view_layer.update()
     sg[f_] = 1 if d1 > d0 else -1
 print("stem clearance before spreading", round(stem_clear(), 4))
-spread = 0
-for spread in (0, 3, 6, 9, 12):
-    rig.pose.bones["f_middle.01.R"].rotation_euler.z = math.radians(sg["middle"] * spread); rig.pose.bones["f_ring.01.R"].rotation_euler.z = math.radians(sg["ring"] * spread)
-    rig.pose.bones["f_index.01.R"].rotation_euler.z = math.radians(sg["middle"] * spread * 0.4); rig.pose.bones["f_pinky.01.R"].rotation_euler.z = math.radians(sg["ring"] * spread * 0.4)
-    bpy.context.view_layer.update()
-    if stem_clear() > 0.0: break
+spread = SPREAD
+if stem_clear() < 0.0:
+    for spread in (SPREAD + 3, SPREAD + 6, SPREAD + 9):
+        rig.pose.bones["f_middle.01.R"].rotation_euler.z = math.radians(SG_M * spread); rig.pose.bones["f_ring.01.R"].rotation_euler.z = math.radians(SG_R * spread)
+        bpy.context.view_layer.update()
+        if stem_clear() > 0.0: break
 print("spread round the stem", spread, "deg; stem clearance", round(stem_clear(), 4))
 for f in ("index", "middle", "ring", "pinky"):
     if GR[f][1] is None: continue
     a0, b0 = GR[f][1], GR[f][2]
-    GR[f] = grasp("R", f, COL_R, range(max(0, a0 - 15), min(95, a0 + 16), 3), range(max(0, b0 - 15), min(108, b0 + 16), 3)); print("right", f, "on the real handle", GR[f])
+    GR[f] = grasp("R", f, COL_R, range(max(0, a0 - 6), min(95, a0 + 7), 2), range(max(0, b0 - 6), min(108, b0 + 7), 2)); print("right", f, "on the real handle", GR[f])
 # (the left hand: its grip searched finely on the chosen knob place, then put there)
 CAND = LEFTC[best_all[2]]; dKl, cKl = Vector(CAND[5]), Vector(CAND[4]); cKn, dKn = np.array(CAND[4]), np.array(CAND[5])
-clrL = lambda P: line_clear(P, cKn, dKn, 0.010, 0.013)
+clrL = lambda P: line_clear(P, cKn, dKn, 0.010, 0.013); set_wrap("L", cKn, dKn, pLn, aLn)
 gi0, gm0 = CAND[6], CAND[7]
 GLn = {}
 for f, g0 in (("index", gi0), ("middle", gm0)):
-    GLn[f] = grasp_np(PPL[f], clrL, range(max(0, g0[1] - 12), min(95, g0[1] + 13), 3), range(max(0, g0[2] - 12), min(106, g0[2] + 13), 3)); print("left", f, GLn[f])
+    GLn[f] = grasp_np(PPL[f], clrL, range(max(0, g0[1] - 12), min(95, g0[1] + 13), 3), range(max(0, g0[2] - 12), min(106, g0[2] + 13), 3), S="L"); print("left", f, "(score, knuckle, middle, last, gaps, round the knob)", GLn[f])
 apply_left((0, 0, 0, 0, 0, 0, GLn["index"], GLn["middle"], CAND[8]))
 TH, SG, BE = best_all[3]
 MhL, KNOB, CARM = left_pose(TH, SG, BE, dKl, cKl); set_pole(rig, "L", pole_for("L", MhL.translation)); set_hand(rig, "L", MhL)
@@ -383,9 +488,9 @@ for S in "LR":
     for f in ("index", "middle", "ring", "pinky", "thumb"):
         for nm in chain(rig, f, S): pose[nm] = [round(math.degrees(a), 2) for a in rig.pose.bones[nm].rotation_euler]
 rig["fd_hold_fingers"] = json.dumps(pose)
-json.dump(dict(rod_world=[list(r) for r in RW], rod_grip=[list(r) for r in (RWi @ MhR)], knob_grip=[list(r) for r in (KW.inverted() @ MhL)], crank_deg=TH, fingers=pose, eye=list(EYE), seat=list(SEATW), place=[FWD, DOWN, ELD, AZD]), open(RIGDIR + "/gate1_v7.json", "w"), indent=1)
+json.dump(dict(rod_world=[list(r) for r in RW], rod_grip=[list(r) for r in (RWi @ MhR)], knob_grip=[list(r) for r in (KW.inverted() @ MhL)], crank_deg=TH, fingers=pose, eye=list(EYE), seat=list(SEATW), place=[FWD, DOWN, ELD, AZD]), open(RIGDIR + "/gate1_v11.json", "w"), indent=1)
 body.hide_viewport = False
 if jk: jk.hide_viewport = False
 bpy.context.view_layer.update()
-bpy.ops.wm.save_as_mainfile(filepath=RIGDIR + "/gate1_v7.blend"); print("saved gate1_v7.blend")
-PREFIX = "G1g"; exec(open(ROOT + "/scripts/render_g1_v1.py").read()); exec(open(ROOT + "/scripts/render_fp_v1.py").read())
+bpy.ops.wm.save_as_mainfile(filepath=RIGDIR + "/gate1_v11.blend"); print("saved gate1_v11.blend")
+PREFIX = "G1l"; exec(open(ROOT + "/scripts/render_g1_v1.py").read()); exec(open(ROOT + "/scripts/render_fp_v1.py").read())
