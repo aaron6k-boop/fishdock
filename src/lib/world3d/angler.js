@@ -13,6 +13,7 @@ import { hasArt, artUrl } from "../../data/fishart.js";
 import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway, bodyWaveSlope } from "../fishMotion.js";
 import { fishMaterials, donorOf, paintSkin } from "./fishLook.js";
 import { castPoint, dirOf } from "./spots.js";
+import { tripodPlan, buildTripod } from "./tripod.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpRig, castAt as rigCastAt, rodFrame, holdView, bodyUp } from "./fpRig.js";
@@ -250,19 +251,24 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const fLine = fishLine(GUIDES.length); world.add(fLine.mesh);
   const flM = new THREE.Vector3(), flT = new THREE.Vector3(), flE = new THREE.Vector3(), dropAt = new THREE.Vector3(); let spoolInfo = null, spinWas = null, dropHad = false;
   const flWind = [0, 0], flCur = [0, 0], flO = {}; let rodWetK = 0;
-  // the rest: a tripod on the beach, a rest on the bank, the railing on a pier or quay
+  // the rest the rod goes in while you wait for a bite: a tripod on a pier, a beach or an estuary's edge (tripod.js),
+  // two bank sticks by a river or a lake. (Until 13 November the rod stayed in your hands the whole time you waited
+  // on a pier, its butt at your hip and the blank on the top rail; Aaron asked for it to be put down in a rest and
+  // picked up on a bite, as bait anglers do)
   const rest = new THREE.Group(); root.add(rest);
   const mMetal = new THREE.MeshStandardMaterial({ color: 0x8c9196, metalness: 0.7, roughness: 0.35 });
-  let restTop = null, restButt = null;
-  if (venue === "beach") {
-    restTop = new THREE.Vector3(0.55, 1.55, -0.9); restButt = new THREE.Vector3(0.55, 0.12, -0.15);
-    for (const [dx, dz] of [[-0.35, 0.3], [0.35, 0.3], [0, -0.5]]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 6), mMetal); between(l, restTop.clone().add(new THREE.Vector3(0, 0.02, 0)), new THREE.Vector3(0.55 + dx, 0, -0.9 + dz)); rest.add(l); }
-  } else if (venue === "river" || venue === "lake") {
+  let restTop = null, restButt = null, tripod = null;
+  if (venue === "river" || venue === "lake") {
     restTop = new THREE.Vector3(0.45, 0.42, -0.85); restButt = new THREE.Vector3(0.45, 0.22, 0.25);
     for (const p of [restTop, restButt]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), mMetal); between(l, new THREE.Vector3(p.x, 0, p.z), p); rest.add(l); }
   } else {
-    restTop = new THREE.Vector3(0.4, 1.12, -0.3); restButt = new THREE.Vector3(0.35, 0.05, 0.4); // leaning on the railing (moved to it once the spot is known)
+    // (to your right and a little ahead, where your right hand reaches the reel; set up for the spot in place())
+    restTop = new THREE.Vector3(0.35, 1.55, -0.75); restButt = new THREE.Vector3();
+    tripod = buildTripod(); rest.add(tripod.group);
   }
+  // (the tripod's head 12 cm in from a pier's railing, or from the edge where there's none, and never more than 75 cm
+  // ahead of you: the reel stays in reach of your right hand)
+  function setRest() { if (!tripod) return; const front = rail ? -Math.max(0.3, edge - 0.22) : -(edge - 0.1); restTop.z = Math.max(front + 0.12, -0.75); const P = tripodPlan(restTop); restButt.copy(P.butt); tripod.place(P); }
   // ---- the seat box's padded seat (charcoal cloth with a stitched border) and its badge ----
   function canvasPad() {
     const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
@@ -527,8 +533,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const c = castPoint(s); castAt.set(c[0], 0, c[2]); castFromEvents();
     const [dx, dz] = dirOf(face);
     edge = Number.isFinite(s.edge) ? s.edge : EDGE[venue] ?? 1;
-    // a real pier's railing stands 22 cm in from its edge: the rod leans on its top rail
-    if (rail) restTop.set(0.4, 1.12, -Math.max(0.3, edge - 0.22));
+    // (a real pier's railing stands 22 cm in from its edge)
+    setRest();
     const out = edge + (REACH[venue] ?? 2);
     nearAt.set(at.x + dx * out, 0, at.z + dz * out);
   }
@@ -551,6 +557,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let landStage = null, landWater = null; // the drop net's stage while landing (for the hands): up | rod | pick | lower | lead | haul | in
   let dropRig = null, ropePull = null, releaseInfo = null, releaseRope = null, matOn = false, releasePole = false, prevKt = -1; // the drop net's rope: over the rail where, hanging or not; which hand is pulling and how far through the pull
   const rodS = { butt: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0), key: "", until: 0, ok: false }; // the rod eased from one way of holding it to the next
+  let inHand = null; // the rod: 0 in its rest, 1 in your hands, between while it's picked up or put down
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
   const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -669,7 +676,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // through the release, the follow-through; the arms stay on the rod (hand IK)
       { const ct = age < 0.75 ? 0.6 + (age / 0.75) * 1.3 : 1.9 + Math.min(1, (age - 0.75) / 0.9) * 0.7; actNow = { key: "cast", t: ct, w: 0.85 * (1 - seg(age, 1.5, 2.3)) }; }
       if (crossed(2.15)) { splashCb?.(castAt, 0.6); rippleCb?.(castAt, 0.7); onSound?.("plop", castAt); feel("splashdown"); }
-      if (age > 2.4) held = age < 2.9;
+      if (age > 2.4) held = age < 2.6; // (then into the rest)
     } else if (ph === "waiting" || ph === "bite" || ph === "missed") {
       held = false; rigAt = castAt.clone(); slack = 0.35;
       if (ph === "missed" && crossed(0.02)) feel("missed", {}, true);
@@ -1075,21 +1082,17 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     spring("k", "kv", bendT * R.flex, 8, 0.35, dt); spring("tip", "tipv", tipT, 18, 0.25, dt);
     const sway = n1(t * 0.4 + id.length) * 0.02 * (1 + env.wind), breath = Math.sin(t * 1.6 + id.length) * 0.008;
     let butt, dir;
-    if (held) {
-      dir = new THREE.Vector3(Math.sin(yawOff) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yawOff) * Math.cos(pitch)).normalize();
-      // the reel always ends up in the same comfortable place for the hand: a long beachcaster's butt reaches back
-      // under the arm, a short spinning rod's doesn't
-      butt = new THREE.Vector3(0.18, 0.95, -0.12).addScaledVector(dir, 0.45 - R.seat);
-      if (ph === "waiting" || ph === "bite") { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
-      // (a cast, seen from outside: the rod goes where the two hands take it, as it does in your own view)
-      if (ph === "cast" && fpCast && !fp) { const c = fpCast; dir = new THREE.Vector3(Math.cos(c.e) * Math.sin(c.sw), Math.sin(c.e), -Math.cos(c.e) * Math.cos(c.sw)).normalize(); butt = new THREE.Vector3(c.x, 1.6 + c.y, -0.05 - c.z).addScaledVector(dir, -R.seat); }
-    } else { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); }
-    if (!held || (ph !== "cast" && ph !== "hooked" && ph !== "landing" && ph !== "lost")) { butt = restButt.clone(); dir = restTop.clone().sub(restButt).normalize(); held = false; }
-    // waiting at a pier's rail, seen from outside: the rod is held, its butt at the hip and the blank resting on the top
-    // rail (as a pier angler stands, and as you see your own hands in first person), not leant against the rail with
-    // the hands in the pockets. The free hand stays free. (A friend's angler and your own in third person.)
-    const railHold = !fp && !walking && rail && venue === "pier" && (ph === "waiting" || ph === "bite" || ph === "missed");
-    if (railHold) { butt = new THREE.Vector3(0.22, 0.92, 0.0); const over = new THREE.Vector3(0.36, 1.12 + 0.06, -Math.max(0.3, edge - 0.22) - 0.25); dir = over.sub(butt).normalize(); held = true; }
+    // in your hands or in its rest: the phase says which (inHand eases from one to the other, below). Waiting for a
+    // bite it's in the rest and your hands are free; a bite and you pick it up, ready to strike; it goes back once a
+    // cast has settled or a missed bite is over. (Lure fishing, when it comes, keeps it in your hands)
+    const restB = restButt.clone(), restD = restTop.clone().sub(restButt).normalize();
+    const handWant = ph === "bite" ? true : ph === "missed" ? age < 1.0 : ph === "waiting" ? false : ph === "idle" || ph === "ended" || ph === "paused" ? fp : held && (ph === "cast" || ph === "hooked" || ph === "landing" || ph === "lost");
+    // (in your hands: the reel always ends up in the same comfortable place for the hand: a long beachcaster's butt
+    // reaches back under the arm, a short spinning rod's doesn't)
+    dir = new THREE.Vector3(Math.sin(yawOff) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yawOff) * Math.cos(pitch)).normalize();
+    butt = new THREE.Vector3(0.18, 0.95, -0.12).addScaledVector(dir, 0.45 - R.seat);
+    // (a cast, seen from outside: the rod goes where the two hands take it, as it does in your own view)
+    if (ph === "cast" && fpCast && !fp) { const c = fpCast; dir = new THREE.Vector3(Math.cos(c.e) * Math.sin(c.sw), Math.sin(c.e), -Math.cos(c.e) * Math.cos(c.sw)).normalize(); butt = new THREE.Vector3(c.x, 1.6 + c.y, -0.05 - c.z).addScaledVector(dir, -R.seat); }
     // walking about: the rod carried in the right hand at the reel, low by your side, its tip leading forwards and up
     // (clear of your legs, the rail and anyone behind you); the line wound in. It moves with you: rising and falling and
     // swaying with your shoulders at each step, the tip trailing a little as you turn and dipping as you stop, and held
@@ -1119,7 +1122,6 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // hands go to the net and its rope: the rod laid down where you can see it, not held by nobody in front of you)
     const fpRodDown = (!!kept && kept.state !== "gone") || (ph === "landing" && (tech === "dropnet" || tech === "net") && (age >= LT.swingIn || (tech === "dropnet" && landStage && landStage !== "up"))); // (drawn up a beach or swung in, the rod stays in your hands until the fish is down: a hand reaching for the line filled the view) // (and while your fish is on the deck: the rod stays down, not held up in front of your face as you look down at it)
     if (fp && !fpRodDown) {
-      held = true;
       // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
       // lower right of the view, the rod rising from there at its angle for the moment (higher at a cast, lower to
       // land), so turning to watch the fish never loses the reel your hand is winding
@@ -1138,8 +1140,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const reelAt = fpCast ? fpEye().addScaledVector(vr, fpCast.x).addScaledVector(vu, fpCast.y).addScaledVector(vf, fpCast.z) : fpEye().addScaledVector(vr, FPR.x + (fpArm?.right || 0)).addScaledVector(vu, FPR.y - fpPullNow * 0.4 + (fpArm?.up || 0)).addScaledVector(vf, FPR.z + fpPullNow + (fpArm?.fwd || 0)); // (above and left of the Reel button, a little to the right so you see the reel and the hand winding it from the left side; your right forearm goes off the right edge)
       butt = reelAt.addScaledVector(dir, -R.seat);
     }
-    // from one way of holding the rod to the next (onto the rail, into your hands, walking off with it) the rod moves
-    // there over a moment rather than jumping
+    // ---- picked up and put down ----
+    // the hands go to the rod in its rest first (the first 30%), then lift it out and bring it to where you hold it;
+    // putting it back is the same the other way round. Walking off, it's carried
+    { const want = walking ? 1 : fp && fpRodDown ? 0 : handWant ? 1 : 0;
+      if (inHand == null || walking) inHand = want; else inHand = want > inHand ? Math.min(1, inHand + dt / 0.8) : Math.max(0, inHand - dt / 0.9); }
+    const lift = walking ? 1 : ease((inHand - 0.3) / 0.7);
+    if (lift < 1) { butt = restB.clone().lerp(butt, lift); dir = restD.clone().lerp(dir, lift).normalize(); }
+    held = walking || inHand > 0;
+    // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
+    // moment rather than jumping
     { const key = `${held}|${fp}|${!!walking}`; if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
       if (rodS.ok && t < rodS.until) { const k2 = 1 - Math.exp(-dt * 6); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
       else { rodS.butt.copy(butt); rodS.dir.copy(dir); rodS.ok = true; } }
@@ -1189,7 +1199,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const a = along(gd.s * R.len); gd.g.position.copy(a.p); gd.g.quaternion.copy(frame(a.t));
       const br = rodSegs[Math.min(NSEG - 1, Math.floor(gd.s * NSEG))].r; gd.wrap.scale.set(br * 1.3, 0.024, br * 1.3);
     });
-    rest.visible = !walking && (!held || venue === "beach");
+    rest.visible = !walking && (!!tripod || !held); // (the tripod stays up while you hold the rod; the bank sticks are only seen under it)
 
     // ---- the person: hands on the rod, the reel's handle, the drop net's rope or the fish; braced against a fight,
     // leaning over the rail to land it, watching the rod tip or the float while they wait ----
@@ -1236,8 +1246,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // while you wait
       // (in first person, holding the rod while you wait, the left hand rests lightly on the knob, ready: it hung in the
       // corner of the view with a finger up before)
-      hands[0] = ph === "cast" && age < 2.4 && !fp ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : ph === "cast" && fp && fpCast?.both ? (() => { const a = along(0.065); return { at: a.p, axis: a.t, palm: V3(1, 0.2, 0), kind: "butt", anat: fpCast.k, sock: { pos: a.p.clone(), quat: frame(a.t) } }; })() /* (first person: the left hand round the butt, the pulling hand of the cast, in the grip made for it: grips.js "butt_l") */ : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() } } : null;
+      // (seen from outside, taking the rod out of its rest and holding it ready through a bite, the left hand's on the
+      // butt too)
+      hands[0] = ph === "cast" && age < 2.4 && !fp ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : !fp && (ph === "cast" || ph === "bite" || ph === "missed" || ph === "waiting" || ph === "idle") ? rodGrip(0.14, V3(1, 0.2, 0), "butt") : ph === "cast" && fp && fpCast?.both ? (() => { const a = along(0.065); return { at: a.p, axis: a.t, palm: V3(1, 0.2, 0), kind: "butt", anat: fpCast.k, sock: { pos: a.p.clone(), quat: frame(a.t) } }; })() /* (first person: the left hand round the butt, the pulling hand of the cast, in the grip made for it: grips.js "butt_l") */ : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() } } : null;
     }
+    // (reaching down to the rod in its rest, seen from outside: the knees bend to it, less as it comes up)
+    if (!fp && held && !walking && inHand < 1) { const r = along(R.seat).p; crouch = Math.max(crouch, clamp((1.02 - r.y) * 0.9, 0, 0.35)); lean = Math.max(lean, 0.1 * (1 - lift)); lookAtW = toWorld(r); }
     if (ph === "bite" && !held) {
       // a hand out over the rod, ready to strike: to the nearest part of it within reach, bending down to it if it's low
       const want = V3(0.24, 1.0, -0.38); let best = null;
