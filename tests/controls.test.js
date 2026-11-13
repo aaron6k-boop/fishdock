@@ -91,6 +91,9 @@ test("gulls by the sea in daylight only, slaps under a pier or quay only, halyar
   assert.ok(ambiencePlan({ kind: "sea", venue: "pier" }).slap); assert.equal(ambiencePlan({ kind: "sea", venue: "beach" }).slap, null);
   assert.ok(ambiencePlan({ kind: "sea", venue: "estuary", wind: 0.5 }).halyard); assert.equal(ambiencePlan({ kind: "sea", venue: "pier", wind: 0.1 }).halyard, null);
   assert.equal(ambiencePlan({ rain: 0 }).patter, null); assert.ok(ambiencePlan({ rain: 0.8 }).patter[0] < ambiencePlan({ rain: 0.3 }).patter[0], "heavier rain, quicker drops");
+  assert.ok(ambiencePlan({ kind: "sea", venue: "beach" }).wave, "waves breaking on a beach"); assert.equal(ambiencePlan({ kind: "sea", venue: "pier" }).wave, null);
+  assert.equal(ambiencePlan({ kind: "lake", venue: "lake" }).wave, null);
+  assert.ok(ambiencePlan({ kind: "sea", venue: "beach", wind: 1 }).wave[1] < ambiencePlan({ kind: "sea", venue: "beach", wind: 0 }).wave[1], "closer together in a blow");
 });
 test("the beds stay quiet and the sparse sounds never come on a beat", () => {
   const p = ambiencePlan({ kind: "sea", venue: "pier", wind: 1, rain: 1 });
