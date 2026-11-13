@@ -640,10 +640,15 @@ function realArms(scene, { gloves, skinHex, sleeveMat = null, fine = false }) {
     FIST["ropeg_" + sd] = { ...g, bones: Object.fromEntries(Object.entries(g.bones).map(([n, q]) => [n, n.startsWith("thumb") ? R.clone().multiply(new THREE.Quaternion(...q)).toArray() : q])) }; }
   // (13 November: the hand turned thumb up, palm to the reel, the knob between the thumb and the curled first finger, as a
   // reel is wound. With the fist round the knob's own length you saw the flat back of the hand and no fingers)
+  // (13 November: the rod hand laid down along the rod, turned 0.85 rad about the line across the rod at the reel, so the
+  // wrist sits just above the butt and the forearm runs back along it, as a rod is held. As made, the wrist stood 8 cm
+  // above the rod with the hand arched down on to it, and the forearm came in across the rod)
+  const SEAT_LAID = (() => { const g = AUTHORED.seat; if (!g || TUNE.seatLaid === false) return null; const R = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), TUNE.seatTilt ?? -0.85);
+    const { elbow: _e, ...rest } = g; return { ...rest, Ph: V(...g.Ph).applyQuaternion(R).toArray(), Qh: R.clone().multiply(new THREE.Quaternion(...g.Qh)).toArray() }; })();
   const KNOB_FIST = TUNE.knobFist === false || !FIST.ropeg_l ? null : { ...FIST.ropeg_l, Ph: [0, -0.03, -0.105], Qh: [0.44587, -0.47507, -0.5191, 0.55321] };
   function authored(S, kind) {
     if (TUNE.authored === false) return null;
-    const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : null) ?? FIST[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
+    const AU = (typeof window !== "undefined" && FILM && window.__fdAuthored) || null, A = AU?.[kind + "_" + SIDES[S.i]] ?? AU?.[kind] ?? (kind === "crank" ? KNOB_FIST : kind === "seat" ? SEAT_LAID : null) ?? FIST[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind + "_" + SIDES[S.i]] ?? AUTHORED[kind]; if (!A || A.side !== SIDES[S.i]) return null;
     const fr = S.frameInv.clone().invert(), dW = (name) => fr.clone().multiply(new THREE.Quaternion(...A.bones[name])).multiply(S.frameInv); // (given in the hand's own frame; here in the model's space as the hand rests)
     const local = (ch) => { let above = null; return ch.map((j, k) => { const pose = dW(j.b.name).multiply(j.w0), par = k > 0 && j.b.parent === ch[k - 1].b ? above : j.pw0; above = pose; return par.clone().invert().multiply(pose); }); };
     const ang = (j, ql) => 2 * Math.acos(clamp(Math.abs(j.rest.clone().invert().multiply(ql).w), 0, 1));
@@ -1257,7 +1262,13 @@ export function createFpHands({ gloves = false, skinHex = 0xc99a74, coatHex = 0x
           // put it, the upper arm then made up to fit)
           if (real?.body && shL[i]) { const L = real.reach(i), sh = shL[i], wr0 = spec.at.clone().addScaledVector(vu, 0.07), sd = wr0.clone().sub(sh), d = Math.min(sd.length(), L.upper + L.fore - 0.012), n = sd.clone().normalize();
             const x = (L.upper * L.upper - L.fore * L.fore + d * d) / (2 * d), hgt = Math.sqrt(Math.max(0, L.upper * L.upper - x * x));
-            const pole = V().crossVectors(vr, vf).normalize().multiplyScalar(TUNE_ELBOW.seatPoleY ?? -1).addScaledVector(vr, (TUNE_ELBOW.seatPoleX ?? 0.3) * h.s); pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
+            const pole = V().crossVectors(vr, vf).normalize().multiplyScalar(TUNE_ELBOW.seatPoleY ?? -1).addScaledVector(vr, (TUNE_ELBOW.seatPoleX ?? 0.3) * h.s); // (13 November: a rod is held with the forearm lying along its butt, the wrist straight: the elbow goes as near as
+            // this arm allows to the point a forearm's length back down the rod from the hand. Set down and out by the view
+            // alone, the forearm came in across the rod and the wrist was bent a right angle)
+            { const k = TUNE_ELBOW.seatAlong ?? 1; if (k > 0) { const bd = ax.clone().multiplyScalar(-1); // (back down the butt; or, part of the way, the way the grip was made to have the forearm leave the hand: up off the butt, the wrist quite straight)
+              if (spec.sock?.quat) bd.lerp(V(-0.1191, 0.6771, -0.7261).applyQuaternion(spec.sock.quat), TUNE_ELBOW.seatAuth ?? 0).normalize();
+              const back = spec.at.clone().addScaledVector(bd, L.fore).addScaledVector(vu, -(TUNE_ELBOW.seatUnder ?? 0)).sub(sh).normalize(); pole.normalize().lerp(back, k); } }
+            pole.addScaledVector(n, -pole.dot(n)); if (pole.lengthSq() > 1e-6) { pole.normalize(); elbow.copy(sh).addScaledVector(n, x).addScaledVector(pole, hgt); } }
         }
         let want;
         if (spec) {
