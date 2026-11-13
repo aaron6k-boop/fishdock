@@ -437,7 +437,7 @@
    "attribution": "Not required; credited in public/models/CREDITS.txt",
    "type": "models",
    "resolution": "10,582 points with three levels of sculpted detail (about 677,000 points at the finest); UVs; no skeleton, no textures",
-   "use": "the hands and wrists of your first-person arms (public/models/fp_body.glb): its second level as the mesh, its finest baked to a normal map",
+   "use": "your arms, hands and jacket in first person (public/models/fp_rig.glb): the body rigged with Rigify, its hands and forearms and a jacket made from it (source-assets/blender/rig/). Before 13 November 2026, the hands and wrists of fp_body.glb",
    "downloaded": "2026-11-10",
    "files": []
   },
@@ -707,18 +707,6 @@
    "files": []
   },
   {
-   "id": "fishdock:fp_hand_relief",
-   "name": "Hand relief (derived)",
-   "source": "high-passed from fp_arms.glb's own skin colour map (MakeHuman, CC0)",
-   "author": "FishDock",
-   "licence": "CC0 1.0 (as its source)",
-   "attribution": "Not required",
-   "type": "textures",
-   "resolution": "2048x512",
-   "use": "the first-person hands' knuckle creases and nail edges as relief (public/textures/fp_hand_relief.jpg)",
-   "files": []
-  },
-  {
    "id": "commons:geograph-7618525",
    "name": "View into the harbour from South Pier, Gorleston-on-Sea",
    "source": "https://commons.wikimedia.org/wiki/File:View_into_the_harbour_from_South_Pier,_Gorleston-on-Sea_-_geograph.org.uk_-_7618525.jpg (Geograph photo 7618525)",
@@ -755,15 +743,27 @@
    "files": []
   },
   {
-   "id": "fishdock:fp_body",
-   "name": "First-person arms with sleeves (derived)",
-   "source": "third build (source-assets/blender/make_fp_body_bs.py): the hands and wrists of Blender Studio's realistic male body (Human Base Meshes 1.1.0, see blender:human-base-meshes) on the MPFB angler's skeleton, coloured from his MakeHuman skin. Before that: cut from the MPFB angler (MakeHuman, CC0) in Blender, with the sleeves of the MakeHuman system assets' field jacket male_casualsuit05 (CC0) fitted by MPFB: source-assets/blender/make_fp_body_hd.py (the first build: make_fp_body.py)",
+   "id": "adobe:mixamo-fishing-cast",
+   "name": "Mixamo \"Fishing Cast\" motion capture",
+   "source": "https://www.mixamo.com (downloaded by Aaron as fishing_cast.fbx; kept on his PC, not in the repository)",
+   "author": "Adobe Mixamo",
+   "licence": "Adobe's Mixamo terms: characters and animations may be used royalty free for personal, commercial and non-profit projects, video games included (https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html)",
+   "attribution": "Not required; credited in public/models/CREDITS.txt and Settings",
+   "type": "animation",
+   "resolution": "264 frames at 30 a second",
+   "use": "the body's turn through the first-person cast: the chest's turn against the hips, retargeted onto the Rigify rig and baked into fp_rig.glb's cast clip (source-assets/blender/rig/15_gate3_cast.py)",
+   "files": []
+  },
+  {
+   "id": "fishdock:fp_rig",
+   "name": "First-person arms, hands and jacket, rigged (derived)",
+   "source": "source-assets/blender/rig/ (Rigify on Blender Studio's realistic male, see blender:human-base-meshes; the cast's body turn from adobe:mixamo-fishing-cast)",
    "author": "FishDock",
-   "licence": "CC0 1.0 (as its source)",
+   "licence": "CC0 1.0 (as its sources allow)",
    "attribution": "Not required",
    "type": "models",
-   "resolution": "11,104 + 8,076 vertices (13,584 + 13,952 triangles); skin maps 2048 px (colour, normal, roughness), sleeve maps 1024 x 520 (shade) and 2048 x 1040 (normal)",
-   "use": "your arms and jacket sleeves in first person (public/models/fp_body.glb)",
+   "resolution": "7,230 skin + 12,000 jacket vertices; 73 deform bones; clips hold, reel, cast, grips",
+   "use": "your arms and hands in first person (public/models/fp_rig.glb), replacing fp_body.glb and fp_arms.glb",
    "files": []
   }
  ]

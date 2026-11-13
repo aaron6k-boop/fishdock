@@ -11,7 +11,7 @@ import { setShadowReach } from "./realPlace.js";
 import { createAngler, waveHeight } from "./angler.js";
 import { createRockSpray } from "./rockSpray.js";
 import { createTipLights, createHeadTorch } from "./nightKit.js";
-import { setHandsDim } from "./fpHands.js";
+import { setHandsDim, setRigView } from "./fpRig.js";
 import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
@@ -594,6 +594,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     camera.position.copy(camPos);
     // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
     camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? FP_TALL : 1) * jumpZoom; camera.updateProjectionMatrix();
+    setRigView(look.fov * (camera.aspect < 0.8 ? FP_TALL : 1)); // (your own arms framed for the picture's height: fpRig.js)
     const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     camera.lookAt(camOverride && lookOverride ? lookOverride : camera.position.clone().add(d));
     for (const [id, x] of anglers) x.a.setFirstPerson((mode === "first" || mode === "free") && id === (focus?.a.id));

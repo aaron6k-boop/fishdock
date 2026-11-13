@@ -1,0 +1,86 @@
+<title>FishDock Arm Rig</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* a workbench: the 3D view takes the page, the controls and the live joint numbers in a column beside it (below it on a phone) */
+:root {
+  --bg: #eef2f4; --panel: #ffffff; --fg: #15222b; --muted: #5b6b76; --line: #d3dce2; --accent: #1f6fb2; --accent-fg: #ffffff; --stage: #cdd8df; --warn: #b4541f;
+  --f-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif; --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; --f-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e151a; --panel: #141e25; --fg: #e3eaef; --muted: #93a3ae; --line: #26343e; --accent: #5aa7e8; --accent-fg: #0b1218; --stage: #1b2730; --warn: #f0935a; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #0e151a; --panel: #141e25; --fg: #e3eaef; --muted: #93a3ae; --line: #26343e; --accent: #5aa7e8; --accent-fg: #0b1218; --stage: #1b2730; --warn: #f0935a; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--f-body); }
+.app { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); height: 100%; min-height: 0; }
+.stage { position: relative; min-width: 0; min-height: 0; background: var(--stage); }
+#view { display: block; width: 100%; height: 100%; touch-action: none; }
+.moment { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: 12px; margin: 0; padding: 6px 10px; border-radius: 6px; background: var(--panel); color: var(--fg); font: 500 12.5px/1.3 var(--f-body); max-width: calc(100% - 24px); }
+.side { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; display: flex; flex-direction: column; gap: 18px; padding-block: 18px; padding-left: 18px; padding-right: max(18px, env(safe-area-inset-right, 0px)); min-width: 0; }
+h1 { font: 600 20px/1.2 var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.lede { margin: 6px 0 0; color: var(--muted); font-size: 13px; max-width: 60ch; }
+.group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.label { font: 600 11px/1 var(--f-body); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: 500 13px/1 var(--f-body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.row label { display: flex; align-items: center; gap: 6px; }
+input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+select { font: 13px var(--f-body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.num { font: 12px var(--f-data); color: var(--muted); font-variant-numeric: tabular-nums; min-width: 3.5em; text-align: right; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font: 12px/1.3 var(--f-data); font-variant-numeric: tabular-nums; }
+th, td { padding: 5px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+thead th { font: 600 10.5px/1.2 var(--f-body); color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+tbody th { text-align: left; font: 600 12px var(--f-body); }
+td:nth-child(2) { text-align: left; }
+td.warn { color: var(--warn); font-weight: 600; }
+.key { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 60ch; }
+.status { font: 12px var(--f-data); color: var(--muted); }
+.notes { font-size: 12.5px; color: var(--muted); margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 820px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; }
+  .stage { aspect-ratio: 3 / 4; max-height: 72vh; width: 100%; }
+  .side { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+<div class="app">
+  <div class="stage" id="stage"><canvas id="view" aria-label="The first-person arms in 3D"></canvas><p class="moment" id="moment">The hold (Gate 1)</p></div>
+  <aside class="side">
+    <header>
+      <h1>FishDock arm rig</h1>
+      <p class="lede">The first-person arms the game uses, rigged in Blender, posed here by the game's own IK on a 12 ft pier rod. Red dots are where each hand is asked to go, green the elbows, yellow the shoulders.</p>
+    </header>
+    <div class="group"><span class="label" id="modes-l">What the hands do</span>
+      <div class="seg" id="modes" role="group" aria-labelledby="modes-l">
+        <button data-v="hold" aria-pressed="true">Hold</button><button data-v="reel" aria-pressed="false">Wind the reel</button><button data-v="cast" aria-pressed="false">Cast</button><button data-v="grips" aria-pressed="false">Other grips</button><button data-v="look" aria-pressed="false">Look about</button>
+      </div></div>
+    <div class="group"><span class="label" id="views-l">Seen from</span>
+      <div class="seg" id="views" role="group" aria-labelledby="views-l">
+        <button data-v="fp" aria-pressed="true">First person</button><button data-v="front" aria-pressed="false">Front</button><button data-v="side" aria-pressed="false">Left side</button><button data-v="over" aria-pressed="false">Over the shoulder</button><button data-v="free" aria-pressed="false">Free (drag)</button>
+      </div></div>
+    <div class="group"><span class="label">Playback</span>
+      <div class="row"><button id="play" aria-pressed="false">Pause</button>
+        <label for="speed">Speed</label><select id="speed"><option value="0.25">Quarter</option><option value="0.5">Half</option><option value="1" selected>Real time</option></select></div>
+      <div class="row"><label for="scrub" class="num" style="text-align:left">Time</label><input id="scrub" type="range" min="0" max="1000" value="0"></div>
+    </div>
+    <div class="group"><span class="label">First-person view</span>
+      <div class="row"><label for="pitch">Up and down</label><input id="pitch" type="range" min="-60" max="40" value="-7"><span class="num" id="pitchv">-7°</span></div>
+      <div class="row"><label for="yaw">Round</label><input id="yaw" type="range" min="-60" max="60" value="0"><span class="num" id="yawv">0°</span></div>
+    </div>
+    <div class="group"><span class="label">Drawn over the arms</span>
+      <div class="row"><label><input type="checkbox" id="skel" checked> Skeleton</label><label><input type="checkbox" id="ik" checked> IK targets and joints</label><label><input type="checkbox" id="att" checked> Attachment points</label></div>
+    </div>
+    <div class="group"><span class="label">Joints now (degrees; bone length ratios; mm short of the target)</span>
+      <div class="table-wrap"><table><thead><tr><th scope="col">Hand</th><th scope="col">Holding</th><th scope="col">Palm</th><th scope="col">Thumb</th><th scope="col">Turn</th><th scope="col">Elbow</th><th scope="col">Upper / fore</th><th scope="col">Short</th></tr></thead><tbody id="readout"></tbody></table></div>
+      <ol class="notes"><li>Palm: the wrist bent towards the palm (its natural range is 45 back to 55 forward).</li><li>Thumb: bent towards the thumb side (30 away to 15 towards).</li><li>Turn: the forearm's turn from palm-in (75 one way to 85 the other).</li><li>A bone length ratio of 1.000 means unstretched.</li></ol>
+    </div>
+    <div class="group"><span class="label">Attachment points</span>
+      <p class="key">Red, green and blue axes (the frame's x, y and z) at the reel seat the right hand holds, the knob the left hand winds and the butt the left hand casts with.</p>
+    </div>
+    <p class="status" id="status">Loading the rig</p>
+  </aside>
+</div>
