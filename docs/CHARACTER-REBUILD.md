@@ -288,6 +288,28 @@ hands. The old hand code (`fpHands.js`, `grips.js`) and its models (`fp_body.glb
   beside your face and fills a corner of the picture; through the follow-through the hands drop to the bottom edge; on
   the drop net the arms reach over the rail to the ring and the rope.
 
+## Ninth stage (13 November, after it went live): the hands turned round what they hold
+
+Aaron's phone showed both hands in the right places but not holding anything: the right hand beside the reel seat
+with its fingers away from it, the left hand's fingers hanging off the knob, and so the left hand looked as if it
+didn't go round with the handle. Measured with the rig in Node: each hand was turned 90 degrees from Blender's (the
+right 90.0 at the hold, the left 96 on the knob), about its own length. The positions were right, which is all the
+tests checked.
+
+The cause was in `tools/fp-rig-data.mjs`, carrying Blender's turns into the game. Blender's glTF exporter turns the
+whole skeleton from z up to y up once, at its root, and leaves each bone's own axes as Blender has them. So a bone's
+turn in the game is that one turn applied to Blender's (C R). The data was written as if the bones' axes had been
+turned too (C R C⁻¹), and the palm and grip frames inside each hand (`loc`, `cyl`, `flat`) were turned the
+same wrong way. They are now carried over as the exporter carries them; the hand frames stay in Blender's own bone
+axes. Nothing else changed: same model, same clips, same code.
+
+- `tests/fpRig.test.js` now also holds each hand's turn to Blender's, not only its place: the right hand at the hold
+  within 1 degree of Gate 1 (both the hold clip and the rod grip Blender measured); the left hand within 1 degree of
+  Gate 2 at every angle of the knob, looking ahead, down, up and to each side. With the old data these fail at 90
+  degrees.
+- Filmed in the game at a phone's size, holding and winding with taps (half a turn a tap, four a second): the right
+  hand round the reel seat, the left hand's fingers on the knob, going round with it turn after turn.
+
 ## Not done
 
 - Not looked at on a real phone or PC: the films are from a software renderer and show shape and movement, not

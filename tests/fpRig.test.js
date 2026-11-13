@@ -97,17 +97,25 @@ const crankSpec = (P, row) => { const k = inReel(P, row.knob_rod); return { at: 
 const pose = (P, hands, n = 1, castT = null) => { for (let i = 0; i < n; i++) rig.pose({ hands, eye: P.eye, vr: P.vr, vu: P.vu, vf: P.vf, dt: 1 / 30, castT }); };
 const at = (b) => b.getWorldPosition(V());
 const LOC = Object.fromEntries(["L", "R"].map((S) => [S, { k: V(...RIG.loc[S].k), palm: V(...RIG.loc[S].palm), along: V(...RIG.loc[S].along) }]));
+// (a hand's turn from Blender's, as the exporter carries it: the y-up turn applied to the bone's own Blender frame, so a
+// hand turned the way Blender has it, fingers round what they hold, not only a hand in the right place)
+const qBlender = (M) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().set(...[M[0], M[2], M[1].map((v) => -v)].flatMap((r) => { const n = (j) => Math.hypot(M[0][j], M[1][j], M[2][j]); return [r[0] / n(0), r[1] / n(1), r[2] / n(2), 0]; }), 0, 0, 0, 1));
+const deg = (a, b) => (a.angleTo(b) * 180) / Math.PI;
 const lengthsKept = (S) => { const A = R.arm[S]; return Math.max(Math.abs(at(A.F).distanceTo(at(A.U)) / A.L1 - 1), Math.abs(at(A.H).distanceTo(at(A.F)) / A.L2 - 1)); };
 
 test("the hold in the game is Gate 1's hold: the right hand and elbow where Blender put them, to the millimetre", () => {
   // (the hold clip's own arm, from its own eye, against the arm the game's IK makes from the rod's place)
   R.clips.hold.apply(1 / RIG.fps); R.scene.parent.position.set(0, 0, 0); R.scene.parent.quaternion.identity(); R.scene.parent.updateMatrixWorld(true);
-  const eyeM = R.eyeLocal.clone().applyMatrix4(R.head.matrixWorld), A = R.arm.R, hand = at(A.H).sub(eyeM), elbow = at(A.F).sub(eyeM);
+  const eyeM = R.eyeLocal.clone().applyMatrix4(R.head.matrixWorld), A = R.arm.R, hand = at(A.H).sub(eyeM), elbow = at(A.F).sub(eyeM), qClip = A.H.getWorldQuaternion(new THREE.Quaternion());
   const P = place(rigP0()); pose(P, [crankSpec(P, TURN[0]), seatSpec(P)], 20);
   const toW = (v) => V(-v.x, v.y, -v.z).add(P.eye); // (the body level, facing -z, when the view looks down by p0)
   assert.ok(at(A.H).distanceTo(toW(hand)) < 0.001, "hand");
   assert.ok(at(A.F).distanceTo(toW(elbow)) < 0.001, "elbow");
   assert.ok(lengthsKept("R") < 1e-5 && lengthsKept("L") < 1e-5);
+  // (and turned as Gate 1 turned it: round the reel seat, not only at it)
+  const turned = new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), Math.PI).multiply(qClip);
+  assert.ok(deg(A.H.getWorldQuaternion(new THREE.Quaternion()), turned) < 1, `the right hand turned ${deg(A.H.getWorldQuaternion(new THREE.Quaternion()), turned).toFixed(1)} degrees off Gate 1's`);
+  assert.ok(deg(A.H.getWorldQuaternion(new THREE.Quaternion()), P.rq.clone().multiply(qBlender(META.rod_grip))) < 1, "and as the rod's grip in Blender has it");
 });
 
 test("winding: the left hand and arm go round with the knob as in Gate 2's turns, wherever you look, arms unstretched", () => {
@@ -117,6 +125,8 @@ test("winding: the left hand and arm go round with the knob as in Gate 2's turns
       pose(P, [crankSpec(P, row), seatSpec(P)], 2);
       const want = inReel(P, [row.hand_rod[0][3], row.hand_rod[1][3], row.hand_rod[2][3]]);
       assert.ok(at(R.arm.L.H).distanceTo(want) < 0.001, `pitch ${pitch} knob ${row.th}`);
+      const turn = deg(R.arm.L.H.getWorldQuaternion(new THREE.Quaternion()), P.rq.clone().multiply(qBlender(row.hand_rod)));
+      assert.ok(turn < 1, `pitch ${pitch} knob ${row.th}: the left hand turned ${turn.toFixed(1)} degrees off Gate 2's`);
       assert.ok(lengthsKept("L") < 1e-5);
       // (and the arm as Gate 2 had it: the wrist's bends and the forearm's turn within 5 degrees of Blender's)
       const A = R.arm.L, w = wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC.L, "L");
