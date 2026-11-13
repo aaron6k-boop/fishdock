@@ -115,13 +115,13 @@ test("favourites and recent spots: only documented marks, kept on this phone, ne
   assert.deepEqual(loadRecent({ getItem() { throw new Error("blocked"); } }), [], "storage blocked: nothing, no error");
 });
 
-test("Fish here opens the 3D game at that spot, with a fish it lists for that water and the chosen position", () => {
+test("Fish here opens the game at that spot and the chosen position (a random fish each cast)", () => {
   const deal = mapSpotById("deal-pier"), wye = mapSpotById("river-wye-ross");
-  assert.equal(fishHereLink(deal, null), "#try/deal-pier/whiting/3d");
-  assert.equal(fishHereLink(deal, "mackerel", 3), "#try/deal-pier/mackerel/3d/p3");
+  assert.equal(fishHereLink(deal, null), "#play/deal-pier");
+  assert.equal(fishHereLink(deal, "mackerel", 3), "#play/deal-pier/p3");
   assert.equal(firstSpecies(deal, "perch"), "whiting", "no freshwater fish off a pier");
   assert.equal(speciesById(firstSpecies(wye)).type === "sea", false);
-  // the link is one the app's own route reads (App.jsx tryRoute)
-  const m = fishHereLink(deal, "mackerel", 2).match(/^#\/?try(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(\/3d)?(?:\/p([1-4]))?$/);
-  assert.deepEqual([m[1], m[2], !!m[3], m[4]], ["deal-pier", "mackerel", true, "2"]);
+  // the link is one the app's own route reads (App.jsx playRoute)
+  const m = fishHereLink(deal, "mackerel", 2).match(/^#\/?play(?:\/([a-z0-9-]+))?(?:\/p([1-4]))?$/);
+  assert.deepEqual([m[1], m[2]], ["deal-pier", "2"]);
 });

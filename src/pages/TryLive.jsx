@@ -1,6 +1,7 @@
-// ---- TryLive: a labelled demo of the Live Fishing View (#try, #try/<place>, #try/<place>/<species>) ----
-// For trying places, fish, light and weather without a real session. Everything on the page says Demo: nothing
-// here is a real session, nothing is saved or shared. Backdrops are real free-licensed photos taken near each place
+// ---- TryLive: the virtual fishing game (#play, #play/<place>; older links #try, #try/<place>/<species>, /3d) ----
+// Places, fish, light and weather to play with, and the testing buttons that skip the waiting. A game, not a real
+// session: nothing here is shared as a real catch. (Until 13 November it was labelled a demo throughout; Aaron asked
+// for it to be the game, one link straight into it.) Backdrops are real free-licensed photos taken near each place
 // (Wikimedia Commons, credited) or the drawn scene; "Live weather" is the real forecast for that place.
 /* global __BUILD_ID__ */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -51,8 +52,10 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const sp = speciesById(species) || fishList[0];
   const [length, setLength] = useState(DRAW_CM[species] || 45);
   // which fish the demo catches: a different one each cast (the default), or the one you choose below
-  const [randomFish, setRandomFish] = useState(() => { try { return localStorage.getItem("fishdock.demoFish") !== "pick"; } catch { return true; } });
-  const setFishMode = (random) => { setRandomFish(random); try { localStorage.setItem("fishdock.demoFish", random ? "random" : "pick"); } catch { /* private window: the choice lasts this visit */ } };
+  // (a random fish every time the game opens; choosing one lasts this visit. The choice used to be remembered, so a
+  // fish picked once to test came back every time)
+  const [randomFish, setRandomFish] = useState(true);
+  const setFishMode = (random) => setRandomFish(random);
   const [photos, setPhotos] = useState(null);
   const [pick, setPick] = useState(0);
   const [view, setView] = useState(defaultView());
@@ -64,7 +67,8 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const [rod, setRod] = useState("auto");
   const [tipLight, setTipLight] = useState("auto");
   const [from, setFrom] = useState("auto");
-  const [sound, setSound] = useState(false);
+  const [sound, setSound] = useState(() => { try { return localStorage.getItem("fishdock.gameSound") !== "off"; } catch { return true; } }); // (on unless you've turned it off; it starts at your first tap, as browsers require)
+  useEffect(() => { try { localStorage.setItem("fishdock.gameSound", sound ? "on" : "off"); } catch { /* no storage */ } }, [sound]);
   const [volume, setVolume] = useState(0.7);
   const [own, setOwn] = useState(null); // the visitor's own photo for this demo: kept in this page only, never sent anywhere
   const [copied, setCopied] = useState("");
@@ -74,7 +78,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const [lookOpen, setLookOpen] = useState(false), [look, setLookNow] = useState(myLook);
   const setLook = (v) => { setLookNow(v); saveLook(v); };
   const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
-  const [view3d, setView3d] = useState(() => /\/3d(\/p[1-4])?$/.test(location.hash)); // the 360° 3D view (Beta)
+  const [view3d, setView3d] = useState(() => /\/3d(\/p[1-4])?$/.test(location.hash) || /^#\/?play/.test(location.hash)); // the 360° 3D view (#play opens straight into it)
   const sceneRef = useRef(null);
   // ---- arriving from the UK spot map (#map): the fishing position chosen there, a way back, and a short label ----
   const [point] = useState(initialPoint); // 1 to 4, or null for the best one (the first safe position, spawn.js)
@@ -85,7 +89,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const vfReset = useRef(null); // a new place starts afresh
 
   useEffect(() => { // address bar follows the choice, so the page can be shared or bookmarked
-    const h = `#try/${placeId}/${species}${view3d ? "/3d" : ""}${view3d && point && placeId === initialPlace ? `/p${point}` : ""}`;
+    const h = view3d ? `#play/${placeId}${point && placeId === initialPlace ? `/p${point}` : ""}` : `#try/${placeId}/${species}`;
     if (location.hash !== h) history.replaceState(null, "", h);
   }, [placeId, species, view3d, point]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { vfReset.current?.(); setPhotos(null); setPick(0); setView(defaultView()); setCond(null); setOwn(null);
@@ -143,7 +147,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   // (what is on the line isn't known until it is hooked)
   const fishKnown = !randomFish || p.phase === "hooked" || last === "catch";
   const fishLabel = fishKnown ? `${sp.name}, ${length} cm` : "Random fish";
-  const base = `${location.origin}/#try`;
+  const base = `${location.origin}/#play`;
   const copy = async (u) => { try { await navigator.clipboard.writeText(u); setCopied(u); setTimeout(() => setCopied(""), 1800); } catch { /* ignore */ } };
 
   const venue = from === "auto" ? venueOf(place) : from;
@@ -154,7 +158,6 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
     <>
       <div className="fs-top">
               {fromMap ? <a className="fs-chip map-back" href={`#map/${placeId}`} aria-label="Back to map" title="Back to map"><Icon name="back" /><Icon name="explore" /></a> : null}
-              <span className="live-badge s-replay">Demo</span>
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${fishLabel} at ${place.name}: change`}>{fishLabel}</button>
               <span className="grow" />
@@ -163,10 +166,10 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
                 <button type="button" className="fs-chip back3d" onClick={() => setView3d(true)} aria-label="Back to 3D" title="Back to the 3D view"><Icon name="compass" />Back to 3D</button>
                 <button type="button" className="fs-btn" onClick={() => setInvite(true)} aria-label="Invite a friend here" title="Invite a friend here"><Icon name="users" /></button>
                 <button type="button" className="fs-btn" onClick={() => setSound(!sound)} aria-label={sound ? "Sound off" : "Sound on"} aria-pressed={sound}><Icon name={sound ? "volume" : "mute"} /></button>
-                <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Demo settings"><Icon name="settings" /></button>
+                <button type="button" className="fs-btn" onClick={() => setSheet(true)} aria-label="Game settings"><Icon name="settings" /></button>
               </> : null}
             </div>
-            {arrived ? <div className="arrive-label" role="status" onAnimationEnd={() => setArrived(false)}><b>{place.name.replace(/ \(.*\)$/, "")}</b><span>{place.region ? `${place.region} · ` : ""}Virtual fishing: catches are simulated, never logged</span></div> : null}
+            {arrived ? <div className="arrive-label" role="status" onAnimationEnd={() => setArrived(false)}><b>{place.name.replace(/ \(.*\)$/, "")}</b><span>{place.region || "Virtual fishing"}</span></div> : null}
             <div className="fs-bottom">
               <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onHold={vf.hold} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
@@ -198,11 +201,11 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
         </> : null}
         <InviteHere open={invite} onClose={() => setInvite(false)} markId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} />
         {sheet ? <div className="sheet-scrim" onClick={() => setSheet(false)} /> : null}
-        <aside className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Demo settings">
+        <aside className={`watch-panel sheet${sheet ? " open" : ""}`} aria-label="Game settings">
           <div className="sheet-head">
             <div className="try-head">
-              <h1>Try the Live Fishing View</h1>
-              <p className="small muted">A demo: nothing here is a real session or a real catch, and nothing is saved or shared.</p>
+              <h1>Fish, place and weather</h1>
+              <p className="small muted">Which fish, where, the light and the weather; the testing buttons further down skip the waiting.</p>
               <a className="btn small" href="#together"><Icon name="users" />Fish Together with friends (Beta)</a>
             </div>
             <button type="button" className="xbtn sheet-x" onClick={() => setSheet(false)} aria-label="Close settings"><Icon name="close" /></button>
@@ -222,7 +225,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
                 </button>
               ))}
             </div>
-            <div className="cond-row"><span>Length</span><input type="range" min="10" max="150" step="1" value={length} disabled={randomFish} onChange={(e) => setLength(Number(e.target.value))} aria-label="Demo length in cm" /><span className="num tiny">{length} cm</span></div>
+            <div className="cond-row"><span>Length</span><input type="range" min="10" max="150" step="1" value={length} disabled={randomFish} onChange={(e) => setLength(Number(e.target.value))} aria-label="Length in cm" /><span className="num tiny">{length} cm</span></div>
             <p className="tiny">Sea fish are drawn from FishDock's own pictures. Freshwater fish without one yet splash and go straight to the close-up.</p>
           </section>
 
@@ -278,27 +281,27 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
 
           {catches.length ? (
             <section className="watch-sec">
-              <div className="card-h"><h2>Demo catches</h2><span className="aside">{catches.length}</span></div>
+              <div className="card-h"><h2>Your catches this visit</h2><span className="aside">{catches.length}</span></div>
               <div className="catch-strip">{catches.slice().reverse().map((e) => (
                 <button key={e.id} type="button" className="catch-tile" onClick={() => { setSheet(false); sceneRef.current?.replayCatch(e); }}>
                   {hasArt(e.data.species) ? <img src={artUrl(e.data.species, "s")} alt="" className="art" /> : <span className="ct-ph"><Icon name="fish" /></span>}
-                  <span className="t">{e.data.name}</span><span className="s">{e.data.lengthCm} cm · demo</span>
+                  <span className="t">{e.data.name}</span><span className="s">{e.data.lengthCm} cm</span>
                 </button>
               ))}</div>
             </section>
           ) : null}
 
           <section className="watch-sec">
-            <div className="card-h"><h2>Links to try</h2></div>
+            <div className="card-h"><h2>Places to fish</h2></div>
             <div className="list">
               {TRY_PLACES.map((id) => { const u = `${base}/${id}`; return (
                 <div key={id} className="li"><span className="grow"><span className="t">{placeOf(id).name}</span><span className="s">{u.replace(/^https?:\/\//, "")}</span></span>
-                  <a className="xbtn" href={`#try/${id}`} onClick={() => setPlaceId(id)} aria-label={`Open ${placeOf(id).name}`}><Icon name="chevron" /></a>
+                  <a className="xbtn" href={`#play/${id}`} onClick={() => setPlaceId(id)} aria-label={`Open ${placeOf(id).name}`}><Icon name="chevron" /></a>
                   <button type="button" className="xbtn" onClick={() => copy(u)} aria-label={`Copy the link for ${placeOf(id).name}`}><Icon name={copied === u ? "check" : "copy"} /></button></div>
               ); })}
             </div>
           </section>
-          <p className="tiny watch-foot">Demo of FishDock's Live Fishing View. Real sessions are shared on private links from the fishing screen. <a href="/">Open FishDock</a>{typeof __BUILD_ID__ !== "undefined" ? <><br />Version {__BUILD_ID__}</> : null}</p>
+          <p className="tiny watch-foot">FishDock virtual fishing. Real sessions are shared on private links from the fishing screen. <a href="/">Open FishDock</a>{typeof __BUILD_ID__ !== "undefined" ? <><br />Version {__BUILD_ID__}</> : null}</p>
         </aside>
       </div>
     </div>

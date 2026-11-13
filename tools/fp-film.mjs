@@ -22,7 +22,7 @@ const ctx = await browser.newContext({ viewport: VP, deviceScaleFactor: 1 });
 await ctx.addInitScript(() => { window.__fdFilm = true; window.__fdPerfOn = true; localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "high", fishCam: "first" })); });
 const page = await ctx.newPage(); const cdp = await ctx.newCDPSession(page);
 const errors = []; page.on("pageerror", (e) => { errors.push(e.message); console.log("ERR", e.message); });
-await page.goto(`${base}/#try/gorleston-south-pier/cod/3d`);
+await page.goto(`${base}/#play/gorleston-south-pier`);
 await page.waitForFunction(() => window.__fdWorld && window.__fdWorld.play, null, { timeout: 150000 }); await page.waitForTimeout(15000);
 const DAY = [{ sunAlt: 38, sunAz: 190 }, { cloudPct: 25, windKph: 14, windDir: 40 }];
 await page.evaluate((env) => { const W = window.__fdWorld; W.freeze(); W.env(env[0], env[1]); W.step(8000); W.at(null); }, DAY);

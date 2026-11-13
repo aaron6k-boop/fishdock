@@ -273,7 +273,7 @@ function FishLook({ ev, demo, onKeep, onRelease, onClose }) {
   return (
     <div className={`fish-look${more ? " open" : ""}`} role="dialog" aria-label={`Your ${sp?.name || "fish"}`}>
       <button type="button" className="xbtn fish-look-x" onClick={onClose} aria-label="Put it down"><Icon name="close" /></button>
-      <span className="cc-kicker">{demo ? "Demo · not logged" : "Simulated · not a real record"}</span>
+      {demo ? null : <span className="cc-kicker">Simulated · not a real record</span>}
       <h3>{sp?.name || "Fish"} {sp?.latin ? <i className="tiny muted">{sp.latin}</i> : null}</h3>
       <p className="cc-facts">{[len, kg].filter(Boolean).join(" · ") || "Size not given"}</p>
       {info.must.length ? <ul className="fl-must">{info.must.map((m, i) => <li key={i} className={`fl-${m.kind}`}><b>{label[m.kind]}:</b> {m.text}{m.source ? <> <a href={m.source} target="_blank" rel="noopener noreferrer">Source</a></> : null}</li>)}</ul> : null}
