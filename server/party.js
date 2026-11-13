@@ -15,6 +15,11 @@
 //   app, or none). It's how their character looks in the simulation, nothing more.
 // - Voice: the server only relays the connection set-up (WebRTC signalling) between members; audio goes phone to
 //   phone and never through FishDock.
+// - Public places (13 November): everyone playing the game at one of FishDock's documented marks is put in that mark's
+//   own room without joining anyone (POST /api/party/public), so whoever's fishing Gorleston South Pier sees the others
+//   there. Up to four anglers a room; a fifth goes in the mark's next room. Virtual only, no host, no chat and no voice
+//   (strangers); the names people chose, their looks, their fishing and their walking about. Nobody's kept for long:
+//   anyone gone two hours is dropped. Still never anyone's coordinates: the mark is a public place.
 // - Notices: a line in the chat when someone joins, leaves or is removed ({ sys: "joined" | "left" | "removed" }),
 //   kept with the chat so someone who connects later sees it too. A name only, nothing else about them.
 
@@ -80,6 +85,11 @@ export function makePin() {
   for (;;) for (const b of crypto.getRandomValues(new Uint16Array(8))) if (b < 60000) return String(b % 10000).padStart(4, "0");
 }
 export const makeCode = () => (PARTY.pin ? makePin() : makeLongCode());
+/** A public place's room code: made from the mark and the room's number, the same everywhere, so everyone at the mark
+ * finds the same rooms (in the six-character form, from the letters and numbers that can't be misread). */
+const PUBLIC_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export async function publicCode(mark, n) { const h = await sha256Hex(`fishdock-public:${mark}:${n}`); let c = ""; for (let i = 0; i < 6; i++) c += PUBLIC_ALPHABET[parseInt(h.slice(i * 4, i * 4 + 4), 16) % PUBLIC_ALPHABET.length]; return c; }
+export const PUBLIC = { rooms: 8, days: 30, dropAfterMs: 2 * 3600e3 };
 export const validCode = (c) => typeof c === "string" && /^(?:[0-9]{4}|[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6})$/.test(c);
 const hashKey = (k) => sha256Hex(`party-member|${k}`);
 const nameOf = (v, d) => cleanLine(v, 24) || d;
@@ -116,7 +126,9 @@ export class PartyRoom {
     const S = this.s, keep = {}, anglers = [];
     for (const m of Object.values(S.members)) {
       if (m.role === "spectator" || m.left || m.kicked) { m.spot = null; continue; }
-      const away = !this.online.get(m.id) && now - m.seenAt > PARTY.spotHoldMs && m.id !== newcomer;
+      // (a spot's kept ten minutes for someone whose phone has dropped out of a party; at a public place, one minute,
+      // so people who've closed the game don't fill the place and send newcomers to its next room)
+      const away = !this.online.get(m.id) && now - m.seenAt > (S.public ? 60e3 : PARTY.spotHoldMs) && m.id !== newcomer;
       if (away && m.spot) m.spot = null;
       if (!away) { anglers.push(m.id); if (m.spot) keep[m.id] = m.spot; }
     }
@@ -157,6 +169,29 @@ export class PartyRoom {
     const m = await this.addMember({ name, role: wants, outfit, look }, now);
     return { member: m, role: S.members[m.id].role, notice: this.notice("joined", m.id, now) };
   }
+  // ---- a public place's room ----
+  initPublic({ code, mark, venue }, now) {
+    if (this.s) throw new Error("exists");
+    this.s = {
+      code, public: true, mode: "virtual", venue: VENUES.includes(venue) ? venue : "pier", place: cleanPlace({ mark }, "virtual"), createdAt: now, expiresAt: now + PUBLIC.days * 86400e3, closed: false,
+      light: "now", secret: randomId(12), codeOn: false, locked: false, chatOn: false, voiceOn: false, anglersOn: true,
+      members: {}, events: [], seq: 0, chat: [], challenge: null, reports: [], photos: [],
+    };
+  }
+  async joinPublic({ name, outfit, look }, now) {
+    const S = this.s;
+    if (!S?.public) return { error: "taken" };
+    S.expiresAt = now + PUBLIC.days * 86400e3;
+    // (nobody's kept for long: anyone not here for two hours is dropped, with their fishing, so the room never fills
+    // with people who've gone; coming back, they're simply put in again)
+    for (const [id, m] of Object.entries(S.members)) if (!this.online.get(id) && now - m.seenAt > PUBLIC.dropAfterMs) delete S.members[id];
+    S.events = S.events.filter((e) => S.members[e.who]); S.chat = S.chat.filter((c) => S.members[c.who]);
+    this.placeAnglers(now);
+    if (this.anglerCount() >= PARTY.maxAnglers) return { error: "full" };
+    const m = await this.addMember({ name, role: "angler", outfit, look }, now);
+    if (S.members[m.id].role !== "angler") { delete S.members[m.id]; return { error: "full" }; }
+    return { member: m, role: "angler", notice: this.notice("joined", m.id, now) };
+  }
   /** A line in the chat saying someone joined, left or was removed; returns the message for everyone. */
   notice(sys, mid, now) {
     const S = this.s, c = { seq: ++S.seq, at: now, who: mid, sys, name: S.members[mid]?.name || "Someone" };
@@ -180,7 +215,7 @@ export class PartyRoom {
     const S = this.s, me = S.members[mid];
     return {
       t: "hello", now, you: { id: mid, role: me.role, host: me.role === "host" },
-      party: { code: S.code, mode: S.mode, venue: S.venue, place: S.place, light: S.light || "now", expiresAt: S.expiresAt, closed: S.closed, locked: S.locked, codeOn: S.codeOn, chatOn: S.chatOn, voiceOn: S.voiceOn, anglersOn: S.anglersOn, challenge: S.challenge, ...(me.role === "host" ? { secret: S.secret } : {}) },
+      party: { code: S.code, public: !!S.public, mode: S.mode, venue: S.venue, place: S.place, light: S.light || "now", expiresAt: S.expiresAt, closed: S.closed, locked: S.locked, codeOn: S.codeOn, chatOn: S.chatOn, voiceOn: S.voiceOn, anglersOn: S.anglersOn, challenge: S.challenge, ...(me.role === "host" ? { secret: S.secret } : {}) },
       members: this.members(), events: S.events.slice(-600), chat: (S.chatOn ? S.chat : S.chat.filter((c) => c.sys)).slice(-50),
     };
   }
@@ -399,6 +434,17 @@ export class PartyHost {
       const host = await room.init(b, now); await this.save();
       return json({ code: room.s.code, secret: room.s.secret, member: host, expiresAt: room.s.expiresAt });
     }
+    if (op === "public" && request.method === "POST") {
+      const b = await request.json();
+      if (room.ready && !room.s.public && !room.ended(now)) return json({ error: "taken" }, 409);
+      if (!room.ready || room.ended(now)) { room.s = null; room.initPublic({ code: b.code, mark: b.mark, venue: b.venue }, now); }
+      const r = await room.joinPublic(b, now);
+      if (r.error) return json({ error: r.error }, 409);
+      await this.save();
+      this.broadcast({ t: "members", members: room.members() });
+      if (r.notice) this.broadcast(r.notice);
+      return json({ code: room.s.code, member: r.member, role: r.role });
+    }
     if (op === "info") {
       const pv = room.preview(now, { secret: url.searchParams.get("s"), viaCode: url.searchParams.get("via") === "code" });
       return pv.ok ? json(pv) : json({ error: pv.why }, pv.why === "ended" ? 410 : 404);
@@ -498,6 +544,19 @@ export async function handleParty(request, env, now = Date.now()) {
         return new Response(r.body, { status: r.status, headers: { "content-type": "application/json" } });
       }
       return err(503, "busy", "Couldn't start a party just now. Try again.");
+    }
+    // a public place: the first of the mark's rooms with a free spot (POST /api/party/public { mark, venue, name, ... })
+    if (code === "public" && !op && request.method === "POST") {
+      await enforce(db, `party:join:${who}`, PARTY.joinsPerMinute, now, { windowMs: 60e3 }, "That's a lot of tries. Wait a minute and try again.");
+      const b = await readJson(request, 4096), mark = typeof b.mark === "string" && markFor(b.mark) ? b.mark : null;
+      if (!mark) return err(404, "not_found", "That isn't one of FishDock's places.");
+      const body = { mark, venue: VENUES.includes(b.venue) ? b.venue : "pier", name: nameOf(b.name, "Angler"), outfit: Number(b.outfit) || 0, look: cleanLook(b.look) };
+      for (let n = 1; n <= PUBLIC.rooms; n++) {
+        const c = await publicCode(mark, n);
+        const r = await inner(c, "public", { method: "POST", body: JSON.stringify({ ...body, code: c }) });
+        if (r.ok) return new Response(r.body, { status: 200, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+      }
+      return err(503, "full", "Every spot at this place is taken just now. Try again in a little while.");
     }
     if (!validCode(code)) return err(404, "not_found", "There's no party with that code.");
     const url = new URL(request.url), m = url.searchParams.get("m") || "";

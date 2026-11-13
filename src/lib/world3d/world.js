@@ -694,6 +694,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       // the fight as the tray would send it: progress 0-1, tension 0-1.4, the handle's turns
       fightIn(f) { anglers.get(localId)?.a.setFight(f); },
       keep(state) { anglers.get(localId)?.a.keepFish(state); },
+      /** (checks) every angler drawn here: id, name and where they stand */
+      crowd() { return [...anglers].map(([id, x]) => ({ id, name: x.name, local: id === localId, line: x.a.line, at: x.a.root.position.toArray().map((v) => +v.toFixed(2)) })); },
       // (single: one frame of that length, as a slow phone would draw it, rather than split into short steps)
       /** (checks) a splash at a point on the water */
       torch(c) { torch.set(c); },

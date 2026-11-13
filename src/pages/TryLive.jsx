@@ -21,6 +21,7 @@ import InviteHere from "../components/InviteHere.jsx";
 import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
 import { saveLook } from "../lib/world3d/people.js";
 import { landedCatches } from "../lib/landed.js";
+import { useParty, joinPublic, publicSeat, forgetPublic, momentText } from "../lib/party.js";
 import { playerName, setPlayerName, cleanName, addCatch, setOutcome, diary as readDiary, summary as diarySummary } from "../lib/diary.js";
 import { conditionsAt } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
@@ -81,6 +82,36 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const [name, setName] = useState(playerName), [naming, setNaming] = useState(() => !playerName()), [nameDraft, setNameDraft] = useState(() => playerName() || "");
   const [diaryOpen, setDiaryOpen] = useState(false), [diaryList, setDiaryList] = useState(readDiary);
   const saveName = () => { const n = setPlayerName(nameDraft); if (n) { setName(n); setNaming(false); } };
+  // ---- the others fishing here: everyone playing this place is in its room (server/party.js public places), seen
+  // in the 3D view with the names they chose; you're in it as soon as you have a name ----
+  const [seat, setSeat] = useState(null), [toasts, setToasts] = useState([]);
+  const toast = (text, kind = "") => { const id = Math.random().toString(36).slice(2); setToasts((t) => [...t.slice(-3), { id, text, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200); };
+  const poseBus = useMemo(() => new EventTarget(), []);
+  const Proom = useParty(seat?.code || null, seat?.key || null, { onMessage: (m) => {
+    const who = (id) => Proom_ref.current?.members.find((x) => x.id === id)?.name || "Someone", mine = (id) => id === Proom_ref.current?.me?.id;
+    if (m.t === "pose") { poseBus.dispatchEvent(new CustomEvent("pose", { detail: { who: m.who, p: m.p } })); return; }
+    if (m.t === "chat" && m.c.sys && !mine(m.c.who)) toast(m.c.sys === "joined" ? `${m.c.name} is fishing here` : `${m.c.name} has gone`, "join");
+    if (m.t === "event" && !mine(m.ev.who)) { const txt = momentText(who(m.ev.who), m.ev, "virtual"); if (txt && (m.ev.type === "catch" || m.ev.type === "hooked")) toast(txt.replace(" (simulated)", "")); }
+  } });
+  const Proom_ref = useRef(Proom); Proom_ref.current = Proom;
+  useEffect(() => { // into this place's room (the one this phone had, or a new seat); out of the last place's
+    if (!name) return undefined;
+    let gone = false; const had = publicSeat(placeId);
+    if (had) setSeat(had); else joinPublic(placeId, { venue: venueOf(place), name, outfit: look.outfit, look: lookOnly(look) }).then((s) => { if (!gone) setSeat(s); }).catch(() => { /* offline or no server: fishing alone */ });
+    return () => { gone = true; Proom_ref.current?.send({ t: "leave" }); setSeat(null); };
+  }, [placeId, name]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (dropped from the room while away, or it's ended: a fresh seat)
+  useEffect(() => { if (Proom.status === "denied" || Proom.status === "ended") { forgetPublic(placeId); setSeat(null); joinPublic(placeId, { venue: venueOf(place), name, outfit: look.outfit, look: lookOnly(look) }).then(setSeat).catch(() => {}); } }, [Proom.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const meRoom = Proom.members.find((m) => m.id === Proom.me?.id);
+  const others = Proom.status === "live" ? Proom.members.filter((m) => m.spot && m.online && m.id !== Proom.me?.id) : []; // (only who's here now)
+  const poseSent = useRef({ at: 0, p: null });
+  const sendPose = (p) => {
+    const now = Date.now(), last = poseSent.current;
+    if (p && !p.spotAt && last.p && now - last.at < 300) return;
+    if (p && !p.spotAt && last.p && Math.hypot(p.x - last.p.x, p.z - last.p.z) < 0.05 && Math.abs(p.face - last.p.face) < 0.05 && p.air === last.p.air && now - last.at < 2000) return;
+    poseSent.current = { at: now, p: p && !p.spotAt ? p : null };
+    Proom_ref.current?.send({ t: "pose", p: p ? (p.spotAt ? { spotAt: true, at: p.at, face: p.face, edge: p.edge, cast: p.cast } : { x: p.x, y: p.y, z: p.z, face: p.face, air: p.air }) : null });
+  };
   const setLook = (v) => { setLookNow(v); saveLook(v); };
   const [panoPreview, setPanoPreview] = useState(() => { try { return localStorage.getItem("fishdock.panoPreview") === "1"; } catch { return false; } });
   const [view3d, setView3d] = useState(() => /\/3d(\/p[1-4])?$/.test(location.hash) || /^#\/?play/.test(location.hash)); // the 360° 3D view (#play opens straight into it)
@@ -131,7 +162,10 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const v = { ...view, facing: light === "dusk" ? Math.round(sun.az) : light === "night" && moon.alt > 0 ? Math.round(moon.az) : null };
   const scene = own ? { kind: "own", src: own.url, view: v, label: "Your photo (it stays on this device)" } : photo ? { kind: "commons", src: photo.url, view: v, commons: photo } : { kind: "representative", src: null, view: { ...defaultView(), facing: v.facing } };
   // virtual fishing: cast, a fish bites by itself, strike, hold to reel; every catch is simulated
-  const vf = useVirtualFishing({ species: sp.id, name: sp.name, lengthCm: length });
+  const vf = useVirtualFishing({ species: sp.id, name: sp.name, lengthCm: length, onEvent: (e) => { if (Proom_ref.current?.status === "live") Proom_ref.current.sendEvent(e.type, e.data); } });
+  // (your fight, a few times a second, so the others see the fish come in as you reel; never saved)
+  const fightSent = useRef(0);
+  useEffect(() => { const f = vf.fight; if (!f || Proom.status !== "live") return; const now = Date.now(); if (now - fightSent.current < 330) return; fightSent.current = now; Proom.send({ t: "pose", p: { fight: { progress: f.progress, tension: f.tension, slipping: f.slipping, turns: f.turns } } }); }, [vf.fight]); // eslint-disable-line react-hooks/exhaustive-deps
   vfReset.current = vf.reset;
   const events = vf.events;
   const [, setTick] = useState(0);
@@ -159,7 +193,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
   const catches = landedCatches(events, Date.now(), venue); // only once each is out of the water
   // (each fish landed goes in your diary once, with the place; keeping it or putting it back is added when you choose)
   useEffect(() => { let added = false; for (const e of catches) if (e?.id && e.data?.species && !diaryList.some((d) => d.id === String(e.id))) { addCatch({ id: String(e.id), species: e.data.species, name: e.data.name || speciesById(e.data.species)?.name, lengthCm: e.data.lengthCm, weightKg: e.data.weightKg, place: placeId, placeName: place.name.replace(/ \(.*\)$/, ""), at: e.t || Date.now() }); added = true; } if (added) setDiaryList(readDiary()); }, [catches.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: (placeId === initialPlace && point) || 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }], [events, sp.id, length, look, placeId, point]); // eslint-disable-line react-hooks/exhaustive-deps
+  const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: meRoom?.spot || (placeId === initialPlace && point) || 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }, ...others.map((m) => ({ id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, look: m.look || null, local: false, inspect: false, real: false, events: Proom.events.filter((e) => e.who === m.id), fishHint: null }))], [events, sp.id, length, look, placeId, point, meRoom?.spot, others, Proom.events]); // eslint-disable-line react-hooks/exhaustive-deps
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (
     <>
@@ -167,6 +201,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
               {fromMap ? <a className="fs-chip map-back" href={`#map/${placeId}`} aria-label="Back to map" title="Back to map"><Icon name="back" /><Icon name="explore" /></a> : null}
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${fishLabel} at ${place.name}: change`}>{fishLabel}</button>
+              {others.length ? <span className="fs-chip here-chip" title={others.map((m) => m.name).join(", ")}><Icon name="users" />{others.length + 1} here</span> : null}
               <span className="grow" />
               {/* in 3D these live in the view's one menu (top right); the photo view keeps its buttons */}
               {!view3d ? <>
@@ -187,7 +222,7 @@ export default function TryLive({ initialPlace, initialSpecies, initialPoint = n
       <div className="watch">
         <div className="watch-stage">
           {view3d ? (
-            <Stage3D onWindIn={vf.windIn} fightLive={vf.fightLive} tipLight={tipLight} onReel={{ tap: () => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }, hold: vf.hold }} menu={[{ key: "diary", label: `Your diary${diaryList.length ? ` (${diaryList.length})` : ""}`, icon: "book", onClick: () => { setDiaryList(readDiary()); setDiaryOpen(true); } }, { key: "name", label: name ? `Your name: ${name}` : "Choose your name", icon: "person", onClick: () => { setNameDraft(name || ""); setNaming(true); } }, { key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo onDecide={(what, ev) => { if (ev?.id) { setOutcome(String(ev.id), what); setDiaryList(readDiary()); } }} onTap={() => setUiHidden((h) => !h)}>
+            <Stage3D onWindIn={vf.windIn} fightLive={vf.fightLive} tipLight={tipLight} onReel={{ tap: () => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }, hold: vf.hold }} menu={[{ key: "diary", label: `Your diary${diaryList.length ? ` (${diaryList.length})` : ""}`, icon: "book", onClick: () => { setDiaryList(readDiary()); setDiaryOpen(true); } }, { key: "name", label: name ? `Your name: ${name}` : "Choose your name", icon: "person", onClick: () => { setNameDraft(name || ""); setNaming(true); } }, { key: "angler", label: "Your angler", icon: "person", onClick: () => setLookOpen(true) }, { key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "invite", label: "Invite a friend here", icon: "users", onClick: () => setInvite(true) }, { key: "demo", label: "Fish, place and weather", icon: "settings", onClick: () => setSheet(true) }, { key: "map", label: fromMap ? "Back to the map" : "Choose a spot on the UK map", icon: "explore", onClick: () => { location.hash = `#map/${placeId}`; } }, { key: "photo", label: "2D view (simpler)", icon: "layers", onClick: () => setView3d(false) }]} feel={haptics.feel} fight={vf.fight} reelOpts={vf.opts} onReelOpts={vf.setOpts} spotId={place.id} placeName={place.name.replace(/ \(.*\)$/, "")} venue={venue} anglers={anglers3d} light={lightNow} cond={c} facing={facing3d} sound={sound} now={Date.now} demo poseBus={poseBus} onPose={sendPose} toasts={toasts} onDecide={(what, ev) => { if (ev?.id) { setOutcome(String(ev.id), what); setDiaryList(readDiary()); } }} onTap={() => setUiHidden((h) => !h)}>
               {overlay}
             </Stage3D>
           ) : (

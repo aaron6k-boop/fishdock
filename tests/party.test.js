@@ -445,3 +445,48 @@ test("a PIN whose party has ended can start a new party, and the old members are
   const j = await b.json(); assert.notEqual(j.secret, r.body.secret); assert.notEqual(j.member.key, r.body.member.key);
   assert.equal(await h.sock(code, r.body.member.key), null, "the old host's key opens nothing");
 });
+
+test("public places: everyone at a mark in the same room without joining anyone, four anglers a room, no chat or voice", async (t) => {
+  const h = harness(t);
+  const pub = (name, mark = "gorleston-south-pier") => h.c("POST", "/public", { body: { mark, venue: "pier", name } });
+  const a = await pub("Gary"); assert.equal(a.status, 200, a.text);
+  assert.ok(validCode(a.body.code), "a room code in the usual form");
+  const b = await pub("Aaron"); assert.equal(b.body.code, a.body.code, "the same room for the same place");
+  const ga = await h.sock(a.body.code, a.body.member.key), hello = ga.last("hello");
+  assert.equal(hello.party.public, true); assert.equal(hello.party.mode, "virtual"); assert.equal(hello.party.chatOn, false); assert.equal(hello.party.voiceOn, false);
+  assert.ok(!("secret" in hello.party), "no host, no link to give out");
+  assert.deepEqual(hello.members.map((m) => m.name).sort(), ["Aaron", "Gary"]);
+  assert.ok(hello.members.every((m) => m.spot), "both fishing, each at a spot");
+  await ga.send({ t: "chat", text: "hello" });
+  assert.equal(ga.last("error")?.code, "chat_off", "no chat with strangers");
+  // four anglers fill a room; the fifth is put in the place's next room
+  await pub("C"); await pub("D");
+  const e = await pub("E"); assert.equal(e.status, 200); assert.notEqual(e.body.code, a.body.code);
+  // another place has its own rooms; somewhere that isn't one of FishDock's places has none
+  const other = await pub("F", "cromer-pier"); assert.notEqual(other.body.code, a.body.code);
+  assert.equal((await pub("G", "my-secret-mark")).status, 404);
+  // the room can't be reached as a private party: no preview by its code, no join without the public route
+  assert.equal((await h.c("GET", `/${a.body.code}?via=code`)).status, 404);
+});
+
+test("public places keep nobody for long: gone two hours, dropped with their fishing; back, put in again", async (t) => {
+  const room = new PartyRoom(null), now = Date.UTC(2026, 10, 13, 18);
+  room.initPublic({ code: "ABCDEF", mark: "gorleston-south-pier", venue: "pier" }, now);
+  const a = await room.joinPublic({ name: "Gary" }, now);
+  room.s.events.push({ seq: 1, t: now, who: a.member.id, type: "cast" });
+  for (const n of ["B", "C", "D"]) await room.joinPublic({ name: n }, now);
+  assert.equal((await room.joinPublic({ name: "E" }, now)).error, "full");
+  const later = now + 2 * 3600e3 + 1, back = await room.joinPublic({ name: "Gary" }, later);
+  assert.ok(back.member, "the place has room again");
+  assert.equal(Object.keys(room.s.members).length, 1, "the four who'd gone are dropped");
+  assert.equal(room.s.events.length, 0, "and their fishing with them");
+  assert.ok(room.s.expiresAt > later + 29 * 86400e3, "the room lasts while people use it");
+});
+
+test("public places: someone who's closed the game frees their spot after a minute, not ten", async (t) => {
+  const room = new PartyRoom(null), now = Date.UTC(2026, 10, 13, 20);
+  room.initPublic({ code: "ABCDEG", mark: "gorleston-south-pier", venue: "pier" }, now);
+  for (const n of ["A", "B", "C", "D"]) await room.joinPublic({ name: n }, now);
+  assert.equal((await room.joinPublic({ name: "E" }, now + 30e3)).error, "full", "half a minute: still theirs");
+  assert.ok((await room.joinPublic({ name: "E" }, now + 61e3)).member, "a minute: free");
+});
