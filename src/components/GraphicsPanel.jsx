@@ -87,7 +87,7 @@ export default function GraphicsPanel({ view, setOpts, world, onClose, scene = n
           </div>
         );
       })}
-      <button type="button" role="switch" aria-checked={view.fpsShow !== false} className={`ft-pill${view.fpsShow !== false ? " on" : ""}`} onClick={() => setOpts({ fpsShow: view.fpsShow === false })}>Show FPS</button>
+      <button type="button" role="switch" aria-checked={view.fps2 !== false} className={`ft-pill${view.fps2 !== false ? " on" : ""}`} onClick={() => setOpts({ fps2: view.fps2 === false })}>Show FPS</button>
       <button type="button" className="ft-pill" onClick={reset}>Reset to recommended</button>
       {devMode() ? <DevDiagnostics world={world} view={view} setOpts={setOpts} scene={scene} /> : null}
     </div>
@@ -136,7 +136,7 @@ function DevDiagnostics({ world, view, setOpts, scene }) {
   // measured frame by frame; everything you had set is put back afterwards, whatever happens
   const run = async () => {
     if (running || !world) return; setRunning(true);
-    const saved = { gfx: view.gfx || "auto", gfxC: view.gfxC && typeof view.gfxC === "object" ? { ...view.gfxC } : {}, battery: !!view.battery, fpsShow: view.fpsShow !== false };
+    const saved = { gfx: view.gfx || "auto", gfxC: view.gfxC && typeof view.gfxC === "object" ? { ...view.gfxC } : {}, battery: !!view.battery, fps2: view.fps2 !== false };
     const rows = [];
     try {
       const fixed = () => { world.setEnv?.({ light: { sunAlt: 28, sunAz: 200 }, cond: { cloudPct: 30, windKph: 16, precipMm: 0 }, facing: scene?.facing ?? 180 }); world.lookAtRod?.(); };
