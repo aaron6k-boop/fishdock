@@ -18,12 +18,26 @@ export function loadPart(name) {
   if (!files.has(name)) {
     loader ||= new GLTFLoader();
     // (the build's id on the address: the models keep their file names from one build to the next and are kept by
-    // the browser for a week, so a phone that had fetched fp_body.glb went on drawing the old hands under new code)
+    // the browser for a week, so a phone that had fetched an earlier arms model went on drawing the old hands under new code)
     const p = loader.loadAsync(MODELS_BASE + name + ".glb" + MODEL_V).then((g) => g.scene);
     p.catch(() => files.delete(name));
     files.set(name, p);
   }
   return files.get(name);
+}
+
+const whole = new Map();
+/** The whole model (its scene and its clips: { scene, animations }), loaded once; for a rigged model whose clips are
+ * wanted too (fp_rig.glb). */
+export function loadModel(name) {
+  if (typeof document === "undefined") return Promise.reject(new Error("no document"));
+  if (!whole.has(name)) {
+    loader ||= new GLTFLoader();
+    const p = loader.loadAsync(MODELS_BASE + name + ".glb" + MODEL_V);
+    p.catch(() => whole.delete(name));
+    whole.set(name, p);
+  }
+  return whole.get(name);
 }
 
 /** A named node of a model, cloned (geometry and materials shared), or null. */

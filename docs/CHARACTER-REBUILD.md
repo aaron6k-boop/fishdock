@@ -221,22 +221,74 @@ end-to-end checks; then they are removed.
 Gates, each shown to Aaron before the next starts: 1 static grip, 2 ten reel turns, 3 the two-handed cast, 4 a full
 catch in the game.
 
+## Eighth stage (13 November): the rig in the game
+
+Gates 2 and 3 were made in Blender, the rig exported, and it now draws your arms in first person in place of the old
+hands. The old hand code (`fpHands.js`, `grips.js`) and its models (`fp_body.glb`, `fp_arms.glb`) are gone.
+
+- **Gate 2, ten turns of the reel** (`source-assets/blender/rig/13_gate2_reel.py`). The crank is keyframed through ten
+  uninterrupted turns at one a second, forwards over the top as a spinning reel winds, and the knob drives the left
+  hand: the knob turns in the fingers and the hand turns about it only as far as keeps the wrist comfortable (between
+  -2 and 8 degrees), the shoulder rising and falling a little with it, the elbow following by IK. Every frame: the first
+  two fingers on the knob (their skin 0.8 and 1.1 mm into it, as fingertips press), the thumb 4 mm off it, the ring and
+  little fingers curled behind; nothing deeper into the knob, crank, reel or rod than 1.1 mm; wrist bend 7 to 30 degrees
+  towards the palm and 5 to 30 towards the little finger, forearm turned 44 to 54 degrees, elbow 99 to 152 degrees; both
+  arm bones at 1.0000 of their length on every frame; the ninth and tenth turns identical. Videos from first person, the
+  side and close to the knob.
+- **The other grips** (`14_grips.py`), searched the Gate 1 way on both hands: the drop net's rope and ring, the landing
+  net's pole, the rod's butt and a fish's tail; a relaxed hand and one cupped under a fish. No finger's skin goes into
+  what it holds by more than 1.2 mm. On the thicker handles (the pole, the butt, the tail) the palm's skin at the base of
+  the fingers goes 6 to 16 mm into the handle where the fingers fold over it; it is inside the fist.
+- **Gate 3, the cast** (`15_gate3_cast.py`). Two-handed and overhead, as a 12 ft pier rod is cast. The body's turn is the
+  Mixamo "Fishing Cast" motion capture (the chest's turn against the hips, up to 23 degrees in the wind-up), retimed to
+  the game's cast. The rod's place is searched at five moments (0.3 s, the wind-up at 0.6 s, 0.72 s, the release at
+  0.85 s, the follow-through at 1.25 s) for the place where both arms reach without stretching, the wrists inside
+  their range, each elbow where its wrist is most comfortable and hands and arms at least 15 cm from the eye; the left
+  hand may hold the butt anywhere along its first 25 cm. The path runs smoothly through those moments, still at the
+  hold, the top of the wind-up and the follow-through. One fault found and fixed: the game squared the rod to the
+  world's up, so as it went past upright it rolled half a turn about itself and took the right hand round with it (the
+  wrist bent 120 degrees). The rod now turns rigidly from the hold, in Blender and in the game (`fpRig.js rodFrame`),
+  and the whole cast stays inside the natural range: right wrist 16 to 44 degrees back, 7 to 22 towards the little
+  finger, forearm turned up to 55 degrees, elbow 61 to 127; left wrist 42 back to 14 forward, within 17 either side,
+  elbow 99 to 149. Both arms at 1.0000 of their length on every frame. Videos from first person, the side and over the
+  shoulder.
+- **Export** (`16_export.py`, `public/models/fp_rig.glb`, 1.6 MB): the 73 deform bones, the hands and forearms (7,230
+  points) and the jacket made lighter (12,000 points), and four clips sampled from the rig: the hold, one turn of the
+  reel, the cast, and every grip's fingers. `node tools/fp-rig-data.mjs` makes the numbers that go with it
+  (`src/lib/world3d/fpRigData.js`) from what the Blender jobs wrote (`source-assets/blender/rig/data/`).
+- **In the game** (`src/lib/world3d/fpRig.js`, the same interface as before). Each frame: the base clip (the hold, the
+  cast's body turn at the cast's moment, the reel's shoulder at the knob's angle); the body under the camera with its
+  eye at the camera, turning with the view, level when the view looks down by an angle set from the field of view (so
+  the held reel sits half way from the middle of the picture to the bottom on a wide screen or a phone); a target for
+  each hand from what it holds (the reel seat and the knob by the grips made in Blender, the other handles by the
+  cylinder grips, turned about the handle for the most comfortable wrist); two-bone IK from each shoulder, never
+  stretching (out of reach the collar bone brings the shoulder forward a little and the body leans towards it over a
+  few frames, never snapping), the forearm's twist shared with its lower half; the elbow where Blender's IK put it for
+  the hold and the knob and where the wrist is most comfortable anywhere else, kept over the rail when reaching for the
+  rope; the fingers set to the grip's pose. Repeated taps to reel are unchanged.
+- **Checked against Blender** (`tests/fpRig.test.js`, the rig posed in Node as the game poses it): the hold puts the
+  right hand and elbow where Gate 1 has them to within 0.1 mm; the left hand goes round the knob exactly as in Gate 2's
+  last turn (within 1 mm) looking ahead, down 43 degrees and up 20, turned either way; the cast keeps the right hand on
+  the reel seat (within 2 mm) and the left on the butt (within 5 mm) all the way, no bone ever longer or shorter, the
+  wrists and elbows inside their range while both hands are on the rod (the left elbow goes nearly straight for about
+  a sixth of a second as that hand goes back to the knob); the other grips reach what they hold with their own finger
+  shapes.
+- **Test page** (`tools/rig-preview/`, `node tools/build-rig-preview.mjs`): the rig on its own with the same code and
+  data: the hold, winding, the cast, the other grips and looking about, from first person, the front, the side, over
+  the shoulder or freely, with the skeleton, the IK targets and joints and the attachment points drawn over it and the
+  joint angles read out live.
+- **Gate 4, a whole catch in the game** (`tools/fp-film.mjs`): the hold and looking about, the cast, winding in a
+  fight and landing with the drop net, filmed frame by frame from the game on a wide screen and an upright phone.
+
 ## Not done
 
-- The hand mesh is the same one. Its measurements are right and it bends cleanly at the wrist, so it was kept. Its
-  weak points are a bare tight fist (the knuckles are still somewhat angular and the thumb's web still stretches,
-  after the weights were eased) and blocky colour on the palm; no corrective shapes or palm bones have been added.
-- Other games show less arm than this does on an upright phone: The Angler's hands take up about a third of a wide
-  screen's height. The view here has not been changed again.
-- With an arm at full stretch, or where a wrist would have to bend too far, the upper arm's top end still comes away
-  from the shoulder (by 20 to 35 cm in places while landing). It is out of the picture when it happens.
-- The left hand is below the picture at the moment of release: looking ahead you see it on the butt in the wind-up
-  and not again until it comes to the reel.
-- Line is not drawn from the spool to the first finger and up through the rings at the reel.
-- For a frame or so as the hands change over on the rope a dark patch of sleeve shows at the left edge.
-- No torso or legs in first person: looking straight down you see the deck, not your body.
-- The first-person arms and the third-person angler are still separate models. The cast now moves the rod the same
-  way in both; other moves are not shared.
-- No breathing or weight shift. The older hand solver is still in the code for holds without a made grip.
-- No frame times from a real phone or PC. The recordings are from a software renderer and show shape and movement
-  only, not smoothness.
+- Not looked at on a real phone or PC: the films are from a software renderer and show shape and movement, not
+  smoothness.
+- The jacket has cuffs but no folds, and no cloth movement.
+- The left thumb sits 4 mm off the knob rather than on it.
+- The palm's skin goes into the thicker handles at the base of the fingers (see the grips above); it is inside the fist.
+- The landing net's pole, the fish and the rope use the general grips searched in Blender for those sizes, placed in
+  the game by the comfort search, not a pose made for each moment; while landing with the drop net the arms reach for
+  the rope and ring where the game puts them, leaning when they are further than the arms reach.
+- No breathing or weight shift beyond the cast's body turn.
+- The third-person angler is a separate model.

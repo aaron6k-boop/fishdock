@@ -204,7 +204,7 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
   const standOutfit = { ...(outfit || {}), jacket: COATS[L.coat]?.hex ?? outfit?.jacket };
   const stand = createFigure({ id, look: L.gloves ? { ...L, skinHex: 0x23262a } : L, outfit: standOutfit, venue }); group.add(stand.group);
   let H = null, fp = false, gone = false;
-  // (in first person none of the body is drawn: your forearms and hands are drawn on their own, fpHands.js)
+  // (in first person none of the body is drawn: your arms and hands are drawn on their own, fpRig.js)
   const show = () => { if (H) H.root.visible = !fp; stand.group.visible = !H && !fp; };
   if (realistic && typeof document !== "undefined") {
     Promise.all([personGLB(L.file || "gardener"), clipSet()]).then(([g, clips]) => {

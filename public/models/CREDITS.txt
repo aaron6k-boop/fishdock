@@ -5,21 +5,13 @@ The net mesh textures are from ambientCG (https://ambientcg.com), by Lennart Dem
 No attribution is required by the licence; credited here with thanks.
 The full list of third-party assets, with sources, licences and file hashes: source-assets/ASSET-LICENCES.json.
 
-fp_body.glb (your arms and hands in first person, with the jacket's sleeves modelled on them) and fp_arms.glb (the
-forearms alone, the fallback) are cut from a person made with MPFB, MakeHuman for Blender
-(https://static.makehumancommunity.org/mpfb/), with the MakeHuman system assets' skin; the people MPFB makes and the
-system assets are CC0 1.0. Credited with thanks to the MakeHuman team.
-The sleeves of fp_body.glb are the sleeves of the MakeHuman system assets' field jacket ("male_casualsuit05"), fitted to
-that person by MPFB: its folds, seams and cuff are its makers' own, from its normal map; its colour map is kept only
-as light and dark so the game can colour it as your jacket; the cuff is drawn in round the wrist. The skin's colour is
-the same MakeHuman skin laid out on a sheet of its own, with a normal map and a roughness map baked from it in Blender
-(source-assets/blender/make_fp_body_hd.py).
-From the third build (source-assets/blender/make_fp_body_bs.py) the hands and wrists of fp_body.glb are those of the
-realistic male body in Blender Studio's Human Base Meshes bundle, version 1.1.0
-(https://www.blender.org/download/demo-files/; CC0 1.0 as announced at its release, the bundle itself carries no
-licence file), set on the MPFB person's skeleton with the
-finger joints moved to that hand's own, its finest sculpted level baked to a normal map, and the MakeHuman skin's
-colour carried across to it. Credited with thanks to Blender Studio.
+fp_rig.glb (your arms, hands and jacket in first person, with their skeleton and clips) is the realistic male body in
+Blender Studio's Human Base Meshes bundle, version 1.1.0 (https://www.blender.org/download/demo-files/; CC0 1.0 as
+announced at its release, the bundle itself carries no licence file), rigged with Rigify in Blender for FishDock, its
+hands and forearms cut from the body and its jacket made from the body (source-assets/blender/rig/). Its grips, the
+reel's ten turns and the cast were posed and solved in Blender on that rig. The body's turn through the cast comes from
+the "Fishing Cast" motion capture on Adobe Mixamo (https://www.mixamo.com), which Adobe allows royalty free in games;
+only that turn, carried onto the rig, is in the file. Credited with thanks to Blender Studio and Adobe.
 
 pierprops.glb (the pier's lamps, lifebuoy stations, bollards and benches): the bollard, bench and lifebuoy housing were
 modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and the buoy Poly Haven's "Lifebuoy"

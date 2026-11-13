@@ -1,0 +1,328 @@
+// ---- fpRig: your own arms and hands in first person, rigged and animated in Blender ----
+// The character (public/models/fp_rig.glb) is the Blender Studio realistic male (CC0) with a Rigify rig, its jacket made
+// from the body, exported with its deform skeleton and four clips: the hold (Gate 1), one turn of the reel (Gate 2), the
+// cast (Gate 3) and the fingers of every grip (source-assets/blender/rig/, docs/CHARACTER-REBUILD.md). The numbers that
+// go with it (where each hand holds the reel seat, the knob all the way round a turn, every handle-sized grip, the eye)
+// are in fpRigData.js, made from the Blender output by tools/fp-rig-data.mjs.
+// Each frame, in one pipeline:
+//   1. the base clip: the hold, or the cast's body turn at the cast's moment, or the reel's shoulder at the handle's angle
+//   2. the body under the camera: the eye at the camera, turning with the view (as a first-person game's arms do), level
+//      when you look down by p0 (set for the field of view: setRigView)
+//   3. a contact target for each hand from what it holds: the reel seat and the knob by the grips solved in Blender; a
+//      rope, the net's ring or pole, the rod's butt, a fish's tail by the cylinder grips, turned about the handle for
+//      the most comfortable wrist (the same measure as the gates)
+//   4. two-bone IK from each shoulder (never stretched: out of reach, the shoulder comes forward a little and the hand
+//      stops short rather than the arm getting longer), the forearm's twist shared with its lower half
+//   5. the fingers set to the grip's own pose
+// The same interface as the drawn hands it replaces (fpHands.js): { group, show(on), pose(o), wrists, dispose() }.
+import * as THREE from "three";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { loadModel } from "./glbParts.js";
+import { RIG } from "./fpRigData.js";
+import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "./fpIk.js";
+
+const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const A3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+const Q4 = (a) => new THREE.Quaternion(a[0], a[1], a[2], a[3]);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const ease = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+/** the name three gives a Blender bone (GLTFLoader drops dots and the like) */
+export const boneName = (s) => s.replace(/\s/g, "_").replace(/[[\].:/]/g, "");
+const BLEND = 0.3; // seconds to go from one grip to the next
+const KIND_CYL = { rope: "rope", hoop: "hoop", pole: "pole", butt: "butt", tailwrist: "tail", carry: "butt" };
+const KIND_FLAT = { fish: "cradle", open: "relax", ready: "relax", line: "relax" };
+
+/** the rod's frame (x left of it, y up from it, z to the tip) for a rod pointing along the unit vector t: squared to the
+ * world's up; or, in your own hands (rest: the rod's direction in the hold), turned from the hold as one rigid thing the
+ * shortest way, so that through a cast the reel stays on the same side of the rod as the hand holding it (under the rod
+ * held forwards, on top of it back over your shoulder) rather than rolling half a turn as the rod passes upright */
+export function rodFrame(t, rest = null, upRef = null) {
+  const up0 = (d, u0) => { const up = (u0 ? u0.clone() : new THREE.Vector3(0, 1, 0)).addScaledVector(d, -d.dot(u0 || new THREE.Vector3(0, 1, 0))); if (up.lengthSq() < 1e-4) up.set(1, 0, 0); up.normalize(); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(up, d), up, d)); };
+  return rest && t.dot(rest) > -0.95 ? new THREE.Quaternion().setFromUnitVectors(rest, t).multiply(up0(rest, upRef)) : up0(t);
+}
+/** your body's up in the view (vf, vu: the view's forward and up): the up the hold's rod is squared to, so the reel
+ * hangs the same way in your hands whether you look up or down */
+export const bodyUp = (vf, vu) => vf.clone().multiplyScalar(Math.sin(P0)).addScaledVector(vu, Math.cos(P0)).normalize();
+
+// ---- framing: the arms turn with the view, so where they sit in the picture is set by the view's pitch at which the
+// body is level (p0). It's chosen for the picture's height: the held reel half way from the middle to the bottom edge,
+// so on a wide screen (62 degrees top to bottom) the knob hand is in frame and on an upright phone (79) it sits low ----
+const FRAME_AT = 0.5;
+export const framingP0 = (vfovDeg) => -((RIG.reelBelow - (FRAME_AT * vfovDeg) / 2) * Math.PI) / 180;
+let P0 = framingP0(62);
+/** the game's first-person field of view top to bottom (degrees), for the framing (world.js, each frame) */
+export function setRigView(vfovDeg) { if (vfovDeg > 10 && vfovDeg < 120) P0 = framingP0(vfovDeg); }
+export const rigP0 = () => P0;
+/** a place and angle from the eye, level (RIG.holdBody, the cast's path), in the view's frame at p0 as angler.js uses
+ * them: x right, y up, z along the view (metres), e the angle up from the view's line and sw round to the right
+ * (radians), written the way round that turns less than a quarter turn (the keys are mixed in straight lines) */
+export function toView(k, p0 = P0) {
+  const c = Math.cos(p0), s = Math.sin(p0), vy = k.y * c - k.z * s, vz = k.y * s + k.z * c;
+  const d = [Math.cos(k.e) * Math.sin(k.sw), Math.sin(k.e), Math.cos(k.e) * Math.cos(k.sw)], du = d[1] * c - d[2] * s, df = d[1] * s + d[2] * c;
+  const e1 = Math.asin(clamp(du, -1, 1)), sw1 = Math.atan2(d[0], df);
+  return Math.abs(sw1) <= Math.PI / 2 ? { x: k.x, y: vy, z: vz, e: e1, sw: sw1 } : { x: k.x, y: vy, z: vz, e: Math.PI - e1, sw: Math.atan2(-d[0], -df) };
+}
+/** the hold in the view's frame now */
+export const holdView = () => toView(RIG.holdBody);
+
+/** where the reel is held and the rod's angle at a moment of the cast (seconds), in the view's frame as angler.js
+ * places it: a smooth curve through Gate 3's moments, still at the hold, at the top of the wind-up and through the
+ * follow-through. k0: the hold it starts from and goes back to (the game's own, holdView() unless a film sets another) */
+export function castAt(t, k0 = holdView()) {
+  const path = RIG.cast.path, n = path.length, T = path.map((k) => k.t), P = path.map((k, i) => (i === 0 || i === n - 1 ? k0 : toView(k))), still = new Set(RIG.cast.still);
+  t = clamp(t, 0, T[n - 1]); let i = 0; while (i < n - 2 && t > T[i + 1]) i++;
+  const tan = (k, c) => (still.has(k) ? 0 : (P[k + 1][c] - P[k - 1][c]) / (T[k + 1] - T[k - 1]));
+  const h = T[i + 1] - T[i], u = (t - T[i]) / h, h00 = 2 * u ** 3 - 3 * u ** 2 + 1, h10 = u ** 3 - 2 * u ** 2 + u, h01 = -2 * u ** 3 + 3 * u ** 2, h11 = u ** 3 - u ** 2;
+  const out = {}; for (const c of ["x", "y", "z", "e", "sw"]) out[c] = h00 * P[i][c] + h10 * h * tan(i, c) + h01 * P[i + 1][c] + h11 * h * tan(i + 1, c);
+  return out;
+}
+
+let DIM = 1; const liveMats = new Set();
+/** the arms in the dark: the colours scaled down at night unless a torch is on (world.js) */
+export function setHandsDim(k) { DIM = clamp(k, 0.2, 1); for (const m of liveMats) m.color.copy(m.userData.base).multiplyScalar(DIM); }
+
+/** a clip's tracks bound to the cloned skeleton's bones, to be sampled at any moment (Blender's frame n is at n / fps
+ * seconds: the first frame of each clip, frame 1, at 1 / fps) */
+function sampler(clip, bones) {
+  const ch = [];
+  for (const tr of clip.tracks) {
+    const dot = tr.name.lastIndexOf("."), b = bones.get(tr.name.slice(0, dot)), prop = tr.name.slice(dot + 1);
+    if (!b || !(prop === "quaternion" || prop === "position" || prop === "scale")) continue;
+    ch.push({ b, prop, it: tr.createInterpolant() });
+  }
+  return {
+    duration: clip.duration,
+    apply(t, only) { for (const c of ch) { if (only && !only(c.b.name)) continue; const v = c.it.evaluate(clamp(t, 0, clip.duration)); c.b[c.prop].fromArray(v); } },
+    value(t, name, prop = "quaternion") { const c = ch.find((x) => x.b.name === name && x.prop === prop); return c ? Array.from(c.it.evaluate(t)) : null; },
+  };
+}
+
+export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, model = null } = {}) {
+  const group = new THREE.Group(); group.name = "fp-rig"; group.visible = false;
+  const root = new THREE.Group(); root.name = "fp-rig-root"; group.add(root);
+  const skinMat = new THREE.MeshStandardMaterial({ color: gloves ? 0x2b2e34 : skinHex, roughness: gloves ? 0.72 : 0.55, metalness: 0 });
+  const coatMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.86, metalness: 0 });
+  // (cloth right at your eye isn't drawn: the collar and the shoulders sit around the camera)
+  coatMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .13) discard;\n#include <opaque_fragment>"); };
+  for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(DIM); liveMats.add(m); }
+  let R = null, failed = false;
+  const hands = [0, 1].map((i) => ({ side: i ? "R" : "L", kind: undefined, cur: null, from: null, u: 1, want: null, fing: null, fingFrom: null, cyl: null, wrist: null }));
+
+  // (model: the loaded fp_rig.glb handed in, as the tests do; otherwise it's fetched)
+  if (model) { R = build(model); root.add(R.scene); }
+  else loadModel("fp_rig").then((g) => { R = build(g); root.add(R.scene); }).catch((e) => { failed = true; if (typeof console !== "undefined") console.warn("fp rig:", e?.message || e); });
+
+  function build(g) {
+    const scene = cloneSkinned(g.scene); const bones = new Map();
+    scene.traverse((o) => {
+      if (o.isBone) bones.set(o.name, o);
+      if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || "") ? coatMat : skinMat; }
+    });
+    const B = (n) => bones.get(boneName(n));
+    const clips = {}; for (const c of g.animations) clips[c.name] = sampler(c, bones);
+    const rest = new Map(); for (const [n, b] of bones) rest.set(n, { q: b.quaternion.clone(), p: b.position.clone() });
+    // the grips' finger poses, read from the grips clip, one frame each
+    const fingerBones = { L: [], R: [] };
+    for (const [n] of bones) { const m = /^DEF-(f_\w+|thumb|palm)\d*(L|R)$/.exec(n); if (m) fingerBones[m[2]].push(n); }
+    const grips = {};
+    RIG.grips.forEach((name, k) => { grips[name] = { L: new Map(), R: new Map() }; for (const S of "LR") for (const n of fingerBones[S]) { const v = clips.grips?.value((k + 1) / RIG.fps, n); if (v) grips[name][S].set(n, new THREE.Quaternion().fromArray(v)); } });
+    // the hold, as Blender left it: each arm's bones' lengths, which way its elbow bends and the forearm's twist at rest
+    clips.hold.apply(1 / RIG.fps); scene.updateMatrixWorld(true);
+    const wp = (b) => b.getWorldPosition(V()), wq = (b) => b.getWorldQuaternion(new THREE.Quaternion());
+    const arm = {};
+    for (const S of "LR") {
+      const sh = B(`DEF-shoulder.${S}`), U = B(`DEF-upper_arm.${S}`), U1 = B(`DEF-upper_arm.${S}.001`), F = B(`DEF-forearm.${S}`), F1 = B(`DEF-forearm.${S}.001`), H = B(`DEF-hand.${S}`);
+      const S0 = wp(U), E0 = wp(F), W0 = wp(H), n0 = E0.clone().sub(S0).cross(W0.clone().sub(E0)).normalize();
+      const ax = W0.clone().sub(S0).normalize(), mid = S0.clone().addScaledVector(ax, E0.clone().sub(S0).dot(ax));
+      const qU = wq(U).invert(), qF = wq(F).invert();
+      arm[S] = { sh, U, U1, F, F1, H, L1: E0.distanceTo(S0), L2: W0.distanceTo(E0),
+        aU: E0.clone().sub(S0).normalize().applyQuaternion(qU), nU: n0.clone().applyQuaternion(qU),
+        aF: W0.clone().sub(E0).normalize().applyQuaternion(qF), nF: n0.clone().applyQuaternion(qF),
+        pole: E0.clone().sub(mid).normalize(), // (in the model's own frame: down and out from the shoulder-to-hand line)
+        f1q: F1.quaternion.clone(), f1ax: H.position.clone().normalize(), tw0: twistAbout(H.quaternion, H.position.clone().normalize()),
+        shq: sh.quaternion.clone() };
+    }
+    // (the eye: where it is at the hold, carried in the head bone's own frame so it moves with the head)
+    const head = B(RIG.eye.bone), eyeLocal = A3(RIG.eye.hold).applyMatrix4(head.matrixWorld.clone().invert());
+    return { scene, bones, B, clips, rest, grips, arm, head, eyeLocal, fingerBones };
+  }
+
+  // ---- the hand's place on what it holds ----
+  const loc = { L: null, R: null };
+  for (const S of "LR") loc[S] = { k: A3(RIG.loc[S].k), palm: A3(RIG.loc[S].palm), along: A3(RIG.loc[S].along) };
+  /** the hand bone's place and turn (world) holding the knob at the handle's angle: the grip from Gate 2's turn */
+  function knobTarget(spec, Mg, qg) {
+    const kq = spec.sock.quat.clone().premultiply(qg), kp = spec.sock.pos.clone().applyMatrix4(Mg);
+    let th = 0;
+    if (spec.hub) { const rel = spec.sock.pos.clone().sub(spec.hub).applyQuaternion(spec.sock.quat.clone().invert()); th = (Math.atan2(-rel.z, -rel.y) * 180 / Math.PI + 360) % 360; }
+    const T = RIG.knob, n = T.length; let i = 0; while (i < n - 1 && T[i + 1].th <= th) i++;
+    const a = T[i], b = T[(i + 1) % n], span = ((b.th - a.th) + 360) % 360 || 360, f = clamp((((th - a.th) + 360) % 360) / span, 0, 1);
+    const p = A3(a.p).lerp(A3(b.p), f), q = Q4(a.q).slerp(Q4(b.q), f);
+    return { pos: p.applyQuaternion(kq).add(kp), quat: kq.clone().multiply(q), grip: "hold", th };
+  }
+  function seatTarget(spec, Mg, qg) {
+    const sq = spec.sock.quat.clone().premultiply(qg), sp = spec.sock.pos.clone().applyMatrix4(Mg);
+    return { pos: A3(RIG.seat.p).applyQuaternion(sq).add(sp), quat: sq.clone().multiply(Q4(RIG.seat.q)), grip: "hold" };
+  }
+  /** a handle-shaped thing held round (or a flat hand laid on something): every way round the handle tried, the
+   * one with the most comfortable wrist taken, staying with the last one unless another is clearly better */
+  function wrapTarget(h, A, spec, Mg, qg, bodyQ) {
+    const S = h.side, cylName = KIND_CYL[spec.kind], flat = !cylName;
+    const g = flat ? null : RIG.cyl[cylName][S];
+    const at = spec.at.clone().applyMatrix4(Mg), axis = (spec.axis ? spec.axis.clone() : V(0, 1, 0)).applyQuaternion(qg).normalize();
+    const palm0 = (spec.palm ? spec.palm.clone() : V(0, -1, 0)).applyQuaternion(qg); palm0.addScaledVector(axis, -palm0.dot(axis));
+    if (palm0.lengthSq() < 1e-6) palm0.set(0, -1, 0).addScaledVector(axis, -axis.y); palm0.normalize();
+    const dH = flat ? loc[S].along.clone() : A3(g.d), pH = flat ? loc[S].palm.clone() : A3(g.pn), cH = flat ? A3(RIG.flat[S].c) : A3(g.c);
+    // (each way of holding it judged with the elbow where it is now, turned as the arm last chose)
+    const shW = A.U.getWorldPosition(V()), pole = A.pole.clone().applyQuaternion(bodyQ); if (h.turn) pole.applyAxisAngle(at.clone().sub(shW).normalize(), h.turn);
+    let best = null;
+    // (a rod's butt may be held anywhere along its first 25 cm: the hand goes as far up it as it needs to be reached)
+    const slides = spec.kind === "butt" ? [0, 0.06, 0.12, 0.18, 0.25] : [0];
+    for (const sl of slides) {
+      const atS = at.clone().addScaledVector(axis, sl);
+      for (const sg of [1, -1]) for (let k = -6; k <= 6; k++) {
+        const phi = k * Math.PI / 6;
+        const pw = flat ? palm0.clone() : palm0.clone().applyAxisAngle(axis, phi), aw = flat ? axis.clone().multiplyScalar(sg).applyAxisAngle(palm0, phi) : axis.clone().multiplyScalar(sg);
+        const q = pairRotation(dH, pH, aw, pw), pos = atS.clone().sub(cH.clone().applyQuaternion(q));
+        const ik = twoBone(shW, pos, A.L1, A.L2, pole);
+        const w = wristAngles(shW, ik.elbow, ik.wrist, q, loc[S], S);
+        const key = `${sg}|${k}|${sl}`;
+        const c = limitsPen(w) * 4 + (Math.abs(w.flex) + Math.abs(w.rad)) * 0.02 + ik.short * 400 + Math.abs(phi) * 0.1 + sl * 2 + (h.cyl && h.cyl !== key ? 0.6 : 0);
+        if (!best || c < best.c) best = { c, pos, quat: q, key, short: ik.short };
+        if (flat && k === 0) break; // (a flat hand isn't turned about its own palm: only which way the fingers point)
+      }
+    }
+    h.cyl = best.key;
+    return { pos: best.pos, quat: best.quat, grip: flat ? KIND_FLAT[spec.kind] : cylName };
+  }
+
+  // ---- one arm onto its target ----
+  const tmpQ = new THREE.Quaternion();
+  function setWorldQuat(b, q) { b.parent.getWorldQuaternion(tmpQ); b.quaternion.copy(tmpQ.invert().multiply(q)); b.updateMatrixWorld(true); }
+  const TURNS = [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180].map((d) => (d * Math.PI) / 180); // (all the way round: winding up a cast, the elbow comes up and forwards)
+  const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+  /** the elbow's turn about the shoulder-to-hand line with the most comfortable wrist for this hand (radians), as
+   * Gate 3 chooses it: near the turn it had, and near none */
+  const MgInv = new THREE.Matrix4();
+  function bestTurn(A, S, h, shW, target, pole, rail) {
+    const ax = target.pos.clone().sub(shW).normalize(); let best = null;
+    for (const a of TURNS) {
+      const ik = twoBone(shW, target.pos, A.L1, A.L2, pole.clone().applyAxisAngle(ax, a)), w = wristAngles(shW, ik.elbow, ik.wrist, target.quat, loc[S], S);
+      let c = limitsPen(w) * 4 + (Math.abs(w.flex) + Math.abs(w.rad)) * 0.02 + Math.abs(a) * 0.25 + angDiff(a, h.turnTo ?? 0) * 0.6;
+      // (a hand out past the rail, on the drop net's rope: the forearm comes over the top rail, never through it)
+      if (rail) { const e = ik.elbow.clone().applyMatrix4(MgInv), wr = ik.wrist.clone().applyMatrix4(MgInv);
+        if (wr.z < rail.z + 0.04 && e.z > rail.z) { const t = (rail.z - wr.z) / (e.z - wr.z), y = wr.y + (e.y - wr.y) * t; if (y < rail.y + 0.08) c += (rail.y + 0.08 - y) * 60; } }
+      if (!best || c < best.c) best = { c, a };
+    }
+    return best.a;
+  }
+  function solveArm(A, S, target, bodyQ, h, search, dt, rail = null) {
+    let shW = A.U.getWorldPosition(V());
+    const pole0 = A.pole.clone().applyQuaternion(bodyQ);
+    // (where the grip was made in Blender with its arm, the hold and the knob, the elbow is where Blender's IK put
+    // it; anywhere else, through a cast or on a rope, it goes where the wrist is most comfortable, moving there
+    // smoothly rather than jumping between the turns tried)
+    h.turnTo = search ? bestTurn(A, S, h, shW, target, pole0, rail) : 0;
+    { const cur = h.turn ?? h.turnTo; h.turn = cur + Math.atan2(Math.sin(h.turnTo - cur), Math.cos(h.turnTo - cur)) * Math.min(1, dt * 8); }
+    const pole = Math.abs(h.turn) > 1e-4 ? pole0.clone().applyAxisAngle(target.pos.clone().sub(shW).normalize(), h.turn) : pole0;
+    let ik = twoBone(shW, target.pos, A.L1, A.L2, pole);
+    if (ik.short > 0.002) {
+      // (out of reach: the collar bone lets the shoulder come towards it, up to 15 degrees, as a real one does)
+      const sp = A.sh.getWorldPosition(V()), dir0 = shW.clone().sub(sp).normalize(), want = target.pos.clone().sub(sp).normalize();
+      const ang = Math.min(dir0.angleTo(want), 0.26) * clamp(ik.short / 0.06, 0, 1);
+      const ax = dir0.clone().cross(want); if (ax.lengthSq() > 1e-8) { const q = new THREE.Quaternion().setFromAxisAngle(ax.normalize(), ang).multiply(A.sh.getWorldQuaternion(new THREE.Quaternion())); setWorldQuat(A.sh, q); }
+      shW = A.U.getWorldPosition(V()); ik = twoBone(shW, target.pos, A.L1, A.L2, pole);
+    }
+    const n = ik.elbow.clone().sub(shW).cross(ik.wrist.clone().sub(ik.elbow)); if (n.lengthSq() < 1e-10) n.copy(pole).cross(ik.wrist.clone().sub(shW)); n.normalize();
+    setWorldQuat(A.U, pairRotation(A.aU, A.nU, ik.elbow.clone().sub(shW), n));
+    setWorldQuat(A.F, pairRotation(A.aF, A.nF, ik.wrist.clone().sub(ik.elbow), n));
+    A.F1.quaternion.copy(A.f1q); A.F1.updateMatrixWorld(true);
+    setWorldQuat(A.H, target.quat);
+    // (the forearm's turn shared: half of the hand's twist from the hold goes into the forearm's lower half, so the
+    // wrist doesn't wring like a sweet wrapper)
+    const tw = twistAbout(A.H.quaternion, A.f1ax) - A.tw0, half = Math.atan2(Math.sin(tw), Math.cos(tw)) * 0.5;
+    A.F1.quaternion.copy(A.f1q).multiply(new THREE.Quaternion().setFromAxisAngle(A.f1ax, half)); A.F1.updateMatrixWorld(true);
+    setWorldQuat(A.H, target.quat);
+    return ik;
+  }
+
+  const Mg = new THREE.Matrix4(), qg = new THREE.Quaternion(), M4 = new THREE.Matrix4();
+  // (leaning towards what's out of reach: the body turned about the eye, as you lean over the rail to a rope or the net,
+  // built up over a few frames while a hand can't reach and let go again once both can, never snapped)
+  const lean = V(), leanAdd = V();
+  return {
+    group,
+    get ready() { return !!R; },
+    get failed() { return failed; },
+    show(on) { group.visible = !!on; if (!on) for (const h of hands) { h.cur = null; h.kind = undefined; } },
+    pose(o) {
+      const { hands: specs = [null, null], eye, dt = 0.016 } = o;
+      if (!group.visible || !R) return;
+      const empty = !specs[0] && !specs[1];
+      // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
+      // take hold of, nothing to hold)
+      const wait = empty || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock);
+      R.scene.visible = !wait; if (wait) return;
+      group.updateWorldMatrix(true, false); Mg.copy(group.matrixWorld); MgInv.copy(Mg).invert(); qg.setFromRotationMatrix(Mg);
+      // ---- 1. the base clip ----
+      R.clips.hold.apply(1 / RIG.fps);
+      if (o.castT != null && R.clips.cast && o.castT + 1 / RIG.fps < R.clips.cast.duration) R.clips.cast.apply(o.castT + 1 / RIG.fps, (n) => n.startsWith("DEF-spine"));
+      // ---- 2. the body under the camera ----
+      const c0 = Math.cos(P0), s0 = Math.sin(P0);
+      const bf = o.vf.clone().multiplyScalar(c0).addScaledVector(o.vu, -s0).normalize(), bu = o.vf.clone().multiplyScalar(s0).addScaledVector(o.vu, c0).normalize(), br = bf.clone().cross(bu).normalize();
+      const bodyQ = new THREE.Quaternion().setFromRotationMatrix(M4.makeBasis(br.clone().negate(), bu, bf)).premultiply(qg);
+      if (lean.lengthSq() > 1e-10) bodyQ.premultiply(new THREE.Quaternion().setFromAxisAngle(lean.clone().normalize(), lean.length()));
+      const eyeW = eye.clone().applyMatrix4(Mg), camW = eyeW.clone();
+      const rootW = new THREE.Matrix4().compose(V(), bodyQ, V(1, 1, 1));
+      root.matrix.copy(new THREE.Matrix4().copy(Mg).invert().multiply(rootW)); root.matrix.decompose(root.position, root.quaternion, root.scale);
+      root.updateMatrixWorld(true);
+      const e0 = R.eyeLocal.clone().applyMatrix4(R.head.matrixWorld);
+      rootW.setPosition(eyeW.sub(e0)); root.matrix.copy(new THREE.Matrix4().copy(Mg).invert().multiply(rootW)); root.matrix.decompose(root.position, root.quaternion, root.scale);
+      root.updateMatrixWorld(true);
+      // ---- 3 to 5. each hand onto what it holds ----
+      leanAdd.set(0, 0, 0); let roomy = true;
+      for (let i = 0; i < 2; i++) {
+        const h = hands[i], S = h.side, A = R.arm[S], spec = specs[i];
+        let want;
+        if (!spec) {
+          // (nothing to hold: the arm hangs at your side, out of the view)
+          for (const b of [A.U, A.U1, A.F, A.F1, A.H]) { const r = R.rest.get(b.name); b.quaternion.copy(r.q); }
+          A.U.updateMatrixWorld(true);
+          want = { pos: A.H.getWorldPosition(V()), quat: A.H.getWorldQuaternion(new THREE.Quaternion()), grip: "relax", kind: null };
+        } else if (spec.kind === "seat" && spec.sock) want = { ...seatTarget(spec, Mg, qg), kind: "seat" };
+        else if (spec.kind === "crank" && spec.sock) {
+          want = { ...knobTarget(spec, Mg, qg), kind: "crank" };
+          // (the shoulder rises and falls a little with the knob, as Gate 2's turns have it)
+          if (R.clips.reel && RIG.reelTh?.length) { const th = want.th, T = RIG.reelTh; let k = 0, bestD = 1e9; for (let j = 0; j < T.length - 1; j++) { const d = Math.abs(((th - T[j]) + 540) % 360 - 180); if (d < bestD) { bestD = d; k = j; } } const v = R.clips.reel.value((k + 1) / RIG.fps, A.sh.name); if (v) { A.sh.quaternion.fromArray(v); A.sh.updateMatrixWorld(true); } }
+        } else want = { ...wrapTarget(h, A, spec, Mg, qg, bodyQ), kind: spec.kind };
+        // easing to something new (a short blend whenever what the hand holds changes); then following it exactly
+        if (want.kind !== h.kind || !h.cur) {
+          h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null; h.kind = want.kind; h.u = h.from ? 0 : 1;
+          h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
+        }
+        h.u = Math.min(1, h.u + dt / BLEND); const e = ease(h.u);
+        const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e) } : want;
+        h.cur = { pos: tgt.pos.clone(), quat: tgt.quat.clone() };
+        { const shW = A.U.getWorldPosition(V()); h.short = solveArm(A, S, tgt, bodyQ, h, o.castT != null || !(want.kind === "seat" || want.kind === "crank"), dt, spec?.rail || null).short;
+          if (spec && h.short > 0.002) { const arm = shW.clone().sub(camW), ax = arm.clone().cross(tgt.pos.clone().sub(shW)); if (ax.lengthSq() > 1e-10) leanAdd.addScaledVector(ax.normalize(), h.short / Math.max(0.1, arm.length())); }
+          if (spec && tgt.pos.distanceTo(shW) > 0.95 * (A.L1 + A.L2)) roomy = false; }
+        // the fingers, curled for the grip
+        const G = R.grips[want.grip]?.[S] || R.grips.relax?.[S]; h.fing ||= new Map();
+        if (G) for (const [n, q] of G) { const b = R.bones.get(n); if (!b) continue; const f = h.fingFrom?.get(n); const qq = f && e < 1 ? f.clone().slerp(q, e) : q; b.quaternion.copy(qq); h.fing.set(n, qq.clone()); }
+        A.H.updateMatrixWorld(true);
+        h.wrist = group.worldToLocal(A.H.getWorldPosition(V()));
+      }
+      if (leanAdd.lengthSq() > 0) { lean.addScaledVector(leanAdd, Math.min(1, dt * 6)); if (lean.length() > 0.45) lean.setLength(0.45); }
+      else if (roomy) lean.multiplyScalar(1 - Math.min(1, dt * 1.5));
+    },
+    /** the loaded rig's insides (bones, clips, arms), for tests and the rig preview page */
+    get internals() { return R; },
+    /** each hand's target (world), what it holds and the elbow's turn, for the rig test page */
+    get debug() { return hands.map((h) => ({ kind: h.kind, target: h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null, short: h.short ?? 0, turn: h.turn ?? 0 })); },
+    /** how far short of its target each hand stopped (metres; 0 when it's there), for tests */
+    get shortfall() { return hands.map((h) => h.short ?? 0); },
+    /** where each hand is (the wrist, in the group's space), for tests */
+    get wrists() { return hands.map((h) => (h.wrist && R ? h.wrist.clone() : null)); },
+    dispose() { skinMat.dispose(); coatMat.dispose(); liveMats.delete(skinMat); liveMats.delete(coatMat); },
+  };
+}
