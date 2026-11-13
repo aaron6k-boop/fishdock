@@ -21,8 +21,8 @@ end of each working session, so the next one can carry on from here.
 |---|---|---|
 | #118 | `game-sound` | Sound starts at the first tap (it was silent on an iPhone until switched off and on); bubbles for water, the cast, the tip bell, beach waves, a short outdoor echo, a compressor so it's louder on a phone |
 | #119 | `arm-steady` | The arms' vibration as the game opens (the rod put down 2% and picked up every other frame), and the snaps in a whole catch; `tools/arm-steady.mjs` |
-| #120 | `progression` | Levels, XP, medals, species book, badges, the logbook; fish drawn by place with a natural size spread |
-| (this) | `weather` (on `game-sound`) | Sea fret and storms: fog from a preset or the real forecast's visibility, lightning lighting the cloud and the sea, thunder as late as the strike is far, a foghorn in a fret |
+| #120 | `progression` | Levels, XP, medals, species book, badges, the logbook, three daily challenges; fish drawn by place with a natural size spread |
+| #121 | `weather` (on `game-sound`) | Sea fret and storms: fog from a preset or the real forecast's visibility, lightning lighting the cloud and the sea, thunder as late as the strike is far, a foghorn in a fret |
 
 ## Backlog, in priority order
 
@@ -44,12 +44,19 @@ end of each working session, so the next one can carry on from here.
 7. **Lighting and nearby textures.** Next: before-and-after of the deck and rail materials at the fixed scenes.
 8. **Audio realism.** Done: #118 (synthesised). Needs: licensed field recordings (waves on a pier wall, gulls, reel
    clicks, drag) added to the repo to go further than synthesis.
-9. **Gameplay depth.** Next: session goals ("land three kinds today"), a tide-and-time bite table per place.
+9. **Gameplay depth.** Done: three daily challenges worth XP (#120). Next: a tide-and-time bite table per place
+   (more bites on the flood at dusk where the sources say so), bite variety by species.
 10. **XP, achievements and statistics.** Done: #120. Next: session history (a visit's catches and XP), statistics
     page.
 11. **Boats, wildlife and NPCs.** Next: gulls diving at bait fish, a fishing boat leaving the harbour now and then.
 12. **Distant scenery.** Low priority.
 13. **Shop.** Later: game credits from fishing, cosmetic gear only, nothing that locks places.
+
+## Next action
+
+Wait for Aaron's review of #118 to #121 (merge order: #118, then #121 which is stacked on it, then #119 and #120 in
+either order). Then, in priority order: the landing's left forearm swing (2), the drop net's rope and bag with a fish
+in it (3), tide height on the pier wall (4), per-species bite styles (6).
 
 ## Evidence kept
 
