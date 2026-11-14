@@ -256,11 +256,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the bend along the rod: curvature goes with the bending moment (most at the butt, none at the tip) over the blank's
   // stiffness (its radius to the fourth: the slim tip gives most), and none along the handle, the stiff butt section.
   // BEND[i]: how much of the total turn the rod has made by point i (0 at the butt, 1 at the tip)
-  const BEND = (() => {
-    const s0 = Math.min(0.5, (R.handle[R.handle.length - 1][1] + 0.02) / R.len), k = [], out = [0];
+  const bendFrom = (s0) => {
+    const k = [], out = [0];
     for (let i = 0; i < NSEG; i++) { const s = (i + 0.5) / NSEG, r = (R.r0 + (R.r1 - R.r0) * Math.pow(s, 0.8)) / R.r0; k.push(s < s0 ? 0 : (1.05 - s) / Math.pow(r, 4)); }
     const tot = k.reduce((a, b) => a + b, 0); let c = 0; for (const x of k) { c += x / tot; out.push(c); } return out;
-  })();
+  };
+  const BEND = bendFrom(Math.min(0.5, (R.handle[R.handle.length - 1][1] + 0.02) / R.len));
+  // (in its rest the rod is held at the cradle as well as the butt, so it bends only beyond the cradle: bending from the
+  // handle, the line's pull took the blank down into the cradle's rubber)
+  let BEND_REST = null;
   // the line: one thread from the spool, over the line roller, through every ring and out to the rig or the fish
   // (fishLine.js), in the world's space
   const fLine = fishLine(GUIDES.length); world.add(fLine.mesh);
@@ -1271,8 +1275,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const toLine = Math.acos(clamp(toT.dot(dir), -1, 1));
     const turn = Math.sign(k) * Math.min(Math.abs(k) * 3.0, castBend ? 0.6 : Math.max(0.15, toLine * 0.98));
     pts[0].copy(butt);
+    const BR = lift < 1 ? (BEND_REST ||= bendFrom(Math.min(0.9, (tripod ? Math.hypot(TRIPOD.rise, TRIPOD.back) : restTop.distanceTo(restButt)) / R.len + 0.02))) : null;
     for (let i = 0; i < NSEG; i++) {
-      const s = (i + 0.5) / NSEG, th = turn * (BEND[i] + BEND[i + 1]) / 2 + spr.tip * 2.2 * Math.pow(s, 5);
+      const s = (i + 0.5) / NSEG, b0 = BEND[i] + (BR ? (BR[i] - BEND[i]) * (1 - lift) : 0), b1 = BEND[i + 1] + (BR ? (BR[i + 1] - BEND[i + 1]) * (1 - lift) : 0), th = turn * (b0 + b1) / 2 + spr.tip * 2.2 * Math.pow(s, 5);
       pts[i + 1].copy(pts[i]).addScaledVector(dir, Math.cos(th) * R.len / NSEG).addScaledVector(bendDir, Math.sin(th) * R.len / NSEG);
     }
     for (let i = 0; i < NSEG; i++) between(rodSegs[i].m, pts[i], pts[i + 1], rodSegs[i].r);

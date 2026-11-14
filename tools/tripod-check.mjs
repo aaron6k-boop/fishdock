@@ -43,16 +43,16 @@ for (let f = 0; f < 300; f++) rows.push(await p.evaluate(() => {
   const W = window.__fdWorld, T = W.THREE, tc = window.__tc; W.step(50); const pr = window.__fdProbe; if (!pr?.rod) return null;
   const pts = pr.rod.map((q) => new T.Vector3(...q)), L = pts.length - 1, cum = [0]; for (let i = 1; i <= L; i++) cum.push(cum[i - 1] + pts[i].distanceTo(pts[i - 1]));
   const R = { r0: 0.0108, r1: 0.0022 }, seg = new T.Line3(), cp = new T.Vector3(); // (Gorleston: the pier rod, angler.js ROD.pier)
-  let deepest = 1;
+  let deepest = 1, at = 0;
   for (const s of tc.S) { const v = new T.Vector3(...s);
     for (let i = 0; i < L; i++) { seg.set(pts[i], pts[i + 1]); const t = seg.closestPointToPointParameter(v, true); seg.at(t, cp); const z = cum[i] + t * (cum[i + 1] - cum[i]);
       if (z < 0.97) continue; // (the handle, grips thicker than the blank: the butt in its cup is checked below)
-      deepest = Math.min(deepest, cp.distanceTo(v) - (R.r0 + (R.r1 - R.r0) * Math.pow(z / cum[L], 0.8))); } }
+      const d = cp.distanceTo(v) - (R.r0 + (R.r1 - R.r0) * Math.pow(z / cum[L], 0.8)); if (d < deepest) { deepest = d; at = z; } } }
   let reel = 1; W.scene.traverse((o) => { if (!o.isMesh || !o.visible || !/reel/.test(`${o.material?.name || ""} ${o.name}`)) return; o.updateWorldMatrix(true, false); const pos = o.geometry.attributes.position, v = new T.Vector3();
     for (let i = 0; i < pos.count; i++) reel = Math.min(reel, tc.near(v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld))); });
   if (!window.__b0) { window.__b0 = pts[0].clone(); window.__d0 = pts[1].clone().sub(pts[0]).normalize(); }
   const db = pts[0].clone().sub(window.__b0), along = db.dot(window.__d0), off = db.clone().addScaledVector(window.__d0, -along).length();
-  return { stage: pr.stage, deepest, reel, cup: along < 0.07 ? Math.max(0, off - 0.005) : 0, moved: db.length() };
+  return { stage: pr.stage, deepest, at, reel, cup: along < 0.07 ? Math.max(0, off - 0.005) : 0, moved: db.length(), along };
 }));
 await b.close();
 const ok = rows.filter(Boolean), wait = ok.filter((r) => r.stage === "waiting"), lift = ok.filter((r) => r.stage !== "waiting");
@@ -62,8 +62,8 @@ const wIn = Math.min(...wait.map((r) => r.deepest)), wMax = Math.max(...wait.map
 check(wait.length > 150 && wIn > -0.0005, `waiting: the tripod ${wIn < 0 ? mm(-wIn) + " inside" : mm(wIn) + " clear of"} the blank at most, in ${wait.length} frames`);
 check(wMax < 0.002, `waiting: the blank resting on the cradle (${mm(wMax)} off it at most)`);
 check(Math.max(...wait.map((r) => r.moved)) < 0.001, `waiting: the rod lies still (its butt moved ${mm(Math.max(...wait.map((r) => r.moved)))})`);
-const lIn = Math.min(...lift.map((r) => r.deepest));
-check(lift.length > 20 && lIn > -0.001, `picked up: the tripod ${lIn < 0 ? mm(-lIn) + " inside" : mm(lIn) + " clear of"} the blank at most, in ${lift.length} frames`);
+const lIn = Math.min(...lift.map((r) => r.deepest)), lw = lift.find((r) => r.deepest === lIn);
+check(lift.length > 20 && lIn > -0.001, `picked up: the tripod ${lIn < 0 ? mm(-lIn) + " inside" : mm(lIn) + " clear of"} the blank at most, in ${lift.length} frames${lIn < 0 ? ` (${lw.at.toFixed(2)} m up the rod, the butt ${(lw.along * 100).toFixed(0)} cm up its line from the cup)` : ""}`);
 check(Math.max(...ok.map((r) => r.cup)) === 0, `the butt never through the side of its cup (${ok.filter((r) => r.cup > 0).length} frames)`);
 { const n = Math.min(...ok.map((r) => r.reel)); check(n >= 0.003, `the reel never within 3 mm of the tripod (at nearest ${n >= 0.02 ? "more than 2 cm" : mm(n)})`); }
 check(!errors.length, errors.length ? `page errors: ${errors.slice(0, 2).join(" | ")}` : "no page errors");
