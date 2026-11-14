@@ -170,8 +170,22 @@ export function dropLining(mesh) {
   for (let t = 0; t < src.length; t += 3) if (inner[src[t]] + inner[src[t + 1]] + inner[src[t + 2]] < 2) keep.push(src[t], src[t + 1], src[t + 2]);
   const dropped = 1 - keep.length / src.length;
   if (dropped < 0.25 || dropped > 0.65) return 0; // (not a lined cloth as expected: left whole)
-  mesh.geometry = g.clone(); mesh.geometry.setIndex(keep);
+  mesh.geometry = g.clone(); mesh.geometry.userData.fpOwn = true; mesh.geometry.setIndex(keep);
   return dropped;
+}
+
+// ---- which of the jacket is its body (chest, back, shoulders, hips) rather than its sleeves ----
+// A vertex's share hanging from the spine, chest, hips and shoulder bones, as an attribute (fpTorso) for the coat's
+// shader, which leaves the body out when you look down. On this rig's own copy of the jacket, never the shared model's.
+const TORSO_BONE = /^DEF-(spine|breast|pelvis|shoulder|thigh)/;
+export function markTorso(mesh) {
+  const g = mesh.geometry, si = g?.attributes?.skinIndex, sw = g?.attributes?.skinWeight, sk = mesh.skeleton;
+  if (!si || !sw || !sk) return 0;
+  const torso = sk.bones.map((b) => TORSO_BONE.test(b.name)), a = new Float32Array(si.count); let n = 0;
+  for (let i = 0; i < si.count; i++) { let w = 0; for (let k = 0; k < 4; k++) if (torso[si.getComponent(i, k)]) w += sw.getComponent(i, k); a[i] = w; if (w > 0.5) n++; }
+  if (!mesh.userData.ownGeometry && !g.userData.fpOwn) { mesh.geometry = g.clone(); mesh.geometry.userData.fpOwn = true; }
+  mesh.geometry.setAttribute("fpTorso", new THREE.BufferAttribute(a, 1));
+  return n / si.count;
 }
 
 export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, model = null } = {}) {
@@ -193,7 +207,15 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // ring or a dark flap round your forearm, hauling or lowering the drop net looking down over the rail (Aaron's
   // screenshots of 14 November, putting a thornback ray back). Without it you see your forearm inside, or the cut
   // sleeve simply ends, as an arm cut by the edge of the picture does. Further off, a cuff's inside still shows)
-  coatMat.onBeforeCompile = (sh) => { sh.uniforms.fpNearCut = nearCut; sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18)) discard;\n#include <opaque_fragment>"); };
+  // (and looking down, the jacket's body isn't drawn at all: its chest and front, right under your eye, were cut by
+  // that sphere into ragged dark flaps across the bottom of the picture, looking down at the mat or over the rail. Which
+  // parts are its body is marked on each vertex when the rig is built (markTorso); your sleeves still show)
+  const lookDown = { value: 0 };
+  coatMat.onBeforeCompile = (sh) => {
+    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown;
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nvarying float vTorso;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nvarying float vTorso;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
+  };
   clothe(coatMat);
   // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)
   skinMat.onBeforeCompile = (sh) => {
@@ -213,7 +235,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     const scene = cloneSkinned(g.scene); const bones = new Map();
     scene.traverse((o) => {
       if (o.isBone) bones.set(o.name, o);
-      if (o.isMesh) { const jacket = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || ""); o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = jacket ? coatMat : skinMat; if (jacket && o.isSkinnedMesh) dropLining(o); }
+      if (o.isMesh) { const jacket = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || ""); o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = jacket ? coatMat : skinMat; if (jacket && o.isSkinnedMesh) { dropLining(o); markTorso(o); } }
     });
     const B = (n) => bones.get(boneName(n));
     const clips = {}; for (const c of g.animations) clips[c.name] = sampler(c, bones);
@@ -380,7 +402,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     pose(o) {
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
-      { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0; nearCut.value += (0.16 + 0.17 * down - nearCut.value) * Math.min(1, dt * 6); }
+      { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0; nearCut.value += (0.16 + 0.17 * down - nearCut.value) * Math.min(1, dt * 6); lookDown.value = down; }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)

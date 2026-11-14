@@ -211,3 +211,15 @@ test("the jacket's inward-facing lining is left out when the rig is built, and w
   console.log(`lining dropped: ${(dropped * 100).toFixed(1)}% of triangles; vertices in use ${used.size} of ${pos.count}`);
   assert.ok(used.size < 0.8 * pos.count, `fewer vertices in use (${used.size} of ${pos.count})`);
 });
+
+test("the jacket's body is marked for leaving out when you look down (chest, shoulders, hips), the sleeves aren't", async () => {
+  const { markTorso, dropLining } = await import("../src/lib/world3d/fpRig.js");
+  const { clone: cloneSkinned } = await import("three/examples/jsm/utils/SkeletonUtils.js");
+  const sc = cloneSkinned(gltf.scene); let jacket = null; sc.traverse((o) => { if (o.isSkinnedMesh && /jacket/i.test(o.name)) jacket = o; });
+  const shared = jacket.geometry; dropLining(jacket); const share = markTorso(jacket);
+  assert.ok(share > 0.1 && share < 0.75, `the body is part of the jacket, not all of it (${(share * 100).toFixed(0)}%)`);
+  assert.ok(jacket.geometry.attributes.fpTorso && !shared.attributes.fpTorso, "on this rig's copy only");
+  // (the vertices hanging from the forearms are never the body)
+  const sk = jacket.skeleton, fi = sk.bones.findIndex((b) => /forearm/.test(b.name)), si = jacket.geometry.attributes.skinIndex, sw = jacket.geometry.attributes.skinWeight, ft = jacket.geometry.attributes.fpTorso;
+  for (let i = 0; i < si.count; i++) if (si.getComponent(i, 0) === fi && sw.getComponent(i, 0) > 0.9) assert.ok(ft.getX(i) < 0.1);
+});

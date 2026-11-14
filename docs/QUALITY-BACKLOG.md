@@ -21,7 +21,8 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   (hands on the line to the net), not authored.
 - **Target:** first-person arms in AAA games never show their insides; hands read as hands at any angle, gripping
   hand over hand with the rope running through the fingers.
-- **Do:** (done here) drop the lining when the rig is built; (next, needs Blender on the PC) author the haul and
+- **Do:** (done) drop the lining when the rig is built, and leave the jacket's body (chest, shoulders, hips) out when
+  looking down, where the cut made ragged flaps across the bottom of the picture; (next, needs Blender on the PC) author the haul and
   lowering as clips on the rig, hands off the eye line, fingers wrapped round the rope, IK for the rope contact.
 - **Benefit:** the drop net, the moment of every pier catch, stops looking broken.
 - **Cost:** the lining drop removes 39% of the jacket's triangles (cheaper); clips cost nothing per frame.
