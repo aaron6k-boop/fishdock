@@ -30,6 +30,7 @@ const ease = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
 /** the name three gives a Blender bone (GLTFLoader drops dots and the like) */
 export const boneName = (s) => s.replace(/\s/g, "_").replace(/[[\].:/]/g, "");
 const BLEND = 0.3; // seconds to go from one grip to the next
+const TURN_MAX = 6, POLE_MAX = 5; // (radians a second: how quickly an elbow can swing round to a new turn, or a new way of pointing; in a cast, which is quick by nature, the turn twelve, and the pointing eight as it starts and quicker as it goes)
 const KIND_CYL = { rope: "rope", hoop: "hoop", pole: "pole", butt: "butt", tailwrist: "tail", carry: "butt" };
 const KIND_FLAT = { fish: "cradle", open: "relax", ready: "relax", line: "relax" };
 
@@ -230,15 +231,36 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     }
     return best.a;
   }
-  function solveArm(A, S, target, bodyQ, h, search, dt, rail = null) {
+  function solveArm(A, S, target, bodyQ, h, search, dt, rail = null, castT = null) {
+    const casting = castT != null;
     let shW = A.U.getWorldPosition(V());
-    const pole0 = target.elbow ? target.elbow.clone().sub(shW) : A.pole.clone().applyQuaternion(bodyQ); // (winding, the elbow where Gate 2 had it at the knob's angle)
+    let pole0 = target.elbow ? target.elbow.clone().sub(shW) : A.pole.clone().applyQuaternion(bodyQ); // (winding, the elbow where Gate 2 had it at the knob's angle)
+    // (where the elbow points, in your body's own frame, turns at most five radians a second: a new grip, or a jump in
+    // the made pose's elbow, swings the elbow round rather than jumping it (at the end of a hand's blend to the reel it
+    // went straight to where Blender had it, and at the start of a landing 8 cm in a frame). Winding, the elbow's own
+    // small circle is well inside that, and followed exactly)
+    { const inv = bodyQ.clone().invert(), d = pole0.clone().normalize().applyQuaternion(inv);
+      if (h.poleL && dt > 0) { const ang = h.poleL.angleTo(d), max = (casting ? 8 + Math.max(0, castT - 0.3) * 60 : POLE_MAX) * dt; if (ang > max) d.copy(h.poleL).applyQuaternion(new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(h.poleL, d), max / ang)).normalize(); }
+      h.poleL = d.clone(); pole0 = d.applyQuaternion(bodyQ).multiplyScalar(pole0.length()); }
     // (where the grip was made in Blender with its arm, the hold and the knob, the elbow is where Blender's IK put
     // it; anywhere else, through a cast or on a rope, it goes where the wrist is most comfortable, moving there
     // smoothly rather than jumping between the turns tried)
     h.turnTo = search ? bestTurn(A, S, h, shW, target, pole0, rail) : 0;
-    { const cur = h.turn ?? h.turnTo; h.turn = cur + Math.atan2(Math.sin(h.turnTo - cur), Math.cos(h.turnTo - cur)) * Math.min(1, dt * 8); }
-    const pole = Math.abs(h.turn) > 1e-4 ? pole0.clone().applyAxisAngle(target.pos.clone().sub(shW).normalize(), h.turn) : pole0;
+    // (eased, and never quicker than six radians a second: a big change of turn swung the elbow 8 cm a frame)
+    { const cur = h.turn ?? h.turnTo, d = Math.atan2(Math.sin(h.turnTo - cur), Math.cos(h.turnTo - cur)), step = d * Math.min(1, dt * 8); h.turn = cur + Math.sign(step) * Math.min(Math.abs(step), (casting ? 12 : TURN_MAX) * dt); }
+    let pole = Math.abs(h.turn) > 1e-4 ? pole0.clone().applyAxisAngle(target.pos.clone().sub(shW).normalize(), h.turn) : pole0;
+    // (and the elbow itself never swings round the shoulder-to-hand line quicker than a real one: where the way it
+    // points passes close to that line, the side it bends to could flip in a frame, and the forearm leapt 16 cm in a
+    // cast. Measured in your body's frame, so turning your head isn't a swing)
+    { const ax = target.pos.clone().sub(shW).normalize(), pp = pole.clone().addScaledVector(ax, -pole.dot(ax));
+      if (pp.lengthSq() > 1e-10) {
+        pp.normalize(); const inv = bodyQ.clone().invert(), cap = (casting ? 14 : 8) * dt;
+        if (h.swivL && dt > 0) {
+          const prev = h.swivL.clone().applyQuaternion(bodyQ); prev.addScaledVector(ax, -prev.dot(ax));
+          if (prev.lengthSq() > 1e-10) { prev.normalize(); const ang = Math.atan2(prev.clone().cross(pp).dot(ax), prev.dot(pp)); if (Math.abs(ang) > cap) { pp.copy(prev.applyAxisAngle(ax, Math.sign(ang) * cap)); pole = pp.clone().multiplyScalar(pole.length()); } }
+        }
+        h.swivL = pp.clone().applyQuaternion(inv);
+      } }
     let ik = twoBone(shW, target.pos, A.L1, A.L2, pole);
     if (ik.short > 0.002) {
       // (out of reach: the collar bone lets the shoulder come towards it, up to 15 degrees, as a real one does)
@@ -268,7 +290,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     group,
     get ready() { return !!R; },
     get failed() { return failed; },
-    show(on) { group.visible = !!on; if (!on) for (const h of hands) { h.cur = null; h.kind = undefined; } },
+    show(on) { group.visible = !!on; if (!on) for (const h of hands) { h.cur = null; h.kind = undefined; h.poleL = null; h.swivL = null; h.wantAt = null; } },
     pose(o) {
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
@@ -310,15 +332,18 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
           // (the shoulder rises and falls a little with the knob, as Gate 2's turns have it)
           if (R.clips.reel && RIG.reelTh?.length) { const th = want.th, T = RIG.reelTh; let k = 0, bestD = 1e9; for (let j = 0; j < T.length - 1; j++) { const d = Math.abs(((th - T[j]) + 540) % 360 - 180); if (d < bestD) { bestD = d; k = j; } } const v = R.clips.reel.value((k + 1) / RIG.fps, A.sh.name); if (v) { A.sh.quaternion.fromArray(v); A.sh.updateMatrixWorld(true); } }
         } else want = { ...wrapTarget(h, A, spec, Mg, qg, bodyQ), kind: spec.kind };
-        // easing to something new (a short blend whenever what the hand holds changes); then following it exactly
-        if (want.kind !== h.kind || !h.cur) {
+        // easing to something new (a short blend whenever what the hand holds changes, or what it holds jumps: the fish
+        // on the line becoming the fish in your hand took the left hand 40 cm in a frame); then following it exactly
+        // (measured from your body, so turning your head, which carries the hold with it, is never a jump)
+        const wl = root.worldToLocal(want.pos.clone()), jumped = h.wantAt && wl.distanceTo(h.wantAt) > Math.max(0.1, 6 * dt); h.wantAt = wl;
+        if (want.kind !== h.kind || !h.cur || jumped) {
           h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null; h.kind = want.kind; h.u = h.from ? 0 : 1;
           h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
         }
         h.u = Math.min(1, h.u + dt / BLEND); const e = ease(h.u);
-        const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e), elbow: e > 0.999 ? want.elbow : null } : want;
+        const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e), elbow: want.elbow || null } : want;
         h.cur = { pos: tgt.pos.clone(), quat: tgt.quat.clone() };
-        { const shW = A.U.getWorldPosition(V()); h.short = solveArm(A, S, tgt, bodyQ, h, o.castT != null || !(want.kind === "seat" || want.kind === "crank"), dt, spec?.rail || null).short;
+        { const shW = A.U.getWorldPosition(V()); h.short = solveArm(A, S, tgt, bodyQ, h, o.castT != null || !(want.kind === "seat" || want.kind === "crank"), dt, spec?.rail || null, o.castT ?? null).short;
           if (spec && h.short > 0.002) { const arm = shW.clone().sub(camW), ax = arm.clone().cross(tgt.pos.clone().sub(shW)); if (ax.lengthSq() > 1e-10) leanAdd.addScaledVector(ax.normalize(), h.short / Math.max(0.1, arm.length())); }
           if (spec && tgt.pos.distanceTo(shW) > 0.95 * (A.L1 + A.L2)) roomy = false; }
         // the fingers, curled for the grip

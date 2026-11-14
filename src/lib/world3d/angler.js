@@ -1198,14 +1198,19 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the hands go to the rod in its rest first (the first 30%), then lift it out and bring it to where you hold it;
     // putting it back is the same the other way round. Walking off, it's carried
     { const want = walking ? 1 : fp && fpRodDown ? 0 : handWant ? 1 : 0;
-      if (inHand == null || walking) inHand = want; else inHand = want > inHand ? Math.min(1, inHand + dt / 0.8) : Math.max(0, inHand - dt / 0.9); }
+      // (once there, it stays there: holding the rod, it used to be put down a step and picked up again every other
+      // frame, and the hands shook a millimetre thirty times a second)
+      if (inHand == null || walking) inHand = want; else inHand = want > inHand ? Math.min(want, inHand + dt / 0.8) : want < inHand ? Math.max(want, inHand - dt / 0.9) : want; }
     const lift = walking ? 1 : ease((inHand - 0.3) / 0.7);
     if (lift < 1) { butt = restB.clone().lerp(butt, lift); dir = restD.clone().lerp(dir, lift).normalize(); }
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping
-    { const key = `${held}|${fp}|${!!walking}`; if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
-      if (rodS.ok && t < rodS.until) { const k2 = 1 - Math.exp(-dt * 6); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
+    { const key = `${held}|${fp && !fpRodDown}|${!!walking}`; // (and the rod put down to land a fish in first person: it went 30 cm in a frame) if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
+      // (and catches up smoothly at the end, quicker and quicker, rather than jumping the last of the way: picking the
+      // rod up on a bite, it was still 15 cm behind when the moment ended, and the rod and both hands leapt up)
+      const late = Math.max(0, t - rodS.until), behind = rodS.ok && (rodS.butt.distanceTo(butt) > 0.001 || rodS.dir.angleTo(dir) > 0.002);
+      if (rodS.ok && (t < rodS.until || (behind && late < 1))) { const k2 = 1 - Math.exp(-dt * (6 + 90 * late)); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
       else { rodS.butt.copy(butt); rodS.dir.copy(dir); rodS.ok = true; } }
     dir.x += sway; dir.y += breath; dir.normalize();
     // the bend is towards the line
@@ -1703,8 +1708,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // test diagnostics only (FILM, never in the app): where the reel, its handle and your hands are this frame
     if (local && typeof window !== "undefined" && FILM) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, rod: pts.map((p) => toWorld(p).toArray()), lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2),
       // (and, for the railing checks, in the angler's own frame: the railing, the rod, and your arms' joints and fingertips)
-      local: { rail: rail ? { y: 1.12, z: -Math.max(0.3, edge - 0.22) } : null, rod: pts.map((p) => p.toArray()), reel: seat.p.toArray(), eye: fpEye().toArray(),
-        arms: fp && fpv?.internals && fpv.group.visible ? ["L", "R"].map((S) => { const A = fpv.internals.arm[S], P = (b) => toLocal(b.getWorldPosition(new THREE.Vector3())).toArray(); const tips = []; for (const [n, b] of fpv.internals.bones) if (n.endsWith(S) && /^DEF-(f_(index|middle|ring|pinky)|thumb)03/.test(n)) tips.push(P(b)); return { S, U: P(A.U), F: P(A.F), H: P(A.H), tips }; }) : null } }; }
+      local: { rail: rail ? { y: 1.12, z: -Math.max(0.3, edge - 0.22) } : null, rod: pts.map((p) => p.toArray()), reel: seat.p.toArray(), eye: fpEye().toArray(), view: viewIn ? [viewIn.yaw, viewIn.pitch] : null, inHand, sway: [holdSway.x, holdSway.y],
+        arms: fp && fpv?.internals && fpv.group.visible ? ["L", "R"].map((S) => { const A = fpv.internals.arm[S], P = (b) => toLocal(b.getWorldPosition(new THREE.Vector3())).toArray(); const tips = []; for (const [n, b] of fpv.internals.bones) if (n.endsWith(S) && /^DEF-(f_(index|middle|ring|pinky)|thumb)03/.test(n)) tips.push(P(b)); const d = fpv.debug[S === "L" ? 0 : 1] || {}; return { S, U: P(A.U), F: P(A.F), H: P(A.H), tips, kind: d.kind, turn: d.turn, short: d.short }; }) : null } }; }
     const eyeNow = fpEye(); // (the eye the rod and your body were placed from this frame: the camera uses the same one)
     // (letting the drop net down and hauling it up, you lean right out over the rail, your head past the wall's top: from
     // behind the rail the edge hides the foot of the wall, where the net and the fish are)
