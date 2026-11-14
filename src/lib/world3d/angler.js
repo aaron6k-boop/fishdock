@@ -1237,9 +1237,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // frame, and the hands shook a millimetre thirty times a second)
       if (inHand == null || walking) inHand = want; else inHand = want > inHand ? Math.min(want, inHand + dt / 0.8) : want < inHand ? Math.max(want, inHand - dt / 0.9) : want; }
     const lift = walking ? 1 : ease((inHand - 0.3) / 0.7);
-    // (lifted out up its own line first, the butt clear of the cup and the blank sliding along the cradle, then swung to
-    // you: going straight to your hands, the butt went out through the side of the cup, 5 mm from the rod)
-    if (lift < 1) { const k = ease((lift - 0.2) / 0.8); butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).lerp(butt, k); dir = restD.clone().lerp(dir, k).normalize(); }
+    // (lifted out as it's done: up its own line first, the butt out of the cup and the blank sliding along the cradle,
+    // then up out of the cradle's open side, then swung to you. Going straight to your hands, the butt went out through
+    // the side of the cup, 5 mm round the rod, and the blank tipped forwards through the cradle and the bar under it)
+    if (lift < 1) { const k = ease((lift - 0.25) / 0.75), open = new THREE.Vector3(0, 1, 0).addScaledVector(restD, -restD.y).normalize();
+      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.05 * ease((lift - 0.08) / 0.22)).lerp(butt, k); dir = restD.clone().lerp(dir, k).normalize(); }
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping

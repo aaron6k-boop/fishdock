@@ -59,3 +59,10 @@ test("a bank stick's rest head: the rod on the rubber, the stick up under it", (
   assert.ok(Math.abs(near - r) < 0.001, `the blank ${((near - r) * 1000).toFixed(1)} mm off the rubber`);
   assert.ok(h.foot.y < top.y - r && h.foot.y > top.y - r - TRIPOD.cradleT * 2, "the stick's top in the rubber under the rod");
 });
+
+test("the bar across the tripod's head passes under the rod, clear of it", () => {
+  // (the bar runs across, 2 cm over the hub; the rod's blank there is at most 9 mm round, the bar's tube 9.5 mm)
+  const P = tripodPlan(restFor(0.9), 0.0089), a = P.hub.clone().add(V(0, 0.02, 0)), n = new THREE.Vector3(1, 0, 0).cross(P.dir).normalize();
+  const gap = Math.abs(a.clone().sub(P.top).dot(n)) - 0.0095 - 0.0089;
+  assert.ok(gap > 0.01, `the bar ${(gap * 1000).toFixed(1)} mm under the rod`);
+});

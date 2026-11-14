@@ -28,7 +28,9 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 export function tripodPlan(top, rodR = TRIPOD.rodR) {
   const T = TRIPOD, cx = top.x + T.side;
   const butt = V(top.x, top.y - T.rise, top.z + T.back);
-  const hub = V(cx, top.y - 0.06, top.z);
+  // (the head 10 cm under the cradles, so the bar across it passes 3 cm under the rod: 6 cm under, the bar went 1.4 mm
+  // into the blank as it lay, and 7 mm as it was lifted out)
+  const hub = V(cx, top.y - 0.1, top.z);
   const bar = V(cx, butt.y - 0.035, butt.z); // (the cup bar: clamped to the rear leg, the cups' bottoms on it)
   const k = hub.y / (hub.y - bar.y), rear = hub.clone().add(bar.clone().sub(hub).multiplyScalar(k)); rear.y = 0;
   const feet = [V(cx - T.spread, 0, top.z - T.ahead), V(cx + T.spread, 0, top.z - T.ahead), rear];
