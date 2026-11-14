@@ -38,3 +38,17 @@ test("no plan: the old rule; and the bite on now is read from the newest event",
   const b = biteOf([{ type: "cast", t: 1 }, { type: "bite", t: 5000, data: { taps: biteTaps("cod", false, fixed(0.5)) } }]);
   assert.equal(b.t, 5000); assert.ok(b.plan.pull > 0);
 });
+
+test("a slack-liner: the rod springs straight and the line falls slack; the moment is when it tightens", () => {
+  let found = null;
+  for (let k = 0; k < 40 && !found; k++) { let i = 0; const seq = [0.1, 0.5, 0.5, 0.5, 0.5, 0.5]; const rnd = () => seq[i++ % seq.length]; const t = biteTaps("cod", false, rnd); if (t.some((x) => x[2] < 0)) found = t; }
+  assert.ok(found, "cod can bite as a slack-liner");
+  const plan = bitePlan(found);
+  assert.ok(plan.slack && !plan.rattle);
+  assert.ok(plan.pull > 1500, `it tightens at ${plan.pull} ms, after the slack`);
+  assert.equal(strikeTiming(900, DUR.bite, plan), "early", "while the line's slack");
+  // (and a quarter of the time or so: never for a rattling whiting)
+  let n = 0; for (let k = 0; k < 400; k++) if (biteTaps("cod", false, Math.random).some((x) => x[2] < 0)) n++;
+  assert.ok(n > 60 && n < 140, `${n} of 400`);
+  for (let k = 0; k < 50; k++) assert.ok(!biteTaps("whiting", false, Math.random).some((x) => x[2] < 0));
+});

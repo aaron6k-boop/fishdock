@@ -56,7 +56,7 @@ export default function FishTray({ phase, last, bite = null, reel = 0, fight = n
   else if (canCast({ phase, lineOut })) { act = "cast"; label = label || (power != null ? "Let go to cast" : last ? "Hold to cast again" : "Hold Cast, aim, let go"); }
   else if (phase === "cast") { busy = true; label = "Casting"; }
   else if (phase === "waiting" || phase === "missed") { act = onWindIn && !autoplay ? "wait" : null; label = phase === "missed" ? "Missed it. The bait's still out" : "Waiting for a bite"; }
-  else if (phase === "bite") { act = "strike"; label = biteStage === "knock" ? (bite?.plan?.rattle ? "Rattling: strike on the next tap" : "Knocks on the tip: wait for the pull") : biteStage === "pull" ? (bite?.plan?.rattle ? "Strike now" : "It's pulling round: strike!") : biteStage === "late" ? "Strike before it lets go" : "Bite! Strike now"; }
+  else if (phase === "bite") { act = "strike"; label = biteStage === "knock" ? (bite?.plan?.slack ? "Slack line: it's swimming towards you. Wait for it to tighten" : bite?.plan?.rattle ? "Rattling: strike on the next tap" : "Knocks on the tip: wait for the pull") : biteStage === "pull" ? (bite?.plan?.rattle ? "Strike now" : bite?.plan?.slack ? "It's tightened: strike!" : "It's pulling round: strike!") : biteStage === "late" ? "Strike before it lets go" : "Bite! Strike now"; }
   else if (phase === "hooked") {
     // (Land stays once it's shown unless the fish really pulls away, so it doesn't flicker with Reel at the edge)
     const near = !!fight?.near || (landOn.current && (fight?.progress ?? 0) > 0.88);

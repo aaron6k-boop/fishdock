@@ -291,14 +291,26 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
   }
   // ---- the unhooking mat's top: quilted cloth (colour and a normal map from the same quilting) and a ruler ----
+  // (padded diamonds, each a soft pillow that falls into a narrow stitched seam, the cloth's fine weave over it, the
+  // seams darker where the light doesn't reach. Before, each diamond's height rose in straight slopes to a flat top, so
+  // from above the mat read as a field of green pyramids (Aaron's screenshot of 14 November))
   function quiltTex() {
     const W = 512, H = 268, S = 46, c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d");
     const img = g.createImageData(W, H), hgt = new Float32Array(W * H);
+    const hash = (x, y) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      const a = (x + y) / S, b = (x - y + 1e4) / S, d1 = Math.min(a % 1, 1 - (a % 1)), d2 = Math.min(b % 1, 1 - (b % 1));
-      const h = Math.sqrt(Math.min(1, Math.min(d1, d2) * 3.2)); hgt[y * W + x] = h;
-      const k = (0.62 + 0.38 * h) * (0.96 + Math.random() * 0.06), i = (y * W + x) * 4;
-      img.data[i] = 47 * k; img.data[i + 1] = 92 * k; img.data[i + 2] = 61 * k; img.data[i + 3] = 255;
+      const a = (x + y) / S, b = (x - y + 1e4) / S, fa = a - Math.floor(a), fb = b - Math.floor(b);
+      // (a pillow: highest in the middle of its diamond, rounding down to the seam; the seam a narrow groove)
+      const pil = Math.pow(Math.sin(Math.PI * fa) * Math.sin(Math.PI * fb), 0.55);
+      const seamD = Math.min(fa, 1 - fa, fb, 1 - fb) * S; // (pixels to the nearest seam)
+      const weave = ((x + y) % 4 < 2 ? 1 : -1) * ((x - y + 4096) % 4 < 2 ? 1 : -1) * 0.012 + (hash(x, y) - 0.5) * 0.02;
+      const h = pil * 0.92 + weave; hgt[y * W + x] = h;
+      // (stitches along each seam: short pale dashes of thread)
+      const along = seamD < 1.6 ? (Math.abs(fa - 0.5) > Math.abs(fb - 0.5) ? b : a) * S : 0, stitch = seamD < 1.6 && along % 7 < 4;
+      const ao = 0.55 + 0.45 * Math.min(1, seamD / 9), k = ao * (0.9 + 0.1 * pil) * (0.97 + hash(x * 3.1, y * 1.7) * 0.05), i = (y * W + x) * 4;
+      if (stitch) { img.data[i] = 84 * ao; img.data[i + 1] = 108 * ao; img.data[i + 2] = 86 * ao; }
+      else { img.data[i] = 40 * k; img.data[i + 1] = 84 * k; img.data[i + 2] = 55 * k; }
+      img.data[i + 3] = 255;
     }
     g.putImageData(img, 0, 0);
     // the ruler along the near edge: a pale strip with centimetre ticks and the tens numbered
@@ -309,7 +321,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const n = document.createElement("canvas"); n.width = W; n.height = H; const gn = n.getContext("2d"), ni = gn.createImageData(W, H);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const hx = hgt[y * W + Math.min(W - 1, x + 1)] - hgt[y * W + Math.max(0, x - 1)], hy = hgt[Math.min(H - 1, y + 1) * W + x] - hgt[Math.max(0, y - 1) * W + x];
-      const v = new THREE.Vector3(-hx * 2.2, hy * 2.2, 1).normalize(), i = (y * W + x) * 4, rule = y > H - 31 ? 0 : 1;
+      const v = new THREE.Vector3(-hx * 1.5, hy * 1.5, 1).normalize(), i = (y * W + x) * 4, rule = y > H - 31 ? 0 : 1;
       ni.data[i] = (rule ? v.x * 0.5 + 0.5 : 0.5) * 255; ni.data[i + 1] = (rule ? v.y * 0.5 + 0.5 : 0.5) * 255; ni.data[i + 2] = (rule ? v.z * 0.5 + 0.5 : 1) * 255; ni.data[i + 3] = 255;
     }
     gn.putImageData(ni, 0, 0);
@@ -700,9 +712,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (ph === "bite") {
         // (the bite's own taps where it carries them, so the strike's timing and the rod go by the same pull)
         if (!P.taps) { const d = info.ev?.type === "bite" ? info.ev.data : null; if (Array.isArray(d?.taps) && d.taps.length) { P.taps = d.taps; if (typeof d.strong === "boolean") P.strong = d.strong; } else P.taps = biteTaps(prof.species, P.strong, seed); }
-        for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; bendT += b * e * prof.pull; if (crossed(p0 + 0.001)) { if (a > 0.05) rippleCb?.(castAt, 0.3); if (p0 > 0.05) feel("tap", { a, b }); } }
+        let slackUp = 0;
+        for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; bendT += b * e * prof.pull; if (b < 0) slackUp = Math.max(slackUp, -b * 9 * e); if (crossed(p0 + 0.001)) { if (a > 0.05) rippleCb?.(castAt, 0.3); if (p0 > 0.05) feel("tap", { a, b }); } }
         if (crossed(0.02)) { onSound?.("bell", at); rippleCb?.(castAt, 0.45); feel("bite", { strong: P.strong }, true); }
-        slack = 0.15;
+        slack = 0.15 + slackUp; // (a slack-liner: the line hangs loose while the fish swims in with the bait)
       }
     } else if (ph === "hooked") {
       // the fish fights its own way (fightProfile): divers bore down and hold, fish of the upper water run fast and

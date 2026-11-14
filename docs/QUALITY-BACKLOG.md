@@ -67,8 +67,8 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   instanced quads. **Check:** before and after at the fishing spot, the same camera.
 
 ### 6. Tackle around you
-- **Wrong:** the tripod, seat box, bucket and unhooking mat are made by code (simple shapes, drawn textures); the mat's
-  quilting reads as a green pyramid pattern looking down.
+- **Wrong:** the tripod, seat box, bucket and unhooking mat are made by code (simple shapes, drawn textures). The mat's
+  quilting read as a green pyramid pattern looking down: redrawn 14 November as padded, stitched diamonds.
 - **Do:** model them in Blender (tripod with screw legs and rest heads, seat box, bucket, mat with real quilting and a
   ruler), PBR textures at 512 to 1k, one LOD each. **Cost:** modest triangles, replaces the code shapes.
 - **Check:** close-ups at the landing, looking down.
@@ -85,9 +85,11 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   reel's clicks and drag, rope and net. Needs the PC link to download. **Check:** listen on the phone.
 
 ### 9. Fishing gameplay
-- **Wrong:** every bite is the same kind of pull; bites don't follow the tide or time of day.
-- **Do:** bite styles per species (rattles, slow pulls, a slack-liner when a fish swims towards you), a tide-and-time
-  table per place where the sources say so. **Check:** tests in `tests/reelModel.test.js` and play.
+- **Was wrong:** the rod already showed each species' bite (knocks then a pull for cod, a rattle for whiting), but the
+  strike went by one rule for every fish. **Done (14 Nov):** strike on the pull, not the knock (`bitePlan`), the Strike
+  button saying where the bite is and marking the moment in green.
+- **Still to do:** a slack-liner (a fish swimming towards you: the line falls slack, wind down then strike); bites by
+  tide and time of day per place where the sources say so. **Check:** `tests/bite.test.js` and play.
 
 ### 10. New places
 - **Wrong:** Gorleston South Pier is the only place built to this standard.
@@ -105,3 +107,6 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | The jacket's lining left out (rings round the forearm) | drop-net film before and after; `tests/fpRig.test.js` |
 | 14 Nov | Cast, Strike and the side buttons as one set with the reel; Strike's bite clock; the cast's distance | phone-width screenshots before and after |
 | 14 Nov | The worst-frame line says where the time went | `tests/frameReport.test.js` |
+| 14 Nov | Strike on the pull, not the knock; the Strike button shows where the bite is | `tests/bite.test.js`; screenshots of each stage |
+| 14 Nov | The game updates itself between catches (no more old copies) | by hand: the update check in `src/main.jsx` |
+| 14 Nov | The unhooking mat as padded, stitched quilting instead of pyramids | before and after of the texture and the mat in the catch film |

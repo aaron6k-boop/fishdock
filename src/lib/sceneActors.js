@@ -94,6 +94,10 @@ export function biteTaps(species, strong = false, rnd = Math.random) {
     return out;
   }
   if (p.tempo >= 1.25 && p.splashy >= 0.5) return [[0, 0.09 * j(), 0.08, 7], [0.28 * j(), 0.1 * j(), 0.12, 7], [0.7 * j(), 0.06, strong ? 0.34 : 0.16, 2.5]]; // bass, mullet, garfish: knocks then a run
+  // (a slack-liner, now and then: a knock, then the rod springs straight and the line falls slack as the fish swims
+  // towards you with the bait, shifting the lead; it tightens again as it turns away, and that's the moment. A negative
+  // bend is the rod straightening; bitePlan reads it)
+  if (p.pull >= 0.8 && rnd() < 0.25) return [[0, 0.04, 0.04, 6], [0.5 * j(), 0.03, -0.05, 0.6], [2.0 * j(), 0.05, strong ? 0.34 : 0.2, 1.4]];
   if (p.pull >= 1.15) return [[0, 0.06, 0.08, 4], [0.5 * j(), 0.07, 0.12, 4], [1.3 * j(), 0.04, strong ? 0.4 : 0.22, 1.2]]; // cod, pollack, smoothhound: knocks, then the rod pulled round
   return [[0, 0.06, 0.04, 6], [0.45 * j(), 0.06, strong ? 0.2 : 0.08, 4], [1.2 * j(), 0.05, strong ? 0.18 : 0.06, 4]];
 }

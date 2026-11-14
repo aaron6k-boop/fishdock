@@ -192,7 +192,7 @@ export function bitePlan(taps, biteMs = DUR.bite) {
   const rattle = taps.length >= 4 && Math.max(...taps.map((t) => t[2])) < 0.05;
   const pull = rattle ? taps[1][0] : taps.reduce((a, t) => (t[2] > a[2] ? t : a), taps[0])[0];
   const from = Math.max(0, pull * 1000 - 120), to = Math.min(biteMs - 600, from + 2400);
-  return { from, to, pull: pull * 1000, rattle };
+  return { from, to, pull: pull * 1000, rattle, slack: taps.some((t) => t[2] < 0) };
 }
 /** Strike timing: "early" before the moment to strike, "late" after it, otherwise "good" (bitePlan). */
 export function strikeTiming(msSinceBite, biteMs = DUR.bite, plan = null) {
