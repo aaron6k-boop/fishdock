@@ -598,7 +598,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const railFix = new THREE.Vector3(); let railTilt = 0; // (first person: how far the hold is moved to keep clear of the railing, eased)
   const holdSway = { x: 0, y: 0, vx: 0, vy: 0, yaw: null, pitch: null }; // (first person: the hold lagging a turn of your head, on a spring)
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
-  const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0 }; // carrying it as you walk: its sway with your steps
+  const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0, out: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
   let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0;
   // ---- your body's weight in first person (metres from where the eye would be: x right, y up, z back) ----
@@ -1168,7 +1168,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       carry.up += (up - carry.up) * (1 - Math.exp(-dt * (up > carry.up ? 9 : 3)));
       const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + carry.d.y * 0.6, az = -0.086 + carry.trail + carry.sway * 0.35;
       dir = new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
-      butt = new THREE.Vector3(0.25, 0.86, -0.05).addScaledVector(carry.d, 0.8).addScaledVector(dir, -R.seat * 0.7); held = true; showLine = false; showFish = false;
+      // (and held a little further out from your side while you turn: stepping round, the right leg came out under the
+      // rod and the hand holding it went into the thigh)
+      carry.out += (0.06 * clamp(Math.abs(walking.turnRate || 0) / 2.5, 0, 1) - carry.out) * kt;
+      butt = new THREE.Vector3(0.25 + carry.out, 0.86, -0.05).addScaledVector(carry.d, 0.8).addScaledVector(dir, -R.seat * 0.7); held = true; showLine = false; showFish = false;
     } else carry.base = null;
     // first person: whenever the line is out the rod is in your hands, low and to the right with the reel in view and
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to

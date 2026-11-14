@@ -27,6 +27,12 @@ import { lookFor, COATS, LEGS, FOOTWEAR, SKINS } from "./people.js";
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+// (the feet when you stop: a foot more than SETTLE_AT from where it would stand is stepped back under you in SETTLE_T;
+// and two feet are never nearer than FEET_GAP, ankle to ankle, along the deck)
+const SETTLE_AT = 0.11, SETTLE_T = 0.42, FEET_GAP = 0.15, STEP_AT = 0.3;
+// (a free hand's clearance from its thigh's line and from the spine's, along the deck: a thigh is about 8 cm round the
+// bone, the hand 4 to 5 cm thick; the belly and hips about 15 from the spine)
+const CLEAR_THIGH = 0.12, CLEAR_BODY = 0.19;
 const rngOf = (seed) => { let a = seed || 1; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
 // ---- loading: each file once, shared ----
@@ -401,7 +407,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   }
 
   // ---- posing ----
-  const st = { u: 0, v: 0, turn: 0, lastYaw: null, look: 0, lookUntil: 0, nextLook: 6 + rnd() * 10, blink: 0, nextBlink: 1 + rnd() * 3, jaw: 0, yaw: 0, pitch: 0, drop: 0, lean: 0, brace: 0, twist: 0, hand: [{ w: 0, kind: null, from: V(), out: V(), u: 1, last: null }, { w: 0, kind: null, from: V(), out: V(), u: 1, last: null }], t: 0, foot: {} };
+  const st = { clear: [], u: 0, v: 0, turn: 0, lastYaw: null, look: 0, lookUntil: 0, nextLook: 6 + rnd() * 10, blink: 0, nextBlink: 1 + rnd() * 3, jaw: 0, yaw: 0, pitch: 0, drop: 0, lean: 0, brace: 0, twist: 0, hand: [{ w: 0, kind: null, from: V(), out: V(), u: 1, last: null }, { w: 0, kind: null, from: V(), out: V(), u: 1, last: null }], t: 0, foot: {} };
   const save = {}; const ARM = ["UpperArm", "Forearm", "Hand"];
   const FINGERS = { L: [], R: [] };
   for (const s of ["L", "R"]) for (const f of [1, 2, 3, 4]) for (const j of ["", "1", "2"]) { const b = B(`${s}_Finger${f}${j}`); if (b) FINGERS[s].push([b, j === "" ? 0.75 : j === "1" ? 1.15 : 0.8]); }
@@ -580,14 +586,42 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         fs.dyaw = mode ? clamp(wrapA(fs.yaw - yaw0), -0.9, 0.9) : fs.dyaw * Math.exp(-dt * 10);
         const cy = Math.cos(fs.dyaw * lw), sy = Math.sin(fs.dyaw * lw), rx = toe0.x - ank.x, rz = toe0.z - ank.z;
         const toe = V(ank.x + rx * cy + rz * sy, toe0.y, ank.z - rx * sy + rz * cy), at = mode === "toe" ? toe : ank;
-        if (mode && mode !== fs.mode) fs.lock.set(at.x + fs.corr.x, 0, at.z + fs.corr.z);
-        fs.mode = mode;
-        if (mode) { fs.corr.set(fs.lock.x - at.x, 0, fs.lock.z - at.z); if (fs.corr.length() > 0.42) { fs.mode = null; fs.corr.setLength(0.42); } }
-        else fs.corr.multiplyScalar(Math.exp(-dt * 12));
-        const tgt = ank.clone().addScaledVector(fs.corr, lw);
+        if (fs.step) {
+          // (a settling step: the foot lifted and put back under you, then held there)
+          fs.step.u = Math.min(1, fs.step.u + dt / (fs.step.T || SETTLE_T)); const e = ease(fs.step.u);
+          fs.corr.copy(fs.step.from).multiplyScalar(1 - e); fs.lift = Math.sin(Math.PI * fs.step.u) * 0.07;
+          if (fs.step.u >= 1) { fs.step = null; fs.lift = 0; fs.mode = mode; fs.lock.set(at.x, 0, at.z); fs.corr.set(0, 0, 0); }
+        } else {
+          if (mode && mode !== fs.mode) fs.lock.set(at.x + fs.corr.x, 0, at.z + fs.corr.z);
+          fs.mode = mode;
+          // (held too far from where the walk would have it, turning tight or round: a quick step back to it, lifted,
+          // while the other foot holds; let go to slide back, it skated up to 14 cm a frame along the deck)
+          const other = st.foot[sd === "L" ? "R" : "L"];
+          if (mode) { fs.corr.set(fs.lock.x - at.x, 0, fs.lock.z - at.z); if (fs.corr.length() > STEP_AT && !other?.step) fs.step = { u: 0, T: 0.3, from: fs.corr.clone() }; else if (fs.corr.length() > 0.42) { fs.mode = null; fs.corr.setLength(0.42); } }
+          else fs.corr.multiplyScalar(Math.exp(-dt * 12));
+        }
+        const tgt = ank.clone().addScaledVector(fs.corr, lw); if (fs.lift) tgt.y += fs.lift;
         if (floor) { const fy = floor(tgt.x, tgt.z); if (Number.isFinite(fy)) tgt.y += clamp(fy - gy, -0.25, 0.25); }
         const fq = new THREE.Quaternion().setFromAxisAngle(up, fs.dyaw * lw).multiply(P.q);
         aims.push([sd, tgt, fq]);
+      }
+      // (standing still with a foot left out of place by the last steps, wide or behind: a step to bring it back under
+      // you, one foot at a time, the further out first. Held where they came down, after a curve the feet stayed 80 cm
+      // apart for as long as you stood there)
+      st.still = st.v < 0.06 && !piv ? (st.still || 0) + dt : 0;
+      if (st.still > 0.25 && !st.foot.L?.step && !st.foot.R?.step) {
+        const far = ["L", "R"].map((sd) => [sd, st.foot[sd]?.corr.length() || 0]).sort((a, b) => b[1] - a[1])[0];
+        if (far[1] > SETTLE_AT) st.foot[far[0]].step = { u: 0, from: st.foot[far[0]].corr.clone() };
+      }
+      // (and the feet never through each other: turning round at a walk, the swinging foot was carried through the
+      // planted one. The one in the air, or the one stepping, is kept a foot's width from the other)
+      {
+        const [a, bb] = aims, dx = a[1].x - bb[1].x, dz = a[1].z - bb[1].z, d = Math.hypot(dx, dz);
+        if (d < FEET_GAP) {
+          const fa = st.foot.L, fb = st.foot.R, moveA = (!fa?.mode || fa?.step) && !(!fb?.mode || fb?.step) ? 1 : (!fb?.mode || fb?.step) && !(!fa?.mode || fa?.step) ? 0 : 0.5;
+          const rgt = figDirW(V(1, 0, 0)); let nx = d > 1e-4 ? dx / d : -rgt.x, nz = d > 1e-4 ? dz / d : -rgt.z; // (L minus R: away from each other)
+          const push = FEET_GAP - d; a[1].x += nx * push * moveA; a[1].z += nz * push * moveA; bb[1].x -= nx * push * (1 - moveA); bb[1].z -= nz * push * (1 - moveA);
+        }
       }
       // (a leg stretched past its length: the hips come down to it)
       let need = 0;
@@ -639,6 +673,24 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     }
 
     // ---- the arms: each hand where it's asked to be, holding what it holds ----
+    // (a free hand, swinging with the motion capture, is kept clear of its own thigh and the body: turning, sprinting
+    // and turning round to walk back, the left hand went through the thigh and the belly. Measured from the bones'
+    // lines, eased so it never pops: the arm bends out round them)
+    const keepClear = (s, i, sg, dt) => {
+      const hand = wp(B(s + "_Hand")), th = wp(B(s + "_Thigh")), ca = wp(B(s + "_Calf")), pel = wp(B("Pelvis")), sp2 = wp(B("Spine2"));
+      const near = (a, b) => { const ab = b.clone().sub(a), t = clamp(hand.clone().sub(a).dot(ab) / Math.max(1e-8, ab.lengthSq()), 0, 1); return a.clone().addScaledVector(ab, t); };
+      const push = V();
+      for (const [a, b, r] of [[th, ca, CLEAR_THIGH], [pel, sp2, CLEAR_BODY]]) {
+        const d = hand.clone().sub(near(a, b)); d.y = 0; const L = d.length();
+        if (L < r) { if (L < 1e-4) d.copy(figDirW(V(sg, 0, 0))); else d.multiplyScalar(1 / L); push.addScaledVector(d, r - L); }
+      }
+      const pv = st.clear[i] || (st.clear[i] = V()); if (push.lengthSq() >= pv.lengthSq()) pv.copy(push); else pv.lerp(push, 1 - Math.exp(-dt * 10)); // (at once going in, which is smooth as the hand comes on smoothly; eased coming away)
+      if (pv.lengthSq() < 1e-6) return;
+      const S0 = wp(B(s + "_UpperArm")), E0 = wp(B(s + "_Forearm")), hq = wq(B(s + "_Hand"));
+      const pole = E0.clone().sub(S0.clone().add(hand).multiplyScalar(0.5));
+      const r2 = twoBone(S0, hand.clone().add(pv), S0.distanceTo(E0), E0.distanceTo(hand), pole.lengthSq() > 1e-8 ? pole.normalize() : figDirW(V(sg * 0.5, -0.4, 0.5)));
+      aim(B(s + "_UpperArm"), B(s + "_Forearm"), r2.B); aim(B(s + "_Forearm"), B(s + "_Hand"), r2.C); setWQ(B(s + "_Hand"), hq);
+    };
     const specs = o.hands || [null, null];
     for (let i = 0; i < 2; i++) {
       const s = i ? "R" : "L", sg = i ? 1 : -1, hs = st.hand[i];
@@ -655,7 +707,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       // ease on and off: a free hand goes back to the motion capture
       if (spec) { hs.last = spec; hs.w = Math.min(1, hs.w + dt / 0.3); } else hs.w = Math.max(0, hs.w - dt / 0.35);
       const use = spec || hs.last;
-      if (!use || hs.w <= 0) { hs.kind = null; continue; }
+      if (!use || hs.w <= 0) { hs.kind = null; keepClear(s, i, sg, dt); continue; }
       for (const n of ARM) save[s + n] = B(s + "_" + n).quaternion.clone();
       const target = use.at.clone();
       if (use.kind !== hs.kind) { hs.from.copy(hs.kind ? hs.out : target); hs.kind = use.kind; hs.u = 0; }
