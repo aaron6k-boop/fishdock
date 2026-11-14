@@ -16,6 +16,7 @@ import { shrinkImage } from "../lib/storage.js";
 import { DRAW_CM, phaseAt } from "../lib/liveEvents.js";
 import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import FishTray from "../components/FishTray.jsx";
+import { biteOf } from "../lib/fishFlow.js";
 import Stage3D from "../components/Stage3D.jsx";
 import InviteHere from "../components/InviteHere.jsx";
 import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
@@ -180,6 +181,10 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   const [, setTick] = useState(0);
   useEffect(() => { if (!events.length) return undefined; const id = setInterval(() => setTick((n) => n + 1), 400); return () => clearInterval(id); }, [events.length]);
   const p = phaseAt(events, Date.now());
+  // (a quiet moment to reload into a newer version, for main.jsx: no line out (a cast waiting would be lost), nothing in the
+  // scene being landed or looked at)
+  const phaseRef = useRef(p.phase); phaseRef.current = p.phase;
+  useEffect(() => { window.__fdSafeToReload = () => ["idle", "ended", "lost"].includes(phaseRef.current) && window.__fdSceneIdle !== false; return () => { delete window.__fdSafeToReload; }; }, []);
   // the fight's over (landed, lost or never started): the reeling ticks stop with it
   useEffect(() => { if (p.phase !== "hooked") haptics.reeling(false); }, [p.phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = events.at(-1)?.type;
@@ -239,7 +244,7 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
             </div>
             {arrived ? <div className="arrive-label" role="status" onAnimationEnd={() => setArrived(false)}><b>{place.name.replace(/ \(.*\)$/, "")}</b><span>{place.region || "Virtual fishing"}</span></div> : null}
             <div className="fs-bottom">
-              <FishTray phase={p.phase} last={last} reel={vf.reel} fight={vf.fight} live={vf.fightLive} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onHold={vf.hold} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
+              <FishTray phase={p.phase} last={last} bite={biteOf(events)} reel={vf.reel} fight={vf.fight} live={vf.fightLive} note={vf.note} opts={vf.opts} autoplay={vf.autoplay} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension, species: sp.id }); }} onHold={vf.hold} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} onStop={vf.stop} />
             </div>
     </>
   );

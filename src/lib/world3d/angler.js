@@ -698,7 +698,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       held = false; rigAt = castAt.clone(); slack = 0.35;
       if (ph === "missed" && crossed(0.02)) feel("missed", {}, true);
       if (ph === "bite") {
-        if (!P.taps) P.taps = biteTaps(prof.species, P.strong, seed);
+        // (the bite's own taps where it carries them, so the strike's timing and the rod go by the same pull)
+        if (!P.taps) { const d = info.ev?.type === "bite" ? info.ev.data : null; if (Array.isArray(d?.taps) && d.taps.length) { P.taps = d.taps; if (typeof d.strong === "boolean") P.strong = d.strong; } else P.taps = biteTaps(prof.species, P.strong, seed); }
         for (const [p0, a, b, dk] of P.taps) if (age > p0) { const e = Math.exp(-(age - p0) * dk); tipT += a * e * prof.pull * 1.4; bendT += b * e * prof.pull; if (crossed(p0 + 0.001)) { if (a > 0.05) rippleCb?.(castAt, 0.3); if (p0 > 0.05) feel("tap", { a, b }); } }
         if (crossed(0.02)) { onSound?.("bell", at); rippleCb?.(castAt, 0.45); feel("bite", { strong: P.strong }, true); }
         slack = 0.15;

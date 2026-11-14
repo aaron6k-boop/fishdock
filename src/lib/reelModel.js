@@ -180,5 +180,22 @@ export function timeToLand(opts, rate, { assisted = false, hold = false, steady 
   return Infinity;
 }
 
-/** Strike timing: "early" in the first moment of a bite, "late" near its end, otherwise "good". */
-export function strikeTiming(msSinceBite, biteMs = DUR.bite) { return msSinceBite < 250 ? "early" : msSinceBite > biteMs - 1500 ? "late" : "good"; }
+// ---- the bite: when to strike ----
+// Each kind of fish bites its own way (sceneActors.js biteTaps: knocks then the rod pulled round for cod, a rattle of
+// small taps for whiting, knocks then a run for bass, a slow heavy draw for a ray). Anglers strike on the pull, not the
+// first knock: a fish still mouthing the bait has it only in its lips. So the moment to strike is from the pull (the tap
+// that bends the rod most) for about two seconds; for a rattle, from its second tap. Before that is early (the bait
+// pulled from it), after is late (it's dropped it). With no plan, the old rule: the first quarter second is early.
+/** When to strike in a bite, from its taps ([[seconds, tip, bend, decay], ...]): { from, to, pull, rattle } in ms. */
+export function bitePlan(taps, biteMs = DUR.bite) {
+  if (!Array.isArray(taps) || !taps.length) return null;
+  const rattle = taps.length >= 4 && Math.max(...taps.map((t) => t[2])) < 0.05;
+  const pull = rattle ? taps[1][0] : taps.reduce((a, t) => (t[2] > a[2] ? t : a), taps[0])[0];
+  const from = Math.max(0, pull * 1000 - 120), to = Math.min(biteMs - 600, from + 2400);
+  return { from, to, pull: pull * 1000, rattle };
+}
+/** Strike timing: "early" before the moment to strike, "late" after it, otherwise "good" (bitePlan). */
+export function strikeTiming(msSinceBite, biteMs = DUR.bite, plan = null) {
+  if (plan) return msSinceBite < plan.from ? "early" : msSinceBite > plan.to ? "late" : "good";
+  return msSinceBite < 250 ? "early" : msSinceBite > biteMs - 1500 ? "late" : "good";
+}

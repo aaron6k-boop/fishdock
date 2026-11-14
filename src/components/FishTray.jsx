@@ -30,13 +30,24 @@ const HOLD_AFTER = 260; // ms into a press of Reel before it counts as holding (
  * (useVirtualFishing); live: the same fight as it is this instant (a ref, for the reel drawn every frame); note: a short
  * message; opts: { assisted, advanced }.
  */
-export default function FishTray({ phase, last, reel = 0, fight = null, live = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onHold, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
+export default function FishTray({ phase, last, bite = null, reel = 0, fight = null, live = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onHold, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
   const world = useContext(WorldCtx), { busy: sceneBusy } = useContext(SceneCtx);
   // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
   const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
   const landOn = useRef(false), castAt = useRef(-1e9), shown = useRef({ act: null, at: -1e9 }), pressed1 = useRef({});
   const [power, setPower] = useState(null), [tapFx, setTapFx] = useState(0), [pressed, setPressed] = useState(false);
   const hold = useRef(null), reelHold = useRef(0);
+  // ---- the bite: knocks first, then the pull to strike on (bitePlan) ----
+  // (where the bite is in its plan: "knock" before the moment to strike, "pull" in it, "late" after; moved on by timers
+  // from the bite's own start, so the words change as the rod pulls round)
+  const [biteStage, setBiteStage] = useState(null);
+  useEffect(() => {
+    if (!bite?.plan) { setBiteStage(null); return undefined; }
+    const at = (ms) => Math.max(0, ms - (Date.now() - bite.t));
+    setBiteStage(Date.now() - bite.t < bite.plan.from ? "knock" : Date.now() - bite.t <= bite.plan.to ? "pull" : "late");
+    const a = setTimeout(() => setBiteStage("pull"), at(bite.plan.from)), b = setTimeout(() => setBiteStage("late"), at(bite.plan.to));
+    return () => { clearTimeout(a); clearTimeout(b); };
+  }, [bite?.t]); // eslint-disable-line react-hooks/exhaustive-deps
   if (phase !== "hooked") landOn.current = false;
   let act = null, label = hint || "", busy = false, status = "", dist = null;
   if (autoplay) { label = "Playing it through"; }
@@ -45,7 +56,7 @@ export default function FishTray({ phase, last, reel = 0, fight = null, live = n
   else if (canCast({ phase, lineOut })) { act = "cast"; label = label || (power != null ? "Let go to cast" : last ? "Hold to cast again" : "Hold Cast, aim, let go"); }
   else if (phase === "cast") { busy = true; label = "Casting"; }
   else if (phase === "waiting" || phase === "missed") { act = onWindIn && !autoplay ? "wait" : null; label = phase === "missed" ? "Missed it. The bait's still out" : "Waiting for a bite"; }
-  else if (phase === "bite") { act = "strike"; label = "Bite! Strike now"; }
+  else if (phase === "bite") { act = "strike"; label = biteStage === "knock" ? (bite?.plan?.rattle ? "Rattling: strike on the next tap" : "Knocks on the tip: wait for the pull") : biteStage === "pull" ? (bite?.plan?.rattle ? "Strike now" : "It's pulling round: strike!") : biteStage === "late" ? "Strike before it lets go" : "Bite! Strike now"; }
   else if (phase === "hooked") {
     // (Land stays once it's shown unless the fish really pulls away, so it doesn't flicker with Reel at the edge)
     const near = !!fight?.near || (landOn.current && (fight?.progress ?? 0) > 0.88);
@@ -144,10 +155,12 @@ export default function FishTray({ phase, last, reel = 0, fight = null, live = n
         ) : null}
         {act === "strike" ? (
           // (the bite won't wait: the ring runs down over the bite, red for its last moments, when it may drop the bait)
-          <button type="button" className="ft-main ft-strike" onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}>
+          // (and the moment to strike marked on it in green: strike as the running-down edge passes through it)
+          <button type="button" className={`ft-main ft-strike${biteStage ? ` bite-${biteStage}` : ""}`} onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}>
             <svg className="ft-ringsvg ft-biteclock" viewBox="0 0 64 64" aria-hidden="true" style={{ "--bite-ms": `${DUR.bite}ms` }}>
               <circle cx="32" cy="32" r={R} className="ft-ring-bg" />
-              <circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C }} />
+              <circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C, animationDelay: bite ? `${-Math.min(DUR.bite, Date.now() - bite.t)}ms` : undefined }} />
+              {bite?.plan ? <circle cx="32" cy="32" r={R} className="ft-bitewin" style={{ strokeDasharray: `${C * (bite.plan.to - bite.plan.from) / DUR.bite} ${C}`, strokeDashoffset: -C * (1 - bite.plan.to / DUR.bite) }} /> : null}
             </svg>
             <Icon name="hook" /><span>Strike</span>
           </button>

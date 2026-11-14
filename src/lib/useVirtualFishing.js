@@ -9,8 +9,8 @@
 // made here is simulated and says so (data.simulated), and nothing here is ever saved as a real catch.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DUR } from "./liveEvents.js";
-import { fightProfile, fightSeconds } from "./sceneActors.js";
-import { createFight, fightStep, tapRate, rhythm, DRAG, strikeTiming } from "./reelModel.js";
+import { fightProfile, fightSeconds, biteTaps } from "./sceneActors.js";
+import { createFight, fightStep, tapRate, rhythm, DRAG, strikeTiming, bitePlan } from "./reelModel.js";
 
 // ---- reeling options, saved on this phone: Assisted reeling, and Advanced (set the drag yourself) ----
 const OPT_KEY = "fishdock.reel";
@@ -58,6 +58,9 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     emit.current?.(e);
     return e;
   }, [who]);
+  // (a bite carries its own taps, the species' way of biting (sceneActors.js biteTaps), so the rod in the 3D view and
+  // the strike's timing go by the same knocks and the same pull)
+  const biteData = () => { const f = fish.current, strong = Math.random() < 0.35 + 0.3 * fightProfile(f.species).pull; return { strong, taps: biteTaps(f.species, strong, Math.random).map((t) => t.map((x) => Math.round(x * 1000) / 1000)) }; };
   const last = events.at(-1);
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
   const later = (ms, f) => { timers.current.push(setTimeout(f, ms)); };
@@ -67,7 +70,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     clearTimers();
     if (!last) return undefined;
     const f = fish.current;
-    if (auto && (last.type === "cast" || last.type === "missed")) later((last.type === "cast" ? DUR.cast : DUR.missed) + biteDelay(f.species) * 1000, () => add("bite"));
+    if (auto && (last.type === "cast" || last.type === "missed")) later((last.type === "cast" ? DUR.cast : DUR.missed) + biteDelay(f.species) * 1000, () => add("bite", biteData()));
     if (last.type === "bite") {
       if (autoplay) later(1100, () => add("hooked"));
       else later(DUR.bite - 700, () => add("missed")); // not struck in time: the fish lets go, the bait is still out
@@ -115,8 +118,10 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     cast: (d) => add("cast", d && Number.isFinite(d.dist) ? { dist: Math.round(d.dist * 10) / 10, aim: Math.round((d.aim || 0) * 1000) / 1000 } : null),
     strike: () => {
       // timing: right in the first moment of a bite, or as it's ending, and it can let go
-      const bite = [...events].reverse().find((e) => e.type === "bite"), when = strikeTiming(Date.now() - (bite?.t || Date.now()));
-      if (when !== "good" && Math.random() < (when === "early" ? 0.3 : 0.35)) { say(when === "early" ? "Too soon: it let go. Wait for the pull." : "Too late: it dropped the bait."); add("missed"); return; }
+      // (by the bite's own plan: on the pull is good; striking at a knock, while it's only mouthing the bait, often
+      // pulls the bait away; too late and it's dropped it)
+      const bite = [...events].reverse().find((e) => e.type === "bite"), plan = bitePlan(bite?.data?.taps), when = strikeTiming(Date.now() - (bite?.t || Date.now()), DUR.bite, plan);
+      if (when !== "good" && Math.random() < (when === "early" ? (plan ? 0.5 : 0.3) : 0.35)) { say(when === "early" ? (plan?.rattle ? "Too soon: strike on the rattle, not the first tap." : "Too soon: it was only knocking. Wait for the pull.") : "Too late: it dropped the bait."); add("missed"); return; }
       add("hooked");
     },
     /** one tap of the reel (or, with Assisted reeling on, start or stop winding) */
@@ -136,7 +141,7 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     playAll: () => { clearTimers(); setEvents([]); setAutoplay(true); setTimeout(() => add("cast"), 300); },
     stop: () => { clearTimers(); setAutoplay(false); setEvents([]); },
     // the testing panel: make something happen now
-    biteNow: () => add("bite"),
+    biteNow: () => add("bite", biteData()),
     miss: () => add("missed"),
     lose: () => add("lost"),
     landNow: () => { fightRef.current = null; add("catch", catchData()); },
