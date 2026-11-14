@@ -662,3 +662,8 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
    width to the left, so for a moment they sat across each other) */
 .w3d-toast { animation-name: w3d-pop; }
 @keyframes w3d-pop { from { transform: translateY(6px) scale(.92); opacity: 0; } }
+/* (the column of toasts given a width of its own. Placed at left: 50% with no width, it could be no wider than half
+   the screen, so a toast's words wrapped; and in Safari a wrapped toast kept the height of one line, so the next one
+   sat over its second line: the "+83 XP · Mackerel · New kind" under "Challenge done" in the 14 November recording) */
+.w3d-toasts { width: min(92vw, 380px); }
+.w3d-toast { max-width: 100%; box-sizing: border-box; }

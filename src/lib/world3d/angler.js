@@ -1286,6 +1286,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const loose = clamp(Math.sin(clamp(u / 0.9, 0, 1) * Math.PI) * 1.6, 0, 1);
       return pull.hand ? { at: [reacher, puller], loose: [loose, 0] } : { at: [puller, reacher], loose: [0, loose] };
     };
+    // (and neither hand down inside the top rail: the rope runs out over it, and the near hand, gripping it where it
+    // crosses, went 4.6 cm into the rail in the railing test, tools/rail-test.mjs, the drop-net landing on 14 November.
+    // A hand that low near the rail's line is drawn back towards you, behind the rail, the rope running from it over
+    // the top: lifting it instead took the arm over the rail and into it. By degrees, the lower it is the further back,
+    // so it never jumps)
+    const ropeClear = (hs) => { for (const hh of hs) { const rl = hh.rail; if (!rl || !hh.at) continue; const low = ease(clamp((rl.y + 0.1 - hh.at.y) / 0.08, 0, 1)); if (low <= 0) continue; const back = rl.z + 0.12 - hh.at.z; if (back > 0 && back < 0.3) hh.at.z += back * low; } };
     // (each hand's grip lies along the rope where that hand is: towards the other hand if that's the one nearer the
     // net, else straight to the net)
     const ropeSocks = (hs, knotL, rd) => { hs.forEach((hh, i) => { const o = hs[1 - i], X = o.at.distanceTo(knotL) < hh.at.distanceTo(knotL) - 0.03 ? o.at.clone().sub(hh.at) : knotL.clone().sub(hh.at); if (X.lengthSq() < 1e-4) X.copy(rd); X.normalize(); if (ROPE_FLIP) X.negate();
@@ -1380,7 +1386,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (in first person each hand closes round the rope as round the reel's knob: the rope across the fingers, the
           // thumb side up, the hand turned about the rope to line up with the forearm)
           if (fp) { const R2 = ropeFp(base, rd, fpEye(), landStage === "haul" ? ropePull : null, landStage === "lower" ? 0.45 : 0.08);
-            hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeSocks(hands, netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : base.clone().add(rd), rd); }
+            hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); ropeSocks(hands, netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : base.clone().add(rd), rd); }
           fpRope = fp; lean = fp ? 0.3 : 0.22; crouch = 0.06; brace = landStage === "haul" ? 0.25 : 0; lookAtW = netAt ? netAt.clone() : lookAtW;
         } else if (landStage === "done") { lookAtW = netAt ? netAt.clone() : lookAtW; lean = 0.05; brace = 0;
         } else if (landStage === "in" && net0) {
@@ -1474,7 +1480,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } };
         hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } }; }
       if (fp) { const R2 = ropeFp(base, rd, E, relStep === "haul" ? ropePull : null, 0.08);
-        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true; }
+        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true; }
       lean = 0.22; crouch = 0.06; brace = relStep === "haul" ? 0.2 : 0; lookAtW = releaseInfo?.fish || (netAt ? netAt.clone() : lookAtW);
     }
     if (kept?.state === "release" && relStep === "haul" && releaseInfo?.over && netAt) {

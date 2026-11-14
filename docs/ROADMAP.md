@@ -24,7 +24,7 @@ performance (Auto is Medium on a phone, the step-down ladder, gulls drawn togeth
 
 | Branch | What |
 |---|---|
-| `play-polish` | From the 14 November recording: the frame-rate panel names the worst frame's cause on the phone; the panel no longer made a WebGL context twice a second; the sleeves no longer magenta at dusk; the fish rests in your palms; one reward card instead of three or four toasts piled over the picture |
+| `play-polish` | From the 14 November recording: things that arrived after start-up (pier props, a passer-by, the drop net) readied before they're seen, not on the frame they first come into view (12 shaders and 16 textures at the cast on main, none on the branch); the frame-rate panel names the worst frame's cause on the phone and no longer made a WebGL context twice a second; the sleeves no longer magenta at dusk; the fish rests in your palms; warmer skin; one reward card instead of a pile of toasts |
 
 ## Backlog, in priority order
 
@@ -56,9 +56,10 @@ performance (Auto is Medium on a phone, the step-down ladder, gulls drawn togeth
 
 ## Next action
 
-Wait for Aaron's review of #118 to #121 (merge order: #118, then #121 which is stacked on it, then #119 and #120 in
-either order). Then, in priority order: the landing's left forearm swing (2), the drop net's rope and bag with a fish
-in it (3), tide height on the pier wall (4), per-species bite styles (6).
+Wait for Aaron's review of `play-polish`, and his iPhone recording of the same sequence on it: the FPS display's
+"worst" line now names what the slowest frame was doing. Then: authored Blender clips for putting the rod in the rest
+and picking it up, and for the drop-net haul (needs this chat linked to Aaron's PC, where Blender is); bite variety
+(taps, pulls, a slack-liner) by species (6, 9); tide height on the pier wall (4).
 
 ## Evidence kept
 
