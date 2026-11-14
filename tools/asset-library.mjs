@@ -64,6 +64,12 @@ export function build() {
     const tex = s.images.length ? s.images.map((i) => (i.w ? `${i.w}x${i.h}` : "?")).join(", ") : "none";
     out.push(`| ${f} | ${what} | ${lod} | ${kb(buf.length)} | ${s.tris.toLocaleString("en-GB")} | ${tex} | ${s.anims.length ? s.anims.length : "none"} |`);
   }
+  const fd = join(md, "fish2");
+  try {
+    const list = readdirSync(fd).filter((x) => x.endsWith(".glb")).sort();
+    let bytes = 0, tris = 0; for (const f of list) { const buf = readFileSync(join(fd, f)); bytes += buf.length; tris += glbStats(buf).tris; }
+    out.push(`| fish2/*.glb (${list.length} files) | The other species with a cut-out picture, one file each (${list.map((f) => f.replace(".glb", "")).join(", ")}) | close (in the hand) to mid (in the water); only the one hooked is fetched | ${kb(bytes)} in all | ${tris.toLocaleString("en-GB")} in all | none | none |`);
+  } catch { /* (none yet) */ }
   out.push("", "## Game-ready textures (`public/textures/`)", "", "| File | Size | Pixels | Format |", "|---|---|---|---|");
   const td = join(ROOT, "public/textures");
   for (const f of readdirSync(td).filter((x) => /\.(jpe?g|png|webp)$/i.test(x)).sort()) {
