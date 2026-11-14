@@ -123,7 +123,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         gate.built(); w.setPacing(false); let pctWas = -1; let liveWas = null, warmed = false;
         w.onFrame(({ outs, view, walk: wk, kept, localId }) => {
           { const fl = props.current.fightLive; if (fl && fl.current !== liveWas) { liveWas = fl.current; w.setFight(liveWas); } } // (each new step of the fight, the frame it arrives)
-          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (!warmed && p >= 85) { warmed = true; w.warm(); } /* (the files are in: everything not yet drawn is built now, under the loading screen) */ if (gate.ready) { gate = null; untrack?.(); untrack = null; w.setPacing(true); if (!gone) setShown(true); } }
+          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (!warmed && p >= 85) { warmed = true; w.warm(); } /* (the files are in: everything not yet drawn is built now, under the loading screen) */ if (gate.ready) { gate = null; untrack?.(); untrack = null; w.warm(); /* (and again as the loading screen goes: whatever arrived since 85% is readied under it, not in your first seconds of fishing) */ w.setPacing(true); if (!gone) setShown(true); } }
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
@@ -208,7 +208,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
 
   const usedQ = useRef(null); // (the preset the view was built with: Auto's choice shows in Settings → Graphics)
   useImperativeHandle(ref, () => ({
-    setGfx: (o) => W.current?.setGfx(o), get gfx() { return W.current ? { ...W.current.gfx, preset: usedQ.current } : null; }, perf: () => W.current?.perf() || null, diag: () => W.current?.diag?.() || null, frameTimes: (since) => W.current?.frameTimes?.(since) || null, setEnv: (o) => W.current?.setEnv?.(o),
+    setGfx: (o) => W.current?.setGfx(o), get gfx() { return W.current ? { ...W.current.gfx, preset: usedQ.current } : null; }, perf: (full) => W.current?.perf(full) || null, diag: () => W.current?.diag?.() || null, frameTimes: (since) => W.current?.frameTimes?.(since) || null, setEnv: (o) => W.current?.setEnv?.(o),
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
     setTorch: (c) => W.current?.setTorch(c),

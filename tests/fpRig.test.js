@@ -179,3 +179,19 @@ test("the other grips: each hand reaches what it holds and its fingers take that
   }
   pose(P, [null, null]); assert.equal(R.scene.visible, false, "nothing in either hand: the arms are put away");
 });
+
+// ---- the skin's shading (14 November: the hands read as pale plastic at dusk) ----
+test("skin: warm light round the shadow's edge and a little variation, worked into three's own lighting", async () => {
+  const { skinShade } = await import("../src/lib/world3d/fpRig.js");
+  const lib = THREE.ShaderLib.physical;
+  const sh = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} };
+  skinShade(sh);
+  // (the scatter goes into the diffuse light only, after three's own; the patches follow the skinned hand)
+  assert.match(sh.fragmentShader, /reflectedLight\.directDiffuse \+= irradiance \* BRDF_Lambert\( material\.diffuseColor \);\s*\{ float fpW/);
+  assert.ok(!sh.fragmentShader.includes("#include <lights_physical_pars_fragment>"), "the lighting chunk is written out with the scatter in it");
+  assert.match(sh.vertexShader, /#include <skinning_vertex>\nvSkinP = transformed;/);
+  assert.match(sh.fragmentShader, /varying vec3 vSkinP;/);
+  assert.match(sh.fragmentShader, /diffuseColor\.rgb \*= mix\(/);
+  // (the scatter adds light only on the dark side of the edge: max(w - dotNL, 0) is never negative)
+  assert.match(sh.fragmentShader, /max\( fpW - dotNL, 0\.0 \)/);
+});

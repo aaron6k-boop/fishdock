@@ -109,6 +109,36 @@ slightly more solid dark fill and no blur. This is a known cost of that effect r
 Found and fixed on 10 November (PR #94): 741,506 triangles in 175 draw calls into a 4096 map every frame on Ultra, now
 371,946 in 89.
 
+### 6. Things that arrived after start-up were readied only when first seen (14 November)
+
+Aaron's recording of 14 November (iPhone, Medium, 1.50x) dropped to a 1% low of 10 fps at the cast and again at 16 to
+22 s, turning round to the lookout while waiting for a bite. Probed on the film clock (the same every run) through
+that sequence at Medium, counting every shader built, texture sent and large buffer sent after the start, by phase.
+Main (`bde759c`) against this branch, 80 film steps after the start before the cast:
+
+| Phase | Main | This branch |
+|---|---|---|
+| The first seconds after the loading screen | 5 textures | none |
+| The cast, as the view swings round | 12 shaders, 16 textures | none |
+| Looking all the way round | 5 textures | 1 shadow shader, 1 texture |
+| The bite | 1 shadow shader, 1 texture | none |
+| Fight, landing, the look at the fish, putting it back, the next cast | none | none |
+
+On the branch all of it is done under the loading screen instead.
+
+What they were: the pier's lifebuoys, benches, signs and lamp posts (`pierprops.glb`), someone walking on the pier,
+the drop net's bag, and their textures. All of them arrived after the warm-up at 85% loaded, which only ran again
+for anglers' own gear, so each was built and sent on the first frame it came into view. Now (`world.js warm`):
+
+- the scene is counted every half second and anything new is readied once it stops arriving, and again as the
+  loading screen goes: shaders compiled where the browser can do it in the background (the parallel-compile
+  extension), then every model drawn once into a single pixel and the sun's shadow map, so its buffers, every
+  texture slot (not only five) and its shadow shader are sent;
+- a texture gets its sharpness (anisotropy) before it's sent, not just after, when it was sent a second time.
+
+The remaining shadow shader and texture on the look round are the next fish's model, sent as it arrives. Counts, not
+timings: what each costs on the iPhone is for its own FPS display to show (the "worst" line, below).
+
 ## Not yet done from Part 1
 
 - **Real frame-time numbers.** None exist yet for either device. They need Record a catch run on the iPhone and on the

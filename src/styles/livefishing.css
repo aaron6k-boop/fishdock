@@ -651,3 +651,19 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .log-today li.done { background: #2fbf9a1f; }
 .log-today li.done svg { color: #8ee6c9; opacity: 1; }
 .log-today li.done span { opacity: .85; }
+.fps-meter .fps-id { opacity: .65; }
+/* ---- a fish's reward: one card, over the frame-rate panel rather than under it ---- */
+.w3d-toasts { z-index: 7; }
+.w3d-toast.reward { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 16px 9px; }
+.w3d-toast.reward .rw-head { display: flex; align-items: baseline; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.w3d-toast.reward .rw-xp { color: #8ee6c9; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.w3d-toast.reward .rw-lines { display: flex; flex-direction: column; gap: 1px; font-size: 12px; font-weight: 600; opacity: .82; }
+/* (the toasts are centred by their column, not by a translate: the banner's pop slid each one in from half its own
+   width to the left, so for a moment they sat across each other) */
+.w3d-toast { animation-name: w3d-pop; }
+@keyframes w3d-pop { from { transform: translateY(6px) scale(.92); opacity: 0; } }
+/* (the column of toasts given a width of its own. Placed at left: 50% with no width, it could be no wider than half
+   the screen, so a toast's words wrapped; and in Safari a wrapped toast kept the height of one line, so the next one
+   sat over its second line: the "+83 XP · Mackerel · New kind" under "Challenge done" in the 14 November recording) */
+.w3d-toasts { width: min(92vw, 380px); }
+.w3d-toast { max-width: 100%; box-sizing: border-box; }
