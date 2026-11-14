@@ -3,9 +3,11 @@
 //   Cast (hold to build power, look where you want it, let go) → Strike (one tap) → Reel (tap it, again and again:
 //   each tap turns the handle) → Land (once the fish is close) → Cast again.
 // The button sits in the thumb's corner on its own, with one short line above it only when there's something to say.
-// While a fish is on, the button is the whole readout: a ring round it for the line's tension (with where the drag will
-// slip) and how far out the fish is under the word Reel, so nothing sits over your hands and the reel. Assisted reeling (an option) winds steadily after one tap. In Advanced mode
-// two small buttons set the drag. Nothing shows while the cast flies or a fish is being landed.
+// While a fish is on, the button is the reel itself (ReelDial): its handle turns with each tap as the reel in your hands
+// does, the ring round it is the line's tension (with where the drag will slip), its spool turns back when the fish
+// takes line, and how far out the fish is sits in its hub, so nothing sits over your hands and the reel. Tap in a steady
+// rhythm; press and hold to wind evenly (slower). Assisted reeling (an option) winds steadily after one tap. In Advanced
+// mode two small buttons set the drag. Nothing shows while the cast flies or a fish is being landed.
 // Each button takes one press for one thing: a second Strike or Land straight after the first is ignored, and Land
 // doesn't take a tap meant for Reel in the moment it appears under your thumb.
 import { useContext, useEffect, useRef, useState } from "react";
@@ -13,21 +15,24 @@ import { Icon } from "./ui.jsx";
 import { WorldCtx, SceneCtx } from "./WorldContext.js";
 import { canCast, busyLabel } from "../lib/fishFlow.js";
 import { GUARD, pressOk } from "../lib/trayGuard.js";
+import ReelDial from "./ReelDial.jsx";
 
 const R = 29, C = 2 * Math.PI * R;
 const HOLD_CYCLE = 1150; // ms from no power to full (then back down: let go at the top)
+const HOLD_AFTER = 260; // ms into a press of Reel before it counts as holding (so a quick tap is a tap, not a short hold)
 
 /**
  * phase: the scene phase; last: the last event type; reel: 0..1; fight: the fight's state while a fish is on
- * (useVirtualFishing); note: a short message; opts: { assisted, advanced }.
+ * (useVirtualFishing); live: the same fight as it is this instant (a ref, for the reel drawn every frame); note: a short
+ * message; opts: { assisted, advanced }.
  */
-export default function FishTray({ phase, last, reel = 0, fight = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onHold, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
+export default function FishTray({ phase, last, reel = 0, fight = null, live = null, note = "", opts = {}, autoplay = false, onCast, onStrike, onTap, onHold, onLand, onDrag, onStop, onNudge, onWindIn, hint }) {
   const world = useContext(WorldCtx), { busy: sceneBusy } = useContext(SceneCtx);
   // the line is in the water after a cast (and a bite, or a missed one) until a fish is landed or lost or you wind in
   const lineOut = last === "cast" || last === "bite" || last === "missed" || last === "smartbite";
   const landOn = useRef(false), castAt = useRef(-1e9), shown = useRef({ act: null, at: -1e9 }), pressed1 = useRef({});
   const [power, setPower] = useState(null), [tapFx, setTapFx] = useState(0), [pressed, setPressed] = useState(false);
-  const hold = useRef(null);
+  const hold = useRef(null), reelHold = useRef(0);
   if (phase !== "hooked") landOn.current = false;
   let act = null, label = hint || "", busy = false, status = "", dist = null;
   if (autoplay) { label = "Playing it through"; }
@@ -43,7 +48,8 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
     landOn.current = near; act = near ? "land" : "reel";
     // what's happening, said only when it's true: a run only while the fish is taking line, the drag only while it slips
     // (the how-to only for the first few taps: after that the button, its ring and the reel turning say it)
-    status = near ? "It's close: tap Land" : fight?.running ? (fight?.dashed && (fight?.progress ?? 0) > 0.6 ? "A last dash: let it run" : "It's running: line going out") : fight?.slipping ? "Too tight: the drag's giving line" : fight?.taking ? "It's taking line: keep tapping" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : (fight?.taps ?? 0) < 4 ? "Tap Reel again and again" : "";
+    // (what to do as well as what's happening: through a run you ease off and let the drag work, then wind again)
+    status = near ? "It's close: tap Land" : fight?.running ? (fight?.dashed && (fight?.progress ?? 0) > 0.6 ? "A last dash: ease off, let it run" : "It's running: ease off, let it go") : fight?.slipping ? "Too tight: tap slower" : fight?.taking ? "It's taking line: wind" : opts.assisted ? (fight?.assisted ? "Winding: tap to stop" : "Tap once to start winding") : fight?.hold ? "Winding steadily: tap in rhythm for more" : (fight?.taps ?? 0) < 6 ? "Tap Reel in a steady rhythm" : "";
     dist = fight && !near ? `${Math.round(fight.dist)}\u00a0m` : null; label = status;
   }
   else if (phase === "landing") { busy = true; label = "Landing it"; }
@@ -68,7 +74,9 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [power != null]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => world?.current?.aimCast?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { world?.current?.aimCast?.(null); clearTimeout(reelHold.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // (the fish landed or lost mid-press: no hold left winding)
+  useEffect(() => { if (act !== "reel") { clearTimeout(reelHold.current); if (pressed) { setPressed(false); onHold?.(false); } } }, [act]); // eslint-disable-line react-hooks/exhaustive-deps
   // (one cast at a time: a second press straight after a cast, before the scene has caught up, is ignored)
   const castDown = (e) => { e.preventDefault(); if (performance.now() - castAt.current < GUARD.again.cast || performance.now() - shown.current.at < GUARD.appear.cast) return; try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* (a key press stands in for a pointer: nothing to capture) */ } hold.current = { t0: performance.now(), p: 0 }; setPower(0); };
   const castUp = () => {
@@ -125,13 +133,14 @@ export default function FishTray({ phase, last, reel = 0, fight = null, note = "
         {act === "strike" ? <button type="button" className="ft-main ft-strike" onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}><Icon name="hook" /><span>Strike</span></button> : null}
         {act === "land" ? <button type="button" className="ft-main ft-land" onPointerDown={land} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(land)}>{tenRing}<Icon name="fish" /><span>Land</span></button> : null}
         {act === "reel" ? (
-          <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap again and again, or hold. ${Math.round(reel * 100)}% of the way in`}
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ } onTap?.(); onHold?.(true); setTapFx((n) => n + 1); setPressed(true); }} onPointerUp={() => { setPressed(false); onHold?.(false); }} onPointerCancel={() => { setPressed(false); onHold?.(false); }} onPointerLeave={() => { setPressed(false); onHold?.(false); }} onContextMenu={(e) => e.preventDefault()}
+          // the reel itself (ReelDial): each tap turns its handle, as the reel in your hands; held down a moment, it winds
+          // steadily (a press only counts as holding after HOLD_AFTER, so quick taps are all taps)
+          <button type="button" className={`ft-main ft-reel${fight?.assisted ? " assisted" : ""}${pressed ? " pressed" : ""}`} aria-label={`Reel: tap in a steady rhythm, or hold. ${dist ? `About ${dist.replace("\u00a0", " ")} out. ` : ""}${Math.round(reel * 100)}% of the way in`}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* older browsers */ } onTap?.(); clearTimeout(reelHold.current); reelHold.current = setTimeout(() => onHold?.(true), HOLD_AFTER); setTapFx((n) => n + 1); setPressed(true); }}
+            onPointerUp={() => { clearTimeout(reelHold.current); setPressed(false); onHold?.(false); }} onPointerCancel={() => { clearTimeout(reelHold.current); setPressed(false); onHold?.(false); }} onPointerLeave={() => { clearTimeout(reelHold.current); setPressed(false); onHold?.(false); }} onContextMenu={(e) => e.preventDefault()}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); (onTap || onNudge)?.(); } }}>
-            {tenRing}
+            <ReelDial live={live} fight={fight} />
             {tapFx ? <span key={tapFx} className="ft-tapfx" aria-hidden="true" /> : null}
-            <span className="ft-handle" style={{ transform: `rotate(${((fight?.turns || 0) * 360) % 360}deg)` }}><Icon name="refresh" /></span><span className="ft-word">Reel</span>
-            {dist ? <b className="ft-dist" aria-label={`About ${dist.replace("\u00a0", " ")} out`}>{dist}</b> : null}
           </button>
         ) : null}
       </div>

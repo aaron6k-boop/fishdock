@@ -2,13 +2,15 @@
 // Cast (with the power and aim you chose), and a fish bites by itself after a while (sooner for quick, plentiful
 // fish); strike in time (too soon or too late and it can let go); then tap the reel to wind it in while it fights
 // back (reelModel.js): watch the line's tension, let the drag do its work through a run, and land it once it's close.
-// Holding the Reel button winds at a steady rate for as long as it's held (on unless turned off), and Assisted reeling
-// (an option) winds steadily after one tap, for anyone who can't tap or hold. Every catch
+// Tapping in an even rhythm winds best (reelModel.js rhythm). Pressing and holding the Reel button winds at an even rate
+// for as long as it's held, a little slower than good tapping (on unless turned off; a hold starts a quarter of a
+// second into a press, so quick taps are taps), and Assisted reeling (an option) winds steadily after one tap, for
+// anyone who can't tap or hold. Every catch
 // made here is simulated and says so (data.simulated), and nothing here is ever saved as a real catch.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DUR } from "./liveEvents.js";
 import { fightProfile, fightSeconds } from "./sceneActors.js";
-import { createFight, fightStep, tapRate, DRAG, strikeTiming } from "./reelModel.js";
+import { createFight, fightStep, tapRate, rhythm, DRAG, strikeTiming } from "./reelModel.js";
 
 // ---- reeling options, saved on this phone: Assisted reeling, and Advanced (set the drag yourself) ----
 const OPT_KEY = "fishdock.reel";
@@ -84,11 +86,11 @@ export function useVirtualFishing({ species, name, lengthCm, auto = true, who = 
     // twenty steps a second; the taps made since the last one each wind in there and then
     const id = setInterval(() => {
       const now = performance.now(), dt = Math.min(0.3, (now - prev) / 1000); prev = now;
-      const assisted = assistOn.current || autoplayRef.current || (holding.current && optsRef.current.holdReel !== false);
+      const assisted = assistOn.current || autoplayRef.current, hold = !assisted && holding.current && optsRef.current.holdReel !== false;
       const n = pending.current; pending.current = 0;
-      const s = fightStep(fightRef.current, dt, { taps: n, rate: tapRate(taps.current, Date.now()), assisted, drag: dragRef.current });
+      const s = fightStep(fightRef.current, dt, { taps: n, rate: tapRate(taps.current, Date.now()), steady: rhythm(taps.current, Date.now()), hold, assisted, drag: dragRef.current });
       fightRef.current = s; reelRef.current = s.progress;
-      const view = { progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, running: s.running, taking: s.taking, dashed: !!s.dashed, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina };
+      const view = { progress: s.progress, dist: s.dist, tension: s.tension, slipping: s.slipping, near: s.near, drag: s.drag, turns: s.turns, taps: tapN.current, assisted, hold, steady: s.steady || 0, running: s.running, taking: s.taking, dashed: !!s.dashed, mode: s.mode, dir: s.dir, shake: s.shake, dive: s.dive, stamina: s.stamina };
       // (the 3D view reads this itself every frame, fightLive below. The page is only told six or seven times a second,
       // or at once when something it shows as a word changes: told all twenty, React drew the whole screen again
       // twenty times a second through every fight, between the frames and never in step with them)

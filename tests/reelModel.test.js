@@ -2,7 +2,7 @@
 // Standard mode never breaks the line, Advanced mode can, and a slack line can lose the fish.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { tapRate, effort, createFight, fightStep, timeToLand, REEL, DRAG } from "../src/lib/reelModel.js";
+import { tapRate, effort, rhythm, createFight, fightStep, timeToLand, REEL, DRAG } from "../src/lib/reelModel.js";
 
 // tapping steadily at `rate` taps a second: the taps that fall in each step
 const tapper = (rate) => { let acc = 0; return (dt) => { acc += rate * dt; const n = Math.floor(acc); acc -= n; return { taps: n, rate }; }; };
@@ -127,4 +127,45 @@ test("a fish makes one last dash when it first comes close", () => {
   assert.ok(dashedAt != null, "it dashed"); assert.ok(runAfter, "and that dash is a run");
   assert.ok(s.near, "and it can still be landed");
   assert.equal(s.runs.filter((r) => r[2] === 1.05).length, 1, "once only");
+});
+
+// ---- rhythm and holding (14 November: tapping should be the skill, holding the comfortable option) ----
+test("rhythm: an even beat of three to five and a half taps a second is steady; uneven, frantic, slow or stopped isn't", () => {
+  const beat = (gapMs, n = 7, jitter = () => 0) => { const t = []; let x = 0; for (let i = 0; i < n; i++) { t.push(x); x += gapMs + jitter(i); } return { t, now: t[t.length - 1] + 50 }; };
+  const even = beat(250); assert.ok(rhythm(even.t, even.now) > 0.95, "four a second, evenly");
+  const ragged = beat(250, 7, (i) => (i % 2 ? 140 : -140)); assert.ok(rhythm(ragged.t, ragged.now) < 0.1, "uneven");
+  const frantic = beat(110); assert.equal(rhythm(frantic.t, frantic.now), 0, "nine a second");
+  const slow = beat(500); assert.equal(rhythm(slow.t, slow.now), 0, "two a second");
+  const few = beat(250, 3); assert.equal(rhythm(few.t, few.now), 0, "too few taps to tell");
+  assert.equal(rhythm(even.t, even.now + 600), 0, "stopped");
+});
+
+test("rhythm wins line: steady tapping lands a fish sooner than the same rate tapped unevenly, by up to the rhythm gain", () => {
+  const fish = { species: "bass", lengthCm: 50, startM: 30, seed: 3 };
+  const plain = timeToLand(fish, 4), steady = timeToLand(fish, 4, { steady: 1 });
+  assert.ok(steady < plain, `${steady} < ${plain}`);
+  assert.ok(steady > plain / (1 + REEL.rhythmGain) - 2, "no more than the rhythm gain");
+});
+
+test("holding winds evenly but slower than good tapping, and still lands the fish; held taps still count", () => {
+  for (const species of ["mackerel", "cod", "bass"]) {
+    const fish = { species, lengthCm: 45, startM: 30, seed: 5 };
+    const held = timeToLand(fish, 0, { hold: true }), tapped = timeToLand(fish, 4, { steady: 1 });
+    assert.ok(Number.isFinite(held), `${species}: holding lands it`);
+    assert.ok(held > tapped, `${species}: holding ${held.toFixed(1)} s is slower than tapping ${tapped.toFixed(1)} s`);
+  }
+  // (a tap made while the button's held winds its half turn on top of the hold)
+  const a = fightStep(createFight({ species: "cod", startM: 30, seed: 1 }), 0.05, { hold: true });
+  const b = fightStep(createFight({ species: "cod", startM: 30, seed: 1 }), 0.05, { hold: true, taps: 1, rate: 1.4 });
+  assert.ok(b.progress > a.progress && b.turns > a.turns);
+});
+
+test("a pause in winding costs line, not the fish: a fish swimming off keeps the line tight", () => {
+  // (wind a third of the way in, then stop for eight seconds: the fish takes line back but the hook holds)
+  let s = createFight({ species: "whiting", lengthCm: 25, startM: 40, seed: 2 }), acc = 0;
+  for (let t = 0; s.progress < 0.33 && t < 60; t += 0.05) { acc += 4 * 0.05; const taps = Math.floor(acc); acc -= taps; s = fightStep(s, 0.05, { taps, rate: 4 }); }
+  const won = s.progress;
+  for (let t = 0; t < 8 && !s.out; t += 0.05) s = fightStep(s, 0.05, { rate: 0 });
+  assert.equal(s.out, null, "still on");
+  assert.ok(s.progress < won, "it took line back");
 });
