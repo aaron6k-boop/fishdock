@@ -47,6 +47,12 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Do:** (done here) the FPS display now says whether the page was busy, the graphics card or browser held it up, the
   page was hidden or the resolution changed; then fix what it names. Measure the software renderer's cost per frame
   through a release (`step_cost.mjs`) to find any view many times heavier than the rest.
+- **Found (14 Nov, software renderer, Medium, a ray landed and put back):** the coming fish and net were readied all
+  at once mid-landing, 7.2 s on the page there; now in the background (worst frame 3.6 s there, which can't build
+  shaders in parallel; off the page where the browser can). The other slow frames, at the look and the release, had
+  no warm-up and no new shader, and fell at different moments in each of four runs: the software renderer building its
+  own pipelines, most likely, which says nothing certain about a phone. The phone's worst-frame line is the next
+  evidence.
 - **Benefit:** no freezes at the best moment of a catch.
 - **Cost:** a 50 ms timer for the measure.
 - **Check:** Aaron's phone recordings with the new line; `tools/phase-probe.mjs` counts.
