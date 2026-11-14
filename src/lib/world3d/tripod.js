@@ -12,7 +12,8 @@ export const TRIPOD = {
   rise: 1.1, back: 0.47, // the butt's place below and behind where the rod rests in the cradle: 67 degrees up
   side: 0.1, // each cradle and cup either side of the middle; the rod's in the left-hand one, nearer you
   spread: 0.3, ahead: 0.1, // the two front feet either side and ahead of the head
-  rodR: 0.011, // the blank's radius where it lies in the cradle
+  rodR: 0.011, // the blank's radius where it lies in the cradle (angler.js gives each rod's own)
+  cradleR: 0.026, cradleT: 0.0065, // the rubber U: its radius to the middle of the rubber, and the rubber's own
 };
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -21,15 +22,23 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
  * Where everything goes for a rod resting at `top` (the point on the rod's axis where it lies in the cradle): its butt,
  * the head, the three feet, the cup bar and the cups, the two cradles.
  */
-export function tripodPlan(top) {
+export function tripodPlan(top, rodR = TRIPOD.rodR) {
   const T = TRIPOD, cx = top.x + T.side;
   const butt = V(top.x, top.y - T.rise, top.z + T.back);
   const hub = V(cx, top.y - 0.06, top.z);
   const bar = V(cx, butt.y - 0.035, butt.z); // (the cup bar: clamped to the rear leg, the cups' bottoms on it)
   const k = hub.y / (hub.y - bar.y), rear = hub.clone().add(bar.clone().sub(hub).multiplyScalar(k)); rear.y = 0;
   const feet = [V(cx - T.spread, 0, top.z - T.ahead), V(cx + T.spread, 0, top.z - T.ahead), rear];
-  return { top: top.clone(), butt, dir: top.clone().sub(butt).normalize(), hub, bar, feet, cups: [-1, 1].map((s) => V(cx + s * T.side, butt.y, butt.z)), cradles: [-1, 1].map((s) => V(cx + s * T.side, top.y, top.z)) };
+  const dir = top.clone().sub(butt).normalize();
+  // the cradle's U is square to the rod, opening away from the ground (up, and back towards you): the rod lies in the
+  // bottom of it along its length, and lifts straight out of its open side. (It used to stand upright, square only to
+  // the rod's heading: at 67 degrees the rod went in through the rubber at the bottom of the U, 9 mm deep)
+  const open = V(0, 1, 0).addScaledVector(dir, -dir.y).normalize();
+  return { top: top.clone(), butt, dir, open, rodR, hub, bar, feet, cups: [-1, 1].map((s) => V(cx + s * T.side, butt.y, butt.z)), cradles: [-1, 1].map((s) => V(cx + s * T.side, top.y, top.z)) };
 }
+
+/** Where the bottom of a cradle's U is (the middle of the rubber, under the rod): the post comes up to it. */
+export const cradleFoot = (P, c) => c.clone().addScaledVector(P.open, -(P.rodR + TRIPOD.cradleT));
 
 // ---- the drawing ----
 const Y = V(0, 1, 0);
@@ -38,17 +47,26 @@ function tube(a, b, r0, r1 = r0, seg = 10, open = false) {
   const q = new THREE.Quaternion().setFromUnitVectors(Y, d.multiplyScalar(1 / len));
   return g.applyMatrix4(new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), q, V(1, 1, 1)));
 }
-function cradle(at, along) {
-  // a U of rubber the rod lies in, open upwards, across the rod
-  const g = new THREE.TorusGeometry(0.026, 0.0065, 6, 14, Math.PI); g.rotateZ(Math.PI);
-  const flat = V(along.x, 0, along.z); if (flat.lengthSq() < 1e-6) flat.set(0, 0, -1); flat.normalize();
-  const q = new THREE.Quaternion().setFromUnitVectors(V(0, 0, 1), flat);
-  return g.applyMatrix4(new THREE.Matrix4().compose(V(at.x, at.y - TRIPOD.rodR - 0.0065 + 0.026, at.z), q, V(1, 1, 1)));
+function cradle(at, P) {
+  // a U of rubber the rod lies in, square to the rod, its inside resting on the rod's underside
+  const { cradleR: R, cradleT: r } = TRIPOD, g = new THREE.TorusGeometry(R, r, 6, 16, Math.PI); g.rotateZ(Math.PI);
+  // (the torus lies in its own x-y plane, the half drawn below its middle: x across the rod, y the open side, z along it)
+  const x = new THREE.Vector3().crossVectors(P.open, P.dir).normalize();
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, P.open, P.dir));
+  return g.applyMatrix4(new THREE.Matrix4().compose(at.clone().addScaledVector(P.open, R - r - P.rodR), q, V(1, 1, 1)));
 }
 function cup(at, dir) {
-  // a butt cup: open at the top, round the end of the rod
-  const bottom = at.clone().addScaledVector(dir, -0.012), top = at.clone().addScaledVector(dir, 0.06);
+  // a butt cup: open at the top, round the end of the rod, the butt standing on its floor
+  const bottom = at.clone().addScaledVector(dir, -0.001), top = at.clone().addScaledVector(dir, 0.07);
   return [tube(bottom, top, 0.021, 0.025, 14, true), tube(bottom.clone().addScaledVector(dir, -0.006), bottom, 0.021, 0.021, 14)];
+}
+/**
+ * A bank stick's rest head for a rod lying along `dir` with its axis through `at` (radius rodR there): the rubber U,
+ * and the point the stick comes up to under it. (By a river or a lake: two sticks, a head on each)
+ */
+export function restHead(at, dir, rodR) {
+  const open = V(0, 1, 0).addScaledVector(dir, -dir.y).normalize(), P = { dir, open, rodR };
+  return { geo: cradle(at, P), foot: cradleFoot(P, at).addScaledVector(open, -TRIPOD.cradleT * 0.5) };
 }
 const flat = (gs) => mergeGeometries(gs.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { for (const n of Object.keys(g.attributes)) if (n !== "position" && n !== "normal") g.deleteAttribute(n); return g; }));
 
@@ -76,7 +94,8 @@ export function buildTripod() {
     bs.push(tube(P.hub.clone().add(V(0, -0.035, 0)), P.hub.clone().add(V(0, 0.03, 0)), 0.03, 0.026, 12));
     const hx = (s) => P.hub.clone().add(V(s * (TRIPOD.side + 0.04), 0.02, 0));
     ms.push(tube(hx(-1), hx(1), 0.0095, 0.0095, 10));
-    for (const c of P.cradles) { ms.push(tube(V(c.x, P.hub.y + 0.02, c.z), V(c.x, c.y - TRIPOD.rodR - 0.016, c.z), 0.007, 0.007, 8)); bs.push(cradle(c, P.dir)); }
+    // (each post leans forward a little, up from the bar into the bottom of its U)
+    for (const c of P.cradles) { const foot = cradleFoot(P, c); ms.push(tube(V(c.x, P.hub.y + 0.02, c.z), foot.addScaledVector(P.open, -TRIPOD.cradleT * 0.5), 0.007, 0.007, 8)); bs.push(cradle(c, P)); }
     // the cup bar, clamped to the rear leg, and the two cups on it
     const bx = (s) => P.bar.clone().add(V(s * (TRIPOD.side + 0.04), 0, 0));
     ms.push(tube(bx(-1), bx(1), 0.0095, 0.0095, 10)); bs.push(tube(P.bar.clone().add(V(0, -0.025, 0)), P.bar.clone().add(V(0, 0.025, 0)), 0.02, 0.02, 10));

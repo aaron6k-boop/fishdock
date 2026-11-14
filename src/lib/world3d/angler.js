@@ -13,7 +13,7 @@ import { hasArt, artUrl } from "../../data/fishart.js";
 import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway, bodyWaveSlope } from "../fishMotion.js";
 import { fishMaterials, donorOf, paintSkin } from "./fishLook.js";
 import { castPoint, dirOf } from "./spots.js";
-import { tripodPlan, buildTripod } from "./tripod.js";
+import { tripodPlan, buildTripod, TRIPOD, restHead } from "./tripod.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpRig, castAt as rigCastAt, rodFrame, holdView, bodyUp } from "./fpRig.js";
@@ -275,7 +275,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let restTop = null, restButt = null, tripod = null;
   if (venue === "river" || venue === "lake") {
     restTop = new THREE.Vector3(0.45, 0.42, -0.85); restButt = new THREE.Vector3(0.45, 0.22, 0.25);
-    for (const p of [restTop, restButt]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), mMetal); between(l, new THREE.Vector3(p.x, 0, p.z), p); rest.add(l); }
+    // (each stick up to a rubber rest head the rod lies in: the front one under the blank, the back one under the
+    // handle a hand's width up from the butt. The sticks used to come up into the middle of the rod)
+    const d = restTop.clone().sub(restButt).normalize(), gripR = R.handle[1][2], mRub = new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.62 });
+    for (const [p, r] of [[restTop, R.r0 + (R.r1 - R.r0) * Math.pow(restTop.distanceTo(restButt) / R.len, 0.8)], [restButt.clone().addScaledVector(d, 0.12), gripR]]) {
+      const h = restHead(p, d, r), l = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), mMetal); between(l, new THREE.Vector3(h.foot.x, 0, h.foot.z), h.foot); rest.add(l);
+      const u = new THREE.Mesh(h.geo, mRub); u.castShadow = true; rest.add(u); }
   } else {
     // (to your right and a little ahead, where your right hand reaches the reel; set up for the spot in place())
     restTop = new THREE.Vector3(0.35, 1.55, -0.75); restButt = new THREE.Vector3();
@@ -283,7 +288,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   }
   // (the tripod's head 12 cm in from a pier's railing, or from the edge where there's none, and never more than 75 cm
   // ahead of you: the reel stays in reach of your right hand)
-  function setRest() { if (!tripod) return; const front = rail ? -Math.max(0.3, edge - 0.22) : -(edge - 0.1); restTop.z = Math.max(front + 0.12, -0.75); const P = tripodPlan(restTop); restButt.copy(P.butt); tripod.place(P); }
+  // (the cradle made to fit this rod: the blank's own radius where it lies in it, as rodKit.js tapers it)
+  const restR = R.r0 + (R.r1 - R.r0) * Math.pow(Math.hypot(TRIPOD.rise, TRIPOD.back) / R.len, 0.8);
+  function setRest() { if (!tripod) return; const front = rail ? -Math.max(0.3, edge - 0.22) : -(edge - 0.1); restTop.z = Math.max(front + 0.12, -0.75); const P = tripodPlan(restTop, restR); restButt.copy(P.butt); tripod.place(P); }
   // ---- the seat box's padded seat (charcoal cloth with a stitched border) and its badge ----
   function canvasPad() {
     const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
@@ -1230,7 +1237,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // frame, and the hands shook a millimetre thirty times a second)
       if (inHand == null || walking) inHand = want; else inHand = want > inHand ? Math.min(want, inHand + dt / 0.8) : want < inHand ? Math.max(want, inHand - dt / 0.9) : want; }
     const lift = walking ? 1 : ease((inHand - 0.3) / 0.7);
-    if (lift < 1) { butt = restB.clone().lerp(butt, lift); dir = restD.clone().lerp(dir, lift).normalize(); }
+    // (lifted out up its own line first, the butt clear of the cup and the blank sliding along the cradle, then swung to
+    // you: going straight to your hands, the butt went out through the side of the cup, 5 mm from the rod)
+    if (lift < 1) { const k = ease((lift - 0.2) / 0.8); butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).lerp(butt, k); dir = restD.clone().lerp(dir, k).normalize(); }
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping
@@ -1240,7 +1249,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const late = Math.max(0, t - rodS.until), behind = rodS.ok && (rodS.butt.distanceTo(butt) > 0.001 || rodS.dir.angleTo(dir) > 0.002);
       if (rodS.ok && (t < rodS.until || (behind && late < 1))) { const k2 = 1 - Math.exp(-dt * (6 + 90 * late)); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
       else { rodS.butt.copy(butt); rodS.dir.copy(dir); rodS.ok = true; } }
-    dir.x += sway; dir.y += breath; dir.normalize();
+    // (the sway of holding it, and your breathing, only while it's in your hands: in its rest it lies still, the butt in
+    // the cup and the blank in the cradle. In a fresh breeze it swayed there too, 4 cm side to side at the cradle, in and out of the rubber)
+    dir.x += sway * lift; dir.y += breath * lift; dir.normalize();
     // the bend is towards the line
     const target = rigAt ? toLocal(rigAt) : butt.clone().add(dir.clone().multiplyScalar(R.len * 2)).add(new THREE.Vector3(0, -2, 0));
     const toT = target.clone().sub(butt).normalize();

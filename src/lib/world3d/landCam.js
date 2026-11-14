@@ -38,10 +38,12 @@ export const SHOTS = {
   // over the rail and onto the deck: from out over the water, higher, looking down onto the deck
   in: { from: [-0.5, 0.55, 0.68], must: ["net", "head", "feet"], want: [], near: 3, far: 10 },
   done: { from: [-0.5, 0.6, 0.62], must: ["net", "head", "feet"], want: [], near: 3, far: 10 },
-  // landed, in the net on the deck: from the deck, off to your left and in front, you and the net together
-  deck: { from: [-0.72, 0.45, 0.52], must: ["net", "head", "feet"], want: [], near: 2.4, far: 8 },
+  // landed, in the net on the deck: off to your left, high, and only just out in front, looking down onto the deck: you
+  // and the net together, with the railing behind you rather than across you. (From further out over the water, the
+  // camera looked back at you through the railing: its bars and a post ran across you, the seat box and the fish)
+  deck: { from: [-0.78, 0.6, 0.18], must: ["net", "head", "feet"], want: [], near: 2.4, far: 8 },
   // putting it back: carried from the mat to the net on the deck
-  carry: { from: [-0.72, 0.45, 0.52], must: ["fish", "net", "head"], want: ["feet"], near: 2.4, far: 8 },
+  carry: { from: [-0.78, 0.6, 0.18], must: ["fish", "net", "head"], want: ["feet"], near: 2.4, far: 8 },
   // the net (the fish in it) lifted over the rail
   over: { from: [-0.5, 0.55, 0.68], must: ["net", "head"], want: ["feet"], near: 3, far: 10 },
   rlower: { from: [-0.68, 0.26, 0.7], must: ["net", "head"], want: ["feet"], near: 3.4, far: 13, wide: true },

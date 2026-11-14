@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { tripodPlan, TRIPOD } from "../src/lib/world3d/tripod.js";
+import { tripodPlan, TRIPOD, restHead } from "../src/lib/world3d/tripod.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 // (where angler.js puts it: 12 cm in from a pier's railing, which is 22 cm in from the edge, never over 75 cm ahead)
@@ -36,4 +36,25 @@ test("on a pier: inside the railing, the rod and line well over it, and the reel
     for (const f of P.feet) assert.ok(Math.hypot(f.x, f.z) > 0.25, `edge ${edge}: a foot under yours`);
   }
   assert.ok(TRIPOD.rise > 1 && TRIPOD.back > 0.3);
+});
+
+test("the rod lies in the bottom of the cradle's rubber U, touching it and never through it", () => {
+  // (each rod's blank where it lies in the cradle: a beachcaster's 8.9 mm, a pier rod's 7.3, a spinning rod's 6.2)
+  for (const rodR of [0.0089, 0.0073, 0.0062]) {
+    const P = tripodPlan(restFor(0.9), rodR), pos = restHead(P.top, P.dir, rodR).geo.attributes.position, v = new THREE.Vector3();
+    let near = 1;
+    for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).sub(P.butt); const d = v.sub(P.dir.clone().multiplyScalar(v.dot(P.dir))).length(); near = Math.min(near, d); }
+    assert.ok(near > rodR - 0.0002, `rod ${rodR * 1000} mm: the rubber ${((rodR - near) * 1000).toFixed(1)} mm inside the blank`);
+    assert.ok(near < rodR + 0.001, `rod ${rodR * 1000} mm: the blank ${((near - rodR) * 1000).toFixed(1)} mm clear of the rubber, not resting on it`);
+    // (open away from the ground: up, and back towards you, so it lifts straight out)
+    assert.ok(P.open.y > 0.3 && P.open.z > 0.5 && Math.abs(P.open.dot(P.dir)) < 1e-9);
+  }
+});
+
+test("a bank stick's rest head: the rod on the rubber, the stick up under it", () => {
+  const top = V(0.45, 0.42, -0.85), butt = V(0.45, 0.22, 0.25), dir = top.clone().sub(butt).normalize(), r = 0.006;
+  const h = restHead(top, dir, r), pos = h.geo.attributes.position, v = new THREE.Vector3();
+  let near = 1; for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).sub(top); near = Math.min(near, v.sub(dir.clone().multiplyScalar(v.dot(dir))).length()); }
+  assert.ok(Math.abs(near - r) < 0.001, `the blank ${((near - r) * 1000).toFixed(1)} mm off the rubber`);
+  assert.ok(h.foot.y < top.y - r && h.foot.y > top.y - r - TRIPOD.cradleT * 2, "the stick's top in the rubber under the rod");
 });
