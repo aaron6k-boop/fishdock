@@ -61,15 +61,16 @@ working backlog, kept for its detail.
 12. **Distant scenery.** Low priority.
 13. **Shop.** Later: game credits from fishing, cosmetic gear only, nothing that locks places.
 
-## Next action (checkpoint, 14 November, about 11:00)
+## Next action (checkpoint, 14 November, about 14:00)
 
-1. Aaron's review of `ui-buttons`.
-2. His phone's FPS display on the next stall: the worst-frame line now says page busy, GPU or browser, page hidden or
-   resolution changed. Fix what it names.
-3. With this chat linked to his PC (Blender, downloads): the haul and lowering as authored clips (backlog 1), skin
-   textures for the hands (2), the tackle round you (6), a ray, a dogfish and a conger (7), field recordings (8).
-4. Without the PC: inspect the water and the pier at eye level against photographs (4, 5) and fix what's missing; bite
-   styles by species (9).
+1. Aaron's review of `polish-3` (#126).
+2. His phone's FPS display on the next stall: the worst-frame line says page busy, GPU or browser, page hidden or
+   resolution changed. In the software renderer the slow frames at the look and the release had no warm-up and no new
+   shader, and moved from run to run; the phone's line is the evidence to go on.
+3. Without the PC: the drop net's hoop swinging up off the deck and over the rail too quickly for the hands (12 cm a
+   frame); the lift's left forearm (9 cm); the water and pier inspection (backlog 4, 5).
+4. With this chat linked to his PC (Blender, downloads): the haul and lowering as authored clips, skin textures for the
+   hands, the tackle round you, a ray, a dogfish and a conger, field recordings.
 
 ## Evidence kept
 
