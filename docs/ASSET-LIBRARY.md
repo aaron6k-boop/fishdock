@@ -36,6 +36,9 @@ it goes in (an asset site's other assets may be under other terms).
 | gorleston_town_lights.webp | 4 KB | 4000x182 | webp |
 | ground_rough_diff.jpg | 193 KB | 1024x1024 | jpeg |
 | ground_rough_nor.jpg | 84 KB | 512x512 | jpeg |
+| hand_colour.webp | 8 KB | 1024x1024 | webp |
+| hand_normal.webp | 65 KB | 1024x1024 | webp |
+| hand_rough.webp | 3 KB | 1024x1024 | webp |
 | pier_concrete_diff.jpg | 334 KB | 1024x1024 | jpeg |
 | pier_concrete_nor.jpg | 184 KB | 1024x1024 | jpeg |
 | pier_concrete_rough.jpg | 28 KB | 512x512 | jpeg |

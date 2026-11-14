@@ -32,14 +32,13 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Check:** the fixed drop-net film (`haul_frames`) before and after; `tools/rail-test.mjs dropnet`; `tools/arm-steady.mjs`.
 
 ### 2. Skin and fingers close up
-- **Wrong:** the hands are one flat colour with no creases, knuckles or nails; at dusk they read as a pale model.
-- **Why:** no skin textures at all (the material is a plain colour); the warm light round shadow edges and the tone
-  variation (done 14 November) help but can't make creases.
-- **Target:** visible knuckle creases, nails, slight redness at the knuckles and fingertips, a soft sheen.
-- **Do:** bake an albedo, normal and roughness map (1024 px) for the Human Base Mesh hands in Blender, from its own UVs.
-- **Benefit:** the biggest thing on screen through every cast and fight.
-- **Cost:** three 1k textures (~1.5 MB of memory with compression), no extra draws.
-- **Check:** close-ups of the hold and the look at the fish from the same film frames.
+- **Was wrong:** the hands were one flat colour with no creases, knuckles or nails; at dusk they read as a pale model.
+- **Done (14 Nov):** maps baked from the rig itself (`source-assets/hands/bake_hand_maps.py`, no outside textures; three
+  1024 maps, 77 KB in all): fine wrinkles across the back of each finger joint, a firm crease on the palm side, nails
+  (paler, glossier, a lighter free edge), redder knuckles and fingertip pads. Laid over the skin as a multiplier, so the
+  player's skin colour stays theirs. Subtle at arm's length, as it should be.
+- **Still to do:** the palm's own creases (heart, head and life lines), veins on the back of the hand, a little hair on
+  the forearm, a slightly sweaty sheen in the cold. **Check:** close-ups of the hold and the look at a fish, same frames.
 
 ### 3. Frame-time stability on a phone
 - **Wrong:** a 1,551 ms frame lowering a thornback ray back (Ultra, 1.5x) with only 6 ms of the game's code and no
@@ -133,3 +132,4 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | A new fish and net readied in the background, not all at once mid-landing | film warm-up timing: 7.2 s on the page in software before, worst frame 3.6 s after |
 | 14 Nov | The conger and the eel as long bodies (Blender, from straightened pictures) | the conger in the net and in the hands, before and after |
 | 14 Nov | Hands on the drop net's hoop at a hand's pace; a fish swung in taken once within reach | frame logs of a 77 cm ray and a 44 cm bass; `tools/arm-steady.mjs` |
+| 14 Nov | Knuckle creases, nails and fingertip pads on your hands | close-ups of the hold before and after; `tests/fpRig.test.js` (the hands' uvs) |
