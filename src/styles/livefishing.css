@@ -667,3 +667,44 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
    sat over its second line: the "+83 XP · Mackerel · New kind" under "Challenge done" in the 14 November recording) */
 .w3d-toasts { width: min(92vw, 380px); }
 .w3d-toast { max-width: 100%; box-sizing: border-box; }
+/* ---- the Reel button as the reel itself (ReelDial.jsx) ----
+   The button is the dial: no fill or border of its own. A dark face (so it reads against sky, sea or deck), the handle
+   in the action colour turning with your taps, the knob gold while your rhythm's even; round it the tension, its safe
+   band faintly marked, red and shivering when the drag gives. Pressed, the face gives a little under your thumb. */
+.ft-main.ft-reel { width: 112px; height: 112px; padding: 0; border: 0; background: none; box-shadow: none; display: block; }
+.ft-reel .reel-dial { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 14px #0009); }
+.ft-reel.pressed { transform: none; }
+.ft-reel.pressed .reel-dial .rd-face, .ft-reel.pressed .reel-dial .rd-hub { transform: scale(.955); transform-origin: 60px 60px; }
+.reel-dial .rd-face, .reel-dial .rd-hub { transition: transform .06s; }
+.reel-dial .rd-face-a { stop-color: #1c4f4b; }
+.reel-dial .rd-face-b { stop-color: #0b2422; }
+.reel-dial .rd-face { stroke: #ffffffd9; stroke-width: 2.5; }
+.reel-dial .rd-track { fill: none; stroke: #0a141bb3; stroke-width: 9; }
+.reel-dial .rd-band { fill: none; stroke: #5fd38d40; stroke-width: 9; }
+.reel-dial .rd-ten { fill: none; stroke: #5fd38d; stroke-width: 7; stroke-linecap: round; transition: stroke .2s; }
+.reel-dial[data-ten="mid"] .rd-ten { stroke: #7fe0a3; }
+.reel-dial[data-ten="high"] .rd-ten { stroke: #e9c74b; }
+.reel-dial[data-ten="slip"] .rd-ten { stroke: #f07a52; }
+.reel-dial[data-ten="slip"] { animation: ft-shiver .18s linear infinite; }
+.reel-dial .rd-drag { stroke: #fff; stroke-width: 2.6; stroke-linecap: round; }
+.reel-dial .rd-mark { stroke: #ffffff59; stroke-width: 2.2; stroke-linecap: round; }
+.reel-dial[data-run="1"] .rd-mark { stroke: #f0a07a; }
+.reel-dial .rd-arm { fill: var(--action, #4fc7b7); }
+.reel-dial .rd-knob { fill: #f4f7f6; stroke: #0b2422; stroke-width: 1.5; transition: fill .2s; }
+.reel-dial .rd-knob-hi { fill: #fff; opacity: .7; }
+.reel-dial[data-steady="1"] .rd-knob { fill: #f2c14b; }
+.reel-dial[data-steady="1"] .rd-arm { fill: #f2c14b; }
+.reel-dial[data-run="1"] .rd-arm { fill: #8aa3a0; }
+.reel-dial .rd-hub { fill: #071917; stroke: #ffffff33; stroke-width: 1.5; }
+.reel-dial .rd-num { fill: #fff; font: 800 17px/1 var(--font-ui, system-ui, sans-serif); font-variant-numeric: tabular-nums; }
+.reel-dial .rd-unit { fill: #ffffffa6; font: 700 8.5px/1 var(--font-ui, system-ui, sans-serif); }
+.ft-reel .ft-tapfx { inset: 4px; border-color: #ffffffb3; }
+.ft-reel.assisted .reel-dial .rd-face { stroke: var(--action, #4fc7b7); stroke-width: 4; }
+@media (prefers-reduced-motion: reduce) { .reel-dial[data-ten="slip"] { animation: none; } }
+/* (Land, straight after the reel dial and in its place: the same dark face and white rim, the word and the net in the
+   action colour, the tension ring kept, a soft pulse to say now) */
+.ft-main.ft-land { width: 104px; height: 104px; background: radial-gradient(circle at 42% 36%, #1c4f4b, #0b2422 70%); border: 2.5px solid #ffffffd9; color: var(--action, #4fc7b7); font-size: 15px; font-weight: 900; animation: ft-land-pulse 1s ease-in-out infinite; }
+.ft-main.ft-land svg:not(.ft-ringsvg) { width: 30px; height: 30px; }
+.ft-land > svg.ft-tension { inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); opacity: .9; }
+@keyframes ft-land-pulse { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--action, #4fc7b7) 28%, transparent), 0 6px 20px #0008; } }
+@media (prefers-reduced-motion: reduce) { .ft-main.ft-land { animation: none; } }
