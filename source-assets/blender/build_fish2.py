@@ -84,7 +84,12 @@ def build(sp, S):
                 for lp, e in zip(f.loops, q): lp[ul].uv = e[1]
         bmp.to_mesh(pm); bmp.free()
         o = bpy.data.objects.new(name, pm); col.objects.link(o); pm.materials.append(M_FIN); return o
-    for k, f in enumerate(S["fins"]): parts.append(plate(f"fish_{sp}_fin{k}", f["box"]))
+    # (each fin's plate reaches a little way into the body, towards the spine: the subdivided body comes in a touch at
+    # its edges, and the thornback ray's wing tips were left floating clear of its wings)
+    def grow(box):
+        bx0, by0, bx1, by1 = box; g = 0.04 * L
+        return [bx0, by0, bx1, by1 + g] if (by0 + by1) / 2 < sy else [bx0, by0 - g, bx1, by1]
+    for k, f in enumerate(S["fins"]): parts.append(plate(f"fish_{sp}_fin{k}", grow(f["box"])))
     if S["tail"]: parts.append(plate(f"fish_{sp}_tail", S["tail"], 10, 10))
 
     # the eyes: domes standing proud of the head on each side (for a flatfish, both on its upper side)
