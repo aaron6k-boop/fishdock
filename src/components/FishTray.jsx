@@ -3,6 +3,9 @@
 //   Cast (hold to build power, look where you want it, let go) → Strike (one tap) → Reel (tap it, again and again:
 //   each tap turns the handle) → Land (once the fish is close) → Cast again.
 // The button sits in the thumb's corner on its own, with one short line above it only when there's something to say.
+// All of them share the reel's dark face and white rim, each ring doing one job: Cast's fills with the power while it's
+// held (its top tenth, the sweet spot, marked) with how far it would go in the middle; Strike's runs down over the bite,
+// red for its last moments when the fish may drop the bait; Reel's and Land's are the line's tension.
 // While a fish is on, the button is the reel itself (ReelDial): its handle turns with each tap as the reel in your hands
 // does, the ring round it is the line's tension (with where the drag will slip), its spool turns back when the fish
 // takes line, and how far out the fish is sits in its hub, so nothing sits over your hands and the reel. Tap in a steady
@@ -14,6 +17,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { Icon } from "./ui.jsx";
 import { WorldCtx, SceneCtx } from "./WorldContext.js";
 import { canCast, busyLabel } from "../lib/fishFlow.js";
+import { DUR } from "../lib/liveEvents.js";
 import { GUARD, pressOk } from "../lib/trayGuard.js";
 import ReelDial from "./ReelDial.jsx";
 
@@ -90,6 +94,8 @@ export default function FishTray({ phase, last, reel = 0, fight = null, live = n
   };
   const castCancel = () => { if (!hold.current) return; hold.current = null; world?.current?.aimCast?.(null); setPower(null); };
 
+  // (how far the cast would go at this power, for the middle of the Cast button while it's held)
+  const castEst = power != null ? world?.current?.castParams?.(power)?.dist ?? null : null;
   const ten = fight ? Math.max(0, Math.min(1.2, fight.tension)) : 0, dragAt = fight ? Math.min(1.2, fight.drag) : 0.78;
   const tenCls = fight?.slipping ? "slip" : ten > dragAt * 0.85 ? "high" : ten > 0.45 ? "mid" : "low";
   const strike = (e) => { e?.preventDefault?.(); if (ok("strike")) onStrike?.(); };
@@ -123,14 +129,29 @@ export default function FishTray({ phase, last, reel = 0, fight = null, live = n
           </div>
         ) : null}
         {act === "cast" ? (
-          <button type="button" className={`ft-main ft-cast${power != null ? " holding" : ""}`} aria-label="Cast: hold to build power, let go to cast"
+          // (holding: the ring fills with the power, its top tenth marked as the sweet spot to let go, and the middle
+          // says how far it would go: the same face as the reel and Land, so the controls read as one set)
+          <button type="button" className={`ft-main ft-cast${power != null ? " holding" : ""}${power != null && power >= 0.9 ? " sweet" : ""}`} aria-label="Cast: hold to build power, let go to cast"
             onPointerDown={castDown} onPointerUp={castUp} onPointerCancel={castCancel} onContextMenu={(e) => e.preventDefault()}
             onKeyDown={key(() => { if (ok("cast")) onCast?.(world?.current?.castParams?.(0.6) || { power: 0.6 }); })}>
-            {power != null ? <svg className="ft-ringsvg" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={R} className="ft-ring-bg" /><circle cx="32" cy="32" r={R} className="ft-ring power" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - power) }} /></svg> : null}
-            <Icon name="target" /><span>{power != null ? `${Math.round(power * 100)}%` : "Cast"}</span>
+            <svg className="ft-ringsvg ft-castring" viewBox="0 0 64 64" aria-hidden="true">
+              <circle cx="32" cy="32" r={R} className="ft-ring-bg" />
+              <circle cx="32" cy="32" r={R} className="ft-sweet" style={{ strokeDasharray: `${C * 0.1} ${C}`, strokeDashoffset: -C * 0.9 }} />
+              {power != null ? <circle cx="32" cy="32" r={R} className="ft-ring power" style={{ strokeDasharray: C, strokeDashoffset: C * (1 - power) }} /> : null}
+            </svg>
+            {power != null ? <><b className="ft-big">{castEst != null ? Math.round(castEst) : Math.round(power * 100)}</b><span className="ft-small">{castEst != null ? "m" : "%"}</span></> : <><Icon name="target" /><span>Cast</span></>}
           </button>
         ) : null}
-        {act === "strike" ? <button type="button" className="ft-main ft-strike" onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}><Icon name="hook" /><span>Strike</span></button> : null}
+        {act === "strike" ? (
+          // (the bite won't wait: the ring runs down over the bite, red for its last moments, when it may drop the bait)
+          <button type="button" className="ft-main ft-strike" onPointerDown={strike} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(strike)}>
+            <svg className="ft-ringsvg ft-biteclock" viewBox="0 0 64 64" aria-hidden="true" style={{ "--bite-ms": `${DUR.bite}ms` }}>
+              <circle cx="32" cy="32" r={R} className="ft-ring-bg" />
+              <circle cx="32" cy="32" r={R} className="ft-ring" style={{ strokeDasharray: C }} />
+            </svg>
+            <Icon name="hook" /><span>Strike</span>
+          </button>
+        ) : null}
         {act === "land" ? <button type="button" className="ft-main ft-land" onPointerDown={land} onContextMenu={(e) => e.preventDefault()} onKeyDown={key(land)}>{tenRing}<Icon name="fish" /><span>Land</span></button> : null}
         {act === "reel" ? (
           // the reel itself (ReelDial): each tap turns its handle, as the reel in your hands; held down a moment, it winds

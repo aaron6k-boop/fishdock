@@ -3,6 +3,7 @@
 // detail too (the sea's mesh, cloud shading, the people's textures, shadow quality), which needs the place built
 // again: your fishing carries on, but someone walking about goes back to their spot. The rest change at once.
 import { useEffect, useState } from "react";
+import { spikeParts } from "../lib/frameReport.js";
 import { createFrameLog, reportText } from "../lib/frameLog.js";
 
 export const PRESETS = [["auto", "Auto"], ["performance", "Low"], ["balanced", "Medium"], ["high", "High"], ["ultra", "Ultra"]];
@@ -207,7 +208,7 @@ export function FpsMeter({ world }) {
       {p.fps} fps · 1% low {p.low}<br />{p.ms} ms · {p.calls} draws · {Math.round(p.tris / 1000)}k tris · {p.dpr.toFixed(2)}x
       {/* (the slowest frame of the last few seconds, when it was a stutter, and what the frame before it did: shaders
           built, textures sent to the card, its own JavaScript; with none of those, the browser's or the GPU's) */}
-      {p.spike && p.spike.ms >= 50 ? <><br />worst {p.spike.ms} ms{p.spike.what ? ` (${p.spike.what})` : ""}: {[p.spike.shaders ? `${p.spike.shaders} shader${p.spike.shaders > 1 ? "s" : ""}` : "", p.spike.tex ? `${p.spike.tex} texture${p.spike.tex > 1 ? "s" : ""}` : "", `JS ${p.spike.js} ms`].filter(Boolean).join(", ")}</> : null}
+      {p.spike && p.spike.ms >= 50 ? <><br />worst {p.spike.ms} ms{p.spike.what ? ` (${p.spike.what})` : ""}: {spikeParts(p.spike).join(", ")}</> : null}
       <br /><span className="fps-id">{NAME[p.preset] || p.preset}{p.build ? ` · ${p.build}` : ""}</span>
     </div>
   );

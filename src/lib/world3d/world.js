@@ -689,7 +689,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
 
   // ---- the loop ----
   let raf = 0, last = 0, visible = true, slow = 0, onFrame = null, clock0 = performance.now(), nowFn = Date.now;
-  const vis = () => { visible = document.visibilityState !== "hidden"; };
+  let hiddenSince = false; // (the page hidden at some point since the last frame: a long gap that's the phone's, not the game's)
+  const vis = () => { visible = document.visibilityState !== "hidden"; if (!visible) hiddenSince = true; };
   document.addEventListener("visibilitychange", vis);
   // steady frame pacing on a phone: if frames keep coming late (the GPU can't keep up at this sharpness), draw at a
   // slightly lower resolution, a step at a time, and back up again once there's room. Better an even 60 (or 30) than
@@ -729,7 +730,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // the graphics card, and how long its own JavaScript took. A long frame with none of those is the browser's or the
   // GPU's (garbage collection, decoding a picture, the card catching up). Shown on the FPS display, so a recording from
   // a phone says what each stutter was)
-  const spike = { ms: 0, at: -1e9, shaders: 0, tex: 0, js: 0, what: "" }, prevF = { prog: 0, tex: 0, js: 0, what: "" };
+  const spike = { ms: 0, at: -1e9, shaders: 0, tex: 0, js: 0, what: "", main: 0, resized: false, hidden: false }, prevF = { prog: 0, tex: 0, js: 0, what: "", dpr: 0 };
+  // (and whether the page's thread was the one held up: a timer meant to tick every 50 ms that ran late was kept waiting
+  // by something on the page itself (React, garbage collection, a decode); one on time while the frame was long means the
+  // wait was the graphics card's or the browser's. 14 November: a 1,551 ms frame lowering a ray back with only 6 ms of
+  // the game's own code in it, which the display couldn't place)
+  const beat = { last: performance.now(), late: 0 }, beatId = typeof setInterval !== "undefined" ? setInterval(() => { const t = performance.now(); beat.late = Math.max(beat.late, t - beat.last - 50); beat.last = t; }, 50) : 0;
   function frame(ts) {
     raf = requestAnimationFrame(frame);
     if (!visible || film) return;
@@ -737,8 +743,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     if (fpsCap && last && ts - last < 1000 / fpsCap - 3) return;
     const raw = last ? ts - last : 0, dt = Math.min(0.1, raw / 1000); last = ts;
     if (raw > 0) { const pg = renderer.info.programs?.length || 0, tx = renderer.info.memory.textures;
-      if (raw >= spike.ms || ts - spike.at > 4000) Object.assign(spike, { ms: raw, at: ts, shaders: Math.max(0, pg - prevF.prog), tex: Math.max(0, tx - prevF.tex), js: prevF.js, what: prevF.what });
-      prevF.prog = pg; prevF.tex = tx; }
+      { const t = performance.now(); beat.late = Math.max(beat.late, t - beat.last - 50); }
+      if (raw >= spike.ms || ts - spike.at > 4000) Object.assign(spike, { ms: raw, at: ts, shaders: Math.max(0, pg - prevF.prog), tex: Math.max(0, tx - prevF.tex), js: prevF.js, what: prevF.what, main: Math.max(0, beat.late), resized: prevF.dpr !== dprNow && prevF.dpr > 0, hidden: hiddenSince });
+      prevF.prog = pg; prevF.tex = tx; prevF.dpr = dprNow; beat.late = 0; hiddenSince = false; }
     if (dt > 0) { ft[ftN++ % 240] = dt * 1000; if (frameTap) { const me = anglers.get(localId), k = me?.out?.kept; frameTap(dt * 1000, { phase: W ? "walking" : k && k !== "gone" ? `fish ${k}` : me?.out?.phase || "-", programs: renderer.info.programs?.length || 0, textures: renderer.info.memory.textures, gpu: gpuN ? +gpuT[(gpuN - 1) % 60].toFixed(2) : null }); } }
     // (the resolution is changed before this frame is drawn, never after: resizing the canvas clears it, and done after
     // drawing, the blank canvas was what the phone showed for that frame, a grey flash mid-fight)
@@ -994,7 +1001,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       let gpu = null; if (gpuN) { const m = Math.min(gpuN, 60); let s2 = 0; for (let i = 0; i < m; i++) s2 += gpuT[i]; gpu = +(s2 / m).toFixed(1); }
       // texture memory, estimated from each texture's size (with its mip chain): what the card holds for this scene
       let texMB = null; if (full) try { texMB = 0; const seen = new Set(); scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) for (const k in m) { const t = m[k]; if (t && t.isTexture && !seen.has(t)) { seen.add(t); const im = t.image; const w = im?.width || im?.videoWidth || 0, h = im?.height || im?.videoHeight || 0; texMB += (w * h * 4 * (t.generateMipmaps ? 1.333 : 1)) / 1048576; } } }); } catch { texMB = 0; }
-      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), gpu, calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, texMB: texMB == null ? null : Math.round(texMB), gpuName: gpuName(), spike: ftN && performance.now() - spike.at < 4500 ? { ms: Math.round(spike.ms), shaders: spike.shaders, tex: spike.tex, js: +spike.js.toFixed(1), what: spike.what } : null, build: typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : "", preset: Q === QUALITY3D.ultra ? "ultra" : Q === QUALITY3D.high ? "high" : Q === QUALITY3D.performance ? "performance" : "balanced", res: [renderer.domElement.width, renderer.domElement.height] };
+      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), gpu, calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, texMB: texMB == null ? null : Math.round(texMB), gpuName: gpuName(), spike: ftN && performance.now() - spike.at < 4500 ? { ms: Math.round(spike.ms), shaders: spike.shaders, tex: spike.tex, js: +spike.js.toFixed(1), what: spike.what, main: Math.round(spike.main), resized: spike.resized, hidden: spike.hidden } : null, build: typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : "", preset: Q === QUALITY3D.ultra ? "ultra" : Q === QUALITY3D.high ? "high" : Q === QUALITY3D.performance ? "performance" : "balanced", res: [renderer.domElement.width, renderer.domElement.height] };
     },
     setAnglers,
     realCheck,
@@ -1143,6 +1150,6 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     /** the screen position (0..1) of a world point, or null when behind the camera */
     project(p) { const v = p.clone().project(camera); return v.z > 1 ? null : { x: (v.x + 1) / 2, y: (1 - v.y) / 2 }; },
     snapshot() { drawFrame(); return canvas.toDataURL("image/jpeg", 0.9); },
-    dispose() { envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); spray.dispose(); tipLights.dispose(); torch.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
+    dispose() { clearInterval(beatId); envRT?.dispose(); pmrem.dispose(); cancelAnimationFrame(raf); document.removeEventListener("visibilitychange", vis); for (const x of anglers.values()) x.a.dispose(); spray.dispose(); tipLights.dispose(); torch.dispose(); env.dispose(); post?.dispose(); renderer.dispose(); },
   };
 }

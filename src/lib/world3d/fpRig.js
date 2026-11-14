@@ -124,6 +124,56 @@ export function skinShade(sh) {
     .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, 0.3, 1.0 );");
 }
 
+// ---- the jacket's lining left out ----
+// The jacket is a thickened cloth: an outer layer and, a centimetre or two inside it, a lining facing inwards. Seen from
+// outside the lining is hidden, but where the cut near your eye opens a sleeve you look straight down the tube at it: the
+// dark ring or flap round your forearm hauling the drop net or lowering a fish back (14 November, Aaron's screenshots;
+// leaving out the inside faces of the outer layer didn't touch it, as the lining faces you). So the lining's triangles
+// are dropped when the rig is built: a vertex is the lining's if, of it and its partner in the other layer, it's the one nearer
+// the bone it hangs from (in the pose the model was made in), the odd misjudged one put right by its neighbours,
+// and a triangle goes if two of its corners are the lining's. Through the opening you then see your
+// forearm, or nothing, as with an arm cut by the edge of the picture. If the count dropped isn't about half (a model
+// made differently), the jacket is left whole.
+export function dropLining(mesh) {
+  const g = mesh.geometry, pos = g?.attributes?.position, nor = g?.attributes?.normal, si = g?.attributes?.skinIndex, sw = g?.attributes?.skinWeight, idx = g?.index, sk = mesh.skeleton;
+  if (!pos || !nor || !si || !sw || !idx || !sk) return 0;
+  const bones = sk.bones, heads = bones.map((b, i) => new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().copy(sk.boneInverses[i]).invert()));
+  const tails = bones.map((b, i) => { const c = b.children.find((x) => x.isBone && bones.includes(x)); if (c) return heads[bones.indexOf(c)]; const pi = bones.indexOf(b.parent); return pi >= 0 ? heads[i].clone().add(heads[i].clone().sub(heads[pi]).multiplyScalar(0.5)) : heads[i]; });
+  const bm = mesh.bindMatrix, nm = new THREE.Matrix3().getNormalMatrix(bm), N = pos.count;
+  const P = new Float32Array(N * 3), Nn = new Float32Array(N * 3), bone = new Int32Array(N), v = new THREE.Vector3(), seg = new THREE.Line3(), c = new THREE.Vector3();
+  for (let i = 0; i < N; i++) {
+    let j = 0, w = -1; for (let k = 0; k < 4; k++) { const wk = sw.getComponent(i, k); if (wk > w) { w = wk; j = si.getComponent(i, k); } }
+    bone[i] = j; v.fromBufferAttribute(pos, i).applyMatrix4(bm); v.toArray(P, i * 3); v.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize(); v.toArray(Nn, i * 3);
+  }
+  const axisDist = (i, j) => { v.fromArray(P, i * 3); seg.set(heads[j], tails[j]).closestPointToPoint(v, true, c); return v.distanceTo(c); };
+  // (each vertex's partner in the other layer: the nearest facing the other way, within 2.5 cm; of the two, the one
+  // nearer the bone is the lining. With no partner, its normal decides: the lining's points in towards the bone)
+  const S = 0.025, grid = new Map(), key = (x, y, z) => ((x + 512) * 1024 + (y + 512)) * 1024 + (z + 512);
+  for (let i = 0; i < N; i++) { const k = key(Math.floor(P[i * 3] / S), Math.floor(P[i * 3 + 1] / S), Math.floor(P[i * 3 + 2] / S)); let a = grid.get(k); if (!a) grid.set(k, (a = [])); a.push(i); }
+  const inner = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    const gx = Math.floor(P[i * 3] / S), gy = Math.floor(P[i * 3 + 1] / S), gz = Math.floor(P[i * 3 + 2] / S);
+    let best = -1, bd = S * S;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) for (const k of grid.get(key(gx + dx, gy + dy, gz + dz)) || []) {
+      if (Nn[i * 3] * Nn[k * 3] + Nn[i * 3 + 1] * Nn[k * 3 + 1] + Nn[i * 3 + 2] * Nn[k * 3 + 2] > -0.6) continue;
+      const d = (P[i * 3] - P[k * 3]) ** 2 + (P[i * 3 + 1] - P[k * 3 + 1]) ** 2 + (P[i * 3 + 2] - P[k * 3 + 2]) ** 2; if (d < bd) { bd = d; best = k; }
+    }
+    if (best >= 0) inner[i] = axisDist(i, bone[i]) < axisDist(best, bone[i]) ? 1 : 0;
+    else { v.fromArray(P, i * 3); seg.set(heads[bone[i]], tails[bone[i]]).closestPointToPoint(v, true, c); inner[i] = (Nn[i * 3] * (v.x - c.x) + Nn[i * 3 + 1] * (v.y - c.y) + Nn[i * 3 + 2] * (v.z - c.z)) < 0 ? 1 : 0; }
+  }
+  const src = idx.array, keep = [];
+  // (a few vertices are misjudged, at folds and joints: each takes the side most of its neighbours are on, three times
+  // over, so no stray triangle of the lining stays and no hole opens in the outer layer to see the sky through)
+  const nb = Array.from({ length: N }, () => []);
+  for (let t = 0; t < src.length; t += 3) for (let a = 0; a < 3; a++) { const i = src[t + a]; nb[i].push(src[t + (a + 1) % 3], src[t + (a + 2) % 3]); }
+  for (let it = 0; it < 3; it++) { const was = inner.slice(); for (let i = 0; i < N; i++) { const l = nb[i]; if (!l.length) continue; let sum = was[i]; for (const k of l) sum += was[k]; inner[i] = sum * 2 > l.length + 1 ? 1 : 0; } }
+  for (let t = 0; t < src.length; t += 3) if (inner[src[t]] + inner[src[t + 1]] + inner[src[t + 2]] < 2) keep.push(src[t], src[t + 1], src[t + 2]);
+  const dropped = 1 - keep.length / src.length;
+  if (dropped < 0.25 || dropped > 0.65) return 0; // (not a lined cloth as expected: left whole)
+  mesh.geometry = g.clone(); mesh.geometry.setIndex(keep);
+  return dropped;
+}
+
 export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, model = null } = {}) {
   const group = new THREE.Group(); group.name = "fp-rig"; group.visible = false;
   const root = new THREE.Group(); root.name = "fp-rig-root"; group.add(root);
@@ -139,7 +189,11 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // between your shoulders and elbows are right under your eye, and filled half the picture in the 13 November
   // recording, hauling the drop net and putting the cod back. Your forearms and hands still show)
   const nearCut = { value: 0.16 };
-  coatMat.onBeforeCompile = (sh) => { sh.uniforms.fpNearCut = nearCut; sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut) discard;\n#include <opaque_fragment>"); };
+  // (and near your eye the inside of a sleeve is never drawn: where the cut opens a sleeve, its lining showed as a
+  // ring or a dark flap round your forearm, hauling or lowering the drop net looking down over the rail (Aaron's
+  // screenshots of 14 November, putting a thornback ray back). Without it you see your forearm inside, or the cut
+  // sleeve simply ends, as an arm cut by the edge of the picture does. Further off, a cuff's inside still shows)
+  coatMat.onBeforeCompile = (sh) => { sh.uniforms.fpNearCut = nearCut; sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18)) discard;\n#include <opaque_fragment>"); };
   clothe(coatMat);
   // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)
   skinMat.onBeforeCompile = (sh) => {
@@ -159,7 +213,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     const scene = cloneSkinned(g.scene); const bones = new Map();
     scene.traverse((o) => {
       if (o.isBone) bones.set(o.name, o);
-      if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || "") ? coatMat : skinMat; }
+      if (o.isMesh) { const jacket = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || ""); o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = jacket ? coatMat : skinMat; if (jacket && o.isSkinnedMesh) dropLining(o); }
     });
     const B = (n) => bones.get(boneName(n));
     const clips = {}; for (const c of g.animations) clips[c.name] = sampler(c, bones);
