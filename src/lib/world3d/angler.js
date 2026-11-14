@@ -586,6 +586,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let tagOff = false;
   let headHand = null; // which hand has the head of a fish held up (0 left, 1 right)
   let landStage = null, landWater = null; // the drop net's stage while landing (for the hands): up | rod | pick | lower | lead | haul | in
+  let liftTook = false; const LIFT_REACH = 0.8; // (a fish swung in by hand: taken once it's this close to your left shoulder, first person)
   let dropRig = null, ropePull = null, releaseInfo = null, releaseRope = null, matOn = false, releasePole = false, prevKt = -1; // the drop net's rope: over the rail where, hanging or not; which hand is pulling and how far through the pull
   const rodS = { butt: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0), key: "", until: 0, ok: false }; // the rod eased from one way of holding it to the next
   let inHand = null; // the rod: 0 in its rest, 1 in your hands, between while it's picked up or put down
@@ -659,7 +660,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     let netOn = false, netAt = null, ropesOn = false, poleFrom = null, inNet = false, actNow = null; // (actNow: a retargeted move played on cue: human3d ACTS)
     let fpE = 0.9, fpYaw = -0.03, fpView = null, fpPull = 0, fpArm = null, fpCast = null, fpRest = null, fpUp = null; // first person: the rod's angle up from level, and a little towards the middle
     landStage = null; landWater = null; dropRig = null; ropePull = null; releaseInfo = null; releaseRope = null; matOn = false; releasePole = false;
-    const ph = info.phase;
+    const ph = info.phase; if (ph !== "landing") liftTook = false; // (a new landing: the fish not yet taken in the hand)
     jumpWatch = false; jumpAt = null;
     fpArm = null; bodyTo = { x: 0, y: 0, z: 0 };
     if (ph === "idle" || ph === "ended" || ph === "paused") { held = false; showLine = false; }
@@ -1357,7 +1358,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (ph === "landing") {
       lookAtW = (fish.visible ? fish.position : rigAt)?.clone() || null; brace = age < LT.T1 ? 0.5 : 0.2; lean = 0.08;
       // (a fish swung in over the rail: your left hand comes off the reel and takes it as it arrives, behind its head)
-      if (tech === "lift" && rigAt && age > LT.swingIn + 0.35 * (LT.card - LT.swingIn)) hands[0] = { at: toLocal(rigAt).add(V3(0, -fishLen * 0.22, 0)), axis: V3(0, -1, 0), palm: V3(0.6, 0, 0.8), kind: "fish" };
+      // (in your own view, only once it's come within reach: taken while it was still swinging in over a metre away, the
+      // hand left the reel and went out to arm's length after it, 7 cm a frame and then stuck short of it. Once taken
+      // it's kept)
+      if (tech === "lift" && rigAt && age > LT.swingIn + 0.35 * (LT.card - LT.swingIn)) {
+        const at = toLocal(rigAt).add(V3(0, -fishLen * 0.22, 0)), E = fp ? fpEye() : null;
+        if (!fp || liftTook || at.distanceTo(V3(E.x - 0.19, E.y - 0.27, E.z + 0.02)) < LIFT_REACH) { liftTook = true; hands[0] = { at, axis: V3(0, -1, 0), palm: V3(0.6, 0, 0.8), kind: "fish" }; }
+      }
       if (tech === "net" && netOn && poleFrom && netAt) { hands[0] = { at: toLocal(poleFrom), axis: toLocal(netAt).sub(toLocal(poleFrom)), palm: V3(0, 1, 0), kind: "pole" }; lean = 0.2; }
       if (tech === "dropnet" && landStage) {
         const railZ = -Math.max(0.3, edge - 0.22), net0 = netAt ? toLocal(netAt) : null, sideL = V3(1, 0, 0);
