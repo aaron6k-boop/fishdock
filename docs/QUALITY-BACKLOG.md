@@ -83,10 +83,15 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Check:** close-ups at the landing, looking down.
 
 ### 7. Fish models
-- **Wrong:** six species have their own bodies (bass, cod, mackerel, plaice, pollack, whiting); rays, dogfish, conger
-  and others use simpler shapes, though they're among the commonest pier catches.
-- **Do:** model a thornback ray, a lesser spotted dogfish and a conger in Blender from references (wet materials as the
-  others). **Cost:** ~5k triangles each, loaded when that fish is on. **Check:** the look at each fish.
+- **Was wrong:** six species have Blender bodies (bass, cod, mackerel, plaice, pollack, whiting); the rest are lofted
+  from FishDock's own picture of them. The conger and the eel are drawn curled, so theirs came out as deep as the whole
+  curl, a third of the fish's length at the tail, with the curl painted over it.
+- **Done (14 Nov):** straight pictures of both made from their own (sampled along the spine:
+  `source-assets/fish-straight/straighten.py`) and modelled in Blender from them like the others
+  (`source-assets/blender/build_eels.py`, `eels.glb`, about 5,200 triangles each).
+- **Still to look at:** the thornback ray (lofted from a picture seen from above, so flat, as a ray is) and the dogfish
+  (from a side view) are passable; a ray with a raised back and a proper tail, and the dogfish's fins as fins, would be
+  next. **Check:** the conger landed and looked at (`conger_look`), before and after.
 
 ### 8. Sound
 - **Wrong:** every sound is made by synthesis in the browser; waves, gulls, reel clicks and drag sound synthetic.
@@ -125,3 +130,4 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | Looking down, the jacket's body is left out (no ragged flaps across the bottom of the picture) | drop-net film before and after; `tests/fpRig.test.js` |
 | 14 Nov | The drop net's rope: the left hand no longer flicks 4 cm every frame between two grips; an arm put away comes up from your side instead of appearing mid-picture | `tools/arm-steady.mjs` (rope flicks 258 to 0 in the logged landing, 5 in the test's own); frame log of a 77 cm ray |
 | 14 Nov | A new fish and net readied in the background, not all at once mid-landing | film warm-up timing: 7.2 s on the page in software before, worst frame 3.6 s after |
+| 14 Nov | The conger and the eel as long bodies (Blender, from straightened pictures) | the conger in the net and in the hands, before and after |
