@@ -105,7 +105,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         let gate = createLoadGate(); setShown(false); setPct(10); setFiles([0, 0]);
         untrack = mod.trackLoads((l, t) => gate.files(l, t));
         w = mod.createWorld(canvas.current, {
-          venue, quality: q, reduceMotion: reduce, real, pano: panoOn ? pano : null, trackJumps: loadView().track,
+          venue, quality: q, shed: quality === "auto", reduceMotion: reduce, real, pano: panoOn ? pano : null, trackJumps: loadView().track,
           onFeel: (n, d) => props.current.feel?.(n, d),
           onSound: (name, pos, _who, data) => { if (!props.current.sound) return; const cam = W.current?.camera; if (soundPan && !loadView().spatial) soundPan(0, 1); else if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name, data); },
         });

@@ -130,8 +130,9 @@ vec3 skyColour(vec3 d){
     // the sun's glow through thin cloud
     c += vec3(1., .86, .68)*pow(sd, 16.)*(uDay + uDusk*.7)*cl.a*(1. - smoothstep(.7, 1., uCloud))*.3;
   }
-  // a sea fret: the sky all one pale grey, as the air round you is (the horizon's colour all the way up)
-  c = mix(c, skyBase(vec3(d.x, .03, d.z)), uFret*.85);
+  // a sea fret: the sky all one pale grey, as the air round you is (the horizon's colour all the way up). (Only in a
+  // fret: skyBase again for every pixel of sky cost every frame for nothing on a clear day)
+  if (uFret > .001) c = mix(c, skyBase(vec3(d.x, .03, d.z)), uFret*.85);
   // lightning lighting the cloud from inside, brighter overhead
   c += vec3(.5, .55, .7)*uFlash*(.35 + .65*smoothstep(-.1, .5, d.y));
   return c;
@@ -141,8 +142,10 @@ vec3 skyReflect(vec3 d){
   vec3 c = skyBase(d);
   float sd = max(dot(d, uSunDir), 0.);
   vec4 cl = cloudAt(d, 0.);
-  return mix(mix(c, cl.rgb, cl.a) + vec3(1., .86, .68)*pow(sd, 12.)*(uDay + uDusk*.6)*(1. - smoothstep(.6, 1., uCloud))*.2, skyBase(vec3(d.x, .03, d.z)), uFret*.85)
-    + vec3(.5, .55, .7)*uFlash*.6; // (the fret and the lightning in the water too)
+  vec3 r = mix(c, cl.rgb, cl.a) + vec3(1., .86, .68)*pow(sd, 12.)*(uDay + uDusk*.6)*(1. - smoothstep(.6, 1., uCloud))*.2;
+  // (the fret and the lightning in the water too; only when there are any: this runs for every pixel of sea)
+  if (uFret > .001) r = mix(r, skyBase(vec3(d.x, .03, d.z)), uFret*.85);
+  return r + vec3(.5, .55, .7)*uFlash*.6;
 }`;
 
 const pick = (a, i) => a[((i % a.length) + a.length) % a.length];

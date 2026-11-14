@@ -22,3 +22,23 @@ test("a device's settled resolution is remembered per quality setting, for a mon
   assert.equal(recallPace("high", { getItem: () => "not json" }, 0), null);
   assert.doesNotThrow(() => rememberPace("high", 1.5, { getItem: () => { throw new Error("blocked"); } }));
 });
+
+test("shedding (Auto): each step only lowers, in order, and a device remembers how far it went", async () => {
+  const { SHED, capGfx, recallShed, rememberShed, rememberPace, recallPace } = await import("../src/lib/pacing.js");
+  const high = { res: 1, shadows: 2, ao: 1, bloom: 1, aa: 4, sharp: 0.5, refl: 1 };
+  assert.deepEqual(capGfx(high, 0), high, "nothing shed: as asked");
+  assert.equal(capGfx(high, 1).refl, 0, "first the mirrored scene"); assert.equal(capGfx(high, 1).shadows, 2);
+  assert.equal(capGfx(high, 2).shadows, 1); assert.equal(capGfx(high, 3).aa, 2); assert.equal(capGfx(high, 4).shadows, 0);
+  const all = capGfx(high, SHED.length); assert.deepEqual([all.refl, all.shadows, all.aa, all.bloom, all.sharp], [0, 0, 0, 0, 0]);
+  assert.equal(all.res, 1, "the sharpness isn't a shed step");
+  // never raises: a setting already lower stays as it was
+  assert.equal(capGfx({ aa: 0, shadows: 0 }, 3).aa, 0); assert.equal(capGfx({ shadows: 0 }, 2).shadows, 0);
+  // an empty request lowers what's in use
+  assert.deepEqual(capGfx({}, 1, high), { refl: 0 });
+  const mem = new Map(), store = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) }, now = Date.UTC(2026, 10, 14);
+  assert.equal(recallShed("balanced", store, now), 0);
+  rememberPace("balanced", 1.25, store, now); rememberShed("balanced", 3, store, now);
+  assert.equal(recallShed("balanced", store, now), 3); assert.equal(recallPace("balanced", store, now), 1.25, "the sharpness kept beside it");
+  rememberPace("balanced", 1.5, store, now); assert.equal(recallShed("balanced", store, now), 3, "and the steps kept beside the sharpness");
+  assert.equal(recallShed("balanced", store, now + 31 * 864e5), 0, "a month on, it finds out again");
+});
