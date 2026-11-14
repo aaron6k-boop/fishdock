@@ -1244,8 +1244,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // (lifted out as it's done: up its own line first, the butt out of the cup and the blank sliding along the cradle,
     // then up out of the cradle's open side, then swung to you. Going straight to your hands, the butt went out through
     // the side of the cup, 5 mm round the rod, and the blank tipped forwards through the cradle and the bar under it)
-    if (lift < 1) { const k = ease((lift - 0.25) / 0.75), open = new THREE.Vector3(0, 1, 0).addScaledVector(restD, -restD.y).normalize();
-      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.05 * ease((lift - 0.08) / 0.22)).lerp(butt, k); dir = restD.clone().lerp(dir, k).normalize(); }
+    // (8 cm out of the cradle before it swings: at 5 cm the swing still took it 2 mm into the cradle's rubber)
+    if (lift < 1) { const k = ease((lift - 0.3) / 0.7), open = new THREE.Vector3(0, 1, 0).addScaledVector(restD, -restD.y).normalize();
+      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.08 * ease((lift - 0.08) / 0.24)).lerp(butt, k); dir = restD.clone().lerp(dir, k).normalize(); }
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping
@@ -1253,7 +1254,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // didn't run at all, the line that starts it having ended up inside the note above it: laying the rod on the rail to
     // land a ray its middle went 1.2 m in a frame. Picked up from its rest or put back it needs none: that's eased
     // already, along a path clear of the tripod, which a lag would cut across)
-    { const key = `${fp && !fpRodDown}|${!!walking}`; if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
+    // (and into a landing and out of it: bringing the fish up, the rod's held angle changes at once, and its middle went
+    // 47 cm in a frame)
+    { const key = `${fp && !fpRodDown}|${!!walking}|${ph === "landing"}`; if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
       // (and catches up smoothly at the end, quicker and quicker, rather than jumping the last of the way: picking the
       // rod up on a bite, it was still 15 cm behind when the moment ended, and the rod and both hands leapt up)
       const late = Math.max(0, t - rodS.until), behind = rodS.ok && (rodS.butt.distanceTo(butt) > 0.001 || rodS.dir.angleTo(dir) > 0.002);
