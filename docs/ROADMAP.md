@@ -21,13 +21,14 @@ end of each working session, so the next one can carry on from here.
 performance, #123 shaders and textures readied under the loading screen, the hand off the rail, one reward card,
 #124 the Reel button as the reel (rhythm, holding, pauses), #125 the buttons as one set, the jacket's lining left out,
 the worst-frame line, the quality backlog, #126 bites by species, the self-updating game, steadier arms on the drop
-net, fish readied in the background.
+net, fish readied in the background, #127 the conger and the eel modelled in Blender, hands at a hand's pace on the drop
+net, skin detail on your hands.
 
 ## Draft PR waiting for Aaron
 
 | Branch | What |
 |---|---|
-| `models-5` (#127) | The conger and the eel modelled in Blender (on Aaron's PC, through the queue runner) from straightened pictures; a fish swung in taken once it's within reach; a grip change mid-blend without a jump; hands on the drop net's hoop at a hand's pace |
+| `fish-all` | The other fourteen species with a cut-out picture modelled in Blender (one small file each); fin plates reaching into the body; the palm's creases and veins in the hand maps |
 
 The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
 opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older
@@ -65,15 +66,15 @@ working backlog, kept for its detail.
 
 ## Next action (checkpoint, 14 November, about 15:00)
 
-1. Aaron's review of `models-5` (#127).
+1. Aaron's review of `fish-all`.
 2. His phone's FPS display on the next stall (the worst-frame line names page or graphics card).
 3. Blender on his PC: the runner (`source-assets/blender/queue_watcher.py`) was started in his open Blender 5.2 this
-   session; scripts go into `Documents/FishDock-assets/queue`, results come back from `exports/`. Next there: the ray
-   with a raised back and its tail, the dogfish's fins as fins, the tackle round you (tripod, seat box, bucket).
+   session; scripts go into `Documents/FishDock-assets/queue`, results come back from `exports/`. Next there: the
+   tackle round you (tripod, seat box, bucket); a ray with a raised back and thorns modelled by hand.
 4. Sound recordings: need Aaron's go-ahead for each download (file, source, licence, size) and somewhere that doesn't
    need signing in.
-5. Without the PC: the palm's own creases and veins (`bake_hand_maps.py`), the third-person walk and idle, the water and
-   pier inspection against the Geograph photographs (backlog 4, 5).
+5. Without the PC: the third-person walk and idle, the water and pier inspection against the Geograph photographs
+   (backlog 4, 5).
 
 ## Evidence kept
 
