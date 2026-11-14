@@ -20,13 +20,14 @@ end of each working session, so the next one can carry on from here.
 #118 sound at the first tap, #119 steady arms, #120 levels and the logbook, #121 sea fret and storms, #122 phone
 performance, #123 shaders and textures readied under the loading screen, the hand off the rail, one reward card,
 #124 the Reel button as the reel (rhythm, holding, pauses), #125 the buttons as one set, the jacket's lining left out,
-the worst-frame line, the quality backlog.
+the worst-frame line, the quality backlog, #126 bites by species, the self-updating game, steadier arms on the drop
+net, fish readied in the background.
 
 ## Draft PR waiting for Aaron
 
 | Branch | What |
 |---|---|
-| `polish-3` (#126) | Bites by species (strike on the pull, not the knock; slack-liners); the game updates itself between catches; the unhooking mat as padded quilting; the jacket's body left out looking down; a new fish and net readied in the background; no flicker on the drop net's rope, arms coming up from your side |
+| `models-5` | The conger and the eel modelled in Blender (on Aaron's PC, through the queue runner) from straightened pictures; a fish swung in taken once it's within reach; a grip change mid-blend without a jump |
 
 The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
 opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older
@@ -38,9 +39,10 @@ working backlog, kept for its detail.
    "Record a catch" (`?dev=1#play`) for the real stalls at a catch; the gameplay frame-time spikes on a phone are not
    yet measured there.
 2. **Hands, arms and character animation.** Done: steady hold, no snaps (#119); no flicker on the drop net's rope, arms
-   coming up from your side (`polish-3`). Next: taking the fish on a lift the left forearm still moves up to 9 cm in a
-   frame; following the drop net's hoop up off the deck and over the rail, up to 12 cm; the third-person walk (foot
-   planting, stopping, turning); the idle (breathing, weight shifts).
+   coming up from your side (`polish-3`). Taking a fish swung in by hand: the left hand waits until it's within reach
+   (worst move in that landing 9 cm a frame to 5, `models-5`). Next: following the drop net's hoop up off the deck and
+   over the rail, up to 12 cm a frame (the hoop's own path needs changing: more time alone barely helped); the
+   third-person walk (foot planting, stopping, turning); the idle (breathing, weight shifts).
 3. **Rods, reels, line and nets.** Next: rod bend under load per fish and drag, the reel's bail opening for the cast and
    closing after it, line slack and tension between guides, the drop net's rope swing and bag sag with a fish in it.
 4. **Water and weather.** Done: sea fret and storms (this branch). Next: tide height moving the waterline on the pier
