@@ -170,7 +170,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the soft dark round your feet where you stand (contactShadow.js; hidden in a jump, and in first person with your body)
   const feetShadow = contactShadow(1.0, 0.85, 0.75); root.add(feetShadow);
   // your forearms and hands in first person (only ever your own angler's are needed: made the first time they're shown)
-  let fpv = null;
+  let fpv = null, fpSpecs = null;
   // (your own first-person arms: made as soon as you're here, not the first time you switch to first person: made
   // then, loading and building them stopped the game for over a second, the 13 November recording at 11 s. Counted as
   // an asset once loaded, so the world builds their shaders while the place is still loading)
@@ -1561,6 +1561,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const vw = fpView || viewVecs();
       const perf = FILM && typeof window !== "undefined" && window.__fdPerfOn ? performance.now() : 0; // (film only: what posing the arms costs each frame)
       fpv.pose({ hands: walking ? [null, null] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt, castT: ph === "cast" ? age : null });
+      if (FILM) fpSpecs = walking ? [null, null] : hands.map((h) => (h ? h.kind || "?" : null)); // (film checks: what each hand was given to hold)
       if (perf) { const P = (window.__fdPerf ||= { n: 0, ms: 0, max: 0 }), d = performance.now() - perf; P.n++; P.ms += d; if (d > P.max) P.max = d; }
     }
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFigP(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
@@ -1730,7 +1731,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // test diagnostics only (FILM, never in the app): where the reel, its handle and your hands are this frame
     if (local && typeof window !== "undefined" && FILM) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, rod: pts.map((p) => toWorld(p).toArray()), lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2),
       // (and, for the railing checks, in the angler's own frame: the railing, the rod, and your arms' joints and fingertips)
-      local: { rail: rail ? { y: 1.12, z: -Math.max(0.3, edge - 0.22) } : null, rod: pts.map((p) => p.toArray()), reel: seat.p.toArray(), eye: fpEye().toArray(), view: viewIn ? [viewIn.yaw, viewIn.pitch] : null, inHand, sway: [holdSway.x, holdSway.y],
+      local: { specs: fpSpecs, shown: fpv?.internals?.scene ? fpv.internals.scene.visible : null, rail: rail ? { y: 1.12, z: -Math.max(0.3, edge - 0.22) } : null, rod: pts.map((p) => p.toArray()), reel: seat.p.toArray(), eye: fpEye().toArray(), view: viewIn ? [viewIn.yaw, viewIn.pitch] : null, inHand, sway: [holdSway.x, holdSway.y],
         arms: fp && fpv?.internals && fpv.group.visible ? ["L", "R"].map((S) => { const A = fpv.internals.arm[S], P = (b) => toLocal(b.getWorldPosition(new THREE.Vector3())).toArray(); const tips = []; for (const [n, b] of fpv.internals.bones) if (n.endsWith(S) && /^DEF-(f_(index|middle|ring|pinky)|thumb)03/.test(n)) tips.push(P(b)); const d = fpv.debug[S === "L" ? 0 : 1] || {}; return { S, U: P(A.U), F: P(A.F), H: P(A.H), tips, kind: d.kind, turn: d.turn, short: d.short }; }) : null } }; }
     const eyeNow = fpEye(); // (the eye the rod and your body were placed from this frame: the camera uses the same one)
     // (letting the drop net down and hauling it up, you lean right out over the rail, your head past the wall's top: from
