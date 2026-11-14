@@ -24,7 +24,7 @@ performance (Auto is Medium on a phone, the step-down ladder, gulls drawn togeth
 
 | Branch | What |
 |---|---|
-| `play-polish` | From the 14 November recording: things that arrived after start-up (pier props, a passer-by, the drop net) readied before they're seen, not on the frame they first come into view (12 shaders and 16 textures at the cast on main, none on the branch); the frame-rate panel names the worst frame's cause on the phone and no longer made a WebGL context twice a second; the sleeves no longer magenta at dusk; the fish rests in your palms; warmer skin; one reward card instead of a pile of toasts |
+| `play-polish` (#123) | From the 14 November recording: things that arrived after start-up (pier props, a passer-by, the drop net) readied before they're seen, not on the frame they first come into view (12 shaders and 16 textures at the cast on main, none on the branch); the frame-rate panel names the worst frame's cause on the phone and no longer made a WebGL context twice a second; the sleeves no longer magenta at dusk; the fish rests in your palms; warmer skin; one reward card instead of a pile of toasts |
 
 ## Backlog, in priority order
 
@@ -58,7 +58,10 @@ performance (Auto is Medium on a phone, the step-down ladder, gulls drawn togeth
 
 Wait for Aaron's review of `play-polish`, and his iPhone recording of the same sequence on it: the FPS display's
 "worst" line now names what the slowest frame was doing. Then: authored Blender clips for putting the rod in the rest
-and picking it up, and for the drop-net haul (needs this chat linked to Aaron's PC, where Blender is); bite variety
+and picking it up, and for the drop-net haul (needs this chat linked to Aaron's PC, where Blender is), which should also end the sleeve
+showing as a hollow ring round your forearm as you haul looking down over the rail (the far hand sits on your line of
+sight, so you look down the sleeve where it's cut near the eye; a dark inside and a soft fade were tried and weren't
+better); bite variety
 (taps, pulls, a slack-liner) by species (6, 9); tide height on the pier wall (4).
 
 ## Evidence kept
