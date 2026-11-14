@@ -195,3 +195,19 @@ test("skin: warm light round the shadow's edge and a little variation, worked in
   // (the scatter adds light only on the dark side of the edge: max(w - dotNL, 0) is never negative)
   assert.match(sh.fragmentShader, /max\( fpW - dotNL, 0\.0 \)/);
 });
+
+// ---- the jacket's lining (14 November: a dark ring round the forearm looking down a sleeve cut near the eye) ----
+test("the jacket's inward-facing lining is left out when the rig is built, and what's left faces outwards", async () => {
+  const { dropLining } = await import("../src/lib/world3d/fpRig.js");
+  const { clone: cloneSkinned } = await import("three/examples/jsm/utils/SkeletonUtils.js");
+  const sc = cloneSkinned(gltf.scene); let jacket = null; sc.traverse((o) => { if (o.isSkinnedMesh && /jacket/i.test(o.name)) jacket = o; });
+  assert.ok(jacket, "the model has a jacket");
+  const before = jacket.geometry.index.count, origGeo = jacket.geometry;
+  const t0 = performance.now(), dropped = dropLining(jacket); console.log(`dropLining took ${(performance.now() - t0).toFixed(0)} ms`);
+  assert.ok(dropped > 0.33 && dropped < 0.6, `about half its triangles were lining (${(dropped * 100).toFixed(0)}%)`);
+  assert.ok(jacket.geometry.index.count < before && origGeo.index.count === before, "the shared model is untouched; this rig's copy lost the lining");
+  // (what's left: its normals point away from the bone each vertex hangs from, on almost every triangle)
+  const g = jacket.geometry, pos = g.attributes.position, nor = g.attributes.normal, idx = g.index.array, used = new Set(idx);
+  console.log(`lining dropped: ${(dropped * 100).toFixed(1)}% of triangles; vertices in use ${used.size} of ${pos.count}`);
+  assert.ok(used.size < 0.8 * pos.count, `fewer vertices in use (${used.size} of ${pos.count})`);
+});

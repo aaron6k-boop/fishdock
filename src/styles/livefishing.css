@@ -708,3 +708,29 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .ft-land > svg.ft-tension { inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); opacity: .9; }
 @keyframes ft-land-pulse { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--action, #4fc7b7) 28%, transparent), 0 6px 20px #0008; } }
 @media (prefers-reduced-motion: reduce) { .ft-main.ft-land { animation: none; } }
+/* ---- the game's buttons as one set (14 November): the reel dial's dark face and white rim for Cast, Strike and Land,
+   each with its ring doing one job (Cast: the power, its sweet spot marked; Strike: the bite running out; Land and Reel:
+   the line's tension), the word and icon in the button's own colour; the round buttons beside them (walk about, the
+   menu) in the same dark glass, a lighter rim ---- */
+.fish-tray, .stage3d { --gb-face: radial-gradient(circle at 42% 36%, #1c4f4b, #0b2422 70%); --gb-rim: #ffffffd9; }
+.ft-main.ft-cast, .ft-main.ft-strike { background: var(--gb-face); border: 2.5px solid var(--gb-rim); box-shadow: 0 6px 18px #0009; }
+.ft-main.ft-cast { width: 92px; height: 92px; color: var(--action, #4fc7b7); font-size: 15px; font-weight: 900; gap: 3px; }
+.ft-main.ft-cast svg:not(.ft-ringsvg) { width: 28px; height: 28px; }
+.ft-main.ft-cast > svg.ft-ringsvg, .ft-main.ft-strike > svg.ft-ringsvg { inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); }
+.ft-castring .ft-ring-bg, .ft-biteclock .ft-ring-bg { stroke: #0a141bb3; stroke-width: 4.5; }
+.ft-castring .ft-sweet { fill: none; stroke: #f2c14b66; stroke-width: 4.5; }
+.ft-castring .ft-ring.power { stroke: var(--action, #4fc7b7); stroke-width: 4; }
+.ft-cast.sweet .ft-castring .ft-ring.power { stroke: #f2c14b; }
+.ft-cast.holding { transform: scale(1.04); }
+.ft-cast .ft-big { color: #fff; font-size: 26px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.ft-cast .ft-small { color: #ffffffa6; font-size: 11px; font-weight: 800; line-height: 1; }
+.ft-main.ft-strike { width: 96px; height: 96px; color: #f2b84b; font-size: 16px; font-weight: 900; animation: ft-strike-pulse .8s ease-in-out infinite; }
+.ft-main.ft-strike svg:not(.ft-ringsvg) { width: 30px; height: 30px; }
+.ft-biteclock .ft-ring { stroke: #f2b84b; stroke-width: 4.5; stroke-dashoffset: 0; transition: none; animation: ft-bite-clock var(--bite-ms, 5500ms) linear forwards; }
+@keyframes ft-bite-clock { 0% { stroke-dashoffset: 0; stroke: #f2b84b; } 72% { stroke: #f2b84b; } 73% { stroke: #f07a52; } 100% { stroke-dashoffset: 182.2; stroke: #f07a52; } }
+@keyframes ft-strike-pulse { 50% { box-shadow: 0 0 0 9px #f2b84b38, 0 6px 18px #0009; } }
+/* the round buttons beside them */
+.stage3d .w3d-walkbtn { background: var(--gb-face); border: 2px solid #ffffff8c; color: #fff; box-shadow: 0 4px 14px #0008; }
+.walk-fish { background: var(--gb-face); color: var(--action, #4fc7b7); border: 2.5px solid var(--gb-rim); }
+.ft-pill.ft-windin { min-height: 44px; border: 2px solid #ffffff8c; background: var(--gb-face); font-weight: 750; }
+@media (prefers-reduced-motion: reduce) { .ft-main.ft-strike { animation: none; } .ft-biteclock .ft-ring { animation: none; } }
