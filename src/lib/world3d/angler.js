@@ -1249,7 +1249,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping
-    { const key = `${held}|${fp && !fpRodDown}|${!!walking}`; // (and the rod put down to land a fish in first person: it went 30 cm in a frame) if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
+    // (and the rod put down to land a fish in first person: it went 30 cm in a frame. From 13 November to 14 November this
+    // didn't run at all, the line that starts it having ended up inside the note above it: laying the rod on the rail to
+    // land a ray its middle went 1.2 m in a frame. Picked up from its rest or put back it needs none: that's eased
+    // already, along a path clear of the tripod, which a lag would cut across)
+    { const key = `${fp && !fpRodDown}|${!!walking}`; if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
       // (and catches up smoothly at the end, quicker and quicker, rather than jumping the last of the way: picking the
       // rod up on a bite, it was still 15 cm behind when the moment ended, and the rod and both hands leapt up)
       const late = Math.max(0, t - rodS.until), behind = rodS.ok && (rodS.butt.distanceTo(butt) > 0.001 || rodS.dir.angleTo(dir) > 0.002);
