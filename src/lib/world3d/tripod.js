@@ -11,7 +11,10 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 export const TRIPOD = {
   rise: 1.1, back: 0.47, // the butt's place below and behind where the rod rests in the cradle: 67 degrees up
   side: 0.1, // each cradle and cup either side of the middle; the rod's in the left-hand one, nearer you
-  spread: 0.3, ahead: 0.1, // the two front feet either side and ahead of the head
+  // the two front feet either side of the head and just ahead of it: 11 cm in from the railing's line, clear of its posts'
+  // base plates (8 cm round) and the braces between them. (At 2 cm in, wherever you stood by a post, a foot stood
+  // in its plate, or a leg went through a brace)
+  spread: 0.3, ahead: 0.01,
   rodR: 0.011, // the blank's radius where it lies in the cradle (angler.js gives each rod's own)
   cradleR: 0.026, cradleT: 0.0065, // the rubber U: its radius to the middle of the rubber, and the rubber's own
 };

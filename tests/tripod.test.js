@@ -24,7 +24,8 @@ test("the rod lies in the cradle at about 67 degrees, its butt in the cup on the
 test("on a pier: inside the railing, the rod and line well over it, and the reel where your right hand reaches it", () => {
   for (const edge of [0.6, 0.9, 1.8]) {
     const P = tripodPlan(restFor(edge)), railZ = -Math.max(0.3, edge - 0.22);
-    for (const f of P.feet) assert.ok(f.z > railZ, `edge ${edge}: a foot past the railing`);
+    // (and clear of the railing's posts' base plates, 8 cm round, and the braces in its line)
+    for (const f of P.feet) assert.ok(f.z > railZ + 0.1, `edge ${edge}: a foot ${((f.z - railZ) * 100).toFixed(0)} cm in from the railing`);
     // (where the rod crosses the railing it's 40 cm or more above the top rail, 1.12 m up)
     const k = (railZ - P.butt.z) / P.dir.z, yOver = P.butt.y + P.dir.y * k;
     assert.ok(k < 0 || yOver > 1.12 + 0.4, `edge ${edge}: the rod ${yOver.toFixed(2)} m up over the rail`);
