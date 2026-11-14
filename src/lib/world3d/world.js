@@ -21,7 +21,7 @@ import { shotFor } from "./landCam.js";
 import { createPost } from "./post.js";
 import { setPeopleDetail } from "./human3d.js";
 import { FILM } from "./film.js";
-import { stepDown, recallPace, rememberPace } from "../pacing.js";
+import { stepDown, recallPace, rememberPace, SHED, capGfx, recallShed, rememberShed } from "../pacing.js";
 
 // dpr: the most pixels per screen pixel; ss: the least (a computer's 1x screen is drawn sharper than its pixels and
 // scaled down, which smooths the fine edges of railings, rods and lines); floor: the least the frame pacing drops to;
@@ -53,11 +53,13 @@ export function autoQuality3d() {
   try {
     // iPhone Safari reports no memory and only a few cores, which put every iPhone (even the newest) on the lowest
     // setting: no antialiasing, one pixel per three and no shadows, so edges were jagged and everything soft. iPhones
-    // from the last several years have strong graphics. A recent one (iOS 18 or later: iPhone XS and newer, and
-    // Balanced measured a steady 60 with room to spare on an iPhone 17 Pro) starts on High quality, which steps itself
-    // down if frames run late; older ones get Balanced
+    // from the last several years have strong graphics, so they start on Balanced (Medium), which measured a steady 60
+    // with room to spare on an iPhone 17 Pro. (They used to start recent ones on High: Aaron's recording on 14 November
+    // showed High at 16 to 24 frames a second fighting a fish at Gorleston, still stepped down to 1.5x. Safari's cost
+    // for each thing drawn is high, and High draws the place a second time for the water's mirror and again for the
+    // contact shade.) Auto still steps down further if frames run late (pacing.js SHED); High is a choice away
     const ua = navigator.userAgent || "", ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-    if (ios) { const v = +(ua.match(/Version\/(\d+)/) || ua.match(/OS (\d+)_/) || [0, 0])[1]; return v >= 18 ? "high" : "balanced"; }
+    if (ios) return "balanced";
     // a computer with its own graphics card (NVIDIA, AMD Radeon, Intel Arc) gets the best, whatever it reports
     if (!/Android|Mobile/.test(ua)) { const g = gpuName(); if (/NVIDIA|GeForce|RTX|Radeon RX|Radeon Pro|Intel\(R\) Arc/i.test(g)) return "ultra"; if (/Apple M\d/i.test(g)) return "high"; } // (a Mac with Apple silicon: High)
     const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4; if (mem <= 2 || cores <= 4) return "performance";
@@ -80,7 +82,7 @@ export const CAMERA_MODES = [
   { id: "cinematic", label: "Cinematic" }, { id: "free", label: "Free look" },
 ];
 
-export function createWorld(canvas, { venue = "pier", quality = "balanced", onSound, onFeel, reduceMotion = false, real = null, pano = null, trackJumps = true } = {}) {
+export function createWorld(canvas, { venue = "pier", quality = "balanced", shed = false, onSound, onFeel, reduceMotion = false, real = null, pano = null, trackJumps = true } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   setPeopleDetail(Q.q >= 2); // (High and Ultra: the people's full-detail textures)
   // (with post-processing the antialiasing is the post buffer's own MSAA, so the screen's would be wasted)
@@ -141,7 +143,20 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       root.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "alphaMap", "emissiveMap"]) { const t = m[k]; if (t?.isTexture && t.image && (t.image.width || t.image.data) && !renderer.properties.get(t).__webglTexture) renderer.initTexture(t); } });
     } catch { /* (a driver that won't: they are built as they are met, as before) */ }
   }
+  // ---- small things cast no shadow: a reel's parts, a clip, a hook, a ring on the rod ----
+  // (each one in the shadow map is another draw every frame, for a speck of shadow nobody could see: there were 150-odd
+  // shadow casters at Gorleston with two anglers. Looked over every few seconds, as models arrive)
+  let trimN = 0;
+  function trimCasters() {
+    scene.traverse((o) => {
+      if (!o.isMesh || !o.castShadow || o.isInstancedMesh || o.userData.fdCast != null) return;
+      const g = o.geometry; if (!g?.attributes?.position) return; if (!g.boundingSphere) g.computeBoundingSphere();
+      o.updateWorldMatrix(true, false); const r = (g.boundingSphere?.radius || 0) * o.matrixWorld.getMaxScaleOnAxis();
+      o.userData.fdCast = r >= 0.1; if (!o.userData.fdCast) o.castShadow = false; // (10 cm across or more casts)
+    });
+  }
   function drawFrame() {
+    if (trimN++ % 300 === 0) trimCasters();
     sharpen(); renderer.info.reset();
     let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
     if (env.fftSea) env.simulate(simT); // (the spectrum sea's passes count in the frame's GPU time)
@@ -620,6 +635,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // (where this device settled on this setting last time: it starts there, so a phone that can't hold the setting's
   // full sharpness doesn't spend the first ten seconds of every visit stuttering its way down to what it can. It still
   // climbs back when frames are easy)
+  let shedN = shed ? recallShed(quality) : 0; // (Auto: how many heavier extras this device went without last time)
+  if (shedN >= SHED.length) dprFloor = Math.min(dprFloor, 1); // (and it went on down past the floor then: it may start there)
   { const was = recallPace(quality); if (was && was < dprNow) { dprNow = Math.max(dprFloor, was); renderer.setPixelRatio(dprNow); } }
   // (not while the place is still loading: frames are late then for reasons that sharpness has nothing to do with, and
   // counting them took the resolution and the ambient occlusion down before you had seen a thing. World3D turns it on
@@ -632,6 +649,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
     if (ts - paceAt < (late > 0.8 ? 1200 : 2000)) return; paceAt = ts;
     if (late > 0.4 && dprNow > dprFloor) { dprNow = stepDown(dprNow, dprFloor, late); renderer.setPixelRatio(dprNow); resize(); rememberPace(quality, dprNow); late = 0.2; easyFor = 0; }
     else if (late > 0.4 && post?.dropAO()) { late = 0.2; easyFor = 0; }
+    // (Auto only: still late at the floor, with the contact shade gone: the next heavier extra goes (pacing.js SHED),
+    // and when they're all gone, the sharpness goes on down to one pixel per screen pixel)
+    else if (late > 0.4 && shed && shedN < SHED.length) { shedN++; setGfx({}); rememberShed(quality, shedN); late = 0.2; easyFor = 0; }
+    else if (late > 0.4 && shed && dprNow > 1) { dprFloor = 1; dprNow = stepDown(dprNow, 1, late); renderer.setPixelRatio(dprNow); resize(); rememberPace(quality, dprNow); late = 0.2; easyFor = 0; }
     else if (late < 0.05 && dprNow < dprMax) { easyFor += 2; if (easyFor >= (Q.easy || 20)) { dprNow = Math.min(dprMax, dprNow + 0.25); renderer.setPixelRatio(dprNow); resize(); rememberPace(quality, dprNow); easyFor = 0; } }
     else easyFor = 0;
   }
@@ -686,7 +707,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   // a set time per frame, so an animation can be filmed exactly even where frames are slow (software graphics)
   let film = null;
   if (typeof window !== "undefined" && FILM) {
-    window.__fdWorld = { Raycaster: THREE.Raycaster, renderer, environment: env, THREE,
+    window.__fdWorld = { Raycaster: THREE.Raycaster, renderer, environment: env, THREE, scene,
+      /** (checks) Settings → Graphics as the panel sets it; returns what's in use */
+      gfx(o = {}) { setGfx(o); return { ...G, dpr: renderer.getPixelRatio(), q: Q.q, shadowsOn: renderer.shadowMap.enabled, shed: shedN }; },
+      /** (checks) the frame pacing told every recent frame was late, so its next look steps down */
+      lateNow() { late = 1; paceAt = 0; pacing = true; },
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),
       // so every phase plays through the real animation code from a known start, frame for frame the same each run:
@@ -696,7 +721,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
       fightIn(f) { anglers.get(localId)?.a.setFight(f); },
       keep(state) { anglers.get(localId)?.a.keepFish(state); },
       /** (checks) every angler drawn here: id, name and where they stand */
-      crowd() { return [...anglers].map(([id, x]) => ({ id, name: x.name, local: id === localId, line: x.a.line, at: x.a.root.position.toArray().map((v) => +v.toFixed(2)) })); },
+      crowd() { return [...anglers].map(([id, x]) => { let meshes = 0, tris = 0; x.a.root.traverseVisible((o) => { if (o.isMesh || o.isLine || o.isPoints) { meshes++; const g = o.geometry; tris += g?.index ? g.index.count / 3 : (g?.attributes?.position?.count || 0) / 3; } }); return { id, name: x.name, local: id === localId, line: x.a.line, at: x.a.root.position.toArray().map((v) => +v.toFixed(2)), meshes, tris: Math.round(tris) }; }); },
+      /** (checks) what's drawn, by the world's top-level groups: visible meshes and triangles */
+      census() { const out = []; for (const c of scene.children) { let meshes = 0, tris = 0; c.traverseVisible((o) => { if (o.isMesh || o.isLine || o.isPoints) { meshes += o.isInstancedMesh ? 1 : 1; const g = o.geometry; tris += (g?.index ? g.index.count / 3 : (g?.attributes?.position?.count || 0) / 3) * (o.isInstancedMesh ? o.count : 1); } }); if (meshes) out.push({ name: c.name || c.type, meshes, tris: Math.round(tris) }); } return out.sort((a, b) => b.meshes - a.meshes); },
       // (single: one frame of that length, as a slow phone would draw it, rather than split into short steps)
       /** (checks) a splash at a point on the water */
       torch(c) { torch.set(c); },
@@ -835,7 +862,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   const G = { res: 1, fps: 0, shadows: Q.shadows ? (Q.q >= 2 ? 2 : 1) : 0, shadowDist: 30, // (World3D applies the preset's own straight after: Ultra's far shadows)
     ao: post ? post.aoLevel : 0, bloom: post ? 1 : 0, aa: post ? 4 : 0, sharp: post ? post.sharp : 0, refl: 0, tex: maxAniso, sea: Q.sea ? 1 : 0 };
   function setGfx(o = {}) {
-    if (o.res != null) { G.res = Math.max(0.5, Math.min(1, +o.res || 1)); dprMax = Math.max(1, dprTop * G.res); dprFloor = Math.min(dprMax, Q.floor || 1); dprNow = dprMax; renderer.setPixelRatio(dprNow); resize(); late = 0; easyFor = 0; }
+    if (shedN) o = capGfx(o, shedN, G); // (Auto, shed: what this device can't hold stays off, whatever's asked)
+    // (only when it changes: World3D sends the preset's 100% straight after the world is made, and that put the
+    // sharpness back to full, throwing away where this device had settled last time, so every visit stuttered its way
+    // down again)
+    if (o.res != null && Math.max(0.5, Math.min(1, +o.res || 1)) !== G.res) { G.res = Math.max(0.5, Math.min(1, +o.res || 1)); dprMax = Math.max(1, dprTop * G.res); dprFloor = Math.min(dprMax, Q.floor || 1); dprNow = dprMax; renderer.setPixelRatio(dprNow); resize(); late = 0; easyFor = 0; }
     if (o.fps != null) { G.fps = [30, 60].includes(+o.fps) ? +o.fps : 0; fpsCap = G.fps; }
     if (o.tex != null) { G.tex = Math.max(1, Math.min(anisoCap, +o.tex || 1)); maxAniso = G.tex; texSeen = -1; sharpenAt = 60; }
     if (post) {

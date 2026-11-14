@@ -17,5 +17,25 @@ export function recallPace(quality, store = typeof localStorage !== "undefined" 
   try { const v = JSON.parse(store?.getItem(KEY) || "{}")[quality]; return v && now - v.t < 30 * 864e5 && v.dpr > 0 ? v.dpr : null; } catch { return null; }
 }
 export function rememberPace(quality, dpr, store = typeof localStorage !== "undefined" ? localStorage : null, now = Date.now()) {
-  try { const all = JSON.parse(store?.getItem(KEY) || "{}"); all[quality] = { dpr: +dpr.toFixed(2), t: now }; store?.setItem(KEY, JSON.stringify(all)); } catch { /* private mode: it finds out again next time */ }
+  try { const all = JSON.parse(store?.getItem(KEY) || "{}"); all[quality] = { ...(all[quality] || {}), dpr: +dpr.toFixed(2), t: now }; store?.setItem(KEY, JSON.stringify(all)); } catch { /* private mode: it finds out again next time */ }
+}
+
+// ---- when the lowest sharpness still isn't enough (Auto only): the heavier extras go, one at a time ----
+// In this order, each taken when frames are still late a couple of seconds after the last: the mirrored scene in the
+// water (the whole place drawn a second time), shadows at standard detail, anti-aliasing at 2x, shadows off (every
+// shadow-casting thing drawn once less), glow and sharpening, then anti-aliasing off. A device remembers how far it
+// went, so a phone that can't hold them starts without them next time instead of stuttering down to it again.
+export const SHED = [{ refl: 0 }, { shadows: 1 }, { aa: 2 }, { shadows: 0 }, { bloom: 0, sharp: 0 }, { aa: 0 }];
+/** Graphics settings with the first n shed steps applied: each only ever lowers what was asked for. */
+export function capGfx(o = {}, n = 0, current = {}) {
+  const out = { ...o };
+  for (const step of SHED.slice(0, n)) for (const [k, v] of Object.entries(step)) { const want = out[k] ?? current[k]; if (want == null || want > v) out[k] = v; }
+  return out;
+}
+/** How many shed steps this device settled on with this setting last time (0 if none, or after a month). */
+export function recallShed(quality, store = typeof localStorage !== "undefined" ? localStorage : null, now = Date.now()) {
+  try { const v = JSON.parse(store?.getItem(KEY) || "{}")[quality]; return v && now - v.t < 30 * 864e5 ? Math.max(0, Math.min(SHED.length, v.shed | 0)) : 0; } catch { return 0; }
+}
+export function rememberShed(quality, n, store = typeof localStorage !== "undefined" ? localStorage : null, now = Date.now()) {
+  try { const all = JSON.parse(store?.getItem(KEY) || "{}"); all[quality] = { ...(all[quality] || {}), shed: n, t: now }; store?.setItem(KEY, JSON.stringify(all)); } catch { /* private mode */ }
 }
