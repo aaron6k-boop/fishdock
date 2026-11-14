@@ -26,7 +26,7 @@ the worst-frame line, the quality backlog.
 
 | Branch | What |
 |---|---|
-| `polish-3` | Bites by species (strike on the pull, not the knock; slack-liners); the game updates itself between catches; the unhooking mat as padded quilting; the jacket's body left out looking down |
+| `polish-3` (#126) | Bites by species (strike on the pull, not the knock; slack-liners); the game updates itself between catches; the unhooking mat as padded quilting; the jacket's body left out looking down; a new fish and net readied in the background; no flicker on the drop net's rope, arms coming up from your side |
 
 The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
 opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older
@@ -37,9 +37,10 @@ working backlog, kept for its detail.
 1. **Stable performance and critical bugs.** Done this session: the arm vibration (#119). Waiting: Aaron's iPhone
    "Record a catch" (`?dev=1#play`) for the real stalls at a catch; the gameplay frame-time spikes on a phone are not
    yet measured there.
-2. **Hands, arms and character animation.** Done: steady hold, no snaps (#119). Next: the landing's left forearm still
-   swings 5 to 8 cm a frame for a few frames taking the fish; the third-person walk (foot planting, stopping, turning);
-   the idle (breathing, weight shifts).
+2. **Hands, arms and character animation.** Done: steady hold, no snaps (#119); no flicker on the drop net's rope, arms
+   coming up from your side (`polish-3`). Next: taking the fish on a lift the left forearm still moves up to 9 cm in a
+   frame; following the drop net's hoop up off the deck and over the rail, up to 12 cm; the third-person walk (foot
+   planting, stopping, turning); the idle (breathing, weight shifts).
 3. **Rods, reels, line and nets.** Next: rod bend under load per fish and drag, the reel's bail opening for the cast and
    closing after it, line slack and tension between guides, the drop net's rope swing and bag sag with a fish in it.
 4. **Water and weather.** Done: sea fret and storms (this branch). Next: tide height moving the waterline on the pier

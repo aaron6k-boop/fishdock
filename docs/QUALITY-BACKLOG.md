@@ -26,6 +26,8 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   lowering as clips on the rig, hands off the eye line, fingers wrapped round the rope, IK for the rope contact.
 - **Benefit:** the drop net, the moment of every pier catch, stops looking broken.
 - **Cost:** the lining drop removes 39% of the jacket's triangles (cheaper); clips cost nothing per frame.
+- **Also next:** taking the hoop as it swings up off the deck and back over the rail, the hand follows it at up to 12 cm
+  a frame (7 m/s): the net's own swing there is quicker than hands lift a net.
 - **Check:** the fixed drop-net film (`haul_frames`) before and after; `tools/rail-test.mjs dropnet`; `tools/arm-steady.mjs`.
 
 ### 2. Skin and fingers close up
@@ -121,3 +123,5 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | The unhooking mat as padded, stitched quilting instead of pyramids | before and after of the texture and the mat in the catch film |
 | 14 Nov | Slack-liners: the tip springs back, then the line tightens, and Strike waits for it | `tests/bite.test.js` |
 | 14 Nov | Looking down, the jacket's body is left out (no ragged flaps across the bottom of the picture) | drop-net film before and after; `tests/fpRig.test.js` |
+| 14 Nov | The drop net's rope: the left hand no longer flicks 4 cm every frame between two grips; an arm put away comes up from your side instead of appearing mid-picture | `tools/arm-steady.mjs` (rope flicks 258 to 0 in the logged landing, 5 in the test's own); frame log of a 77 cm ray |
+| 14 Nov | A new fish and net readied in the background, not all at once mid-landing | film warm-up timing: 7.2 s on the page in software before, worst frame 3.6 s after |
