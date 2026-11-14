@@ -125,7 +125,9 @@ export function landingTech(species, lengthCm, weightKg, venue = "pier") {
 export function landingTimes(species, lengthCm, weightKg, venue = "pier") {
   const tech = landingTech(species, lengthCm, weightKg, venue);
   const ts = clamp(0.85 + 0.15 * fishLoad(species, lengthCm, weightKg), 0.9, 1.12);
-  const B = { lift: [1.6, 2.6, 3.9, 4.6, 5.6, 6.6], dropnet: [1.2, 3.0, 5.0, 5.7, 8.4, 9.6], net: [1.6, 2.6, 3.7, 4.9, 6.3, 7.2], beach: [1.8, 3.4, 4.6, 5.6, 6.0, 6.9] }[tech];
+  // (the drop net: a little more time to lift it off the deck and over the rail, and to bring it back over onto the deck,
+  // taken from the haul: in 1.1 s and 1.2 s your hands went after the hoop at up to 7 m/s, 12 cm a frame)
+  const B = { lift: [1.6, 2.6, 3.9, 4.6, 5.6, 6.6], dropnet: [1.2, 3.4, 5.2, 5.8, 7.9, 9.6], net: [1.6, 2.6, 3.7, 4.9, 6.3, 7.2], beach: [1.8, 3.4, 4.6, 5.6, 6.0, 6.9] }[tech];
   const [T1, T2, T3, T4, swingIn, end] = B.map((v) => v * ts);
   return { tech, ts, T1, T2, T3, T4, swingIn, end, card: end - 0.2 };
 }

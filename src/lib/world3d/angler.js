@@ -118,7 +118,12 @@ function netTexture() {
 }
 
 // ---- the species modelled in Blender (public/models/fish.glb, source-assets/blender/build_fish.py) ----
-const MODELLED_FISH = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack"]);
+const MODELLED_FISH = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack", "conger", "eel"]);
+// (the conger and the eel are drawn curled in their pictures: their 3D body comes from a straight picture of them,
+// source-assets/fish-straight/straighten.py, and their model from eels.glb, build_eels.py. From the curled picture
+// the body was as deep as the whole curl, a third of its length at the tail)
+const STRAIGHT_PIC = new Set(["conger", "eel"]);
+const fishPart = (pic) => (STRAIGHT_PIC.has(pic) ? "eels" : "fish");
 const EARLY_FISH = new Set(["cast", "waiting", "bite"]); // (the phases in which the coming fish is got ready)
 const modelledCache = new Map();
 /** One geometry for a modelled species: its body, fins and eyes as three groups (materials 0, 1 and 2), its uvs the
@@ -496,7 +501,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         useGeometry(geo, [mats.body, mats.fin, mats.eye]);
         // the species modelled in Blender (fish.glb: a rounder body, a fuller belly, eyes standing proud), where there
         // is one: the same picture over it, the same bending
-        if (MODELLED_FISH.has(pic)) loadPart("fish").then((sc) => {
+        if (MODELLED_FISH.has(pic)) loadPart(fishPart(pic)).then((sc) => {
           if (fishFor !== key) return;
           const geoBlend = modelledFish(sc, pic); if (!geoBlend) return;
           if (donor && donor[1] !== 1) { const p = geoBlend.attributes.position.array; for (let i = 1; i < p.length; i += 3) p[i] *= donor[1]; geoBlend.computeVertexNormals(); }
@@ -504,7 +509,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         }).catch(() => {});
       } catch { /* keep the generic fish */ }
     };
-    img.src = artUrl(pic, "s");
+    img.src = artUrl(STRAIGHT_PIC.has(pic) ? pic + "-straight" : pic, "s");
   }
   // bend the fish along its body and place it: mouth at `at`, body along `dir` (a unit vector from head to tail). Its
   // back is kept as near upright as the direction allows, and where the fish points straight up or down (hanging on
