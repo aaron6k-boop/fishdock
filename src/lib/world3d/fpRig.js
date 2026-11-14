@@ -464,7 +464,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         // on the line becoming the fish in your hand took the left hand 40 cm in a frame); then following it exactly
         // (measured from your body, so turning your head, which carries the hold with it, is never a jump)
         const wl = root.worldToLocal(want.pos.clone()), jumped = h.wantAt && wl.distanceTo(h.wantAt) > Math.max(0.1, 6 * dt); h.wantAt = wl;
-        const swap = h.cylSwap && want.kind === h.kind && !jumped; h.cylSwap = false;
+        const swap = h.cylSwap && want.kind === h.kind && !jumped && h.u >= 1; h.cylSwap = false; // (mid-blend, the blend already under way carries it there: restarted short, an arm coming up into view to the rope covered 60 cm in 0.15 s)
         if (want.kind !== h.kind || !h.cur || jumped || swap) {
           h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null; h.kind = want.kind; h.u = h.from ? 0 : 1;
           h.blendT = h.reachIn ? REACH_IN : swap ? SWAP_BLEND : BLEND; h.reachIn = false;
