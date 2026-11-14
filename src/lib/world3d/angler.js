@@ -607,7 +607,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
   const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0, out: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0, surfOut = 0;
+  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0;
   // ---- your body's weight in first person (metres from where the eye would be: x right, y up, z back) ----
   // the eye rides on it, and the rod and your hands hang off the eye: rocking back for a cast and throwing the weight
   // forwards through it, leaning back against a fish and being pulled towards it on a surge. A spring, a touch under
@@ -834,14 +834,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (for a drop net the fish is brought up beside the pier, a metre or so along from where the net will hang and a
       // little out from the wall, so the net, the fish and you at the rail are all in the one picture: it was brought to
       // the surface two and a half metres straight out, where the net shot couldn't see it)
-      // (in your own eyes, from behind the rail, the water close in under a high pier is hidden by its edge: from an eye
-      // 1.6 m up and e behind the edge, everything within e x (the deck's height over the water) / 1.6 of the wall. There
-      // the fish is held that far out and a little more, under where your rod tip is, so you see it over the edge)
-      const surf = tech === "dropnet" ? (() => { const ns = Math.max(1, (fishLen * 0.62) / 0.35), g0 = dropGeo(ns), [fx, fz] = dirOf(face);
-        const out0 = 0.36 * ns + 1.05, cap = Math.min(clamp(edge - 0.35, 0, 0.7), rail ? Math.max(0, (Math.max(0.3, edge - 0.22) - 0.42) / 0.85) : 0.7), e = Math.max(0.1, edge - 0.08 - 0.85 * cap);
-        const want = fp ? Math.max(0, e * Math.max(0, toWorld(new THREE.Vector3()).y - g0.waterY) / 1.6 + 0.4 - out0) : 0;
-        surfOut += (want - surfOut) * (age < 0.05 ? 1 : 1 - Math.exp(-dt * 2)); // (eased: switching views mid-landing, it swims out or in rather than jumping)
-        const o = 0.95 + Math.min(1.2, surfOut); return g0.col.clone().add(new THREE.Vector3(fz * 1.1 + fx * o, 0, -fx * 1.1 + fz * o)); })() /* (on the far side of the net from you: the net shot looks along the wall from that side) */ : nearAt.clone();
+      const surf = tech === "dropnet" ? (() => { const g0 = dropGeo(Math.max(1, (fishLen * 0.62) / 0.35)), [fx, fz] = dirOf(face); return g0.col.clone().add(new THREE.Vector3(fz * 1.1 + fx * 0.95, 0, -fx * 1.1 + fz * 0.95)); })() /* (on the far side of the net from you: the net shot looks along the wall from that side) */ : nearAt.clone();
       surf.y = wh(surf.x, surf.z);
       const tip = tipWorld();
       bendT = 0.25 * load; pitch = 1.05; slack = 0; fpE = 0.6; fpYaw = 0;
