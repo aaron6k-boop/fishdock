@@ -121,6 +121,8 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   };
   // someone else has a fish on: a small chip offers to watch it
   const sceneState = useMemo(() => ({ busy }), [busy]);
+  // (for the app's update check, main.jsx: nothing being landed, kept or looked at in the scene just now)
+  useEffect(() => { window.__fdSceneIdle = !busy && !looking && (!kept || kept === "gone"); return () => { window.__fdSceneIdle = undefined; }; }, [busy, looking, kept]);
   const [alert, setAlert] = useState(null);
   useEffect(() => { if (!alert) return undefined; const t = setTimeout(() => setAlert(null), 14000); return () => clearTimeout(t); }, [alert]);
   // ---- full screen (a PC, mostly: on a phone the view already fills the screen): the browser's own full screen where

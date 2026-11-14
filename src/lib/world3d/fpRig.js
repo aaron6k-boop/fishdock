@@ -30,6 +30,8 @@ const ease = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
 /** the name three gives a Blender bone (GLTFLoader drops dots and the like) */
 export const boneName = (s) => s.replace(/\s/g, "_").replace(/[[\].:/]/g, "");
 const BLEND = 0.3; // seconds to go from one grip to the next
+const CYL_HOLD = 0.4, SWAP_BLEND = 0.15; // (a way of holding a rope, a hoop or a fish kept at least this long; changing to another, this long)
+const REACH_IN = 0.45; // (seconds for an arm that was put away to come up into the view to what it now holds)
 const TURN_MAX = 6, POLE_MAX = 5; // (radians a second: how quickly an elbow can swing round to a new turn, or a new way of pointing; in a cast, which is quick by nature, the turn twelve, and the pointing eight as it starts and quicker as it goes)
 const KIND_CYL = { rope: "rope", hoop: "hoop", pole: "pole", butt: "butt", tailwrist: "tail", carry: "butt" };
 const KIND_FLAT = { fish: "cradle", open: "relax", ready: "relax", line: "relax" };
@@ -170,8 +172,22 @@ export function dropLining(mesh) {
   for (let t = 0; t < src.length; t += 3) if (inner[src[t]] + inner[src[t + 1]] + inner[src[t + 2]] < 2) keep.push(src[t], src[t + 1], src[t + 2]);
   const dropped = 1 - keep.length / src.length;
   if (dropped < 0.25 || dropped > 0.65) return 0; // (not a lined cloth as expected: left whole)
-  mesh.geometry = g.clone(); mesh.geometry.setIndex(keep);
+  mesh.geometry = g.clone(); mesh.geometry.userData.fpOwn = true; mesh.geometry.setIndex(keep);
   return dropped;
+}
+
+// ---- which of the jacket is its body (chest, back, shoulders, hips) rather than its sleeves ----
+// A vertex's share hanging from the spine, chest, hips and shoulder bones, as an attribute (fpTorso) for the coat's
+// shader, which leaves the body out when you look down. On this rig's own copy of the jacket, never the shared model's.
+const TORSO_BONE = /^DEF-(spine|breast|pelvis|shoulder|thigh)/;
+export function markTorso(mesh) {
+  const g = mesh.geometry, si = g?.attributes?.skinIndex, sw = g?.attributes?.skinWeight, sk = mesh.skeleton;
+  if (!si || !sw || !sk) return 0;
+  const torso = sk.bones.map((b) => TORSO_BONE.test(b.name)), a = new Float32Array(si.count); let n = 0;
+  for (let i = 0; i < si.count; i++) { let w = 0; for (let k = 0; k < 4; k++) if (torso[si.getComponent(i, k)]) w += sw.getComponent(i, k); a[i] = w; if (w > 0.5) n++; }
+  if (!mesh.userData.ownGeometry && !g.userData.fpOwn) { mesh.geometry = g.clone(); mesh.geometry.userData.fpOwn = true; }
+  mesh.geometry.setAttribute("fpTorso", new THREE.BufferAttribute(a, 1));
+  return n / si.count;
 }
 
 export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, model = null } = {}) {
@@ -193,7 +209,15 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // ring or a dark flap round your forearm, hauling or lowering the drop net looking down over the rail (Aaron's
   // screenshots of 14 November, putting a thornback ray back). Without it you see your forearm inside, or the cut
   // sleeve simply ends, as an arm cut by the edge of the picture does. Further off, a cuff's inside still shows)
-  coatMat.onBeforeCompile = (sh) => { sh.uniforms.fpNearCut = nearCut; sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18)) discard;\n#include <opaque_fragment>"); };
+  // (and looking down, the jacket's body isn't drawn at all: its chest and front, right under your eye, were cut by
+  // that sphere into ragged dark flaps across the bottom of the picture, looking down at the mat or over the rail. Which
+  // parts are its body is marked on each vertex when the rig is built (markTorso); your sleeves still show)
+  const lookDown = { value: 0 };
+  coatMat.onBeforeCompile = (sh) => {
+    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown;
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nvarying float vTorso;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nvarying float vTorso;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
+  };
   clothe(coatMat);
   // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)
   skinMat.onBeforeCompile = (sh) => {
@@ -213,7 +237,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     const scene = cloneSkinned(g.scene); const bones = new Map();
     scene.traverse((o) => {
       if (o.isBone) bones.set(o.name, o);
-      if (o.isMesh) { const jacket = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || ""); o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = jacket ? coatMat : skinMat; if (jacket && o.isSkinnedMesh) dropLining(o); }
+      if (o.isMesh) { const jacket = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || ""); o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = jacket ? coatMat : skinMat; if (jacket && o.isSkinnedMesh) { dropLining(o); markTorso(o); } }
     });
     const B = (n) => bones.get(boneName(n));
     const clips = {}; for (const c of g.animations) clips[c.name] = sampler(c, bones);
@@ -272,7 +296,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     const dH = flat ? loc[S].along.clone() : A3(g.d), pH = flat ? loc[S].palm.clone() : A3(g.pn), cH = flat ? A3(RIG.flat[S].c) : A3(g.c);
     // (each way of holding it judged with the elbow where it is now, turned as the arm last chose)
     const shW = A.U.getWorldPosition(V()), pole = A.pole.clone().applyQuaternion(bodyQ); if (h.turn) pole.applyAxisAngle(at.clone().sub(shW).normalize(), h.turn);
-    let best = null;
+    let best = null, cur = null;
     // (a rod's butt may be held anywhere along its first 25 cm: the hand goes as far up it as it needs to be reached)
     const slides = spec.kind === "butt" ? [0, 0.06, 0.12, 0.18, 0.25] : [0];
     for (const sl of slides) {
@@ -286,9 +310,17 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         const key = `${sg}|${k}|${sl}`;
         const c = limitsPen(w) * 4 + (Math.abs(w.flex) + Math.abs(w.rad)) * 0.02 + ik.short * 400 + Math.abs(phi) * 0.1 + sl * 2 + (h.cyl && h.cyl !== key ? 0.6 : 0);
         if (!best || c < best.c) best = { c, pos, quat: q, key, short: ik.short };
+        if (key === h.cyl) cur = { c, pos, quat: q, key, short: ik.short };
         if (flat && k === 0) break; // (a flat hand isn't turned about its own palm: only which way the fingers point)
       }
     }
+    // (and once a way of holding it is chosen, it's kept a moment, then changed to by a short blend: judged afresh every
+    // frame, two ways of holding the drop net's rope each looked best with the elbow where the other had just put it,
+    // and the left hand flicked 4 cm between them every frame for seconds, lowering the net and hauling it up. Not in a
+    // cast, where the grip has to keep up with the swing)
+    const same = h.kind === spec.kind; // (a new thing to hold is judged fresh)
+    if (same && cur && best.key !== h.cyl && h.cylHold > 0 && !h.casting) best = cur;
+    if (same && h.cyl && best.key !== h.cyl) { h.cylHold = CYL_HOLD; h.cylSwap = true; }
     h.cyl = best.key;
     return { pos: best.pos, quat: best.quat, grip: flat ? KIND_FLAT[spec.kind] : cylName };
   }
@@ -380,12 +412,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     pose(o) {
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
-      { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0; nearCut.value += (0.16 + 0.17 * down - nearCut.value) * Math.min(1, dt * 6); }
+      { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0; nearCut.value += (0.16 + 0.17 * down - nearCut.value) * Math.min(1, dt * 6); lookDown.value = down; }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)
       const wait = empty || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock);
-      R.scene.visible = !wait; if (wait) return;
+      R.scene.visible = !wait; if (wait) { for (const h of hands) h.away = true; return; }
       group.updateWorldMatrix(true, false); Mg.copy(group.matrixWorld); MgInv.copy(Mg).invert(); qg.setFromRotationMatrix(Mg);
       // ---- 1. the base clip ----
       R.clips.hold.apply(1 / RIG.fps);
@@ -406,6 +438,16 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       leanAdd.set(0, 0, 0); let roomy = true;
       for (let i = 0; i < 2; i++) {
         const h = hands[i], S = h.side, A = R.arm[S], spec = specs[i];
+        h.cylHold = Math.max(0, (h.cylHold || 0) - dt); h.casting = o.castT != null;
+        // (both arms put away, and now one has something to hold again: it comes up into the view from your side, where
+        // a put-away arm hangs, rather than appearing wherever it was last. Taking the drop net's hoop as it came back
+        // over the rail, your arm appeared a metre from where it had been, mid-picture, between one frame and the next)
+        if (h.away && spec && h.cur) {
+          for (const b of [A.U, A.U1, A.F, A.F1, A.H]) b.quaternion.copy(R.rest.get(b.name).q);
+          A.U.updateMatrixWorld(true);
+          h.cur = { pos: A.H.getWorldPosition(V()), quat: A.H.getWorldQuaternion(new THREE.Quaternion()) }; h.kind = null; h.reachIn = true;
+        }
+        h.away = false;
         let want;
         if (!spec) {
           // (nothing to hold: the arm hangs at your side, out of the view)
@@ -422,11 +464,13 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         // on the line becoming the fish in your hand took the left hand 40 cm in a frame); then following it exactly
         // (measured from your body, so turning your head, which carries the hold with it, is never a jump)
         const wl = root.worldToLocal(want.pos.clone()), jumped = h.wantAt && wl.distanceTo(h.wantAt) > Math.max(0.1, 6 * dt); h.wantAt = wl;
-        if (want.kind !== h.kind || !h.cur || jumped) {
+        const swap = h.cylSwap && want.kind === h.kind && !jumped && h.u >= 1; h.cylSwap = false; // (mid-blend, the blend already under way carries it there: restarted short, an arm coming up into view to the rope covered 60 cm in 0.15 s)
+        if (want.kind !== h.kind || !h.cur || jumped || swap) {
           h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null; h.kind = want.kind; h.u = h.from ? 0 : 1;
+          h.blendT = h.reachIn ? REACH_IN : swap ? SWAP_BLEND : BLEND; h.reachIn = false;
           h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
         }
-        h.u = Math.min(1, h.u + dt / BLEND); const e = ease(h.u);
+        h.u = Math.min(1, h.u + dt / (h.blendT || BLEND)); const e = ease(h.u);
         const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e), elbow: want.elbow || null } : want;
         h.cur = { pos: tgt.pos.clone(), quat: tgt.quat.clone() };
         { const shW = A.U.getWorldPosition(V()); h.short = solveArm(A, S, tgt, bodyQ, h, o.castT != null || !(want.kind === "seat" || want.kind === "crank"), dt, spec?.rail || null, o.castT ?? null).short;

@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { haptics } from "../lib/haptics.js";
 import Stage3D from "../components/Stage3D.jsx";
 import FishTray from "../components/FishTray.jsx";
+import { biteOf } from "../lib/fishFlow.js";
 import { Icon } from "../components/ui.jsx";
 import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
 import { saveLook } from "../lib/world3d/people.js";
@@ -270,7 +271,7 @@ function PartyLive({ code, mkey }) {
           <div className="fs-bottom">
             {voiceState.on && voiceState.ptt ? <button type="button" className="ft-pill ptt" onPointerDown={() => voice.current?.talk(true)} onPointerUp={() => voice.current?.talk(false)} onPointerLeave={() => voice.current?.talk(false)}><Icon name="mic" />Hold to talk</button> : null}
             {!fishing ? <span className="ft-label">Watching{meM?.role === "spectator" ? "" : " (no spot free)"}</span>
-              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} reel={vf.reel} fight={vf.fight} live={vf.fightLive} note={vf.note} opts={vf.opts} autoplay={false} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension }); }} onHold={vf.hold} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} />
+              : mode === "virtual" ? <FishTray phase={myPhase.phase} last={lastMine} bite={biteOf(myEvents)} reel={vf.reel} fight={vf.fight} live={vf.fightLive} note={vf.note} opts={vf.opts} autoplay={false} onCast={vf.cast} onWindIn={vf.windIn} onStrike={vf.strike} onTap={() => { vf.tap(); haptics.feel("reelTap", { load: vf.fight?.tension }); }} onHold={vf.hold} onLand={vf.land} onDrag={(d) => vf.setDrag((vf.fight?.drag ?? 0.78) + d * 0.08)} onNudge={vf.nudge} />
               : <div className="fish-tray real-tray" role="group" aria-label="Log what happens">{realNext.map(([l, f, ic]) => <button key={l} type="button" className="ft-pill" onClick={f}><Icon name={ic} />{l}</button>)}<span className="ft-label">{meM?.presence === "water" ? "At the water" : "Not at the water"}</span></div>}
           </div>
         </Stage3D>

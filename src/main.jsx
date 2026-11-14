@@ -20,13 +20,19 @@ if (!PREVIEW && "serviceWorker" in navigator && typeof __BUILD_ID__ !== "undefin
 // Stay current. When FishDock comes back to the front (a phone may keep an old page in memory for hours), and every
 // 10 minutes, it checks for a newer build. The live view pages (#watch, #try) reload straight away; the app shows a
 // small bar, so a fishing session is never interrupted.
+// In the game (#play) it reloads by itself at the next quiet moment: no fish on, none being landed or looked at, no menu
+// open (the game says when, window.__fdSafeToReload); until then the bar shows and it looks again every 20 seconds.
+// (14 November: Aaron's phone kept an old copy through closing and reopening the tab, the bar unseen.)
 if (!PREVIEW && typeof __BUILD_ID__ !== "undefined") {
-  let shown = false;
+  let shown = false, retry = 0;
+  const inGame = () => /^#\/?play/.test(location.hash);
+  const quiet = () => { try { return inGame() && typeof window.__fdSafeToReload === "function" && window.__fdSafeToReload() && !document.querySelector(".sheet.open, [role=dialog]"); } catch { return false; } };
   const check = async () => {
     try {
       const b = await (await fetch("/build.json", { cache: "no-store" })).json();
       if (!b?.build || b.build === __BUILD_ID__) return;
-      if (/^#\/?(watch|try)/.test(location.hash)) { location.reload(); return; }
+      if (/^#\/?(watch|try)/.test(location.hash) || quiet()) { location.reload(); return; }
+      if (inGame() && !retry) retry = setTimeout(() => { retry = 0; check(); }, 20e3);
       if (shown) return;
       shown = true;
       const bar = document.createElement("div");

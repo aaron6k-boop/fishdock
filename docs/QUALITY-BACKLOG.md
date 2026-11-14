@@ -21,10 +21,13 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   (hands on the line to the net), not authored.
 - **Target:** first-person arms in AAA games never show their insides; hands read as hands at any angle, gripping
   hand over hand with the rope running through the fingers.
-- **Do:** (done here) drop the lining when the rig is built; (next, needs Blender on the PC) author the haul and
+- **Do:** (done) drop the lining when the rig is built, and leave the jacket's body (chest, shoulders, hips) out when
+  looking down, where the cut made ragged flaps across the bottom of the picture; (next, needs Blender on the PC) author the haul and
   lowering as clips on the rig, hands off the eye line, fingers wrapped round the rope, IK for the rope contact.
 - **Benefit:** the drop net, the moment of every pier catch, stops looking broken.
 - **Cost:** the lining drop removes 39% of the jacket's triangles (cheaper); clips cost nothing per frame.
+- **Also next:** taking the hoop as it swings up off the deck and back over the rail, the hand follows it at up to 12 cm
+  a frame (7 m/s): the net's own swing there is quicker than hands lift a net.
 - **Check:** the fixed drop-net film (`haul_frames`) before and after; `tools/rail-test.mjs dropnet`; `tools/arm-steady.mjs`.
 
 ### 2. Skin and fingers close up
@@ -46,6 +49,12 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Do:** (done here) the FPS display now says whether the page was busy, the graphics card or browser held it up, the
   page was hidden or the resolution changed; then fix what it names. Measure the software renderer's cost per frame
   through a release (`step_cost.mjs`) to find any view many times heavier than the rest.
+- **Found (14 Nov, software renderer, Medium, a ray landed and put back):** the coming fish and net were readied all
+  at once mid-landing, 7.2 s on the page there; now in the background (worst frame 3.6 s there, which can't build
+  shaders in parallel; off the page where the browser can). The other slow frames, at the look and the release, had
+  no warm-up and no new shader, and fell at different moments in each of four runs: the software renderer building its
+  own pipelines, most likely, which says nothing certain about a phone. The phone's worst-frame line is the next
+  evidence.
 - **Benefit:** no freezes at the best moment of a catch.
 - **Cost:** a 50 ms timer for the measure.
 - **Check:** Aaron's phone recordings with the new line; `tools/phase-probe.mjs` counts.
@@ -67,8 +76,8 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   instanced quads. **Check:** before and after at the fishing spot, the same camera.
 
 ### 6. Tackle around you
-- **Wrong:** the tripod, seat box, bucket and unhooking mat are made by code (simple shapes, drawn textures); the mat's
-  quilting reads as a green pyramid pattern looking down.
+- **Wrong:** the tripod, seat box, bucket and unhooking mat are made by code (simple shapes, drawn textures). The mat's
+  quilting read as a green pyramid pattern looking down: redrawn 14 November as padded, stitched diamonds.
 - **Do:** model them in Blender (tripod with screw legs and rest heads, seat box, bucket, mat with real quilting and a
   ruler), PBR textures at 512 to 1k, one LOD each. **Cost:** modest triangles, replaces the code shapes.
 - **Check:** close-ups at the landing, looking down.
@@ -85,9 +94,13 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   reel's clicks and drag, rope and net. Needs the PC link to download. **Check:** listen on the phone.
 
 ### 9. Fishing gameplay
-- **Wrong:** every bite is the same kind of pull; bites don't follow the tide or time of day.
-- **Do:** bite styles per species (rattles, slow pulls, a slack-liner when a fish swims towards you), a tide-and-time
-  table per place where the sources say so. **Check:** tests in `tests/reelModel.test.js` and play.
+- **Was wrong:** the rod already showed each species' bite (knocks then a pull for cod, a rattle for whiting), but the
+  strike went by one rule for every fish. **Done (14 Nov):** strike on the pull, not the knock (`bitePlan`), the Strike
+  button saying where the bite is and marking the moment in green.
+  **Done (14 Nov):** a slack-liner now and then from a strong biter (the tip springs back as the fish swims towards
+  you, then the line tightens; the Strike button says to wait for it).
+- **Still to do:** bites by tide and time of day per place where the sources say so. **Check:** `tests/bite.test.js`
+  and play.
 
 ### 10. New places
 - **Wrong:** Gorleston South Pier is the only place built to this standard.
@@ -105,3 +118,10 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | The jacket's lining left out (rings round the forearm) | drop-net film before and after; `tests/fpRig.test.js` |
 | 14 Nov | Cast, Strike and the side buttons as one set with the reel; Strike's bite clock; the cast's distance | phone-width screenshots before and after |
 | 14 Nov | The worst-frame line says where the time went | `tests/frameReport.test.js` |
+| 14 Nov | Strike on the pull, not the knock; the Strike button shows where the bite is | `tests/bite.test.js`; screenshots of each stage |
+| 14 Nov | The game updates itself between catches (no more old copies) | by hand: the update check in `src/main.jsx` |
+| 14 Nov | The unhooking mat as padded, stitched quilting instead of pyramids | before and after of the texture and the mat in the catch film |
+| 14 Nov | Slack-liners: the tip springs back, then the line tightens, and Strike waits for it | `tests/bite.test.js` |
+| 14 Nov | Looking down, the jacket's body is left out (no ragged flaps across the bottom of the picture) | drop-net film before and after; `tests/fpRig.test.js` |
+| 14 Nov | The drop net's rope: the left hand no longer flicks 4 cm every frame between two grips; an arm put away comes up from your side instead of appearing mid-picture | `tools/arm-steady.mjs` (rope flicks 258 to 0 in the logged landing, 5 in the test's own); frame log of a 77 cm ray |
+| 14 Nov | A new fish and net readied in the background, not all at once mid-landing | film warm-up timing: 7.2 s on the page in software before, worst frame 3.6 s after |

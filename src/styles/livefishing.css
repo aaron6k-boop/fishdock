@@ -734,3 +734,7 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .walk-fish { background: var(--gb-face); color: var(--action, #4fc7b7); border: 2.5px solid var(--gb-rim); }
 .ft-pill.ft-windin { min-height: 44px; border: 2px solid #ffffff8c; background: var(--gb-face); font-weight: 750; }
 @media (prefers-reduced-motion: reduce) { .ft-main.ft-strike { animation: none; } .ft-biteclock .ft-ring { animation: none; } }
+/* (the bite's moment to strike: a green arc on the clock; the button calmer while it only knocks, urgent on the pull) */
+.ft-biteclock .ft-bitewin { fill: none; stroke: #5fd38d; stroke-width: 2.2; opacity: .95; stroke-linecap: round; }
+.ft-main.ft-strike.bite-knock { animation-duration: 1.6s; }
+.ft-main.ft-strike.bite-pull { animation-duration: .45s; color: #ffd27a; border-color: #ffd27a; }
