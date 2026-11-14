@@ -143,7 +143,20 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       root.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "alphaMap", "emissiveMap"]) { const t = m[k]; if (t?.isTexture && t.image && (t.image.width || t.image.data) && !renderer.properties.get(t).__webglTexture) renderer.initTexture(t); } });
     } catch { /* (a driver that won't: they are built as they are met, as before) */ }
   }
+  // ---- small things cast no shadow: a reel's parts, a clip, a hook, a ring on the rod ----
+  // (each one in the shadow map is another draw every frame, for a speck of shadow nobody could see: there were 150-odd
+  // shadow casters at Gorleston with two anglers. Looked over every few seconds, as models arrive)
+  let trimN = 0;
+  function trimCasters() {
+    scene.traverse((o) => {
+      if (!o.isMesh || !o.castShadow || o.isInstancedMesh || o.userData.fdCast != null) return;
+      const g = o.geometry; if (!g?.attributes?.position) return; if (!g.boundingSphere) g.computeBoundingSphere();
+      o.updateWorldMatrix(true, false); const r = (g.boundingSphere?.radius || 0) * o.matrixWorld.getMaxScaleOnAxis();
+      o.userData.fdCast = r >= 0.1; if (!o.userData.fdCast) o.castShadow = false; // (10 cm across or more casts)
+    });
+  }
   function drawFrame() {
+    if (trimN++ % 300 === 0) trimCasters();
     sharpen(); renderer.info.reset();
     let q = null; if (tq && qs.length < 8) { q = gl.createQuery(); gl.beginQuery(tq.TIME_ELAPSED_EXT, q); }
     if (env.fftSea) env.simulate(simT); // (the spectrum sea's passes count in the frame's GPU time)
