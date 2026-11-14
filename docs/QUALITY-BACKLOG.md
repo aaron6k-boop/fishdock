@@ -89,9 +89,14 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Done (14 Nov):** straight pictures of both made from their own (sampled along the spine:
   `source-assets/fish-straight/straighten.py`) and modelled in Blender from them like the others
   (`source-assets/blender/build_eels.py`, `eels.glb`, about 5,200 triangles each).
-- **Still to look at:** the thornback ray (lofted from a picture seen from above, so flat, as a ray is) and the dogfish
-  (from a side view) are passable; a ray with a raised back and a proper tail, and the dogfish's fins as fins, would be
-  next. **Check:** the conger landed and looked at (`conger_look`), before and after.
+- **Done (14 Nov):** the other fourteen species with a cut-out picture modelled in Blender the same way
+  (`source-assets/blender/build_fish2.py`, `public/models/fish2/`, one file each so only the fish hooked is fetched):
+  ballan wrasse, black bream, coalfish, dab, flounder, garfish, gurnard, lesser spotted dogfish, pouting, smoothhound,
+  sole, thick-lipped mullet, thornback ray and tope. Close up the difference is modest (a rounder body, eyes standing
+  proud), as the lofted ones were already shaped by the same pictures.
+- **Still to look at:** the perch has no cut-out picture; a ray with a properly raised back and thorns along its tail
+  would want modelling by hand rather than lofting. **Check:** a ray and a dogfish landed and looked at
+  (`conger_look`), before and after.
 
 ### 8. Sound
 - **Wrong:** every sound is made by synthesis in the browser; waves, gulls, reel clicks and drag sound synthetic.
