@@ -22,13 +22,13 @@ performance, #123 shaders and textures readied under the loading screen, the han
 #124 the Reel button as the reel (rhythm, holding, pauses), #125 the buttons as one set, the jacket's lining left out,
 the worst-frame line, the quality backlog, #126 bites by species, the self-updating game, steadier arms on the drop
 net, fish readied in the background, #127 the conger and the eel modelled in Blender, hands at a hand's pace on the drop
-net, skin detail on your hands.
+net, skin detail on your hands, #128 every fish with a cut-out picture in Blender, the palm's creases.
 
 ## Draft PR waiting for Aaron
 
 | Branch | What |
 |---|---|
-| `fish-all` | The other fourteen species with a cut-out picture modelled in Blender (one small file each); fin plates reaching into the body; the palm's creases and veins in the hand maps |
+| `people-walk` | Your angler's walk in third person without clipping (settling steps, no skating or crossed feet, hands clear of the body, toes out of the deck); wellies shaped as wellies; `tools/walk-check.mjs` |
 
 The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
 opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older
@@ -42,8 +42,10 @@ working backlog, kept for its detail.
 2. **Hands, arms and character animation.** Done: steady hold, no snaps (#119); no flicker on the drop net's rope, arms
    coming up from your side (`polish-3`). Taking a fish swung in by hand: the left hand waits until it's within reach
    (worst move in that landing 9 cm a frame to 5, `models-5`). Hands on the drop net's hoop at a hand's pace (12 cm a
-   frame to under 6). Next: the third-person walk (foot planting, stopping, turning); the idle (breathing, weight
-   shifts).
+   frame to under 6). The third-person walk (`people-walk`): a settling step when you stop, a planted foot
+   stepping rather than skating when you turn tight, the feet never through each other, the free hand clear of the thigh
+   and the body, the boots' toes out of the deck, wellies shaped as wellies (`tools/walk-check.mjs`). Next: the idle
+   (breathing, weight shifts); the rod-carrying hand's grip while turning.
 3. **Rods, reels, line and nets.** Next: rod bend under load per fish and drag, the reel's bail opening for the cast and
    closing after it, line slack and tension between guides, the drop net's rope swing and bag sag with a fish in it.
 4. **Water and weather.** Done: sea fret and storms (this branch). Next: tide height moving the waterline on the pier
@@ -66,7 +68,7 @@ working backlog, kept for its detail.
 
 ## Next action (checkpoint, 14 November, about 15:00)
 
-1. Aaron's review of `fish-all`.
+1. Aaron's review of `people-walk`.
 2. His phone's FPS display on the next stall (the worst-frame line names page or graphics card).
 3. Blender on his PC: the runner (`source-assets/blender/queue_watcher.py`) was started in his open Blender 5.2 this
    session; scripts go into `Documents/FishDock-assets/queue`, results come back from `exports/`. Next there: the
