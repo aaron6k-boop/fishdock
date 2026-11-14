@@ -63,16 +63,17 @@ working backlog, kept for its detail.
 12. **Distant scenery.** Low priority.
 13. **Shop.** Later: game credits from fishing, cosmetic gear only, nothing that locks places.
 
-## Next action (checkpoint, 14 November, about 14:00)
+## Next action (checkpoint, 14 November, about 15:00)
 
-1. Aaron's review of `polish-3` (#126).
-2. His phone's FPS display on the next stall: the worst-frame line says page busy, GPU or browser, page hidden or
-   resolution changed. In the software renderer the slow frames at the look and the release had no warm-up and no new
-   shader, and moved from run to run; the phone's line is the evidence to go on.
-3. Without the PC: the drop net's hoop swinging up off the deck and over the rail too quickly for the hands (12 cm a
-   frame); the lift's left forearm (9 cm); the water and pier inspection (backlog 4, 5).
-4. With this chat linked to his PC (Blender, downloads): the haul and lowering as authored clips, skin textures for the
-   hands, the tackle round you, a ray, a dogfish and a conger, field recordings.
+1. Aaron's review of `models-5` (#127).
+2. His phone's FPS display on the next stall (the worst-frame line names page or graphics card).
+3. Blender on his PC: the runner (`source-assets/blender/queue_watcher.py`) was started in his open Blender 5.2 this
+   session; scripts go into `Documents/FishDock-assets/queue`, results come back from `exports/`. Next there: the ray
+   with a raised back and its tail, the dogfish's fins as fins, the tackle round you (tripod, seat box, bucket).
+4. Sound recordings: need Aaron's go-ahead for each download (file, source, licence, size) and somewhere that doesn't
+   need signing in.
+5. Without the PC: the palm's own creases and veins (`bake_hand_maps.py`), the third-person walk and idle, the water and
+   pier inspection against the Geograph photographs (backlog 4, 5).
 
 ## Evidence kept
 
