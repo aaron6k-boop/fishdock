@@ -27,6 +27,12 @@ import { lookFor, COATS, LEGS, FOOTWEAR, SKINS } from "./people.js";
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+// (the feet when you stop: a foot more than SETTLE_AT from where it would stand is stepped back under you in SETTLE_T;
+// and two feet are never nearer than FEET_GAP, ankle to ankle, along the deck)
+const SETTLE_AT = 0.11, SETTLE_T = 0.42, FEET_GAP = 0.15, STEP_AT = 0.3;
+// (a free hand's clearance from its thigh's line and from the spine's, along the deck: a thigh is about 8 cm round the
+// bone, the hand 4 to 5 cm thick; the belly and hips about 15 from the spine)
+const CLEAR_THIGH = 0.12, CLEAR_BODY = 0.19;
 const rngOf = (seed) => { let a = seed || 1; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
 
 // ---- loading: each file once, shared ----
@@ -392,16 +398,19 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 1.04, 0.006, 6, 20), wm); rim.position.copy(top); rim.quaternion.copy(shaft.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI / 2));
       const sg = new THREE.Group(); sg.add(shaft, rim); attach(s + "_Calf", sg);
       // the foot: from behind the heel to past the toes, on the ground
-      const heelZ = an.z + 0.075, tipZ = toe.z - 0.06, cx = (an.x + toe.x) / 2 + (s === "L" ? 0 : 0);
-      const L0 = heelZ - tipZ, Wf = 0.115, Hf = Math.max(0.1, an.y + 0.025);
-      const foot = new THREE.Mesh(roundedBox(), wm); foot.scale.set(Wf / 2, Hf / 2, L0 / 2); foot.position.set(cx, Hf / 2, (heelZ + tipZ) / 2);
-      const so = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), sole); so.scale.set(Wf * 0.96, 0.014, L0 * 0.97); so.position.set(cx, 0.007, (heelZ + tipZ) / 2);
+      const heelZ = an.z + 0.078, tipZ = toe.z - 0.072, cx = (an.x + toe.x) / 2 + (s === "L" ? 0 : 0); // (long enough to cover the shoe underneath: its toe showed through)
+      const L0 = heelZ - tipZ, Wf = 0.12, Hf = Math.max(0.1, an.y + 0.025);
+      // (shaped as a welly is: a rounded heel, the widest across the ball of the foot, a toe box lower than the instep and
+      // rounded off at the tip, on a flat sole. It was a rounded box, a toy's boot, on a square black sole whose corners
+      // stood out under it like a plate)
+      const foot = new THREE.Mesh(wellyFoot(cx, heelZ, tipZ, Wf, Hf), wm);
+      const so = new THREE.Mesh(wellyFoot(cx, heelZ + 0.004, tipZ - 0.004, Wf * 1.04, 0.016, true), sole);
       const fg = new THREE.Group(); fg.add(foot, so); attach(s + "_Foot", fg);
     }
   }
 
   // ---- posing ----
-  const st = { u: 0, v: 0, turn: 0, lastYaw: null, look: 0, lookUntil: 0, nextLook: 6 + rnd() * 10, blink: 0, nextBlink: 1 + rnd() * 3, jaw: 0, yaw: 0, pitch: 0, drop: 0, lean: 0, brace: 0, twist: 0, hand: [{ w: 0, kind: null, from: V(), out: V(), u: 1, last: null }, { w: 0, kind: null, from: V(), out: V(), u: 1, last: null }], t: 0, foot: {} };
+  const st = { clear: [], u: 0, v: 0, turn: 0, lastYaw: null, look: 0, lookUntil: 0, nextLook: 6 + rnd() * 10, blink: 0, nextBlink: 1 + rnd() * 3, jaw: 0, yaw: 0, pitch: 0, drop: 0, lean: 0, brace: 0, twist: 0, hand: [{ w: 0, kind: null, from: V(), out: V(), u: 1, last: null }, { w: 0, kind: null, from: V(), out: V(), u: 1, last: null }], t: 0, foot: {} };
   const save = {}; const ARM = ["UpperArm", "Forearm", "Hand"];
   const FINGERS = { L: [], R: [] };
   for (const s of ["L", "R"]) for (const f of [1, 2, 3, 4]) for (const j of ["", "1", "2"]) { const b = B(`${s}_Finger${f}${j}`); if (b) FINGERS[s].push([b, j === "" ? 0.75 : j === "1" ? 1.15 : 0.8]); }
@@ -580,14 +589,42 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         fs.dyaw = mode ? clamp(wrapA(fs.yaw - yaw0), -0.9, 0.9) : fs.dyaw * Math.exp(-dt * 10);
         const cy = Math.cos(fs.dyaw * lw), sy = Math.sin(fs.dyaw * lw), rx = toe0.x - ank.x, rz = toe0.z - ank.z;
         const toe = V(ank.x + rx * cy + rz * sy, toe0.y, ank.z - rx * sy + rz * cy), at = mode === "toe" ? toe : ank;
-        if (mode && mode !== fs.mode) fs.lock.set(at.x + fs.corr.x, 0, at.z + fs.corr.z);
-        fs.mode = mode;
-        if (mode) { fs.corr.set(fs.lock.x - at.x, 0, fs.lock.z - at.z); if (fs.corr.length() > 0.42) { fs.mode = null; fs.corr.setLength(0.42); } }
-        else fs.corr.multiplyScalar(Math.exp(-dt * 12));
-        const tgt = ank.clone().addScaledVector(fs.corr, lw);
+        if (fs.step) {
+          // (a settling step: the foot lifted and put back under you, then held there)
+          fs.step.u = Math.min(1, fs.step.u + dt / (fs.step.T || SETTLE_T)); const e = ease(fs.step.u);
+          fs.corr.copy(fs.step.from).multiplyScalar(1 - e); fs.lift = Math.sin(Math.PI * fs.step.u) * 0.07;
+          if (fs.step.u >= 1) { fs.step = null; fs.lift = 0; fs.mode = mode; fs.lock.set(at.x, 0, at.z); fs.corr.set(0, 0, 0); }
+        } else {
+          if (mode && mode !== fs.mode) fs.lock.set(at.x + fs.corr.x, 0, at.z + fs.corr.z);
+          fs.mode = mode;
+          // (held too far from where the walk would have it, turning tight or round: a quick step back to it, lifted,
+          // while the other foot holds; let go to slide back, it skated up to 14 cm a frame along the deck)
+          const other = st.foot[sd === "L" ? "R" : "L"];
+          if (mode) { fs.corr.set(fs.lock.x - at.x, 0, fs.lock.z - at.z); if (fs.corr.length() > STEP_AT && !other?.step) fs.step = { u: 0, T: 0.3, from: fs.corr.clone() }; else if (fs.corr.length() > 0.42) { fs.mode = null; fs.corr.setLength(0.42); } }
+          else fs.corr.multiplyScalar(Math.exp(-dt * 12));
+        }
+        const tgt = ank.clone().addScaledVector(fs.corr, lw); if (fs.lift) tgt.y += fs.lift;
         if (floor) { const fy = floor(tgt.x, tgt.z); if (Number.isFinite(fy)) tgt.y += clamp(fy - gy, -0.25, 0.25); }
         const fq = new THREE.Quaternion().setFromAxisAngle(up, fs.dyaw * lw).multiply(P.q);
         aims.push([sd, tgt, fq]);
+      }
+      // (standing still with a foot left out of place by the last steps, wide or behind: a step to bring it back under
+      // you, one foot at a time, the further out first. Held where they came down, after a curve the feet stayed 80 cm
+      // apart for as long as you stood there)
+      st.still = st.v < 0.06 && !piv ? (st.still || 0) + dt : 0;
+      if (st.still > 0.25 && !st.foot.L?.step && !st.foot.R?.step) {
+        const far = ["L", "R"].map((sd) => [sd, st.foot[sd]?.corr.length() || 0]).sort((a, b) => b[1] - a[1])[0];
+        if (far[1] > SETTLE_AT) st.foot[far[0]].step = { u: 0, from: st.foot[far[0]].corr.clone() };
+      }
+      // (and the feet never through each other: turning round at a walk, the swinging foot was carried through the
+      // planted one. The one in the air, or the one stepping, is kept a foot's width from the other)
+      {
+        const [a, bb] = aims, dx = a[1].x - bb[1].x, dz = a[1].z - bb[1].z, d = Math.hypot(dx, dz);
+        if (d < FEET_GAP) {
+          const fa = st.foot.L, fb = st.foot.R, moveA = (!fa?.mode || fa?.step) && !(!fb?.mode || fb?.step) ? 1 : (!fb?.mode || fb?.step) && !(!fa?.mode || fa?.step) ? 0 : 0.5;
+          const rgt = figDirW(V(1, 0, 0)); let nx = d > 1e-4 ? dx / d : -rgt.x, nz = d > 1e-4 ? dz / d : -rgt.z; // (L minus R: away from each other)
+          const push = FEET_GAP - d; a[1].x += nx * push * moveA; a[1].z += nz * push * moveA; bb[1].x -= nx * push * (1 - moveA); bb[1].z -= nz * push * (1 - moveA);
+        }
       }
       // (a leg stretched past its length: the hips come down to it)
       let need = 0;
@@ -601,6 +638,17 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         const L1 = hip.distanceTo(knee), L2 = knee.distanceTo(ank);
         const r = twoBone(hip, tgt, L1, L2, pole);
         aim(B(sd + "_Thigh"), B(sd + "_Calf"), r.B); aim(B(sd + "_Calf"), B(sd + "_Foot"), r.C); setWQ(B(sd + "_Foot"), fq);
+        // (and the toe never into the deck: as the heel came down or the foot turned on it, the boot's toe dipped up to
+        // 2 cm through the boards. The foot is tipped up about the ankle just enough to keep it on them)
+        const toeB = B(sd + "_Toe0");
+        if (toeB) {
+          const tw = wp(toeB), aw = wp(B(sd + "_Foot")), fy = floor ? floor(tw.x, tw.z) : NaN;
+          const lo = (Number.isFinite(fy) ? clamp(fy - gy, -0.25, 0.25) : 0) + Math.max(refT, footRef.idle?.t ?? refT) - 0.002, tF = wFig(tw); // (no lower than standing: the turning steps were measured with the toe lower)
+          if (tF.y < lo) {
+            const arm = tw.clone().sub(aw), L = arm.length(), side = arm.clone().cross(V(0, 1, 0));
+            if (L > 1e-3 && side.lengthSq() > 1e-8) turnW(B(sd + "_Foot"), side.normalize(), Math.asin(clamp((lo - tF.y) / L, 0, 0.6))); // (about toe-cross-up: positive turns the toe up)
+          }
+        }
       }
     } else if (st.foot.L || st.foot.R) { st.foot = {}; st.ikDrop = 0; }
 
@@ -639,6 +687,24 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     }
 
     // ---- the arms: each hand where it's asked to be, holding what it holds ----
+    // (a free hand, swinging with the motion capture, is kept clear of its own thigh and the body: turning, sprinting
+    // and turning round to walk back, the left hand went through the thigh and the belly. Measured from the bones'
+    // lines, eased so it never pops: the arm bends out round them)
+    const keepClear = (s, i, sg, dt) => {
+      const hand = wp(B(s + "_Hand")), th = wp(B(s + "_Thigh")), ca = wp(B(s + "_Calf")), pel = wp(B("Pelvis")), sp2 = wp(B("Spine2"));
+      const near = (a, b) => { const ab = b.clone().sub(a), t = clamp(hand.clone().sub(a).dot(ab) / Math.max(1e-8, ab.lengthSq()), 0, 1); return a.clone().addScaledVector(ab, t); };
+      const push = V();
+      for (const [a, b, r] of [[th, ca, CLEAR_THIGH], [pel, sp2, CLEAR_BODY]]) {
+        const d = hand.clone().sub(near(a, b)); d.y = 0; const L = d.length();
+        if (L < r) { if (L < 1e-4) d.copy(figDirW(V(sg, 0, 0))); else d.multiplyScalar(1 / L); push.addScaledVector(d, r - L); }
+      }
+      const pv = st.clear[i] || (st.clear[i] = V()); if (push.lengthSq() >= pv.lengthSq()) pv.copy(push); else pv.lerp(push, 1 - Math.exp(-dt * 10)); // (at once going in, which is smooth as the hand comes on smoothly; eased coming away)
+      if (pv.lengthSq() < 1e-6) return;
+      const S0 = wp(B(s + "_UpperArm")), E0 = wp(B(s + "_Forearm")), hq = wq(B(s + "_Hand"));
+      const pole = E0.clone().sub(S0.clone().add(hand).multiplyScalar(0.5));
+      const r2 = twoBone(S0, hand.clone().add(pv), S0.distanceTo(E0), E0.distanceTo(hand), pole.lengthSq() > 1e-8 ? pole.normalize() : figDirW(V(sg * 0.5, -0.4, 0.5)));
+      aim(B(s + "_UpperArm"), B(s + "_Forearm"), r2.B); aim(B(s + "_Forearm"), B(s + "_Hand"), r2.C); setWQ(B(s + "_Hand"), hq);
+    };
     const specs = o.hands || [null, null];
     for (let i = 0; i < 2; i++) {
       const s = i ? "R" : "L", sg = i ? 1 : -1, hs = st.hand[i];
@@ -655,7 +721,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       // ease on and off: a free hand goes back to the motion capture
       if (spec) { hs.last = spec; hs.w = Math.min(1, hs.w + dt / 0.3); } else hs.w = Math.max(0, hs.w - dt / 0.35);
       const use = spec || hs.last;
-      if (!use || hs.w <= 0) { hs.kind = null; continue; }
+      if (!use || hs.w <= 0) { hs.kind = null; keepClear(s, i, sg, dt); continue; }
       for (const n of ARM) save[s + n] = B(s + "_" + n).quaternion.clone();
       const target = use.at.clone();
       if (use.kind !== hs.kind) { hs.from.copy(hs.kind ? hs.out : target); hs.kind = use.kind; hs.u = 0; }
@@ -849,6 +915,36 @@ function strap(curve, outward, w, d) {
   return g;
 }
 // a box with well-rounded edges (a superellipsoid), 2 units across
+// ---- a welly's foot: lofted along the foot from heel to toe, in the figure's own space (x across, y up, -z forwards) ----
+// (sole: the thin dark sole under it, the same outline a touch larger, flat on the ground)
+function wellyFoot(cx, heelZ, tipZ, W, H, sole = false) {
+  const K = 18, M = 16, pos = [], idx = [], len = heelZ - tipZ;
+  const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  for (let i = 0; i <= K; i++) {
+    const t = i / K, z = heelZ - len * t;
+    // across: a rounded heel, the widest at the ball of the foot (two thirds along), then the toe rounding off
+    let w = W * (0.8 + 0.2 * sm(0, 0.62, t) - 0.12 * sm(0.7, 0.95, t));
+    // up: the instep up to the ankle at the back, the toe box lower at the front
+    let h = sole ? H : H * (1 - 0.32 * sm(0.3, 0.8, t));
+    // the ends rounded: the heel's back and the toe's tip close up in a curve
+    const endT = t > 0.86 ? Math.sqrt(Math.max(0, 1 - ((t - 0.86) / 0.14) ** 2)) : t < 0.06 ? Math.sqrt(Math.max(0, 1 - ((0.06 - t) / 0.06) ** 2)) * 0.35 + 0.65 : 1;
+    w *= endT; h *= sole ? 1 : 0.55 + 0.45 * endT;
+    for (let j = 0; j <= M; j++) {
+      // round the top, flat underneath (a half superellipse, and its base)
+      const a = (j / M) * Math.PI, c = Math.cos(a), sn = Math.sin(a);
+      const x = cx + (w / 2) * Math.sign(c) * Math.abs(c) ** 0.7, y = sole ? (j === 0 || j === M ? 0 : h) : h * Math.abs(sn) ** 0.85;
+      pos.push(x, y, z);
+    }
+  }
+  const R = M + 1;
+  for (let i = 0; i < K; i++) for (let j = 0; j < M; j++) { const a = i * R + j, b = a + 1, c = a + R, d = c + 1; idx.push(a, c, b, b, c, d); }
+  // the bottom, and the two ends closed
+  const base = pos.length / 3; for (let i = 0; i <= K; i++) { pos.push(...pos.slice((i * R) * 3, (i * R) * 3 + 3)); pos.push(...pos.slice((i * R + M) * 3, (i * R + M) * 3 + 3)); }
+  for (let i = 0; i < K; i++) { const a = base + i * 2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); }
+  for (const i of [0, K]) { const cIdx = pos.length / 3, row = i * R; let mx = 0, my = 0, mz = 0; for (let j = 0; j <= M; j++) { mx += pos[(row + j) * 3]; my += pos[(row + j) * 3 + 1]; mz += pos[(row + j) * 3 + 2]; } pos.push(mx / R, my / R, mz / R); for (let j = 0; j < M; j++) { if (i === 0) idx.push(cIdx, row + j, row + j + 1); else idx.push(cIdx, row + j + 1, row + j); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+
 function roundedBox(p = 3.2) {
   const g = new THREE.BoxGeometry(2, 2, 2, 8, 8, 8), a = g.attributes.position;
   for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), r = (Math.abs(x) ** p + Math.abs(y) ** p + Math.abs(z) ** p) ** (1 / p) || 1; a.setXYZ(i, x / r, y / r, z / r); }
