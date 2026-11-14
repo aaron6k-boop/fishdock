@@ -1252,7 +1252,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (lift < 1) { const k = ease((lift - 0.3) / 0.7), open = new THREE.Vector3(0, 1, 0).addScaledVector(restD, -restD.y).normalize();
       // (and up over the tripod's head on the way: the rod is held further out than it rests, so going straight there
       // its blank passed forwards through the bar across the head, 7 mm in)
-      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.08 * ease((lift - 0.08) / 0.24)).lerp(butt, k); butt.y += 0.3 * Math.sin(Math.PI * k); dir = restD.clone().lerp(dir, k).normalize(); }
+      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.08 * ease((lift - 0.08) / 0.24)).lerp(butt, k); butt.y += 0.12 * Math.sin(Math.PI * k); dir = restD.clone().lerp(dir, k).normalize(); }
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping
@@ -1262,11 +1262,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // already, along a path clear of the tripod, which a lag would cut across)
     // (and into a landing and out of it: bringing the fish up, the rod's held angle changes at once, and its middle went
     // 47 cm in a frame)
-    { const key = `${fp && !fpRodDown}|${!!walking}|${ph === "landing"}`; if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
+    { const key = `${fp && !fpRodDown}|${!!walking}|${ph === "landing"}`; if (key !== rodS.key) { if (rodS.key) { rodS.until = t + 0.75; rodS.from = t; } rodS.key = key; }
       // (and catches up smoothly at the end, quicker and quicker, rather than jumping the last of the way: picking the
       // rod up on a bite, it was still 15 cm behind when the moment ended, and the rod and both hands leapt up)
       const late = Math.max(0, t - rodS.until), behind = rodS.ok && (rodS.butt.distanceTo(butt) > 0.001 || rodS.dir.angleTo(dir) > 0.002);
-      if (rodS.ok && (t < rodS.until || (behind && late < 1))) { const k2 = 1 - Math.exp(-dt * (6 + 90 * late)); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
+      // (starting gently: easing at full rate from the first frame, laying the rod on the rail its middle still went 12 cm
+      // in that frame; it now gathers speed over the first 0.3 s)
+      if (rodS.ok && (t < rodS.until || (behind && late < 1))) { const k2 = 1 - Math.exp(-dt * (6 * clamp((t - (rodS.from ?? -9)) / 0.3, 0.15, 1) + 90 * late)); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
       else { rodS.butt.copy(butt); rodS.dir.copy(dir); rodS.ok = true; } }
     // (the sway of holding it, and your breathing, only while it's in your hands: in its rest it lies still, the butt in
     // the cup and the blank in the cradle. In a fresh breeze it swayed there too, 4 cm side to side at the cradle, in and out of the rubber)
