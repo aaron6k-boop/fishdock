@@ -10,6 +10,7 @@ it goes in (an asset site's other assets may be under other terms).
 
 | File | What | Drawn | Size | Triangles | Textures inside | Animations |
 |---|---|---|---|---|---|---|
+| eels.glb | The conger and the eel (from their straightened pictures) | close (in the hand) to mid (in the water) | 206 KB | 10,432 | none | none |
 | fish.glb | Fish bodies, fins and eyes | close (in the hand) to mid (in the water) | 628 KB | 33,896 | none | none |
 | fp_rig.glb | Your arms, hands and jacket in first person, skeleton and clips | close (first person), one level | 1.5 MB | 37,414 | none | 4 |
 | nets.glb | Drop net and landing net | close to mid | 491 KB | 6,692 | 512x512, 512x512, 512x512, 512x512 | none |
@@ -35,6 +36,9 @@ it goes in (an asset site's other assets may be under other terms).
 | gorleston_town_lights.webp | 4 KB | 4000x182 | webp |
 | ground_rough_diff.jpg | 193 KB | 1024x1024 | jpeg |
 | ground_rough_nor.jpg | 84 KB | 512x512 | jpeg |
+| hand_colour.webp | 8 KB | 1024x1024 | webp |
+| hand_normal.webp | 65 KB | 1024x1024 | webp |
+| hand_rough.webp | 3 KB | 1024x1024 | webp |
 | pier_concrete_diff.jpg | 334 KB | 1024x1024 | jpeg |
 | pier_concrete_nor.jpg | 184 KB | 1024x1024 | jpeg |
 | pier_concrete_rough.jpg | 28 KB | 512x512 | jpeg |
@@ -83,7 +87,7 @@ it goes in (an asset site's other assets may be under other terms).
 | Mixamo "Fishing Cast" motion capture | Adobe Mixamo | https://www.mixamo.com (downloaded by Aaron as fishing_cast.fbx; kept on his PC, not in the repository) | Adobe's Mixamo terms: characters and animations may be used royalty free for personal, commercial and non-profit projects, video games included (https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html) | Not required; credited in public/models/CREDITS.txt and Settings | the body's turn through the first-person cast: the chest's turn against the hips, retargeted onto the Rigify rig and baked into fp_rig.glb's cast clip (source-assets/blender/rig/15_gate3_cast.py) |  |
 | First-person arms, hands and jacket, rigged (derived) | FishDock | source-assets/blender/rig/ (Rigify on Blender Studio's realistic male, see blender:human-base-meshes; the cast's body turn from adobe:mixamo-fishing-cast) | CC0 1.0 (as its sources allow) | Not required | your arms and hands in first person (public/models/fp_rig.glb), replacing fp_body.glb and fp_arms.glb |  |
 
-Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies, the bench,
+Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench,
 bollard and lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA
 (the Gorleston photographs) is given in the app and in `public/models/CREDITS.txt`.
 

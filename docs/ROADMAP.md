@@ -20,13 +20,14 @@ end of each working session, so the next one can carry on from here.
 #118 sound at the first tap, #119 steady arms, #120 levels and the logbook, #121 sea fret and storms, #122 phone
 performance, #123 shaders and textures readied under the loading screen, the hand off the rail, one reward card,
 #124 the Reel button as the reel (rhythm, holding, pauses), #125 the buttons as one set, the jacket's lining left out,
-the worst-frame line, the quality backlog.
+the worst-frame line, the quality backlog, #126 bites by species, the self-updating game, steadier arms on the drop
+net, fish readied in the background.
 
 ## Draft PR waiting for Aaron
 
 | Branch | What |
 |---|---|
-| `polish-3` (#126) | Bites by species (strike on the pull, not the knock; slack-liners); the game updates itself between catches; the unhooking mat as padded quilting; the jacket's body left out looking down; a new fish and net readied in the background; no flicker on the drop net's rope, arms coming up from your side |
+| `models-5` (#127) | The conger and the eel modelled in Blender (on Aaron's PC, through the queue runner) from straightened pictures; a fish swung in taken once it's within reach; a grip change mid-blend without a jump; hands on the drop net's hoop at a hand's pace |
 
 The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
 opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older
@@ -38,9 +39,10 @@ working backlog, kept for its detail.
    "Record a catch" (`?dev=1#play`) for the real stalls at a catch; the gameplay frame-time spikes on a phone are not
    yet measured there.
 2. **Hands, arms and character animation.** Done: steady hold, no snaps (#119); no flicker on the drop net's rope, arms
-   coming up from your side (`polish-3`). Next: taking the fish on a lift the left forearm still moves up to 9 cm in a
-   frame; following the drop net's hoop up off the deck and over the rail, up to 12 cm; the third-person walk (foot
-   planting, stopping, turning); the idle (breathing, weight shifts).
+   coming up from your side (`polish-3`). Taking a fish swung in by hand: the left hand waits until it's within reach
+   (worst move in that landing 9 cm a frame to 5, `models-5`). Hands on the drop net's hoop at a hand's pace (12 cm a
+   frame to under 6). Next: the third-person walk (foot planting, stopping, turning); the idle (breathing, weight
+   shifts).
 3. **Rods, reels, line and nets.** Next: rod bend under load per fish and drag, the reel's bail opening for the cast and
    closing after it, line slack and tension between guides, the drop net's rope swing and bag sag with a fish in it.
 4. **Water and weather.** Done: sea fret and storms (this branch). Next: tide height moving the waterline on the pier
@@ -61,16 +63,17 @@ working backlog, kept for its detail.
 12. **Distant scenery.** Low priority.
 13. **Shop.** Later: game credits from fishing, cosmetic gear only, nothing that locks places.
 
-## Next action (checkpoint, 14 November, about 14:00)
+## Next action (checkpoint, 14 November, about 15:00)
 
-1. Aaron's review of `polish-3` (#126).
-2. His phone's FPS display on the next stall: the worst-frame line says page busy, GPU or browser, page hidden or
-   resolution changed. In the software renderer the slow frames at the look and the release had no warm-up and no new
-   shader, and moved from run to run; the phone's line is the evidence to go on.
-3. Without the PC: the drop net's hoop swinging up off the deck and over the rail too quickly for the hands (12 cm a
-   frame); the lift's left forearm (9 cm); the water and pier inspection (backlog 4, 5).
-4. With this chat linked to his PC (Blender, downloads): the haul and lowering as authored clips, skin textures for the
-   hands, the tackle round you, a ray, a dogfish and a conger, field recordings.
+1. Aaron's review of `models-5` (#127).
+2. His phone's FPS display on the next stall (the worst-frame line names page or graphics card).
+3. Blender on his PC: the runner (`source-assets/blender/queue_watcher.py`) was started in his open Blender 5.2 this
+   session; scripts go into `Documents/FishDock-assets/queue`, results come back from `exports/`. Next there: the ray
+   with a raised back and its tail, the dogfish's fins as fins, the tackle round you (tripod, seat box, bucket).
+4. Sound recordings: need Aaron's go-ahead for each download (file, source, licence, size) and somewhere that doesn't
+   need signing in.
+5. Without the PC: the palm's own creases and veins (`bake_hand_maps.py`), the third-person walk and idle, the water and
+   pier inspection against the Geograph photographs (backlog 4, 5).
 
 ## Evidence kept
 

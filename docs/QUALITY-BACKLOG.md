@@ -26,19 +26,19 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   lowering as clips on the rig, hands off the eye line, fingers wrapped round the rope, IK for the rope contact.
 - **Benefit:** the drop net, the moment of every pier catch, stops looking broken.
 - **Cost:** the lining drop removes 39% of the jacket's triangles (cheaper); clips cost nothing per frame.
-- **Also next:** taking the hoop as it swings up off the deck and back over the rail, the hand follows it at up to 12 cm
-  a frame (7 m/s): the net's own swing there is quicker than hands lift a net.
+- **Done (14 Nov):** taking the hoop as it swung up off the deck and back over the rail, the hand followed it at up to
+  12 cm a frame (7 m/s), and an arm let go of it dropped at 11 cm. Hands on the hoop now go no quicker than 2.5 m/s and
+  a let-go arm drops in 0.45 s: lifting the net 118 to 56 mm a frame at most, bringing it in 113 to 44.
 - **Check:** the fixed drop-net film (`haul_frames`) before and after; `tools/rail-test.mjs dropnet`; `tools/arm-steady.mjs`.
 
 ### 2. Skin and fingers close up
-- **Wrong:** the hands are one flat colour with no creases, knuckles or nails; at dusk they read as a pale model.
-- **Why:** no skin textures at all (the material is a plain colour); the warm light round shadow edges and the tone
-  variation (done 14 November) help but can't make creases.
-- **Target:** visible knuckle creases, nails, slight redness at the knuckles and fingertips, a soft sheen.
-- **Do:** bake an albedo, normal and roughness map (1024 px) for the Human Base Mesh hands in Blender, from its own UVs.
-- **Benefit:** the biggest thing on screen through every cast and fight.
-- **Cost:** three 1k textures (~1.5 MB of memory with compression), no extra draws.
-- **Check:** close-ups of the hold and the look at the fish from the same film frames.
+- **Was wrong:** the hands were one flat colour with no creases, knuckles or nails; at dusk they read as a pale model.
+- **Done (14 Nov):** maps baked from the rig itself (`source-assets/hands/bake_hand_maps.py`, no outside textures; three
+  1024 maps, 77 KB in all): fine wrinkles across the back of each finger joint, a firm crease on the palm side, nails
+  (paler, glossier, a lighter free edge), redder knuckles and fingertip pads. Laid over the skin as a multiplier, so the
+  player's skin colour stays theirs. Subtle at arm's length, as it should be.
+- **Still to do:** the palm's own creases (heart, head and life lines), veins on the back of the hand, a little hair on
+  the forearm, a slightly sweaty sheen in the cold. **Check:** close-ups of the hold and the look at a fish, same frames.
 
 ### 3. Frame-time stability on a phone
 - **Wrong:** a 1,551 ms frame lowering a thornback ray back (Ultra, 1.5x) with only 6 ms of the game's code and no
@@ -83,10 +83,15 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Check:** close-ups at the landing, looking down.
 
 ### 7. Fish models
-- **Wrong:** six species have their own bodies (bass, cod, mackerel, plaice, pollack, whiting); rays, dogfish, conger
-  and others use simpler shapes, though they're among the commonest pier catches.
-- **Do:** model a thornback ray, a lesser spotted dogfish and a conger in Blender from references (wet materials as the
-  others). **Cost:** ~5k triangles each, loaded when that fish is on. **Check:** the look at each fish.
+- **Was wrong:** six species have Blender bodies (bass, cod, mackerel, plaice, pollack, whiting); the rest are lofted
+  from FishDock's own picture of them. The conger and the eel are drawn curled, so theirs came out as deep as the whole
+  curl, a third of the fish's length at the tail, with the curl painted over it.
+- **Done (14 Nov):** straight pictures of both made from their own (sampled along the spine:
+  `source-assets/fish-straight/straighten.py`) and modelled in Blender from them like the others
+  (`source-assets/blender/build_eels.py`, `eels.glb`, about 5,200 triangles each).
+- **Still to look at:** the thornback ray (lofted from a picture seen from above, so flat, as a ray is) and the dogfish
+  (from a side view) are passable; a ray with a raised back and a proper tail, and the dogfish's fins as fins, would be
+  next. **Check:** the conger landed and looked at (`conger_look`), before and after.
 
 ### 8. Sound
 - **Wrong:** every sound is made by synthesis in the browser; waves, gulls, reel clicks and drag sound synthetic.
@@ -125,3 +130,6 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | Looking down, the jacket's body is left out (no ragged flaps across the bottom of the picture) | drop-net film before and after; `tests/fpRig.test.js` |
 | 14 Nov | The drop net's rope: the left hand no longer flicks 4 cm every frame between two grips; an arm put away comes up from your side instead of appearing mid-picture | `tools/arm-steady.mjs` (rope flicks 258 to 0 in the logged landing, 5 in the test's own); frame log of a 77 cm ray |
 | 14 Nov | A new fish and net readied in the background, not all at once mid-landing | film warm-up timing: 7.2 s on the page in software before, worst frame 3.6 s after |
+| 14 Nov | The conger and the eel as long bodies (Blender, from straightened pictures) | the conger in the net and in the hands, before and after |
+| 14 Nov | Hands on the drop net's hoop at a hand's pace; a fish swung in taken once within reach | frame logs of a 77 cm ray and a 44 cm bass; `tools/arm-steady.mjs` |
+| 14 Nov | Knuckle creases, nails and fingertip pads on your hands | close-ups of the hold before and after; `tests/fpRig.test.js` (the hands' uvs) |

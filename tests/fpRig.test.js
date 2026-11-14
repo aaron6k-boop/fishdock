@@ -223,3 +223,11 @@ test("the jacket's body is marked for leaving out when you look down (chest, sho
   const sk = jacket.skeleton, fi = sk.bones.findIndex((b) => /forearm/.test(b.name)), si = jacket.geometry.attributes.skinIndex, sw = jacket.geometry.attributes.skinWeight, ft = jacket.geometry.attributes.fpTorso;
   for (let i = 0; i < si.count; i++) if (si.getComponent(i, 0) === fi && sw.getComponent(i, 0) > 0.9) assert.ok(ft.getX(i) < 0.1);
 });
+
+test("the hands' uvs come onto their one tile, alike for both hands, and the rest onto a plain corner, once", async () => {
+  const THREE = await import("three"); const { handUV } = await import("../src/lib/world3d/fpRig.js");
+  const g = new THREE.BufferGeometry(); g.setAttribute("uv", new THREE.Float32BufferAttribute([2.25, 0.5, 2.25, -1.5, 3.2, 0.3, 2.9, 0.06], 2));
+  handUV(g); handUV(g);
+  const uv = Array.from(g.attributes.uv.array).map((x) => Math.round(x * 1000) / 1000);
+  assert.deepEqual(uv, [0.25, 0.5, 0.25, 0.5, 0.998, 0.998, 0.9, 0.06]);
+});

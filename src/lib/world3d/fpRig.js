@@ -18,6 +18,7 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { loadModel } from "./glbParts.js";
+import { TEX_BASE } from "./textures3d.js";
 import { RIG } from "./fpRigData.js";
 import { clothe } from "./fabric.js";
 import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "./fpIk.js";
@@ -190,6 +191,17 @@ export function markTorso(mesh) {
   return n / si.count;
 }
 
+// ---- the hands' uvs onto their one tile ----
+// The skin's uvs are the base mesh's tiles: each hand fills one (u 2 to 3; v -2 to -1 and 0 to 1), laid out alike, the
+// arms the next ones along. The hands' maps cover one tile, so each hand's uvs are brought onto it, and everything
+// else onto a texel in its corner where the maps are plain. Once per geometry (the clones share it).
+export const HAND_NEUTRAL = 0.85;
+export function handUV(geo) {
+  const uv = geo?.attributes?.uv; if (!uv || geo.userData.fpHandUV) return; geo.userData.fpHandUV = true;
+  for (let i = 0; i < uv.count; i++) { const u = uv.getX(i), v = uv.getY(i); if (Math.floor(u) === 2) uv.setXY(i, u - 2, v - Math.floor(v)); else uv.setXY(i, 0.998, 0.998); }
+  uv.needsUpdate = true;
+}
+
 export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, model = null } = {}) {
   const group = new THREE.Group(); group.name = "fp-rig"; group.visible = false;
   const root = new THREE.Group(); root.name = "fp-rig-root"; group.add(root);
@@ -225,6 +237,14 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     if (!gloves) skinShade(sh);
   };
   skinMat.customProgramCacheKey = () => (gloves ? "fp-gloves" : "fp-skin");
+  // (the hands' own detail: knuckle creases, nails, the palm's creases and fingertip pads, baked from the rig by
+  // source-assets/hands/bake_hand_maps.py into the hands' uv tile. The colour map is a multiplier about 0.85, so the
+  // skin keeps the player's own colour; nothing waits on it: the plain skin until it's in)
+  if (!gloves && typeof document !== "undefined") {
+    const tl = new THREE.TextureLoader(), got = {};
+    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.roughness = 1; skinMat.normalScale.set(1, 1); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
+    for (const [k, f] of [["map", "hand_colour"], ["normalMap", "hand_normal"], ["roughnessMap", "hand_rough"]]) tl.load(TEX_BASE + f + ".webp", (t) => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; got[k] = t; done(); }, undefined, () => {});
+  }
   for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(DIM); liveMats.add(m); }
   let R = null, failed = false;
   const hands = [0, 1].map((i) => ({ side: i ? "R" : "L", kind: undefined, cur: null, from: null, u: 1, want: null, fing: null, fingFrom: null, cyl: null, wrist: null }));
@@ -237,7 +257,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     const scene = cloneSkinned(g.scene); const bones = new Map();
     scene.traverse((o) => {
       if (o.isBone) bones.set(o.name, o);
-      if (o.isMesh) { const jacket = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || ""); o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = jacket ? coatMat : skinMat; if (jacket && o.isSkinnedMesh) { dropLining(o); markTorso(o); } }
+      if (o.isMesh) { const jacket = /jacket/i.test(o.name) || /jacket/i.test(o.material?.name || ""); o.frustumCulled = false; o.castShadow = false; o.receiveShadow = false; o.material = jacket ? coatMat : skinMat; if (jacket && o.isSkinnedMesh) { dropLining(o); markTorso(o); } else handUV(o.geometry); }
     });
     const B = (n) => bones.get(boneName(n));
     const clips = {}; for (const c of g.animations) clips[c.name] = sampler(c, bones);
@@ -464,10 +484,13 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         // on the line becoming the fish in your hand took the left hand 40 cm in a frame); then following it exactly
         // (measured from your body, so turning your head, which carries the hold with it, is never a jump)
         const wl = root.worldToLocal(want.pos.clone()), jumped = h.wantAt && wl.distanceTo(h.wantAt) > Math.max(0.1, 6 * dt); h.wantAt = wl;
-        const swap = h.cylSwap && want.kind === h.kind && !jumped && h.u >= 1; h.cylSwap = false; // (mid-blend, the blend already under way carries it there: restarted short, an arm coming up into view to the rope covered 60 cm in 0.15 s)
+        // (a new way of holding the same thing: a short blend to it; mid-blend, the blend under way is begun again from
+        // where the hand is with the time it had left: restarted short, an arm coming up into view to the rope covered
+        // 60 cm in 0.15 s, and left alone, the hand jumped the 5 cm between the two grips near the end of its blend)
+        const swap = h.cylSwap && want.kind === h.kind && !jumped, left = h.u < 1 ? (1 - h.u) * (h.blendT || BLEND) : 0; h.cylSwap = false;
         if (want.kind !== h.kind || !h.cur || jumped || swap) {
           h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null; h.kind = want.kind; h.u = h.from ? 0 : 1;
-          h.blendT = h.reachIn ? REACH_IN : swap ? SWAP_BLEND : BLEND; h.reachIn = false;
+          h.blendT = h.reachIn ? REACH_IN : swap ? Math.max(SWAP_BLEND, left) : !spec ? REACH_IN : BLEND; h.reachIn = false; // (an arm let go to hang at your side drops in the same time it takes to come up: in 0.3 s it went at 11 cm a frame)
           h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
         }
         h.u = Math.min(1, h.u + dt / (h.blendT || BLEND)); const e = ease(h.u);

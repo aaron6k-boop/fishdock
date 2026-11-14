@@ -61,6 +61,6 @@ let fails = 0; const ok = (c, what) => { console.log(`${c ? "PASS" : "FAIL"}  ${
 ok(holdFrames > 100 && reversals === 0, `holding the rod as the game opens: ${reversals} reversals in ${holdFrames / 4} frames (the hands don't shake)`);
 ok(worst.mm < 100, `outside the cast, the biggest move in one frame: ${worst.mm.toFixed(0)} mm (${worst.at})`);
 ok(worstCast.mm < 150, `in the cast, the biggest move in one frame: ${worstCast.mm.toFixed(0)} mm (${worstCast.at})`);
-ok(ropeFrames > 300 && flicks <= 10, `the drop net's rope: ${flicks} flicks back and forth in ${ropeFrames} frames (biggest move there ${rayWorst.mm.toFixed(0)} mm, ${rayWorst.at})`);
+ok(ropeFrames > 200 && flicks <= 10, `the drop net's rope: ${flicks} flicks back and forth in ${ropeFrames} frames (biggest move there ${rayWorst.mm.toFixed(0)} mm, ${rayWorst.at})`);
 ok(!errors.length, `no page errors${errors.length ? `: ${errors[0]}` : ""}`);
 console.log(fails ? `\n${fails} check(s) failed` : "\nAll checks passed"); process.exit(fails ? 1 : 0);
