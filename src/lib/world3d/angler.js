@@ -1246,7 +1246,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // the side of the cup, 5 mm round the rod, and the blank tipped forwards through the cradle and the bar under it)
     // (8 cm out of the cradle before it swings: at 5 cm the swing still took it 2 mm into the cradle's rubber)
     if (lift < 1) { const k = ease((lift - 0.3) / 0.7), open = new THREE.Vector3(0, 1, 0).addScaledVector(restD, -restD.y).normalize();
-      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.08 * ease((lift - 0.08) / 0.24)).lerp(butt, k); dir = restD.clone().lerp(dir, k).normalize(); }
+      // (and up over the tripod's head on the way: the rod is held further out than it rests, so going straight there
+      // its blank passed forwards through the bar across the head, 7 mm in)
+      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.08 * ease((lift - 0.08) / 0.24)).lerp(butt, k); butt.y += 0.3 * Math.sin(Math.PI * k); dir = restD.clone().lerp(dir, k).normalize(); }
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping
