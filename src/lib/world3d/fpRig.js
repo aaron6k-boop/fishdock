@@ -470,7 +470,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         const swap = h.cylSwap && want.kind === h.kind && !jumped, left = h.u < 1 ? (1 - h.u) * (h.blendT || BLEND) : 0; h.cylSwap = false;
         if (want.kind !== h.kind || !h.cur || jumped || swap) {
           h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null; h.kind = want.kind; h.u = h.from ? 0 : 1;
-          h.blendT = h.reachIn ? REACH_IN : swap ? Math.max(SWAP_BLEND, left) : BLEND; h.reachIn = false;
+          h.blendT = h.reachIn ? REACH_IN : swap ? Math.max(SWAP_BLEND, left) : !spec ? REACH_IN : BLEND; h.reachIn = false; // (an arm let go to hang at your side drops in the same time it takes to come up: in 0.3 s it went at 11 cm a frame)
           h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
         }
         h.u = Math.min(1, h.u + dt / (h.blendT || BLEND)); const e = ease(h.u);
