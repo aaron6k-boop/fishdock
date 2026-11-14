@@ -1401,7 +1401,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const d = toLocal(keptPose.mouth.clone().add(keptPose.dir)).sub(toLocal(keptPose.mouth)), upL = V3(0, 1, 0);
       // (the palms just under it, behind the head and at the wrist of the tail, as far down as its belly reaches the way
       // it's turned: they used to sit a few centimetres under the spine, inside a fish of any size)
-      const below = restHeight(halfDepth(), halfThick(), keptPose.roll || 0) + 0.022;
+      // (the hand's point is its palm, and the belly settles into a cupped hand a little: 2 cm below, the mackerel in
+      // Aaron's 14 November recording hovered over his palms when he held it up to look at it)
+      const below = restHeight(halfDepth(), halfThick(), keptPose.roll || 0) - 0.006;
       const under = (k) => toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * k)).add(V3(0, -below, 0));
       // (taking a fish that's just come in over the rail: your left hand round it behind the head while the right
       // still has the rod, putting it in its rest)

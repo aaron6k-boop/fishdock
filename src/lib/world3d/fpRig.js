@@ -105,7 +105,10 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   const skinMat = new THREE.MeshStandardMaterial({ color: gloves ? 0x2b2e34 : skinHex, roughness: gloves ? 0.72 : 0.55, metalness: 0 });
   // (the coat: an outdoor jacket's ripstop nylon, its weave and creases and the soft sheen cloth has at a glancing
   // angle, fabric.js. Until 13 November it was one flat colour: "just some blue", Aaron said)
-  const coatMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.78, metalness: 0, sheen: 0.55, sheenRoughness: 0.6, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xffffff), 0.35) });
+  // (a soft sheen, kept to the coat's own colour: at 0.55 and a third of the way to white, the forearms seen along
+  // their length, holding a fish out or letting it go, caught the dusk sky's pink and went magenta in Aaron's 14
+  // November recording)
+  const coatMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.8, metalness: 0, sheen: 0.22, sheenRoughness: 0.8, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xffffff), 0.12) });
   // (cloth right at your eye isn't drawn: the collar and the shoulders sit around the camera)
   // (and further off when you look down past your arms at a net or the deck below the rail: from above, the sleeves
   // between your shoulders and elbows are right under your eye, and filled half the picture in the 13 November

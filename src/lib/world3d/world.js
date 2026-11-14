@@ -67,7 +67,14 @@ export function autoQuality3d() {
   } catch { /* ignore */ }
   return "balanced";
 }
+// (asked once and kept: it makes a whole WebGL context to ask, and the FPS display asked twice a second, a new
+// context made and thrown away every half second while you played)
+let gpuNameWas = null;
 function gpuName() {
+  if (gpuNameWas != null) return gpuNameWas;
+  gpuNameWas = gpuName0(); return gpuNameWas;
+}
+function gpuName0() {
   try {
     const gl = document.createElement("canvas").getContext("webgl2"); if (!gl) return "";
     const ext = gl.getExtension("WEBGL_debug_renderer_info"); const name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "";
@@ -659,17 +666,27 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // ---- frame-rate limit (Settings → Graphics: 30, 60 or as fast as the screen goes) and the frame-time record ----
   // (the record: the last 240 frame times, for the FPS display's average and its 1% low, the slowest frame in a hundred)
   let fpsCap = 0; const ft = new Float32Array(240); let ftN = 0;
+  // (and the worst frame of the last four seconds with what the frame before it did: shaders built and textures sent to
+  // the graphics card, and how long its own JavaScript took. A long frame with none of those is the browser's or the
+  // GPU's (garbage collection, decoding a picture, the card catching up). Shown on the FPS display, so a recording from
+  // a phone says what each stutter was)
+  const spike = { ms: 0, at: -1e9, shaders: 0, tex: 0, js: 0, what: "" }, prevF = { prog: 0, tex: 0, js: 0, what: "" };
   function frame(ts) {
     raf = requestAnimationFrame(frame);
     if (!visible || film) return;
     // (a little early is fine: the screen's own beat decides when it shows, so this only skips every other one at 30)
     if (fpsCap && last && ts - last < 1000 / fpsCap - 3) return;
-    const dt = Math.min(0.1, (ts - (last || ts)) / 1000); last = ts;
+    const raw = last ? ts - last : 0, dt = Math.min(0.1, raw / 1000); last = ts;
+    if (raw > 0) { const pg = renderer.info.programs?.length || 0, tx = renderer.info.memory.textures;
+      if (raw >= spike.ms || ts - spike.at > 4000) Object.assign(spike, { ms: raw, at: ts, shaders: Math.max(0, pg - prevF.prog), tex: Math.max(0, tx - prevF.tex), js: prevF.js, what: prevF.what });
+      prevF.prog = pg; prevF.tex = tx; }
     if (dt > 0) { ft[ftN++ % 240] = dt * 1000; if (frameTap) { const me = anglers.get(localId), k = me?.out?.kept; frameTap(dt * 1000, { phase: W ? "walking" : k && k !== "gone" ? `fish ${k}` : me?.out?.phase || "-", programs: renderer.info.programs?.length || 0, textures: renderer.info.memory.textures, gpu: gpuN ? +gpuT[(gpuN - 1) % 60].toFixed(2) : null }); } }
     // (the resolution is changed before this frame is drawn, never after: resizing the canvas clears it, and done after
     // drawing, the blank canvas was what the phone showed for that frame, a grey flash mid-fight)
     pace(ts, dt);
+    const tj = performance.now();
     tick((ts - clock0) / 1000, nowFn(), dt);
+    { const me = anglers.get(localId), k = me?.out?.kept; prevF.js = performance.now() - tj; prevF.what = W ? "walking" : k && k !== "gone" ? `fish ${k}` : me?.out?.phase || ""; }
   }
   // ---- the sky as light and reflection: the sky itself (its gradient, sun glow and clouds; the sea below the horizon,
   // environment.js envSky) made into an environment map whenever the light has changed enough (at most every 90 frames,
@@ -905,14 +922,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     setGfx,
     get gfx() { return { ...G, post: !!post, anisoCap, dprTop, dpr: dprNow }; },
     /** for the FPS display: the last few seconds' average, 1% low and frame time, and this frame's drawing work */
-    perf() {
+    perf(full = false) {
       const n = Math.min(ftN, 240); if (!n) return null;
       const a = Array.from(ft.subarray(0, n)).sort((x, y) => x - y), mean = a.reduce((s2, v) => s2 + v, 0) / n, worst = a[Math.min(n - 1, Math.floor(n * 0.99))];
       const r = renderer.info.render;
       let gpu = null; if (gpuN) { const m = Math.min(gpuN, 60); let s2 = 0; for (let i = 0; i < m; i++) s2 += gpuT[i]; gpu = +(s2 / m).toFixed(1); }
       // texture memory, estimated from each texture's size (with its mip chain): what the card holds for this scene
-      let texMB = 0; try { const seen = new Set(); scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) for (const k in m) { const t = m[k]; if (t && t.isTexture && !seen.has(t)) { seen.add(t); const im = t.image; const w = im?.width || im?.videoWidth || 0, h = im?.height || im?.videoHeight || 0; texMB += (w * h * 4 * (t.generateMipmaps ? 1.333 : 1)) / 1048576; } } }); } catch { texMB = 0; }
-      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), gpu, calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, texMB: Math.round(texMB), gpuName: gpuName(), preset: Q === QUALITY3D.ultra ? "ultra" : Q === QUALITY3D.high ? "high" : Q === QUALITY3D.performance ? "performance" : "balanced", res: [renderer.domElement.width, renderer.domElement.height] };
+      let texMB = null; if (full) try { texMB = 0; const seen = new Set(); scene.traverse((o) => { const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : []; for (const m of ms) for (const k in m) { const t = m[k]; if (t && t.isTexture && !seen.has(t)) { seen.add(t); const im = t.image; const w = im?.width || im?.videoWidth || 0, h = im?.height || im?.videoHeight || 0; texMB += (w * h * 4 * (t.generateMipmaps ? 1.333 : 1)) / 1048576; } } }); } catch { texMB = 0; }
+      return { fps: Math.round(1000 / mean), low: Math.round(1000 / worst), ms: +mean.toFixed(1), gpu, calls: r.calls, tris: r.triangles, dpr: dprNow, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, texMB: texMB == null ? null : Math.round(texMB), gpuName: gpuName(), spike: ftN && performance.now() - spike.at < 4500 ? { ms: Math.round(spike.ms), shaders: spike.shaders, tex: spike.tex, js: +spike.js.toFixed(1), what: spike.what } : null, build: typeof __BUILD_ID__ !== "undefined" ? __BUILD_ID__ : "", preset: Q === QUALITY3D.ultra ? "ultra" : Q === QUALITY3D.high ? "high" : Q === QUALITY3D.performance ? "performance" : "balanced", res: [renderer.domElement.width, renderer.domElement.height] };
     },
     setAnglers,
     realCheck,

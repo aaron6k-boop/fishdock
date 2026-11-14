@@ -111,7 +111,7 @@ const PRESET_ORDER = ["performance", "balanced", "high", "ultra"];
 const catchRec = { cur: null, text: null, onDone: null };
 function stopCatchRec(world) {
   const r = catchRec.cur; if (!r) return; catchRec.cur = null; r.world?.tapFrames?.(null); clearTimeout(r.timer); try { r.po?.disconnect(); } catch { /* not offered */ }
-  const w = r.world || world, last = w?.perf?.(), g = w?.gfx || {};
+  const w = r.world || world, last = w?.perf?.(true), g = w?.gfx || {};
   const where = navigator.userAgent.match(/FishDockDesktop\/[\d.]+/)?.[0] || (/iPhone|iPad/.test(navigator.userAgent) ? "iOS browser" : /Android/.test(navigator.userAgent) ? "Android browser" : "browser");
   const head = `FishDock catch recording · ${last?.gpuName || "unknown GPU"} · ${where} · window ${innerWidth}x${innerHeight} @${devicePixelRatio}x · drawn at ${last?.res?.join("x") || "?"} · preset ${NAME[last?.preset] || last?.preset || "?"}`;
   const extra = `long tasks (the page busy for over 50 ms): ${r.po ? `${r.long.n}, ${Math.round(r.long.ms)} ms in all, longest ${Math.round(r.long.max)} ms` : "not reported by this browser"} · memory: ${performance.memory ? `${Math.round(r.mem0 / 1e6)} MB at the start, ${Math.round(performance.memory.usedJSHeapSize / 1e6)} MB at the end` : "not reported by this browser"} · resolution at the end ${g.dpr?.toFixed?.(2) ?? "?"}x`;
@@ -128,7 +128,7 @@ function startCatchRec(world) {
 }
 function DevDiagnostics({ world, view, setOpts, scene }) {
   const [p, setP] = useState(null), [d, setD] = useState(null), [bench, setBench] = useState(null), [running, setRunning] = useState(false);
-  useEffect(() => { const t = setInterval(() => { setP(world?.perf?.() || null); setD(world?.diag?.() || null); }, 1000); return () => clearInterval(t); }, [world]);
+  useEffect(() => { const t = setInterval(() => { setP(world?.perf?.(true) || null); setD(world?.diag?.() || null); }, 1000); return () => clearInterval(t); }, [world]);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const pct = (a, q) => a[Math.min(a.length - 1, Math.max(0, Math.ceil(a.length * q) - 1))];
   // the benchmark: the same scene for every run (a clear afternoon, a light wind, looking out over the rod from your
@@ -147,7 +147,7 @@ function DevDiagnostics({ world, view, setOpts, scene }) {
         world.setGfx?.(effectiveGfx(q, {}, false)); fixed(); await wait(5000);
         const t0 = performance.now(); let since = world.frameTimes?.()?.n ?? 0; const all = [];
         while (performance.now() - t0 < 8000) { await wait(1000); const f = world.frameTimes?.(since); if (f) { all.push(...f.times); since = f.n; } }
-        const last = world.perf?.();
+        const last = world.perf?.(true);
         if (all.length > 10 && last) {
           const a = all.slice().sort((x, y) => x - y), mean = a.reduce((s2, v) => s2 + v, 0) / a.length;
           rows.push({ q, frames: a.length, fps: Math.round(1000 / mean), p50: +pct(a, 0.5).toFixed(1), p95: +pct(a, 0.95).toFixed(1), p99: +pct(a, 0.99).toFixed(1), low1: Math.round(1000 / pct(a, 0.99)), gpu: last.gpu, calls: last.calls, tris: last.tris, texMB: last.texMB, res: last.res });
@@ -205,6 +205,10 @@ export function FpsMeter({ world }) {
   return (
     <div className="fps-meter" aria-live="off">
       {p.fps} fps · 1% low {p.low}<br />{p.ms} ms · {p.calls} draws · {Math.round(p.tris / 1000)}k tris · {p.dpr.toFixed(2)}x
+      {/* (the slowest frame of the last few seconds, when it was a stutter, and what the frame before it did: shaders
+          built, textures sent to the card, its own JavaScript; with none of those, the browser's or the GPU's) */}
+      {p.spike && p.spike.ms >= 50 ? <><br />worst {p.spike.ms} ms{p.spike.what ? ` (${p.spike.what})` : ""}: {[p.spike.shaders ? `${p.spike.shaders} shader${p.spike.shaders > 1 ? "s" : ""}` : "", p.spike.tex ? `${p.spike.tex} texture${p.spike.tex > 1 ? "s" : ""}` : "", `JS ${p.spike.js} ms`].filter(Boolean).join(", ")}</> : null}
+      <br /><span className="fps-id">{NAME[p.preset] || p.preset}{p.build ? ` · ${p.build}` : ""}</span>
     </div>
   );
 }

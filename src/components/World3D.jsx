@@ -208,7 +208,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
 
   const usedQ = useRef(null); // (the preset the view was built with: Auto's choice shows in Settings → Graphics)
   useImperativeHandle(ref, () => ({
-    setGfx: (o) => W.current?.setGfx(o), get gfx() { return W.current ? { ...W.current.gfx, preset: usedQ.current } : null; }, perf: () => W.current?.perf() || null, diag: () => W.current?.diag?.() || null, frameTimes: (since) => W.current?.frameTimes?.(since) || null, setEnv: (o) => W.current?.setEnv?.(o),
+    setGfx: (o) => W.current?.setGfx(o), get gfx() { return W.current ? { ...W.current.gfx, preset: usedQ.current } : null; }, perf: (full) => W.current?.perf(full) || null, diag: () => W.current?.diag?.() || null, frameTimes: (since) => W.current?.frameTimes?.(since) || null, setEnv: (o) => W.current?.setEnv?.(o),
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
     setTorch: (c) => W.current?.setTorch(c),

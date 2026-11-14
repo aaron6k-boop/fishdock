@@ -651,3 +651,4 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .log-today li.done { background: #2fbf9a1f; }
 .log-today li.done svg { color: #8ee6c9; opacity: 1; }
 .log-today li.done span { opacity: .85; }
+.fps-meter .fps-id { opacity: .65; }
