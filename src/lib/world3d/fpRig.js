@@ -464,10 +464,13 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         // on the line becoming the fish in your hand took the left hand 40 cm in a frame); then following it exactly
         // (measured from your body, so turning your head, which carries the hold with it, is never a jump)
         const wl = root.worldToLocal(want.pos.clone()), jumped = h.wantAt && wl.distanceTo(h.wantAt) > Math.max(0.1, 6 * dt); h.wantAt = wl;
-        const swap = h.cylSwap && want.kind === h.kind && !jumped && h.u >= 1; h.cylSwap = false; // (mid-blend, the blend already under way carries it there: restarted short, an arm coming up into view to the rope covered 60 cm in 0.15 s)
+        // (a new way of holding the same thing: a short blend to it; mid-blend, the blend under way is begun again from
+        // where the hand is with the time it had left: restarted short, an arm coming up into view to the rope covered
+        // 60 cm in 0.15 s, and left alone, the hand jumped the 5 cm between the two grips near the end of its blend)
+        const swap = h.cylSwap && want.kind === h.kind && !jumped, left = h.u < 1 ? (1 - h.u) * (h.blendT || BLEND) : 0; h.cylSwap = false;
         if (want.kind !== h.kind || !h.cur || jumped || swap) {
           h.from = h.cur ? { pos: h.cur.pos.clone(), quat: h.cur.quat.clone() } : null; h.kind = want.kind; h.u = h.from ? 0 : 1;
-          h.blendT = h.reachIn ? REACH_IN : swap ? SWAP_BLEND : BLEND; h.reachIn = false;
+          h.blendT = h.reachIn ? REACH_IN : swap ? Math.max(SWAP_BLEND, left) : BLEND; h.reachIn = false;
           h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
         }
         h.u = Math.min(1, h.u + dt / (h.blendT || BLEND)); const e = ease(h.u);
