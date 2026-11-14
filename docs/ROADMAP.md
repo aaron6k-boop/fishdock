@@ -19,13 +19,14 @@ end of each working session, so the next one can carry on from here.
 
 #118 sound at the first tap, #119 steady arms, #120 levels and the logbook, #121 sea fret and storms, #122 phone
 performance, #123 shaders and textures readied under the loading screen, the hand off the rail, one reward card,
-#124 the Reel button as the reel (rhythm, holding, pauses).
+#124 the Reel button as the reel (rhythm, holding, pauses), #125 the buttons as one set, the jacket's lining left out,
+the worst-frame line, the quality backlog.
 
 ## Draft PR waiting for Aaron
 
 | Branch | What |
 |---|---|
-| `ui-buttons` | Cast, Strike and the side buttons as one set with the reel (Cast's power ring and distance, Strike's bite clock); the jacket's lining left out (the rings round the forearm on the drop net); the worst-frame line says where the time went; `docs/QUALITY-BACKLOG.md`; `docs/ASSET-LIBRARY.md` written by `tools/asset-library.mjs` |
+| `polish-3` | Bites by species (strike on the pull, not the knock; slack-liners); the game updates itself between catches; the unhooking mat as padded quilting; the jacket's body left out looking down |
 
 The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
 opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older

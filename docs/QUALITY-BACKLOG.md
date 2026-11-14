@@ -89,8 +89,10 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Was wrong:** the rod already showed each species' bite (knocks then a pull for cod, a rattle for whiting), but the
   strike went by one rule for every fish. **Done (14 Nov):** strike on the pull, not the knock (`bitePlan`), the Strike
   button saying where the bite is and marking the moment in green.
-- **Still to do:** a slack-liner (a fish swimming towards you: the line falls slack, wind down then strike); bites by
-  tide and time of day per place where the sources say so. **Check:** `tests/bite.test.js` and play.
+  **Done (14 Nov):** a slack-liner now and then from a strong biter (the tip springs back as the fish swims towards
+  you, then the line tightens; the Strike button says to wait for it).
+- **Still to do:** bites by tide and time of day per place where the sources say so. **Check:** `tests/bite.test.js`
+  and play.
 
 ### 10. New places
 - **Wrong:** Gorleston South Pier is the only place built to this standard.
@@ -111,3 +113,5 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | Strike on the pull, not the knock; the Strike button shows where the bite is | `tests/bite.test.js`; screenshots of each stage |
 | 14 Nov | The game updates itself between catches (no more old copies) | by hand: the update check in `src/main.jsx` |
 | 14 Nov | The unhooking mat as padded, stitched quilting instead of pyramids | before and after of the texture and the mat in the catch film |
+| 14 Nov | Slack-liners: the tip springs back, then the line tightens, and Strike waits for it | `tests/bite.test.js` |
+| 14 Nov | Looking down, the jacket's body is left out (no ragged flaps across the bottom of the picture) | drop-net film before and after; `tests/fpRig.test.js` |

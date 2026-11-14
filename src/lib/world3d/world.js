@@ -137,7 +137,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // ---- ahead of time: shaders built and textures sent for things that exist but have not been drawn yet ----
   // (three.js does both the first time a thing is actually drawn, which for a fish, a net or a light that comes on at a
   // bite is in the middle of the action. Given the object, or nothing for the whole scene.)
-  let warmAt = 0, warmSum = 0, frameTap = null, growN = 0, growWas = -1, warmedN = -1, warmBusy = false;
+  let warmAt = 0, warmSum = 0, frameTap = null, growN = 0, growWas = -1, warmedN = -1, warmBusy = false, warmCount = 0;
   // (every slot a texture can sit in, not only the common five: a building's ambient occlusion or a metal's
   // metalness map was sent the first time you turned and looked at it)
   const TEX_SLOTS = ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "bumpMap", "alphaMap", "emissiveMap", "lightMap", "displacementMap", "specularMap", "clearcoatMap", "clearcoatNormalMap", "clearcoatRoughnessMap", "sheenColorMap", "sheenRoughnessMap", "transmissionMap", "thicknessMap", "specularIntensityMap", "specularColorMap", "iridescenceMap", "iridescenceThicknessMap", "anisotropyMap"];
@@ -174,7 +174,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     }
     scene.traverseVisible((o) => { if (o.geometry) sentGeo.add(o.geometry); });
   }
+  let warmMs = 0, warmCalls = 0; // (film checks only: how often the scene was readied, and the time it took on the page)
   function warm(root = scene, late = false) {
+    const t0w = performance.now(); warmCalls++;
+    try { return warm0(root, late); } finally { warmMs += performance.now() - t0w; }
+  }
+  function warm0(root = scene, late = false) {
     if (late && warmBusy) { warmedN = -1; return; } // (one late one at a time: looked at again at the next count)
     // (late, in the middle of play: the shaders built in the background where the browser can (compileAsync, with
     // the parallel-compile extension), and only once they're ready is everything sent and drawn into its pixel, so a
@@ -795,6 +800,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       gfx(o = {}) { setGfx(o); return { ...G, dpr: renderer.getPixelRatio(), q: Q.q, shadowsOn: renderer.shadowMap.enabled, shed: shedN }; },
       /** (checks) the frame pacing told every recent frame was late, so its next look steps down */
       lateNow() { late = 1; paceAt = 0; pacing = true; },
+      get warms() { return { late: warmCount, calls: warmCalls, ms: Math.round(warmMs) }; },
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),
       // so every phase plays through the real animation code from a known start, frame for frame the same each run:
@@ -921,7 +927,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // on the 14 November build at Medium: 17 shaders and 11 textures were built or sent in the first seconds of fishing,
     // as the cast swung the view round to things never drawn before, and 3 more on the first look round. Those were the
     // stalls in Aaron's recording at the cast and at 16 to 22 s, turning to the lookout
-    if (++growN % 30 === 0) { let n = 0; scene.traverse((o) => { if (o.material) n++; }); if (n !== warmedN && n === growWas) { warmedN = n; warm(scene, true); } growWas = n; }
+    if (++growN % 30 === 0 && !(FILM && typeof window !== "undefined" && window.__fdNoGrow)) { let n = 0; scene.traverse((o) => { if (o.material) n++; }); if (n !== warmedN && n === growWas) { warmedN = n; warmCount++; warm(scene, true); } growWas = n; }
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
