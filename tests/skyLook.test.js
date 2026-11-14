@@ -67,3 +67,21 @@ test("a clear day's shadow is about a fifth as bright as the sunlit deck beside 
   assert.ok(low.skyIntensity < L.skyIntensity * 0.7, `low sky ${low.skyIntensity}`);
   assert.ok(low.exposure > L.exposure);
 });
+
+test("sea fret and storms: from a preset or the real forecast's visibility and weather code", async () => {
+  const { fretAndStorm, lightingFor } = await import("../src/lib/world3d/skyLook.js");
+  assert.deepEqual(fretAndStorm({}), { fog: 0, thunder: 0 });
+  assert.equal(fretAndStorm({ fog: 0.8 }).fog, 0.8);
+  assert.equal(fretAndStorm({ visibilityM: 10000 }).fog, 0, "a clear day");
+  assert.ok(fretAndStorm({ visibilityM: 200 }).fog > 0.99, "200 m: thick fret");
+  assert.ok(fretAndStorm({ visibilityM: 1500 }).fog > 0.3 && fretAndStorm({ visibilityM: 1500 }).fog < 0.8);
+  assert.ok(fretAndStorm({ code: 45, visibilityM: 9000 }).fog >= 0.6, "the forecast says fog");
+  assert.equal(fretAndStorm({ code: 95 }).thunder, 1); assert.equal(fretAndStorm({ code: 61 }).thunder, 0); assert.equal(fretAndStorm({ thunder: true }).thunder, 1);
+  // in a fret the haze is far thicker, the sun all but gone, shadows soft, and the haze a pale grey
+  const clear = lightingFor({ day: 1, cloud: 0.3 }), fret = lightingFor({ day: 1, cloud: 0.9, fog: 1 });
+  assert.ok(fret.fogDensity > 15 * clear.fogDensity, `${fret.fogDensity} against ${clear.fogDensity}`);
+  // (exponential-squared haze in the water, three's exponential on land: at 150 m the land is mostly hidden)
+  assert.ok(1 - Math.exp(-fret.fogDensity * 150) > 0.9);
+  assert.ok(fret.sunIntensity < clear.sunIntensity * 0.1); assert.ok(fret.shadow < 0.3);
+  const [r, g, b] = fret.fogColour; assert.ok(Math.abs(r - b) < 0.05 && r > 0.5, `a pale grey ${fret.fogColour}`);
+});

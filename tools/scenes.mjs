@@ -19,6 +19,8 @@ const DAY = [{ sunAlt: 38, sunAz: 190 }, { cloudPct: 25, windKph: 14, windDir: 4
 const SUNSET = [{ sunAlt: 3, sunAz: 250 }, { cloudPct: 35, windKph: 10, windDir: 60 }];
 const RAIN = [{ sunAlt: 20, sunAz: 200 }, { cloudPct: 100, windKph: 28, windDir: 30, precipMm: 2.5 }];
 const NIGHT = [{ sunAlt: -15, sunAz: 330, moonAlt: 35, moonAz: 150, moonIllum: 0.8 }, { cloudPct: 20, windKph: 8 }];
+const FRET = [{ sunAlt: 30, sunAz: 190 }, { cloudPct: 100, windKph: 6, windDir: 40, fog: 0.85 }];
+const STORM = [{ sunAlt: 12, sunAz: 220 }, { cloudPct: 100, windKph: 58, windDir: 30, precipMm: 6, thunder: true }];
 // camera: [x, y, z, lookX, lookY, lookZ] in the world (the fishing spot is the origin, the sea to -z); rel: the same
 // from the angler's feet (the anglers face -z);
 // or fp: first person at the given pitch; play: the scripted events (seconds from now) and the fight to run
@@ -34,6 +36,9 @@ const SCENES = [
   // (the landing is seen through the game's own landing camera, as a player sees it: no camera is set here)
   { name: "09-drop-net-landing", env: DAY, play: [["cast", -40], ["hooked", -20], ["catch", -7, { species: "cod", lengthCm: 62 }]], hint: { species: "cod", lengthCm: 62 }, step: 2500 },
   { name: "10-third-person-walking", env: DAY, third: true, walk: true, me: { side: 2.0, fwd: 1.5, h: 1.6, lf: 0.5, lh: 1.0 } },
+  // (the weather added 13 November: a sea fret from the daylight view, and a storm caught in a lightning flash)
+  { name: "11-sea-fret", env: FRET, cam: [-55, 3.8, -8, -20, 3, -4], settle: 20000 },
+  { name: "12-storm-lightning", env: STORM, cam: [-55, 3.8, -8, -20, 3, -4], settle: 20000, flash: true },
 ];
 
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
@@ -47,7 +52,9 @@ await page.waitForFunction(() => window.__fdWorld && window.__fdWorld.play, null
 const snap = async (name) => { const r = await page.evaluate(() => { const c = document.querySelector(".w3d canvas"); const b = c.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; }); const { data } = await cdp.send("Page.captureScreenshot", { format: "jpeg", quality: 90, clip: { ...r, scale: 1 } }); writeFileSync(`${out}/${name}.jpg`, Buffer.from(data, "base64")); };
 const setThird = async (on) => { await page.getByRole("button", { name: /menu/i }).first().click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(400); await page.getByText(on ? "Third person" : "First person", { exact: true }).click({ timeout: 5000 }).catch(() => {}); await page.keyboard.press("Escape").catch(() => {}); await page.evaluate(() => window.__fdWorld.step(1200)); };
 let third = false;
-for (const sc of SCENES) {
+// (ONLY=<pattern> draws just the scenes whose names match, e.g. ONLY=fret)
+const ONLY = process.env.ONLY ? new RegExp(process.env.ONLY) : null;
+for (const sc of SCENES.filter((s) => !ONLY || ONLY.test(s.name))) {
   if (!!sc.third !== third) { await setThird(!!sc.third); third = !!sc.third; }
   await page.evaluate(([env, settle]) => { const W = window.__fdWorld; W.freeze(); W.env(env[0], env[1]); W.step(settle); W.at(null); }, [sc.env, sc.settle || 8000]);
   if (sc.walk) await page.evaluate(() => { const W = window.__fdWorld; document.querySelector(".w3d-walkbtn")?.click(); W.step(600); W.walkInput(0, 1); W.step(1800); });
@@ -60,6 +67,8 @@ for (const sc of SCENES) {
     else if (sc.me && P) { const f = P.feet, r = P.rod, n = r.length - 1; let fx = r[n][0] - f[0], fz = r[n][2] - f[2]; const l = Math.hypot(fx, fz) || 1; fx /= l; fz /= l; const rx = -fz, rz = fx, m = sc.me;
       W.at(f[0] + rx * m.side + fx * m.fwd, f[1] + m.h, f[2] + rz * m.side + fz * m.fwd, [f[0] + fx * m.lf, f[1] + m.lh, f[2] + fz * m.lf]); }
     W.step(100);
+    // (a storm: the clock run on until the lightning flashes, and the picture taken in it)
+    if (sc.flash) { W.environment.strike(); W.step(16, true); }
   }, sc);
   await snap(sc.name); console.log("drawn", sc.name);
   if (sc.walk) await page.evaluate(() => { const W = window.__fdWorld; W.walkInput(0, 0); document.querySelector(".walk-pill[aria-label='Stop walking']")?.click(); W.step(500); });

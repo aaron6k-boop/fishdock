@@ -17,7 +17,9 @@ import { ukIso } from "./time.js";
 
 export const CONDITIONS = { cellDeg: 0.05, ttlMs: 30 * 60e3, forecastDays: 3 };
 export const ATTRIBUTION = "Weather data by Open-Meteo.com (CC BY 4.0)";
-const FORECAST_VARS = ["temperature_2m", "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m", "pressure_msl", "precipitation", "cloud_cover", "is_day"];
+// (visibility, metres, and weather_code, the WMO code: fog is 45 and 48, a thunderstorm 95 to 99. Used by the 3D game for
+// sea fret and storms, from the real forecast when it's live)
+const FORECAST_VARS = ["temperature_2m", "wind_speed_10m", "wind_gusts_10m", "wind_direction_10m", "pressure_msl", "precipitation", "cloud_cover", "is_day", "visibility", "weather_code"];
 const MARINE_VARS = ["wave_height", "swell_wave_height", "swell_wave_period", "sea_surface_temperature"];
 
 // ---- cells ----
@@ -59,6 +61,8 @@ export function shapeForecast(raw) {
       precipMm: round(at(h.precipitation, i), 1),
       cloudPct: round(at(h.cloud_cover, i), 0),
       isDay: isDay == null ? null : isDay ? 1 : 0,
+      visibilityM: round(at(h.visibility, i), 0),
+      code: round(at(h.weather_code, i), 0),
     });
   });
   return out;

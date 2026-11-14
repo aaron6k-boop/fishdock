@@ -39,8 +39,11 @@ const LIGHT = [{ value: "now", label: "Now" }, { value: "morning", label: "Morni
 const RODS = [{ value: "auto", label: "For the place" }, ...Object.values(ROD_STYLES).map((r) => ({ value: r.id, label: r.name }))];
 const TIPS = [{ value: "auto", label: "At night" }, { value: "on", label: "On" }, { value: "off", label: "Off" }];
 const FROM = [{ value: "auto", label: "The place's own" }, { value: "beach", label: "Beach" }, { value: "pier", label: "Pier" }, { value: "estuary", label: "Estuary" }, { value: "river", label: "River bank" }, { value: "lake", label: "Lake" }];
-const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", label: "Calm" }, { value: "breezy", label: "Breezy" }, { value: "windy", label: "Windy" }, { value: "overcast", label: "Overcast" }, { value: "drizzle", label: "Light rain" }, { value: "rain", label: "Heavy rain" }];
-const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, overcast: { windKph: 14, cloudPct: 100, precipMm: 0 }, drizzle: { windKph: 16, cloudPct: 95, precipMm: 0.4 }, rain: { windKph: 30, cloudPct: 100, precipMm: 4 } };
+const WEATHER = [{ value: "live", label: "Live weather" }, { value: "calm", label: "Calm" }, { value: "breezy", label: "Breezy" }, { value: "windy", label: "Windy" }, { value: "overcast", label: "Overcast" }, { value: "drizzle", label: "Light rain" }, { value: "rain", label: "Heavy rain" }, { value: "fret", label: "Sea fret" }, { value: "storm", label: "Storm" }];
+const DEMO_WX = { calm: { windKph: 5, cloudPct: 15, precipMm: 0 }, breezy: { windKph: 20, cloudPct: 45, precipMm: 0 }, windy: { windKph: 42, cloudPct: 70, precipMm: 0 }, overcast: { windKph: 14, cloudPct: 100, precipMm: 0 }, drizzle: { windKph: 16, cloudPct: 95, precipMm: 0.4 }, rain: { windKph: 30, cloudPct: 100, precipMm: 4 },
+  // (a sea fret: the North Sea's summer fog, still air, the far end of the pier gone grey; a storm: a gale, heavy rain and
+  // thunder. Both simulated, as every preset is: Live weather is the real forecast)
+  fret: { windKph: 6, cloudPct: 100, precipMm: 0, fog: 0.85 }, storm: { windKph: 58, cloudPct: 100, precipMm: 6, thunder: true } };
 
 /** A time today that gives the chosen light at this place, found from the real sun. */
 
@@ -156,7 +159,7 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
 
   const t = timeFor(light, place);
   const live = conditionsAt(cond, t);
-  const c = wx === "live" ? (live ? { windKph: live.windKph, windDir: live.windDir, cloudPct: live.cloudPct, precipMm: live.precipMm, waveM: live.waveM } : DEMO_WX.breezy) : DEMO_WX[wx];
+  const c = wx === "live" ? (live ? { windKph: live.windKph, windDir: live.windDir, cloudPct: live.cloudPct, precipMm: live.precipMm, waveM: live.waveM, visibilityM: live.visibilityM, code: live.code } : DEMO_WX.breezy) : DEMO_WX[wx];
   const sun = ASTRO.sunPos(t, place.lat, place.lon), moon = ASTRO.moonPos(t, place.lat, place.lon);
   const lightNow = { sunAlt: sun.alt, sunAz: sun.az, moonAlt: moon.alt, moonAz: moon.az, moonIllum: ASTRO.moonIllum(t).fraction };
   // at dusk the demo faces the sunset, so the glitter path shows

@@ -159,6 +159,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", onSo
   }
   const tBuild = performance.now();
   const env = createEnvironment(scene, { venue, quality: Q.q, real, pano, post: !!post });
+  env.onThunder = (delay, far) => onSound?.("thunder", null, localId, { delay, far }); // (a storm's lightning: its thunder, as late as it's far)
   const buildMs = Math.round(performance.now() - tBuild);
   if (Q.sea) env.setFftSea(true, renderer);
   // (every material's shader compiled now, in parallel where the driver allows, rather than the first time its object
