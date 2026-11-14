@@ -118,12 +118,16 @@ function netTexture() {
 }
 
 // ---- the species modelled in Blender (public/models/fish.glb, source-assets/blender/build_fish.py) ----
-const MODELLED_FISH = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack", "conger", "eel"]);
+const MODELLED_FISH = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack", "conger", "eel",
+  // (the rest of the species with a cut-out picture: fish2.glb, build_fish2.py; the perch has none and stays lofted)
+  "ballan-wrasse", "black-bream", "coalfish", "dab", "flounder", "garfish", "gurnard", "lesser-spotted-dogfish", "pouting", "smoothhound", "sole",
+  "thick-lipped-mullet", "thornback-ray", "tope"]);
+const FIRST_SIX = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack"]);
 // (the conger and the eel are drawn curled in their pictures: their 3D body comes from a straight picture of them,
 // source-assets/fish-straight/straighten.py, and their model from eels.glb, build_eels.py. From the curled picture
 // the body was as deep as the whole curl, a third of its length at the tail)
 const STRAIGHT_PIC = new Set(["conger", "eel"]);
-const fishPart = (pic) => (STRAIGHT_PIC.has(pic) ? "eels" : "fish");
+const fishPart = (pic) => (STRAIGHT_PIC.has(pic) ? "eels" : FIRST_SIX.has(pic) ? "fish" : "fish2/" + pic); // (one file each, about 130 kB: only the fish you've hooked is fetched)
 const EARLY_FISH = new Set(["cast", "waiting", "bite"]); // (the phases in which the coming fish is got ready)
 const modelledCache = new Map();
 /** One geometry for a modelled species: its body, fins and eyes as three groups (materials 0, 1 and 2), its uvs the
