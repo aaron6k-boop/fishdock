@@ -27,7 +27,7 @@ net, fish readied in the background.
 
 | Branch | What |
 |---|---|
-| `models-5` | The conger and the eel modelled in Blender (on Aaron's PC, through the queue runner) from straightened pictures; a fish swung in taken once it's within reach; a grip change mid-blend without a jump |
+| `models-5` (#127) | The conger and the eel modelled in Blender (on Aaron's PC, through the queue runner) from straightened pictures; a fish swung in taken once it's within reach; a grip change mid-blend without a jump; hands on the drop net's hoop at a hand's pace |
 
 The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
 opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older
@@ -40,9 +40,9 @@ working backlog, kept for its detail.
    yet measured there.
 2. **Hands, arms and character animation.** Done: steady hold, no snaps (#119); no flicker on the drop net's rope, arms
    coming up from your side (`polish-3`). Taking a fish swung in by hand: the left hand waits until it's within reach
-   (worst move in that landing 9 cm a frame to 5, `models-5`). Next: following the drop net's hoop up off the deck and
-   over the rail, up to 12 cm a frame (the hoop's own path needs changing: more time alone barely helped); the
-   third-person walk (foot planting, stopping, turning); the idle (breathing, weight shifts).
+   (worst move in that landing 9 cm a frame to 5, `models-5`). Hands on the drop net's hoop at a hand's pace (12 cm a
+   frame to under 6). Next: the third-person walk (foot planting, stopping, turning); the idle (breathing, weight
+   shifts).
 3. **Rods, reels, line and nets.** Next: rod bend under load per fish and drag, the reel's bail opening for the cast and
    closing after it, line slack and tension between guides, the drop net's rope swing and bag sag with a fish in it.
 4. **Water and weather.** Done: sea fret and storms (this branch). Next: tide height moving the waterline on the pier
