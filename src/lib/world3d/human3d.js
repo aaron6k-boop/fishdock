@@ -635,6 +635,17 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         const L1 = hip.distanceTo(knee), L2 = knee.distanceTo(ank);
         const r = twoBone(hip, tgt, L1, L2, pole);
         aim(B(sd + "_Thigh"), B(sd + "_Calf"), r.B); aim(B(sd + "_Calf"), B(sd + "_Foot"), r.C); setWQ(B(sd + "_Foot"), fq);
+        // (and the toe never into the deck: as the heel came down or the foot turned on it, the boot's toe dipped up to
+        // 2 cm through the boards. The foot is tipped up about the ankle just enough to keep it on them)
+        const toeB = B(sd + "_Toe0");
+        if (toeB) {
+          const tw = wp(toeB), aw = wp(B(sd + "_Foot")), fy = floor ? floor(tw.x, tw.z) : NaN;
+          const lo = (Number.isFinite(fy) ? clamp(fy - gy, -0.25, 0.25) : 0) + Math.max(refT, footRef.idle?.t ?? refT) - 0.002, tF = wFig(tw); // (no lower than standing: the turning steps were measured with the toe lower)
+          if (tF.y < lo) {
+            const arm = tw.clone().sub(aw), L = arm.length(), side = arm.clone().cross(V(0, 1, 0));
+            if (L > 1e-3 && side.lengthSq() > 1e-8) turnW(B(sd + "_Foot"), side.normalize(), Math.asin(clamp((lo - tF.y) / L, 0, 0.6))); // (about toe-cross-up: positive turns the toe up)
+          }
+        }
       }
     } else if (st.foot.L || st.foot.R) { st.foot = {}; st.ikDrop = 0; }
 
