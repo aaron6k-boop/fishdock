@@ -127,6 +127,36 @@ def main(glb, out):
         a *= 1 - 0.18 * rim[:, None]; h += 0.12 * mm * nail - 0.18 * mm * rim
         rough = rough * (1 - nail) + 0.26 * nail
         H[sel] += h; A[sel] *= a; R[sel] = np.minimum(R[sel], rough)
+    # the palm's own creases and the veins on the back of the hand, in the hand's own frame: a from the wrist (0) to the
+    # line of the knuckles (1), b across from the index finger's side (0) to the little finger's (1)
+    wrist = bone(f"DEF-hand.{side}")[:3, 3]
+    mi, mp = chains[0]["pts"][0], chains[3]["pts"][0]; mcp = (mi + mp) / 2
+    ua, lenA = (mcp - wrist) / np.linalg.norm(mcp - wrist), np.linalg.norm(mcp - wrist)
+    wb = mp - mi; lenB = np.linalg.norm(wb); wb = wb / lenB
+    pa = ((p - wrist) @ ua) / lenA; pb = ((p - mi) @ wb) / lenB
+    handN = np.cross(ua, wb); handN /= np.linalg.norm(handN)
+    if handN @ chains[1]["dors"][0] < 0: handN = -handN  # (pointing out of the back of the hand)
+    facing = n @ handN
+    palmS, backS = (~on) * smooth(0.15, 0.5, -facing), (~on) * smooth(0.15, 0.5, facing)
+    def pdist(poly):  # (distance in metres from each texel to a line drawn in the hand's frame)
+        P2 = np.array(poly, float); best_d = np.full(K, 1e9)
+        for i in range(len(P2) - 1):
+            a0, a1 = P2[i], P2[i + 1]; d = a1 - a0; dm = np.array([d[0] * lenA, d[1] * lenB])
+            rel = np.stack([(pa - a0[0]) * lenA, (pb - a0[1]) * lenB], 1); t = np.clip((rel @ dm) / (dm @ dm), 0, 1)
+            best_d = np.minimum(best_d, np.linalg.norm(rel - np.outer(t, dm), axis=1))
+        return best_d
+    for poly, depth, wdt in (
+        ([(0.80, 1.02), (0.79, 0.75), (0.83, 0.5), (0.9, 0.3), (0.95, 0.22)], 0.38, 0.55),  # (across under the fingers, from the little finger's side)
+        ([(0.74, -0.02), (0.69, 0.25), (0.63, 0.55), (0.6, 0.78)], 0.38, 0.55),  # (across the middle, from the index finger's side)
+        ([(0.73, 0.02), (0.55, 0.06), (0.35, 0.12), (0.18, 0.2), (0.04, 0.28)], 0.42, 0.6),  # (round the ball of the thumb)
+        ([(0.0, 0.1), (0.0, 0.5), (0.02, 0.9)], 0.3, 0.5), ([(-0.06, 0.15), (-0.05, 0.85)], 0.25, 0.45),  # (the wrist)
+    ):
+        ln = palmS * np.exp(-0.5 * (pdist(poly) / (wdt * mm)) ** 2)
+        H -= depth * mm * ln; A *= 1 - 0.16 * ln[:, None]
+    # a few faint veins fanning out over the back of the hand from the wrist, a little bluer, standing a touch proud
+    for poly in ([(0.02, 0.35), (0.2, 0.33), (0.35, 0.3), (0.52, 0.27), (0.7, 0.22)], [(0.02, 0.5), (0.2, 0.49), (0.4, 0.5), (0.56, 0.53), (0.72, 0.58)], [(0.05, 0.62), (0.25, 0.68), (0.45, 0.75), (0.6, 0.81), (0.75, 0.88)]):
+        ln = backS * np.exp(-0.5 * (pdist([(a0, b0 + 0.025 * math.sin(a0 * 17 + b0 * 5)) for a0, b0 in poly]) / (1.3 * mm)) ** 2) * (0.5 + 0.5 * smooth(0.0, 0.3, pa)) * (1 - smooth(0.6, 0.8, pa))
+        H += 0.14 * mm * ln; A *= 1 - ln[:, None] * np.array([0.035, 0.022, 0.0])
     # a very fine skin grain everywhere, so the light never reads as plastic
     rng = np.random.default_rng(7); grain = rng.normal(0, 1, K)
     H += 0.015 * mm * grain
