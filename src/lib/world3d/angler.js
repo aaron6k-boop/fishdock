@@ -611,7 +611,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
   const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0, out: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0;
+  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0, fpEN = null, fpYN = null; // (fpEN/fpYN: the held rod's angle in your own view, eased)
   // ---- your body's weight in first person (metres from where the eye would be: x right, y up, z back) ----
   // the eye rides on it, and the rod and your hands hang off the eye: rocking back for a cast and throwing the weight
   // forwards through it, leaning back against a fish and being pulled towards it on a surge. A spring, a touch under
@@ -674,7 +674,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     let fishPose = null; // (the fish swimming: where its mouth is, which way its body lies, how hard it beats its tail)
     let jumpWatch = false, jumpAt = null, netRest = 0; // netRest: 0 hanging, 1 set down on the deck (the bag flattens)
     let netOn = false, netAt = null, ropesOn = false, poleFrom = null, inNet = false, actNow = null; // (actNow: a retargeted move played on cue: human3d ACTS)
-    let fpE = 0.9, fpYaw = -0.03, fpView = null, fpPull = 0, fpArm = null, fpCast = null, fpRest = null, fpUp = null; // first person: the rod's angle up from level, and a little towards the middle
+    let fpStrike = 0, fpE = 0.9, fpYaw = -0.03, fpView = null, fpPull = 0, fpArm = null, fpCast = null, fpRest = null, fpUp = null; // first person: the rod's angle up from level, and a little towards the middle
     landStage = null; landWater = null; dropRig = null; ropePull = null; releaseInfo = null; releaseRope = null; matOn = false; releasePole = false;
     const ph = info.phase; if (ph !== "landing") liftTook = false; // (a new landing: the fish not yet taken in the hand)
     jumpWatch = false; jumpAt = null;
@@ -813,7 +813,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       fpE = 0.95 - 0.22 * surge * tk + 0.28 * pump; fpYaw = -0.08 + clamp(run * 0.15 * st.runWidth, -0.22, 0.22); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
       // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
-      pitch += 0.38 * strikeK; fpE += 0.32 * strikeK; bendT += 0.25 * strikeK;
+      pitch += 0.38 * strikeK; fpStrike = 0.32 * strikeK; bendT += 0.25 * strikeK;
       bodyTo.z += 0.07 * strikeK; bodyTo.y -= 0.015 * strikeK; // (your weight thrown back into the strike)
       P.tension = tension;
       if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); else onSound?.("swish", at); feel("hooked", {}, true); } // (the strike: the rod swept up)
@@ -1201,7 +1201,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (from the lower right, leaning in a little towards the middle, so it doesn't run straight up the view)
       // (as you'd hold it yourself: the reel low in the middle of the view, the rod rising away up and to the left,
       // both hands on it, the water and the line beyond)
-      const e = fpCast ? fpCast.e : fpE - FPROD.de, sw = fpCast ? fpCast.sw : fpYaw - FPROD.dsw;
+      // (the held angle eased from one moment to the next, the strike's own sweep added on top unchanged: at the strike the
+      // angle for playing a fish replaced the one for a bite in a frame, and the rod's middle went 17 cm, up to 49 cm when
+      // the fish ran off to the side; eased over a tenth of a second the step is gone, the strike as sharp as before)
+      if (fpEN == null || fpCast) { fpEN = fpE; fpYN = fpYaw; } else { const kE = 1 - Math.exp(-dt * 10); fpEN += (fpE - fpEN) * kE; fpYN += (fpYaw - fpYN) * kE; }
+      const e = fpCast ? fpCast.e : fpEN + fpStrike - FPROD.de, sw = fpCast ? fpCast.sw : fpYN - FPROD.dsw;
       dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
       fpView = { vr, vu, vf };
       { const e0 = 0.9 - FPROD.de, s0 = -0.03 - FPROD.dsw; fpRest = vf.clone().multiplyScalar(Math.cos(e0) * Math.cos(s0)).addScaledVector(vu, Math.sin(e0)).addScaledVector(vr, Math.cos(e0) * Math.sin(s0)).normalize(); fpUp = bodyUp(vf, vu); } // (the rod's direction in the hold, for its roll: below)
