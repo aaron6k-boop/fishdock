@@ -18,13 +18,18 @@ end of each working session, so the next one can carry on from here.
 ## Merged with Aaron's approval (14 November 2026)
 
 #118 sound at the first tap, #119 steady arms, #120 levels and the logbook, #121 sea fret and storms, #122 phone
-performance (Auto is Medium on a phone, the step-down ladder, gulls drawn together, small things cast no shadow).
+performance, #123 shaders and textures readied under the loading screen, the hand off the rail, one reward card,
+#124 the Reel button as the reel (rhythm, holding, pauses).
 
 ## Draft PR waiting for Aaron
 
 | Branch | What |
 |---|---|
-| `play-polish` (#123) | From the 14 November recording: things that arrived after start-up (pier props, a passer-by, the drop net) readied before they're seen, not on the frame they first come into view (12 shaders and 16 textures at the cast on main, none on the branch); the frame-rate panel names the worst frame's cause on the phone and no longer made a WebGL context twice a second; the sleeves no longer magenta at dusk; the fish rests in your palms; warmer skin; one reward card instead of a pile of toasts |
+| `ui-buttons` | Cast, Strike and the side buttons as one set with the reel (Cast's power ring and distance, Strike's bite clock); the jacket's lining left out (the rings round the forearm on the drop net); the worst-frame line says where the time went; `docs/QUALITY-BACKLOG.md`; `docs/ASSET-LIBRARY.md` written by `tools/asset-library.mjs` |
+
+The permanent quality backlog (Aaron's programme of 14 November) is `docs/QUALITY-BACKLOG.md`: the ten biggest
+opportunities with what's wrong, why, the target, the fix, its cost and how it's checked. The list below is the older
+working backlog, kept for its detail.
 
 ## Backlog, in priority order
 
@@ -54,15 +59,15 @@ performance (Auto is Medium on a phone, the step-down ladder, gulls drawn togeth
 12. **Distant scenery.** Low priority.
 13. **Shop.** Later: game credits from fishing, cosmetic gear only, nothing that locks places.
 
-## Next action
+## Next action (checkpoint, 14 November, about 11:00)
 
-Wait for Aaron's review of `play-polish`, and his iPhone recording of the same sequence on it: the FPS display's
-"worst" line now names what the slowest frame was doing. Then: authored Blender clips for putting the rod in the rest
-and picking it up, and for the drop-net haul (needs this chat linked to Aaron's PC, where Blender is), which should also end the sleeve
-showing as a hollow ring round your forearm as you haul looking down over the rail (the far hand sits on your line of
-sight, so you look down the sleeve where it's cut near the eye; a dark inside and a soft fade were tried and weren't
-better); bite variety
-(taps, pulls, a slack-liner) by species (6, 9); tide height on the pier wall (4).
+1. Aaron's review of `ui-buttons`.
+2. His phone's FPS display on the next stall: the worst-frame line now says page busy, GPU or browser, page hidden or
+   resolution changed. Fix what it names.
+3. With this chat linked to his PC (Blender, downloads): the haul and lowering as authored clips (backlog 1), skin
+   textures for the hands (2), the tackle round you (6), a ray, a dogfish and a conger (7), field recordings (8).
+4. Without the PC: inspect the water and the pier at eye level against photographs (4, 5) and fix what's missing; bite
+   styles by species (9).
 
 ## Evidence kept
 

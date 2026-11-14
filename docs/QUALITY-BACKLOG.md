@@ -51,17 +51,20 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Check:** Aaron's phone recordings with the new line; `tools/phase-probe.mjs` counts.
 
 ### 4. The water by the pier
-- **Wrong:** no foam where the sea meets the pier's piles and wall, no rings where the float or the net sits, the near
-  water's colour is uniform.
-- **Target:** The Angler's water: foam lines and wash against structures, wind streaks, darker deep water.
-- **Do:** foam from the distance to the pier wall and piles (known from the place's map), rings from the float and net,
-  a depth-based colour. **Cost:** a few shader instructions on the water only. **Check:** the fixed scenes
-  (`tools/scenes.mjs`).
+- **Already in:** an FFT sea with whitecaps and lingering foam streaks (`fftSea.js`), foam washing against walls,
+  piers and banks from each place's shore map (`shoreMap.js`, `environment.js`), ripples, reflections.
+- **To check first, at eye level against photographs of the pier:** whether the wash against the piles reads at the
+  distance you see it from the deck, how the water's colour changes with depth by the wall, and how the near water
+  looks looking straight down (where the drop net goes in).
+- **Do:** only what that inspection finds missing. **Check:** the fixed scenes (`tools/scenes.mjs`) before and after.
 
 ### 5. The pier at eye level
-- **Wrong:** railings one clean paint, the deck's concrete tiles evenly, nothing on the deck (stains, gum, line, scales).
-- **Do:** wear masks on the railings (rust at joints and feet), decals on the deck, a second deck texture blended in.
-  **Cost:** decals as a few instanced quads. **Check:** before and after at the fishing spot, the same camera.
+- **Already in:** photographed concrete for the deck (with worn patches), rust and weed on the wall, weathering drawn
+  on the railings, lamp columns and furniture (`textures3d.js`).
+- **To check first:** the deck and railings at the fishing spot from standing height against photographs: tiling,
+  wear at the railing feet and joints, what lies on a working pier's deck.
+- **Do:** what that finds: wear masks, a few decals, a second deck texture blended in. **Cost:** decals as a few
+  instanced quads. **Check:** before and after at the fishing spot, the same camera.
 
 ### 6. Tackle around you
 - **Wrong:** the tripod, seat box, bucket and unhooking mat are made by code (simple shapes, drawn textures); the mat's
