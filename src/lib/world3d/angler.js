@@ -586,7 +586,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let tagOff = false;
   let headHand = null; // which hand has the head of a fish held up (0 left, 1 right)
   let landStage = null, landWater = null; // the drop net's stage while landing (for the hands): up | rod | pick | lower | lead | haul | in
-  let liftTook = false; const LIFT_REACH = 0.8; // (a fish swung in by hand: taken once it's this close to your left shoulder, first person)
+  let liftTook = false; const LIFT_REACH = 0.8;
+  const hoopPrev = [null, null], hoopNow = [false, false], HOOP_V = 2.5; // (where each hand on the drop net's hoop was last frame, and how fast it may go) // (a fish swung in by hand: taken once it's this close to your left shoulder, first person)
   let dropRig = null, ropePull = null, releaseInfo = null, releaseRope = null, matOn = false, releasePole = false, prevKt = -1; // the drop net's rope: over the rail where, hanging or not; which hand is pulling and how far through the pull
   const rodS = { butt: new THREE.Vector3(), dir: new THREE.Vector3(0, 1, 0), key: "", until: 0, ok: false }; // the rod eased from one way of holding it to the next
   let inHand = null; // the rod: 0 in its rest, 1 in your hands, between while it's picked up or put down
@@ -1539,6 +1540,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       figOff.lerp(want, 1 - Math.exp(-dt * 2.5)); if (figOff.lengthSq() < 1e-8) figOff.set(0, 0, 0); fig.group.position.copy(figOff); }
     const toFig = (v) => (v && figYaw ? v.clone().applyAxisAngle(UP, figYaw) : v);
     const toFigP = (v) => (v ? toFig(v.clone().sub(figOff)) : v);
+    // (and a hand on the hoop or reaching for it is never quicker than a hand moves, 2.5 m/s: following the rim as it
+    // swung up over the rail, and reaching after it from the shoulder as it passed close by, the hand went at up to
+    // 7 m/s, 12 cm a frame, lifting the net off the deck and bringing it back over)
+    const hoopPace = (hh, at) => { const i = hands.indexOf(hh), pv = hoopPrev[i]; hoopNow[i] = true; if (pv && dt > 0) { const d = at.clone().sub(pv), mx = HOOP_V * dt; if (d.length() > mx) at.copy(pv).addScaledVector(d.normalize(), mx); } hoopPrev[i] = at.clone(); };
     // first person: a hand on the drop net's hoop closes round the hoop's rim itself (the same hook grip as on the rope and
     // the knob, the rim across the fingers), not a pointing hand floating near it
     if (fp && netAt && net.visible) for (const hh of hands) if (hh && hh.kind === "hoop") {
@@ -1555,13 +1560,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // (so now the hand goes out towards the rim as far as the arm reaches, closed as it will be on it, and takes
         // hold when the hoop comes within reach: closed on a rope that isn't drawn there, the two hands were held up
         // in front of you like claws, on Aaron's review of 12 November)
-        if (toH.length() > reach + 0.3) { hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
+        if (toH.length() > reach + 0.3) { hoopPrev[hands.indexOf(hh)] = null; hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
         at.copy(sh).addScaledVector(toH.normalize(), reach);
+        hoopPace(hh, at);
         hh.at = at; hh.kind = "rope"; hh.loose = 0.5; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
         continue;
       }
+      hoopPace(hh, at);
       hh.at = at; hh.kind = "rope"; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
     }
+    for (let i = 0; i < 2; i++) { if (!hoopNow[i]) hoopPrev[i] = null; hoopNow[i] = false; } // (not on the hoop this frame: starts afresh next time)
     if (fp && ropeHeld === false && hands.some((h) => h?.kind === "rope")) { handsNow = hands.map((h, i) => (h ? h.at.clone() : handsNow[i])); ropeHeld = true; } // (the rope runs to where the hands were just put)
     // (13 November: the rope runs straight through each fist, along the line the fist was closed round, and bends just
     // outside the hand. Drawn straight from hand to hand, it bent at the middle of each fist, and the slack to the deck
