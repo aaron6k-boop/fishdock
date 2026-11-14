@@ -156,7 +156,12 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
         onLanded={(id, ev) => { const a = anglers.find((x) => x.id === id); onLanded?.(id, ev); if (alert?.id === id) setAlert(null); if (a?.local && a.inspect) { setLanded({ ev, key: `${id}|${ev?.id || ev?.t}` }); return; } if (a?.local || watch === id) { setCard({ ev, key: `${id}|${ev?.id || ev?.t}`, who: a?.local ? null : a?.name }); setTimeout(() => setCard((c) => (c?.ev === ev ? null : c)), 8000); } }}>
         <div className="fs-overlay"><WorldCtx.Provider value={w}><SceneCtx.Provider value={sceneState}>{children}</SceneCtx.Provider></WorldCtx.Provider></div>
         <div className="w3d-toasts" aria-live="polite">
-          {toasts.slice(-3).map((t) => <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
+          {toasts.slice(-3).map((t) => typeof t.text === "object" && t.text ? (
+            <div key={t.id} className={`w3d-toast ${t.kind || ""}`} role="status">
+              <span className="rw-head">{t.text.xp ? <b className="rw-xp">+{t.text.xp} XP</b> : null}<span className="rw-t">{t.text.title}</span></span>
+              {t.text.lines?.length ? <span className="rw-lines">{t.text.lines.map((l) => <span key={l}>{l}</span>)}</span> : null}
+            </div>
+          ) : <div key={t.id} className={`w3d-toast ${t.kind || ""}`}>{t.text}</div>)}
           {alert ? <button type="button" className="w3d-toast w3d-watch" onClick={() => watchOne(alert.id)}>{alert.name} has a fish on · <b>Watch</b></button> : null}
           {walkMsg ? <div className="w3d-toast msg" role="status">{walkMsg}</div> : null}
         </div>

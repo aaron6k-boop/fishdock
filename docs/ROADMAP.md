@@ -15,14 +15,16 @@ end of each working session, so the next one can carry on from here.
   registries and GitHub), run Blender, or run a real GPU. Licensed recordings and models have to be added to the repo
   (or attached in the conversation) to be used.
 
-## Draft PRs waiting for Aaron (13 November 2026)
+## Merged with Aaron's approval (14 November 2026)
 
-| PR | Branch | What |
-|---|---|---|
-| #118 | `game-sound` | Sound starts at the first tap (it was silent on an iPhone until switched off and on); bubbles for water, the cast, the tip bell, beach waves, a short outdoor echo, a compressor so it's louder on a phone |
-| #119 | `arm-steady` | The arms' vibration as the game opens (the rod put down 2% and picked up every other frame), and the snaps in a whole catch; `tools/arm-steady.mjs` |
-| #120 | `progression` | Levels, XP, medals, species book, badges, the logbook, three daily challenges; fish drawn by place with a natural size spread |
-| #121 | `weather` (on `game-sound`) | Sea fret and storms: fog from a preset or the real forecast's visibility, lightning lighting the cloud and the sea, thunder as late as the strike is far, a foghorn in a fret |
+#118 sound at the first tap, #119 steady arms, #120 levels and the logbook, #121 sea fret and storms, #122 phone
+performance (Auto is Medium on a phone, the step-down ladder, gulls drawn together, small things cast no shadow).
+
+## Draft PR waiting for Aaron
+
+| Branch | What |
+|---|---|
+| `play-polish` | From the 14 November recording: the frame-rate panel names the worst frame's cause on the phone; the panel no longer made a WebGL context twice a second; the sleeves no longer magenta at dusk; the fish rests in your palms; one reward card instead of three or four toasts piled over the picture |
 
 ## Backlog, in priority order
 

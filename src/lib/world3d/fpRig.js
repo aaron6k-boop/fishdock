@@ -99,6 +99,31 @@ function sampler(clip, bones) {
   };
 }
 
+// ---- skin: light going into it, and a little life in its colour ----
+// Skin isn't a painted surface: light goes in and comes out a few millimetres on, reddened by the blood under it, so
+// the edge of a shadow across a hand is soft and warm, not a hard grey line. And no hand is one even colour: it's a
+// touch redder and paler in patches. Without either, the hands read as a pale plastic model in Aaron's 14 November
+// recording, at dusk most of all. The scatter goes into the diffuse light only (a glow, not a shine); the patches are
+// worked out from where each point is on the hand itself, so they move with the fingers and never swim.
+const SKIN_BLEED = "reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );";
+const SKIN_NOISE = `varying vec3 vSkinP;
+float fpSkinHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
+float fpSkinNoise( vec3 x ) { vec3 i = floor( x ), f = fract( x ); f = f * f * ( 3.0 - 2.0 * f );
+  return mix( mix( mix( fpSkinHash( i ), fpSkinHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 0 ) ), fpSkinHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
+    mix( mix( fpSkinHash( i + vec3( 0, 0, 1 ) ), fpSkinHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 1 ) ), fpSkinHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z ); }`;
+export function skinShade(sh) {
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSkinP;").replace("#include <skinning_vertex>", "#include <skinning_vertex>\nvSkinP = transformed;");
+  const chunk = THREE.ShaderChunk.lights_physical_pars_fragment;
+  if (!chunk.includes(SKIN_BLEED)) return; // (a three.js whose lighting is written differently: plain skin, as before)
+  sh.fragmentShader = sh.fragmentShader
+    .replace("#include <common>", `#include <common>\n${SKIN_NOISE}`)
+    // (the light that wraps round past the shadow's edge, a third of the way into the dark side, warm)
+    .replace("#include <lights_physical_pars_fragment>", chunk.replace(SKIN_BLEED, `${SKIN_BLEED}\n\t{ float fpW = saturate( ( dot( geometryNormal, directLight.direction ) + 0.5 ) / 1.5 ); reflectedLight.directDiffuse += max( fpW - dotNL, 0.0 ) * directLight.color * vec3( 0.9, 0.26, 0.15 ) * BRDF_Lambert( material.diffuseColor ); }`))
+    // (patches 3 to 10 cm across, a few per cent redder or paler; the knuckles' and palms' sheen varies with them)
+    .replace("#include <color_fragment>", "#include <color_fragment>\n{ float fpN = fpSkinNoise( vSkinP * 11.0 ) * 0.6 + fpSkinNoise( vSkinP * 34.0 ) * 0.4; diffuseColor.rgb *= mix( vec3( 1.04, 0.96, 0.95 ), vec3( 0.97, 1.02, 1.03 ), fpN ); }")
+    .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, 0.3, 1.0 );");
+}
+
 export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b3a4f, model = null } = {}) {
   const group = new THREE.Group(); group.name = "fp-rig"; group.visible = false;
   const root = new THREE.Group(); root.name = "fp-rig-root"; group.add(root);
@@ -117,7 +142,11 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   coatMat.onBeforeCompile = (sh) => { sh.uniforms.fpNearCut = nearCut; sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut) discard;\n#include <opaque_fragment>"); };
   clothe(coatMat);
   // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)
-  skinMat.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .07) discard;\n#include <opaque_fragment>"); };
+  skinMat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .07) discard;\n#include <opaque_fragment>");
+    if (!gloves) skinShade(sh);
+  };
+  skinMat.customProgramCacheKey = () => (gloves ? "fp-gloves" : "fp-skin");
   for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(DIM); liveMats.add(m); }
   let R = null, failed = false;
   const hands = [0, 1].map((i) => ({ side: i ? "R" : "L", kind: undefined, cur: null, from: null, u: 1, want: null, fing: null, fingFrom: null, cyl: null, wrist: null }));

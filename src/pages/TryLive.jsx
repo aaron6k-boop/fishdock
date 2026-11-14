@@ -93,7 +93,7 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   // ---- the others fishing here: everyone playing this place is in its room (server/party.js public places), seen
   // in the 3D view with the names they chose; you're in it as soon as you have a name ----
   const [seat, setSeat] = useState(null), [toasts, setToasts] = useState([]);
-  const toast = (text, kind = "") => { const id = Math.random().toString(36).slice(2); setToasts((t) => [...t.slice(-3), { id, text, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200); };
+  const toast = (text, kind = "") => { const id = Math.random().toString(36).slice(2); setToasts((t) => [...t.slice(-3), { id, text, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), typeof text === "object" ? 5200 : 4200); };
   const poseBus = useMemo(() => new EventTarget(), []);
   const Proom = useParty(seat?.code || null, seat?.key || null, { onMessage: (m) => {
     const who = (id) => Proom_ref.current?.members.find((x) => x.id === id)?.name || "Someone", mine = (id) => id === Proom_ref.current?.me?.id;
@@ -213,10 +213,11 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   const reward = (id) => { if (!rewards.current.has(String(id))) return; rewards.current.delete(String(id));
     const all = readDiary(), e = all.find((d) => d.id === String(id)); if (!e) return;
     const r = afterCatch(all.filter((d) => d.id !== e.id), e, Date.now()), what = `${r.medal ? `${r.medal.name.toLowerCase()} ` : ""}${(e.name || "fish").toLowerCase()}`;
-    toast(`+${r.xp} XP · ${what[0].toUpperCase()}${what.slice(1)}${r.first ? " · New kind" : r.best ? " · Your biggest" : ""}`, "good");
-    if (r.levelUp) toast(`Level ${r.level} reached`, "good");
-    for (const c of r.challenges) toast(`Challenge done: ${c.name} (+${CHALLENGE_XP} XP)`, "good");
-    for (const b of r.badges.slice(0, 2)) toast(`Badge: ${b.name}`, "good"); };
+    // (one card for everything a fish earned, rather than a stack of three or four that piled up over the top of the
+    // picture and each other in the 14 November recording)
+    const xp = r.xp + r.challenges.length * CHALLENGE_XP;
+    toast({ xp, title: `${what[0].toUpperCase()}${what.slice(1)}${r.first ? " · New kind" : r.best ? " · Your biggest" : ""}`,
+      lines: [r.levelUp ? `Level ${r.level} reached` : null, ...r.challenges.map((c) => `Challenge done: ${c.name}`), ...r.badges.slice(0, 2).map((b) => `Badge: ${b.name}`)].filter(Boolean).slice(0, 3) }, "good reward"); };
   const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: meRoom?.spot || (placeId === initialPlace && point) || 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }, ...others.map((m) => ({ id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, look: m.look || null, local: false, inspect: false, real: false, events: Proom.events.filter((e) => e.who === m.id), fishHint: null }))], [events, sp.id, length, look, placeId, point, meRoom?.spot, others, Proom.events]); // eslint-disable-line react-hooks/exhaustive-deps
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (

@@ -110,12 +110,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   try { post = pano ? null : createPost(renderer, scene, camera, { level: Q.post }); } catch (e) { console.warn("FishDock 3D: post-processing off", e); post = null; }
   const anisoCap = renderer.capabilities.getMaxAnisotropy(); let maxAniso = Q.q >= 1 ? anisoCap : 4;
   let texSeen = -1, sharpenAt = 0;
-  function sharpen() {
+  function sharpen(now = false) {
     // (textures arrive as the models load: look again whenever the count changes, at most once a second or so)
     // (looked for six times a second, so nearly every texture gets its sharpness before the graphics card first has
     // it. Found only once a second, after the count of textures had changed, most had been sent already and were sent
     // again whole, mip levels and all, a few dozen at a time as a place loaded: stutters just as you arrive)
-    if (++sharpenAt < 10) return; sharpenAt = 0;
+    // (now: straight away, before warm() sends textures ahead of time; otherwise each one it sent was sent a second
+    // time a moment later, when this found it without its sharpness)
+    if (!now && ++sharpenAt < 10) return; sharpenAt = 0;
     scene.traverse((o) => {
       const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : null; if (!ms) return;
       for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "bumpMap", "emissiveMap"]) {
@@ -135,8 +137,64 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // ---- ahead of time: shaders built and textures sent for things that exist but have not been drawn yet ----
   // (three.js does both the first time a thing is actually drawn, which for a fish, a net or a light that comes on at a
   // bite is in the middle of the action. Given the object, or nothing for the whole scene.)
-  let warmAt = 0, warmSum = 0, frameTap = null;
-  function warm(root = scene) {
+  let warmAt = 0, warmSum = 0, frameTap = null, growN = 0, growWas = -1, warmedN = -1, warmBusy = false;
+  // (every slot a texture can sit in, not only the common five: a building's ambient occlusion or a metal's
+  // metalness map was sent the first time you turned and looked at it)
+  const TEX_SLOTS = ["map", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "bumpMap", "alphaMap", "emissiveMap", "lightMap", "displacementMap", "specularMap", "clearcoatMap", "clearcoatNormalMap", "clearcoatRoughnessMap", "sheenColorMap", "sheenRoughnessMap", "transmissionMap", "thicknessMap", "specularIntensityMap", "specularColorMap", "iridescenceMap", "iridescenceThicknessMap", "anisotropyMap"];
+  // ---- every model's vertices sent to the graphics card ahead of time ----
+  // three.js sends a model's vertex buffers the first time it is drawn in view, and building shaders ahead of time
+  // (compile) doesn't do it: so the first look round, at the lookout, the town or along the pier, sent each model's
+  // buffers on the frame it first came into view. So everything not yet drawn is drawn once now, frustum culling off,
+  // into a single pixel of what the scene is drawn into, and into the sun's shadow map (the shadow's own shaders for a
+  // net or a sign with holes in it were built the first time each came into the sun's view): every buffer and texture
+  // sent, every shader it needs built, at a moment that doesn't matter (under the loading screen, or as gear arrives).
+  // What's been sent once is skipped next time.
+  const sentGeo = new WeakSet();
+  function sendAll() {
+    const off = [], culled = [];
+    // (what would be drawn: warm() has shown the hidden ones for the moment before calling this)
+    scene.traverseVisible((o) => {
+      if (!(o.isMesh || o.isLine || o.isPoints || o.isSprite)) return;
+      if (o.geometry && sentGeo.has(o.geometry)) { off.push(o); return; }
+      if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; }
+    });
+    for (const o of off) o.visible = false;
+    // (one pixel: a render target keeps its own scissor, and takes it when it's bound; the screen uses the renderer's)
+    const tgt = renderer.getRenderTarget(), shadowWas = renderer.shadowMap.autoUpdate, needWas = renderer.shadowMap.needsUpdate, ac = renderer.autoClear;
+    const sc = tgt ? tgt.scissorTest : renderer.getScissorTest(), box = tgt ? tgt.scissor.clone() : renderer.getScissor(new THREE.Vector4());
+    try {
+      renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true; renderer.autoClear = false;
+      if (tgt) { tgt.scissor.set(0, 0, 1, 1); tgt.scissorTest = true; renderer.setRenderTarget(tgt); } else { renderer.setScissor(0, 0, 1, 1); renderer.setScissorTest(true); }
+      renderer.render(scene, camera);
+    } finally {
+      renderer.shadowMap.autoUpdate = shadowWas; renderer.shadowMap.needsUpdate = needWas; renderer.autoClear = ac;
+      if (tgt) { tgt.scissor.copy(box); tgt.scissorTest = sc; renderer.setRenderTarget(tgt); } else { renderer.setScissor(box); renderer.setScissorTest(sc); }
+      for (const o of off) o.visible = true;
+      for (const o of culled) o.frustumCulled = true;
+    }
+    scene.traverseVisible((o) => { if (o.geometry) sentGeo.add(o.geometry); });
+  }
+  function warm(root = scene, late = false) {
+    if (late && warmBusy) { warmedN = -1; return; } // (one late one at a time: looked at again at the next count)
+    // (late, in the middle of play: the shaders built in the background where the browser can (compileAsync, with
+    // the parallel-compile extension), and only once they're ready is everything sent and drawn into its pixel, so a
+    // frame doesn't sit waiting on the compiler)
+    if (late && root === scene) {
+      try {
+        const hidden = []; scene.traverse((o) => { if (!o.visible && !o.isLight) { hidden.push(o); o.visible = true; } });
+        const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
+        let mats; try { mats = renderer.compile(scene, camera); } finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
+        // (three's own compileAsync does this too, but threw, and never finished, on a material whose shader had gone
+        // in the meantime; so here: gone counts as done, and a second and a half is long enough to wait regardless)
+        warmBusy = true; const t0 = performance.now();
+        const check = () => {
+          if (mats) for (const m of mats) { const pr = renderer.properties.get(m).currentProgram; if (!pr || pr.isReady?.() !== false) mats.delete(m); }
+          if (!mats || !mats.size || performance.now() - t0 > 1500) { warmBusy = false; warm(scene); } else setTimeout(check, 16);
+        };
+        setTimeout(check, 16);
+      } catch { warmBusy = false; }
+      return;
+    }
     try {
       // (built for what the scene is really drawn into. With post-processing on that is the composer's target, not
       // the screen, and a shader for one is not the shader for the other: built for the screen, as this used to be at
@@ -145,9 +203,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       // unhooking mat, the nets and the splashes, hidden until a catch, had theirs built on the frame each first
       // appeared, mid-landing. Lights are left as they are: showing one would build every shader for a light that's off)
       const hidden = []; root.traverse((o) => { if (!o.visible && !o.isLight) { hidden.push(o); o.visible = true; } });
+      sharpen(true);
       const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
-      try { if (root === scene) renderer.compile(scene, camera); else renderer.compile(root, camera, scene); } finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
-      root.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const k of ["map", "normalMap", "roughnessMap", "alphaMap", "emissiveMap"]) { const t = m[k]; if (t?.isTexture && t.image && (t.image.width || t.image.data) && !renderer.properties.get(t).__webglTexture) renderer.initTexture(t); } });
+      try { if (root === scene) { renderer.compile(scene, camera); sendAll(); } else renderer.compile(root, camera, scene); } finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
+      root.traverse((o) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const k of TEX_SLOTS) { const t = m[k]; if (t?.isTexture && !t.isRenderTargetTexture && t.image && (t.image.width || t.image.data) && !renderer.properties.get(t).__webglTexture) renderer.initTexture(t); } });
     } catch { /* (a driver that won't: they are built as they are met, as before) */ }
   }
   // ---- small things cast no shadow: a reel's parts, a clip, a hook, a ring on the rod ----
@@ -850,6 +909,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // anything an angler has just been given (the coming fish, a net) goes to the graphics card now, shaders and
     // textures, while it is still out of sight: not on the frame it first appears
     { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum) { warmSum = sum; warm(); } } // (the whole scene: a fish and a net live in the world, not under their angler)
+    // and anything else that turns up after the start (the pier's lifebuoys, benches, signs and lamp posts, someone
+    // walking on the pier, a fish model): counted every half second, and readied once it has stopped arriving. Measured
+    // on the 14 November build at Medium: 17 shaders and 11 textures were built or sent in the first seconds of fishing,
+    // as the cast swung the view round to things never drawn before, and 3 more on the first look round. Those were the
+    // stalls in Aaron's recording at the cast and at 16 to 22 s, turning to the lookout
+    if (++growN % 30 === 0) { let n = 0; scene.traverse((o) => { if (o.material) n++; }); if (n !== warmedN && n === growWas) { warmedN = n; warm(scene, true); } growWas = n; }
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
