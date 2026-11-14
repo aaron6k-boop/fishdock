@@ -398,10 +398,13 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 1.04, 0.006, 6, 20), wm); rim.position.copy(top); rim.quaternion.copy(shaft.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI / 2));
       const sg = new THREE.Group(); sg.add(shaft, rim); attach(s + "_Calf", sg);
       // the foot: from behind the heel to past the toes, on the ground
-      const heelZ = an.z + 0.075, tipZ = toe.z - 0.06, cx = (an.x + toe.x) / 2 + (s === "L" ? 0 : 0);
-      const L0 = heelZ - tipZ, Wf = 0.115, Hf = Math.max(0.1, an.y + 0.025);
-      const foot = new THREE.Mesh(roundedBox(), wm); foot.scale.set(Wf / 2, Hf / 2, L0 / 2); foot.position.set(cx, Hf / 2, (heelZ + tipZ) / 2);
-      const so = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), sole); so.scale.set(Wf * 0.96, 0.014, L0 * 0.97); so.position.set(cx, 0.007, (heelZ + tipZ) / 2);
+      const heelZ = an.z + 0.078, tipZ = toe.z - 0.072, cx = (an.x + toe.x) / 2 + (s === "L" ? 0 : 0); // (long enough to cover the shoe underneath: its toe showed through)
+      const L0 = heelZ - tipZ, Wf = 0.12, Hf = Math.max(0.1, an.y + 0.025);
+      // (shaped as a welly is: a rounded heel, the widest across the ball of the foot, a toe box lower than the instep and
+      // rounded off at the tip, on a flat sole. It was a rounded box, a toy's boot, on a square black sole whose corners
+      // stood out under it like a plate)
+      const foot = new THREE.Mesh(wellyFoot(cx, heelZ, tipZ, Wf, Hf), wm);
+      const so = new THREE.Mesh(wellyFoot(cx, heelZ + 0.004, tipZ - 0.004, Wf * 1.04, 0.016, true), sole);
       const fg = new THREE.Group(); fg.add(foot, so); attach(s + "_Foot", fg);
     }
   }
@@ -912,6 +915,36 @@ function strap(curve, outward, w, d) {
   return g;
 }
 // a box with well-rounded edges (a superellipsoid), 2 units across
+// ---- a welly's foot: lofted along the foot from heel to toe, in the figure's own space (x across, y up, -z forwards) ----
+// (sole: the thin dark sole under it, the same outline a touch larger, flat on the ground)
+function wellyFoot(cx, heelZ, tipZ, W, H, sole = false) {
+  const K = 18, M = 16, pos = [], idx = [], len = heelZ - tipZ;
+  const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  for (let i = 0; i <= K; i++) {
+    const t = i / K, z = heelZ - len * t;
+    // across: a rounded heel, the widest at the ball of the foot (two thirds along), then the toe rounding off
+    let w = W * (0.8 + 0.2 * sm(0, 0.62, t) - 0.12 * sm(0.7, 0.95, t));
+    // up: the instep up to the ankle at the back, the toe box lower at the front
+    let h = sole ? H : H * (1 - 0.32 * sm(0.3, 0.8, t));
+    // the ends rounded: the heel's back and the toe's tip close up in a curve
+    const endT = t > 0.86 ? Math.sqrt(Math.max(0, 1 - ((t - 0.86) / 0.14) ** 2)) : t < 0.06 ? Math.sqrt(Math.max(0, 1 - ((0.06 - t) / 0.06) ** 2)) * 0.35 + 0.65 : 1;
+    w *= endT; h *= sole ? 1 : 0.55 + 0.45 * endT;
+    for (let j = 0; j <= M; j++) {
+      // round the top, flat underneath (a half superellipse, and its base)
+      const a = (j / M) * Math.PI, c = Math.cos(a), sn = Math.sin(a);
+      const x = cx + (w / 2) * Math.sign(c) * Math.abs(c) ** 0.7, y = sole ? (j === 0 || j === M ? 0 : h) : h * Math.abs(sn) ** 0.85;
+      pos.push(x, y, z);
+    }
+  }
+  const R = M + 1;
+  for (let i = 0; i < K; i++) for (let j = 0; j < M; j++) { const a = i * R + j, b = a + 1, c = a + R, d = c + 1; idx.push(a, c, b, b, c, d); }
+  // the bottom, and the two ends closed
+  const base = pos.length / 3; for (let i = 0; i <= K; i++) { pos.push(...pos.slice((i * R) * 3, (i * R) * 3 + 3)); pos.push(...pos.slice((i * R + M) * 3, (i * R + M) * 3 + 3)); }
+  for (let i = 0; i < K; i++) { const a = base + i * 2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, c, b, d, c); }
+  for (const i of [0, K]) { const cIdx = pos.length / 3, row = i * R; let mx = 0, my = 0, mz = 0; for (let j = 0; j <= M; j++) { mx += pos[(row + j) * 3]; my += pos[(row + j) * 3 + 1]; mz += pos[(row + j) * 3 + 2]; } pos.push(mx / R, my / R, mz / R); for (let j = 0; j < M; j++) { if (i === 0) idx.push(cIdx, row + j, row + j + 1); else idx.push(cIdx, row + j + 1, row + j); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+
 function roundedBox(p = 3.2) {
   const g = new THREE.BoxGeometry(2, 2, 2, 8, 8, 8), a = g.attributes.position;
   for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i), z = a.getZ(i), r = (Math.abs(x) ** p + Math.abs(y) ** p + Math.abs(z) ** p) ** (1 / p) || 1; a.setXYZ(i, x / r, y / r, z / r); }
