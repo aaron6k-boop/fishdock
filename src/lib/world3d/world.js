@@ -921,7 +921,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     }
     // anything an angler has just been given (the coming fish, a net) goes to the graphics card now, shaders and
     // textures, while it is still out of sight: not on the frame it first appears
-    { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum) { warmSum = sum; warm(); } } // (the whole scene: a fish and a net live in the world, not under their angler)
+    // (in the background, as the late ones below: readied all at once here, the coming fish and its net stopped the page
+    // for 7.2 seconds in the software renderer, mid-landing, as their shaders were built and checked. One at a time:
+    // while one is under way, looked at again next frame)
+    { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum && !warmBusy) { warmSum = sum; warm(scene, true); } } // (the whole scene: a fish and a net live in the world, not under their angler)
     // and anything else that turns up after the start (the pier's lifebuoys, benches, signs and lamp posts, someone
     // walking on the pier, a fish model): counted every half second, and readied once it has stopped arriving. Measured
     // on the 14 November build at Medium: 17 shaders and 11 textures were built or sent in the first seconds of fishing,
