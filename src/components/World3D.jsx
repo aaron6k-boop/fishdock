@@ -214,7 +214,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
     setTorch: (c) => W.current?.setTorch(c),
     setTrack: (on) => W.current?.setTrack(on), setLandShot: (on) => W.current?.setLandShot(on),
     inspectFish: (on) => W.current?.inspectFish(on), keepFish: () => W.current?.keepFish(), releaseFish: () => W.current?.releaseFish(),
-    setSpeaking: (id, on) => W.current?.setSpeaking(id, on),
+    setSpeaking: (id, on) => W.current?.setSpeaking(id, on), say: (id, text) => W.current?.say(id, text),
     walk: (on, o) => W.current?.walk(on, o), setWalkInput: (i) => W.current?.setWalkInput(i), jump: () => W.current?.jump(), fishHere: () => W.current?.fishHere(),
     onPose: (f) => W.current?.onPose(f), emote: (k) => W.current?.emote(k),
     setLookFeel: (v) => W.current?.look.setFeel({ sens: LOOK_SENS[v.look] ?? 1, smooth: v.smooth !== false }),

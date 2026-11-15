@@ -519,3 +519,37 @@ test("the board drops a count that's stopped coming after three hours", () => {
   assert.deepEqual(b.counts(t0 + 2 * 3600e3), { "gorleston-south-pier": 3 });
   assert.deepEqual(b.counts(t0 + 3.1 * 3600e3), {});
 });
+
+test("public places: the fixed phrases only, never typed words; seen by everyone there, and by anyone who comes later", async (t) => {
+  const h = harness(t);
+  const pub = (name) => h.c("POST", "/public", { body: { mark: "gorleston-south-pier", venue: "pier", name } });
+  const a = await pub("Gary"), b = await pub("Aaron");
+  const ga = await h.sock(a.body.code, a.body.member.key), ab = await h.sock(b.body.code, b.body.member.key);
+  await ga.send({ t: "say", id: "bites" });
+  const line = ab.last("chat").c;
+  assert.equal(line.say, "bites"); assert.equal(line.who, a.body.member.id); assert.ok(!("text" in line), "an id, no words of anyone's own");
+  // (anything else is dropped: a made-up id, words in place of an id, typed chat)
+  const chats = () => ab.got.filter((m) => m.t === "chat").length, before = chats();
+  await ga.send({ t: "say", id: "come to my house" }); await ga.send({ t: "say", text: "hi", id: null }); await ga.send({ t: "chat", text: "hello" });
+  assert.equal(chats(), before, "nothing else reached anyone");
+  assert.equal(ga.last("error").code, "chat_off");
+  // someone connecting later sees the phrase (and still no typed chat)
+  const again = await h.sock(b.body.code, b.body.member.key);
+  assert.ok(again.last("hello").chat.some((c) => c.say === "bites"));
+  // and it's limited like chat: a few at a time
+  for (let i = 0; i < 8; i++) await ga.send({ t: "say", id: "hello" });
+  assert.equal(ga.last("error").code, "chat_slow");
+});
+
+test("in a party the phrases follow the host's chat switch, alongside typed chat", async (t) => {
+  const { phraseText, lineText, PHRASES } = await import("../src/lib/chatPhrases.js");
+  assert.equal(phraseText("bites"), "Any bites?"); assert.equal(phraseText("nope"), null); assert.equal(phraseText({}), null);
+  assert.equal(lineText({ say: "nice" }), "Nice fish!"); assert.equal(lineText({ text: "hi" }), "hi"); assert.equal(lineText({ sys: "joined", name: "Sam" }), null);
+  assert.ok(PHRASES.every((p) => /^[a-z]+$/.test(p.id) && p.text.length <= 40 && !/[—–]/.test(p.text)), "short, plain, no dashes");
+  assert.equal(new Set(PHRASES.map((p) => p.id)).size, PHRASES.length);
+  const room = new PartyRoom(); const now = Date.UTC(2026, 10, 15, 21);
+  const host = (await room.init({ code: "ABCDEF", mode: "virtual", venue: "pier", place: { label: "Norfolk coast" }, name: "Host" }, now)).id;
+  assert.equal(room.message(host, { t: "say", id: "luck" }, now + 10).out[0].msg.c.say, "luck");
+  room.s.chatOn = false;
+  assert.equal(room.message(host, { t: "say", id: "luck" }, now + 20).out[0].msg.code, "chat_off");
+});

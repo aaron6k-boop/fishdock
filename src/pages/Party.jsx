@@ -12,6 +12,7 @@ import { Icon } from "../components/ui.jsx";
 import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
 import { saveLook } from "../lib/world3d/people.js";
 import { useParty, previewParty, joinParty, remember, membershipOf, forget, partyLink, momentText, uploadPartyPhoto, partyPhotoUrl } from "../lib/party.js";
+import { lineText } from "../lib/chatPhrases.js";
 import { useVirtualFishing } from "../lib/useVirtualFishing.js";
 import { phaseAt } from "../lib/liveEvents.js";
 import { isLanded } from "../lib/landed.js";
@@ -122,7 +123,7 @@ function PartyLive({ code, mkey }) {
       if (m.t === "chat" && m.c.sys && m.c.who !== P_ref.current?.me?.id) {
         toast(noticeText(m.c), "join");
         if (m.c.sys === "joined" && !blocked.has(m.c.who)) haptics.feel("friendJoined", { key: `${m.c.who}|joined|${Math.floor(Date.now() / 60000)}` });
-      } else if (m.t === "chat" && !m.c.sys && m.c.who !== P_ref.current?.me?.id && !blocked.has(m.c.who) && sheetRef.current !== "chat") toast(`${name(m.c.who)}: ${m.c.text}`, "chat");
+      } else if (m.t === "chat" && !m.c.sys && m.c.who !== P_ref.current?.me?.id && !blocked.has(m.c.who) && sheetRef.current !== "chat") toast(`${name(m.c.who)}: ${lineText(m.c)}`, "chat");
       if (m.t === "signal") voice.current?.signal(m.from, m.data);
       if (m.t === "voice" && m.voice.on && m.who !== P_ref.current?.me?.id && !blocked.has(m.who)) voice.current?.meet(m.who);
       if (m.t === "voice" && !m.voice.on) voice.current?.drop(m.who);
@@ -211,6 +212,9 @@ function PartyLive({ code, mkey }) {
     return { id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, look: m.look || null, local: m.id === me?.id, inspect: m.id === me?.id && mode === "virtual", real: mode === "real", events, fishHint: m.id === me?.id && mode === "virtual" ? fishFor : null };
   }), [P.members, P.events, vf.events, me?.id, mode, replay, fishFor]);
 
+  // (what's said in the party, typed or a phrase, each over its angler's head in the 3D view; not from anyone blocked)
+  const chat3d = useMemo(() => (P.chat || []).filter((c) => !blocked.has(c.who)).map((c) => { const text = lineText(c); return text ? { seq: c.seq, who: c.who, name: P.members.find((m) => m.id === c.who)?.name || "Someone", text, mine: c.who === me?.id } : null; }).filter(Boolean), [P.chat, P.members, me?.id, blocked]);
+
   // the light: a real trip is always now; a virtual party at whatever time of day the host picks (midday to start)
   const lightPick = mode === "real" ? "now" : party?.light || "midday";
   const lightNow = useMemo(() => { const at = { lat: 52.6, lon: 1.7 }, t = timeFor(lightPick, at), sun = ASTRO.sunPos(t, at.lat, at.lon), moon = ASTRO.moonPos(t, at.lat, at.lon); return { sunAlt: sun.alt, sunAz: sun.az, moonAlt: moon.alt, moonAz: moon.az, moonIllum: ASTRO.moonIllum(t).fraction }; }, [lightPick, Math.floor(now / 600000)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -254,7 +258,7 @@ function PartyLive({ code, mkey }) {
   return (
     <div className={`watch-shell try-shell immersive party-shell${uiHidden ? " ui-hidden" : ""}`}>
       <div className="watch"><div className="watch-stage">
-        <Stage3D onWindIn={mode === "virtual" ? vf.windIn : undefined} fightLive={mode === "virtual" ? vf.fightLive : null} onReel={mode === "virtual" ? { tap: vf.tap, hold: vf.hold } : null} menu={[{ key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "people", label: "People, chat and catches", icon: "users", onClick: () => setSheet("people") }]} feel={haptics.feel} fight={mode === "virtual" ? vf.fight : null} reelOpts={mode === "virtual" ? vf.opts : null} onReelOpts={vf.setOpts} poseBus={poseBus} onHear={onHear} speaking={speaking} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
+        <Stage3D onWindIn={mode === "virtual" ? vf.windIn : undefined} fightLive={mode === "virtual" ? vf.fightLive : null} onReel={mode === "virtual" ? { tap: vf.tap, hold: vf.hold } : null} menu={[{ key: "sound", label: sound ? "Sound on" : "Sound off", icon: sound ? "volume" : "mute", on: sound, onClick: () => setSound(!sound) }, { key: "people", label: "People, chat and catches", icon: "users", onClick: () => setSheet("people") }]} feel={haptics.feel} fight={mode === "virtual" ? vf.fight : null} reelOpts={mode === "virtual" ? vf.opts : null} onReelOpts={vf.setOpts} poseBus={poseBus} onHear={onHear} speaking={speaking} chat={chat3d} chatMode={party?.chatOn ? "free" : null} onSay={(id) => P_ref.current?.send({ t: "say", id })} onChat={(text) => P_ref.current?.send({ t: "chat", text })} onPose={mode === "virtual" ? sendPose : undefined} onEmote={mode === "virtual" ? (k) => P_ref.current?.send({ t: "pose", p: { emote: k } }) : undefined} spotId={party?.place?.mark || null} placeName={party?.place?.label || ""} venue={venue} anglers={anglers} light={lightNow} cond={cond} facing={venue === "river" || venue === "lake" ? 200 : 110} sound={sound} now={Date.now} onTap={() => setUiHidden((h) => !h)} toasts={toasts}
           catchPhoto={(ev) => (ev?.data?.photo ? partyPhotoUrl(code, mkey, ev.data.photo) : null)}>
           <div className="fs-top">
             <span className={`live-badge ${mode === "real" ? "s-live" : "s-replay"}`}>{mode === "real" ? <><span className="rec-dot" />Real trip</> : "Virtual"}</span>
@@ -344,7 +348,7 @@ function PartyLive({ code, mkey }) {
             {!party.chatOn ? <p className="notice small">The host has turned chat off.</p> : null}
             <ol className="chat">{P.chat.filter((c) => c.sys || !blocked.has(c.who)).map((c) => (c.sys
               ? <li key={c.seq} className="sys">{noticeText(c, c.who === me.id)}<span className="tiny"> {fmtTime(c.at - P.offset)}</span></li>
-              : <li key={c.seq} className={c.who === me.id ? "mine" : ""}><b>{memberById[c.who]?.name || "Someone"}</b> {c.text}<span className="tiny"> {fmtTime(c.at - P.offset)}</span></li>))}</ol>
+              : <li key={c.seq} className={c.who === me.id ? "mine" : ""}><b>{memberById[c.who]?.name || "Someone"}</b> {lineText(c)}<span className="tiny"> {fmtTime(c.at - P.offset)}</span></li>))}</ol>
             <form className="row" onSubmit={(e) => { e.preventDefault(); if (chatText.trim()) { P.send({ t: "chat", text: chatText.trim() }); setChatText(""); } }}>
               <input value={chatText} onChange={(e) => setChatText(e.target.value)} maxLength={200} placeholder={party.chatOn ? "Say something" : "Chat is off"} disabled={!party.chatOn} aria-label="Message" />
               <button type="submit" className="btn small primary" disabled={!party.chatOn}>Send</button>

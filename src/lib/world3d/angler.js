@@ -108,6 +108,23 @@ function label(text, colour = "#ffffff") {
   s.scale.set(0.95, 0.24, 1); s.renderOrder = 20;
   return s;
 }
+// a speech bubble: a chat line over someone's head (Fish Together, and the phrases in public places), up to two lines,
+// a little tail pointing down at the name; its size follows the words so a short "Yes" is a small bubble
+export function bubble(text) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 160;
+  const g = c.getContext("2d"); g.font = "600 30px system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+  // (wrapped by words to fit 440 px, two lines at most, the second cut short with an ellipsis)
+  const words = String(text).trim().split(/\s+/), lines = [""];
+  for (const w of words) { const next = lines[lines.length - 1] ? `${lines[lines.length - 1]} ${w}` : w; if (g.measureText(next).width <= 440 || !lines[lines.length - 1]) lines[lines.length - 1] = next; else if (lines.length < 2) lines.push(w); else { lines[1] = `${lines[1]}…`; break; } }
+  for (let i = 0; i < lines.length; i++) while (g.measureText(lines[i]).width > 440 && lines[i].length > 2) lines[i] = `${lines[i].slice(0, -2)}…`;
+  const w = Math.min(480, Math.max(...lines.map((l) => g.measureText(l).width)) + 44), h = lines.length * 38 + 26, x0 = (512 - w) / 2, y0 = 128 - h;
+  g.fillStyle = "rgba(250,252,250,.94)"; g.beginPath(); g.roundRect?.(x0, y0, w, h, 22); g.moveTo(244, 128); g.lineTo(256, 150); g.lineTo(268, 128); g.fill();
+  g.fillStyle = "#13212a"; lines.forEach((l, i) => g.fillText(l, 256, y0 + 13 + 19 + i * 38));
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true }));
+  s.scale.set(1.3, 1.3 * 160 / 512, 1); s.renderOrder = 21; s.center.set(0.5, 0);
+  return s;
+}
 // a cylinder from a to b (for limbs, rod sections, ropes)
 const UP = new THREE.Vector3(0, 1, 0), tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
 const tmpUp = new THREE.Vector3();
@@ -201,6 +218,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const talkTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"); g.strokeStyle = "#7ee8de"; g.lineWidth = 5; g.lineCap = "round"; for (const r of [10, 19, 28]) { g.beginPath(); g.arc(32, 40, r, -Math.PI * 0.8, -Math.PI * 0.2); g.stroke(); } g.fillStyle = "#7ee8de"; g.beginPath(); g.arc(32, 40, 4, 0, Math.PI * 2); g.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
   const talk = new THREE.Sprite(new THREE.SpriteMaterial({ map: talkTex, depthTest: false, transparent: true })); talk.scale.set(0.32, 0.32, 1); talk.position.set(0, tagY + 0.31, 0); talk.visible = false; talk.renderOrder = 10; root.add(talk);
   let speaking = false;
+  // a chat line over the head: shown for SAY_S seconds, fading out over the last half second (your own in first person
+  // isn't shown: it would sit in front of your eyes)
+  const SAY_S = 6;
+  let said = null; // { s: the sprite, t0 }
   // an emote (Fish Together): a wave, a cheer or a clap for a couple of seconds
   const EMOTE_S = { wave: 2.2, cheer: 1.8, clap: 2.0 };
   let emoting = null;
@@ -1668,6 +1689,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFigP(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
     fig.pose({ t, dt, act: actNow, emote, kneel, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5, off: walking.off || 0, floor: walking.floor || null } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFigP(toLocal(lookAtW)) : null, speaking, hood: fig.look?.hat === 4, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
     tag.position.y = fig.top + 0.3; talk.position.y = tag.position.y + 0.31;
+    if (said) { said.t0 ??= t; const age = t - said.t0; if (age > SAY_S) { root.remove(said.s); said.s.material.map.dispose(); said.s.material.dispose(); said = null; }
+      else { said.s.position.y = tag.position.y + (speaking ? 0.5 : 0.17); said.s.material.opacity = Math.min(1, (SAY_S - age) / 0.5) * Math.min(1, age / 0.15); said.s.visible = !fp && !tagOff; } }
     if (!fp && !walking && (ph === "waiting" || ph === "idle" || ph === "ended" || ph === "paused")) { const ey = fig.eyeAt?.y; if (ey > 1.2 && ey < 2) eyeH += (ey - eyeH) * (1 - Math.exp(-dt * 0.5)); }
 
     // ---- fish, net, line, rig ----
@@ -1927,6 +1950,12 @@ const FPR = { get x() { return filmSet("__fdFpr")?.x ?? holdView().x; }, get y()
       else if (walking) { walking = null; place(curSpot); feetShadow.visible = !fp; }
     },
     setSpeaking(on) { speaking = !!on; },
+    /** A chat line in a bubble over the head for a few seconds (a new one replaces the last). */
+    say(text) {
+      if (said) { root.remove(said.s); said.s.material.map.dispose(); said.s.material.dispose(); said = null; }
+      if (!text || typeof document === "undefined") return;
+      const s = bubble(text); s.position.set(0, tag.position.y + 0.17, 0); s.material.opacity = 0; root.add(s); said = { s, t0: null };
+    },
     /** Wave, cheer or clap (Fish Together). Only free hands join in: not while fighting a fish. */
     emote(kind) { if (EMOTE_S[kind]) emoting = { kind, t0: null }; },
     get walking() { return !!walking; },

@@ -1079,6 +1079,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     get walking() { return !!W; },
     /** Someone talking (voice chat): a light above their head. */
     setSpeaking(id, on) { anglers.get(id)?.a.setSpeaking(on); },
+    /** A chat line in a bubble over someone's head (id: the angler's, as in setAnglers). */
+    say(id, text) { anglers.get(id)?.a.say?.(text); },
     /** Aiming a cast while Cast is held: power 0..1 shows where it would land (null hides it). Returns the plan. */
     aimCast(power) { aimPower = power == null ? null : power; return power == null ? null : castPlanFor(power); },
     /** The cast for this power and where you're looking now: { dist, aim, power }, or null (not fishing here). */
