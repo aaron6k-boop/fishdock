@@ -386,6 +386,25 @@ html:not([data-hand="left"]) .ft-readout { justify-items: end; text-align: right
 .cam-row { display: flex; gap: 6px; } .cam-row .ft-pill { flex: 1; justify-content: center; }
 .w3d-walkbtn { position: absolute; z-index: 5; right: max(14px, env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; border: 1px solid #ffffff33; background: #0a141bc4; color: #fff; pointer-events: auto; }
 .w3d-walkbtn svg { width: 24px; height: 24px; }
+/* chat (Fish Together and public places): a button above the walking one, and its panel */
+.w3d-chatbtn { position: absolute; z-index: 5; right: max(14px, env(safe-area-inset-right)); bottom: calc(86px + env(safe-area-inset-bottom)); width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; border: 1px solid #ffffff33; background: #0a141bc4; color: #fff; pointer-events: auto; }
+.w3d-chatbtn.on { background: #1d5f5ad9; }
+.w3d-chatbtn svg { width: 22px; height: 22px; }
+html:not([data-hand="left"]) .w3d-chatbtn { right: auto; left: max(14px, env(safe-area-inset-left)); }
+.w3d-unread { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #e8574a; color: #fff; font: 700 11px/18px system-ui, sans-serif; text-align: center; }
+.w3d-chat { position: absolute; z-index: 6; left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: calc(146px + env(safe-area-inset-bottom)); max-width: 420px; max-height: 52vh; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; border-radius: 16px; border: 1px solid #ffffff26; background: #0a141be6; color: #fff; pointer-events: auto; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+html[data-hand="left"] .w3d-chat { left: auto; }
+.w3d-chat-head { display: flex; align-items: center; gap: 8px; }
+.w3d-chat-head b { flex: 1; font-size: 15px; }
+.w3d-chat-head .ft-pill { padding: 4px 10px; font-size: 12px; }
+.w3d-chat-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; min-height: 0; font-size: 14px; line-height: 1.35; }
+.w3d-chat-lines b { color: #9fe3dc; font-weight: 600; }
+.w3d-chat-lines li.mine b { color: #ffd98a; }
+.w3d-chat-none, .w3d-chat-note { color: #c7d2d6; font-size: 12.5px; margin: 0; }
+.w3d-chat-phrases { display: flex; flex-wrap: wrap; gap: 6px; overflow-y: auto; max-height: 132px; }
+.w3d-chat-phrases .ft-pill { padding: 6px 10px; font-size: 13px; }
+.w3d-chat-form { display: flex; gap: 6px; }
+.w3d-chat-form input { flex: 1; min-width: 0; padding: 8px 12px; border-radius: 999px; border: 1px solid #ffffff33; background: #ffffff14; color: #fff; font-size: 15px; }
 html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(safe-area-inset-left)); }
 .stage3d.walking .w3d-walkbtn, .immersive.ui-hidden .w3d-walkbtn, .immersive.ui-hidden .w3d-menuwrap { opacity: 0; pointer-events: none; }
 .w3d-tools { position: absolute; z-index: 4; right: max(12px, env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; align-items: flex-end; pointer-events: auto; }

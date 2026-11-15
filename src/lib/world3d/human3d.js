@@ -52,6 +52,32 @@ export function setPeopleDetail(on) { PEOPLE_HD = !!on; }
 const personGLB = (name) => (PEOPLE_HD ? loadGLB(name + "_hd").catch(() => loadGLB(name)) : loadGLB(name));
 // the walks' own speeds where a clip carries no travel of its own (measured from the feet), m/s at the model's size
 const LOCO = ["walk_slow", "walk", "walk_fast", "run"];
+// (where a walk becomes a run, m/s at the model's size: the brisk walk up to the first, the run from the second)
+export const GAIT = [1.95, 2.25];
+/**
+ * The movements' weights at a speed vs (m/s), from the clips' own speeds sp (walk_slow, walk, walk_fast, run) at the
+ * person's size k: { w: { idle, walk_slow, walk, walk_fast, run }, stretch } (stretch: how much longer than the clips'
+ * the stride is).
+ * A walk or a run, not a mixture: people walk up to about 2 m/s and then break into a run, they don't do a bit of
+ * each. Between the brisk walk and the run the brisk walk lengthens its stride, and from GAIT[0] to GAIT[1] it gives way
+ * to the run over a few steps. Before 15 November the walks and the run were blended by speed all the way from the brisk
+ * walk (1.5 m/s) to the run (2.4), so walking at the game's 1.8 m/s was a third of a jog.
+ * Away from the speed a clip was filmed at, a walk's stride and its steps' pace each take the square root of the
+ * difference, as people's do: faster, longer strides as well as quicker ones; slower, shorter ones. A run speeds up
+ * mostly by lengthening the stride (four fifths of the difference) and only a little by quicker steps: the run was
+ * captured at 2.4 m/s with short steps, and taken to 3.2 m/s half and half it made 3.2 steps a second, faster than a
+ * runner's 2.7 to 3 (the planted foot is held by the leg IK, so a stretched stride doesn't slide).
+ */
+export function gaitWeights(vs, sp, k = 1) {
+  const w = { idle: 0, walk_slow: 0, walk: 0, walk_fast: 0, run: 0 };
+  if (vs < 0.05) w.idle = 1;
+  else if (vs < sp[0]) { const f = vs / sp[0]; w.idle = 1 - f; w.walk_slow = f; }
+  else if (vs <= sp[2]) { let i = 0; while (i < 2 && vs > sp[i + 1]) i++; const f = clamp((vs - sp[i]) / Math.max(0.01, sp[i + 1] - sp[i]), 0, 1); w[LOCO[i]] = 1 - f; w[LOCO[i + 1]] = f; }
+  else { const g = ease((vs - GAIT[0] * k) / ((GAIT[1] - GAIT[0]) * k)); w.walk_fast = 1 - g; w.run = g; }
+  let ws = 0, vClip = 0; LOCO.forEach((key, i) => { ws += w[key]; vClip += w[key] * sp[i]; });
+  const share = 0.5 + 0.3 * (ws > 0 ? w.run / ws : 0);
+  return { w, stretch: ws > 0 && vClip > 0 && vs >= sp[0] ? clamp((vs / (vClip / ws)) ** share, 0.85, 1.35) : 1 };
+}
 // the retargeted poses blended in while standing (fish_idle: holding a rod; kneel and inspect: down by the fish or the
 // net; crouch: a lower stance)
 const POSES = ["fish_idle", "kneel", "inspect", "crouch"];
@@ -466,14 +492,9 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     // (without the turning steps, as before: small steps of the slow walk)
     const turning = !canPivot && o.walk && st.v < 0.4 ? clamp((st.turn - 0.8) / 2, 0, 1) : 0;
     const vs = Math.max(st.v, turning * 0.55 * speedOf("walk_slow"));
-    const sp = LOCO.map(speedOf), w = { idle: 0, walk_slow: 0, walk: 0, walk_fast: 0, run: 0 };
-    if (vs < 0.05) w.idle = 1;
-    else if (vs < sp[0]) { const f = vs / sp[0]; w.idle = 1 - f; w.walk_slow = f; }
-    else { let i = 0; while (i < 3 && vs > sp[i + 1]) i++; if (i >= 3) w.run = 1; else { const f = clamp((vs - sp[i]) / Math.max(0.01, sp[i + 1] - sp[i]), 0, 1); w[LOCO[i]] = 1 - f; w[LOCO[i + 1]] = f; } }
+    const sp = LOCO.map(speedOf), { w, stretch } = gaitWeights(vs, sp, k);
     let stride = 0, ws = 0; for (const key of LOCO) { stride += w[key] * (clips[key]?.userData.travel || 1) * k; ws += w[key]; }
-    // (faster than the run was filmed at, a sprint: longer strides as well as quicker ones, the planted foot held by the
-    // leg IK below, rather than legs spinning)
-    if (ws > 0) stride *= clamp(Math.sqrt(Math.max(1, vs / sp[3])), 1, 1.35);
+    if (ws > 0) stride *= stretch;
     const adv = moved + turning * 0.55 * speedOf("walk_slow") * dt;
     if (ws > 0 && walking) st.u = (st.u + adv / (stride / ws)) % 1;
     for (const key of LOCO) { const a = act[key]; if (!a) continue; a.setEffectiveWeight(w[key]); a.time = (((st.u + (offs[key] || 0)) % 1) + 1) % 1 * a.getClip().duration; }

@@ -9,7 +9,10 @@
 // builds from nothing (a moment's weight shift, then the first step) and settles without a jolt: about half a second to
 // walking pace, a little less to stop. turnMax: the quickest you turn, in radians a second, standing (a pivot), at a
 // walk and flat out, so a turn is a turn and never an instant flip; turn eases you into the last part of it)
-export const WALK = { speed: 1.8, sprint: 4.2, turn: 9, turnMax: [5.5, 4.6, 3.2], jump: 5.2, gravity: 16, step: 0.45, go: 9, halt: 13, air: 4.9, dead: 0.12 };
+// (speed: an ordinary walk, about 1.4 m/s, as people walk when nobody's hurrying them, so the walk is the motion-captured
+// walk at its own pace; sprint: a run at 3.2 m/s, the captured run a little quicker. Until 15 November they were 1.8 and
+// 4.2: the walk came out a third of a jog and the run a jog sped up nearly twice over, legs whirring)
+export const WALK = { speed: 1.4, sprint: 3.2, turn: 9, turnMax: [5.5, 4.6, 3.2], jump: 5.2, gravity: 16, step: 0.45, go: 9, halt: 13, air: 4.9, dead: 0.12 };
 
 /** A fresh walker standing at (x, z), facing `face` (radians, 0 = -z). */
 export function walker(x, z, face, y = 0) { return { x, z, y, vy: 0, vx: 0, vz: 0, ax: 0, az: 0, face, speed: 0, air: false, phase: 0, turnRate: 0, acc: 0, off: 0 }; }

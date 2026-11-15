@@ -58,6 +58,7 @@ export default function SpotMap({ game = false }) {
   const flipFav = (id) => app?.update?.((x) => ({ favourites: toggleFav(x.favourites || [], id) }));
   const [sel, setSel] = useState(() => mapSpotById(app?.nav?.spot) || null);
   const [filters, setFilters] = useState(false), [list, setList] = useState(false), [noMap, setNoMap] = useState(false);
+  const baseMap = ["chart", "map", "satellite"].includes(app?.settings?.spotBase) ? app.settings.spotBase : "chart";
   const [found, setFound] = useState(false); // the search box's results list is open
   // the note that this is the virtual game, not a real trip: shown until it's hidden, for this visit
   const [mode, setMode] = useState(() => { try { return sessionStorage.getItem("fishdock.mapNote") !== "off"; } catch { return true; } });
@@ -85,7 +86,9 @@ export default function SpotMap({ game = false }) {
   return (
     <>
     <div className={`smap${game ? " game" : ""}`}>
-      {!noMap ? <SpotMapView ref={mapRef} spots={shown} selectedId={sel?.id} here={here} onPick={(s) => pick(s, false)} onFail={() => { setNoMap(true); setList(true); }} /> : null}
+      {!noMap ? <SpotMapView ref={mapRef} spots={shown} selectedId={sel?.id} here={here} base={baseMap} onPick={(s) => pick(s, false)} onFail={() => { setNoMap(true); setList(true); }} /> : null}
+      {/* the base map: the sea chart (depths, for fishing; the default), the street map or the satellite photo */}
+      {!noMap && !list && !sel ? <div className="smap-base seg" role="radiogroup" aria-label="Base map">{[["chart", "Sea chart"], ["map", "Map"], ["satellite", "Satellite"]].map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={baseMap === k} className={baseMap === k ? "on" : ""} onClick={() => app?.update?.({ spotBase: k })}>{l}</button>)}</div> : null}
 
       {/* ---- the top bar: back, search, filters, map or list ---- */}
       <div className="smap-top">
