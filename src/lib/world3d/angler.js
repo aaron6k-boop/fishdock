@@ -35,9 +35,11 @@ function rng(seed) { let a = seed || 1; return () => { a = (a + 0x6d2b79f5) | 0;
 const n1 = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); const h = (k) => { const s = Math.sin(k * 127.1) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }; return h(i) * (1 - u) + h(i + 1) * u; };
 
 // ---- your hands on the drop net's rope, first person (see ropeFp) ----
-// (along your line of sight to the net, then out level towards it: reaching 58 cm down that line put the hands at the
-// top rail's height out beyond it, and the arms went 7 cm into the rail, tools/rail-test.mjs, 15 November)
-export const FP_ROPE_OUT = 0.46, FP_ROPE_REACH = 0.12, FP_ROPE_NEAR = [0.14, 0.1];
+// (58 cm out along your line of sight to the net. Tried, 15 November: 46 cm along it and 12 out level, with each hand
+// lifted until the line from its shoulder cleared the rail. It kept the arms off the rail, but brought the hands back
+// up towards your face, and with them the sleeves cut open in front of you: kept as it is, the elbow is turned clear
+// of the rail instead, fpRig.js)
+export const FP_ROPE_OUT = 0.58, FP_ROPE_REACH = 0, FP_ROPE_NEAR = [0.14, 0.1];
 const ropeReach = (E, sight) => { const h = new THREE.Vector3(sight.x, 0, sight.z); if (h.lengthSq() > 1e-8) h.normalize(); return E.clone().addScaledVector(sight, FP_ROPE_OUT).addScaledVector(h, FP_ROPE_REACH); };
 
 /** Clothes: a jacket, trousers and hat for each angler (chosen, or from their id). */
@@ -1387,19 +1389,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // A hand that low near the rail's line is drawn back towards you, behind the rail, the rope running from it over
     // the top: lifting it instead took the arm over the rail and into it. By degrees, the lower it is the further back,
     // so it never jumps)
-    // (and an arm reaching out over the rail to a hand beyond it goes over the rail, not through it: if the line from the
-    // shoulder to the hand would pass the top rail closer than an upper arm's thickness and the rail's (11 cm between
-    // their middles), the hand comes up until it clears. Reaching low and far, the arm lay nearly straight along that
-    // line and the upper arm went 7 cm into the rail, hauling up the drop net: tools/rail-test.mjs, 15 November. The
-    // shoulders are taken from your eye: 24 cm below it, 17 cm to each side, 6 cm back)
-    const armClear = (hs, E) => { hs.forEach((hh, i) => { const rl = hh?.rail; if (!rl || !hh.at || !E) return;
-      const S = E.clone().add(V3(i ? 0.17 : -0.17, -0.24, 0.06)), H = hh.at; if (!(H.z < rl.z && S.z > rl.z)) return;
-      const t = (S.z - rl.z) / (S.z - H.z), y = S.y + (H.y - S.y) * t, need = rl.y + 0.11;
-      if (y < need) H.y += (need - y) / Math.max(t, 0.2); });
-      // (and the hand itself kept a hand's thickness off the rail, pushed straight away from it: leaning out to lower the
-      // net, the left hand passed 4 cm into the rail for a frame)
-      for (const hh of hs) { const rl = hh?.rail; if (!rl || !hh.at) continue; const dy = hh.at.y - rl.y, dz = hh.at.z - rl.z, d = Math.hypot(dy, dz), want = 0.09;
-        if (d < want) { const k = d > 1e-4 ? want / d : 0; if (k) { hh.at.y = rl.y + dy * k; hh.at.z = rl.z + dz * k; } else hh.at.y = rl.y + want; } } };
+    // (and each hand kept clear of the top rail, pushed straight away from it: leaning out to lower the net, the left
+    // hand passed 4 cm into the rail for a frame, tools/rail-test.mjs, 15 November)
+    const armClear = (hs) => { for (const hh of hs) { const rl = hh?.rail; if (!rl || !hh.at) continue; const dy = hh.at.y - rl.y, dz = hh.at.z - rl.z, d = Math.hypot(dy, dz), want = 0.07;
+      if (d < want) { const k = d > 1e-4 ? want / d : 0; if (k) { hh.at.y = rl.y + dy * k; hh.at.z = rl.z + dz * k; } else hh.at.y = rl.y + want; } } };
     const ropeClear = (hs) => { for (const hh of hs) { const rl = hh.rail; if (!rl || !hh.at) continue; const low = ease(clamp((rl.y + 0.1 - hh.at.y) / 0.08, 0, 1)); if (low <= 0) continue; const back = rl.z + 0.12 - hh.at.z; if (back > 0 && back < 0.3) hh.at.z += back * low; } };
     // (each hand's grip lies along the rope where that hand is: towards the other hand if that's the one nearer the
     // net, else straight to the net)
@@ -1501,7 +1494,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (in first person each hand closes round the rope as round the reel's knob: the rope across the fingers, the
           // thumb side up, the hand turned about the rope to line up with the forearm)
           if (fp) { const R2 = ropeFp(base, rd, fpEye(), landStage === "haul" ? ropePull : null, landStage === "lower" ? 0.45 : 0.08);
-            hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands, fpEye()); ropeSocks(hands, netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : base.clone().add(rd), rd); }
+            hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands); ropeSocks(hands, netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : base.clone().add(rd), rd); }
           fpRope = fp; lean = fp ? 0.3 : 0.22; crouch = 0.06; brace = landStage === "haul" ? 0.25 : 0; lookAtW = netAt ? netAt.clone() : lookAtW;
         } else if (landStage === "done") { lookAtW = netAt ? netAt.clone() : lookAtW; lean = 0.05; brace = 0;
         } else if (landStage === "in" && net0) {
@@ -1595,7 +1588,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } };
         hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } }; }
       if (fp) { const R2 = ropeFp(base, rd, E, relStep === "haul" ? ropePull : null, 0.08);
-        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands, E); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true; }
+        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true; }
       lean = 0.22; crouch = 0.06; brace = relStep === "haul" ? 0.2 : 0; lookAtW = releaseInfo?.fish || (netAt ? netAt.clone() : lookAtW);
     }
     if (kept?.state === "release" && relStep === "haul" && releaseInfo?.over && netAt) {

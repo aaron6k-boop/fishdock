@@ -399,6 +399,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   }
   // (how far an arm goes into the top rail, in metres: the deeper of its upper arm and forearm, in the body's own frame,
   // the rail along x at (rail.y, rail.z); below 0, clear by that much)
+  const RAIL_TURN = 14;
   function railPen(shW, ik, rail) {
     const sh = shW.clone().applyMatrix4(MgInv), e = ik.elbow.clone().applyMatrix4(MgInv), w = ik.wrist.clone().applyMatrix4(MgInv);
     const d = (a, b) => { const dy = b.y - a.y, dz = b.z - a.z, l2 = dy * dy + dz * dz, t = l2 ? clamp(((rail.y - a.y) * dy + (rail.z - a.z) * dz) / l2, 0, 1) : 0; return Math.hypot(a.y + dy * t - rail.y, a.z + dz * t - rail.z); };
@@ -443,14 +444,28 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       shW = A.U.getWorldPosition(V()); ik = twoBone(shW, target.pos, A.L1, A.L2, pole);
     }
     // (and never into the rail: where the turn chosen, still easing round, puts the elbow or the forearm into the top rail,
-    // the elbow is turned about the shoulder-to-hand line by the least that clears it, at once. Leaning out quickly to
-    // lower the drop net, the elbow sagged onto the rail while its turn caught up: the upper arm 7 cm into it in
-    // tools/rail-test.mjs, 15 November. Measured as that test measures: an upper arm 5 cm thick, a forearm 4, the rail 2.6)
-    if (rail) { const pen = railPen(shW, ik, rail);
-      if (pen > 0) { const ax = target.pos.clone().sub(shW).normalize(); let best = null;
-        for (let k = 1; k <= 12 && !(best && best.pen <= 0); k++) for (const sg of [1, -1]) { const a = sg * k * (Math.PI / 24), ik2 = twoBone(shW, target.pos, A.L1, A.L2, pole.clone().applyAxisAngle(ax, a)), p2 = railPen(shW, ik2, rail);
-          if (!best || p2 < best.pen) best = { pen: p2, ik: ik2, a }; }
-        if (best && best.pen < pen) { ik = best.ik; pole = pole.clone().applyAxisAngle(ax, best.a); } } }
+    // the elbow is turned about the shoulder-to-hand line by the least that clears it. Leaning out quickly to lower the
+    // drop net, the elbow sagged onto the rail while its turn caught up: the upper arm 7 cm into it in
+    // tools/rail-test.mjs, 15 November. Measured as that test measures: an upper arm 5 cm thick, a forearm 4, the rail 2.6.
+    // The least turn found exactly (stepping out, then halving), the same way round as last time where that clears, and
+    // followed at no more than fourteen radians a second (the elbow at most about 3.5 cm a frame): turned at once in whole
+    // steps, either way round, the forearm snapped 21 cm in a frame lowering the net (tools/arm-steady.mjs); at six it
+    // lagged the lean out and the arm went 7.6 cm into the rail again)
+    if (rail) {
+      const ax = target.pos.clone().sub(shW).normalize(), at = (a) => twoBone(shW, target.pos, A.L1, A.L2, pole.clone().applyAxisAngle(ax, a));
+      let want = 0;
+      if (railPen(shW, ik, rail) > 0) {
+        for (const sg of h.railSide ? [h.railSide, -h.railSide] : [1, -1]) {
+          let lo = 0, hi = null;
+          for (let k = 1; k <= 24; k++) { const a = sg * k * (Math.PI / 48); if (railPen(shW, at(a), rail) <= 0) { hi = a; break; } lo = a; }
+          if (hi == null) continue;
+          for (let it = 0; it < 6; it++) { const mid = (lo + hi) / 2; if (railPen(shW, at(mid), rail) <= 0) hi = mid; else lo = mid; }
+          want = hi; h.railSide = sg; break;
+        }
+      }
+      const cur = h.railA || 0, step = RAIL_TURN * (dt > 0 ? dt : 1 / 60), next = cur + clamp(want - cur, -step, step); h.railA = Math.abs(next) < 1e-5 ? 0 : next;
+      if (h.railA) { pole = pole.clone().applyAxisAngle(ax, h.railA); ik = twoBone(shW, target.pos, A.L1, A.L2, pole); }
+    }
     const n = ik.elbow.clone().sub(shW).cross(ik.wrist.clone().sub(ik.elbow)); if (n.lengthSq() < 1e-10) n.copy(pole).cross(ik.wrist.clone().sub(shW)); n.normalize();
     setWorldQuat(A.U, pairRotation(A.aU, A.nU, ik.elbow.clone().sub(shW), n));
     setWorldQuat(A.F, pairRotation(A.aF, A.nF, ik.wrist.clone().sub(ik.elbow), n));
@@ -472,7 +487,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     group,
     get ready() { return !!R; },
     get failed() { return failed; },
-    show(on) { group.visible = !!on; if (!on) for (const h of hands) { h.cur = null; h.kind = undefined; h.poleL = null; h.swivL = null; h.wantAt = null; } },
+    show(on) { group.visible = !!on; if (!on) for (const h of hands) { h.cur = null; h.kind = undefined; h.poleL = null; h.swivL = null; h.wantAt = null; h.railA = 0; h.railSide = 0; } },
     pose(o) {
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
