@@ -29,15 +29,21 @@ test("tip lights follow the anglers given, and go when an angler does", { skip }
   L.dispose(); assert.equal(scene.children.length, 0);
 });
 
-test("the head torch: off until chosen, white, red or green, pointing where you look, dimmer by day", { skip }, () => {
+test("the head torch: off until chosen, white, red or green, pointing where you look, nothing by day", { skip }, () => {
   const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(); cam.position.set(0, 1.7, 0); cam.lookAt(0, 1.7, -10); cam.updateMatrixWorld(true);
   const T = kit.createHeadTorch(scene, cam);
   T.update(1, 1); assert.equal(T.light.intensity, 0);
   T.set("red"); T.update(1, 1); const night = T.light.intensity; assert.ok(night > 0); assert.ok(T.light.color.r > 0.9 && T.light.color.g < 0.3);
   assert.ok(T.light.target.position.z < -5, "aimed down the view");
-  T.update(0, 1); assert.ok(T.light.intensity < night * 0.3);
+  T.update(0, 1); assert.equal(T.light.intensity, 0, "lost in daylight: it tinted the railing beside you red by day");
+  T.update(0.3, 1); assert.ok(T.light.intensity > 0 && T.light.intensity < night * 0.5, "coming up through dusk");
   T.set("green"); assert.ok(T.light.color.g > T.light.color.r);
   T.set("purple"); T.update(1, 1); assert.equal(T.colour, "off"); assert.equal(T.light.intensity, 0);
+  // (third person: from your forehead along your face, not from the camera behind you)
+  T.set("white"); T.update(1, 1, { p: new THREE.Vector3(5, 1.7, 2), d: new THREE.Vector3(1, -0.27, 0).normalize() });
+  assert.deepEqual(T.light.position.toArray(), [5, 1.7, 2]);
+  assert.ok(T.light.target.position.x > 10 && T.light.target.position.y < 1.7, "out ahead of the head and down a little");
+  T.update(1, 1); assert.ok(Math.abs(T.light.position.x) < 1e-9 && Math.abs(T.light.position.y - 1.79) < 1e-6, "without it, the eye again");
   T.dispose();
 });
 

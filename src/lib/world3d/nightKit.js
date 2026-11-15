@@ -5,6 +5,7 @@
 // you look. Neither changes how anything else is drawn.
 import * as THREE from "three";
 
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 export const TORCHES = ["off", "white", "red", "green"];
 export const TORCH_NAMES = { off: "Off", white: "White", red: "Red", green: "Green" };
 const TORCH_HEX = { white: 0xfff1dc, red: 0xff2a1a, green: 0x39ff6a };
@@ -78,12 +79,19 @@ export function createHeadTorch(scene, camera) {
     light,
     set(c) { colour = TORCHES.includes(c) ? c : "off"; if (colour !== "off") light.color.setHex(TORCH_HEX[colour]); },
     get colour() { return colour; },
-    /** dark: 0 to 1 (a torch does little in daylight, so it's turned down then and nothing is washed out). */
-    update(dark, dt) {
+    /**
+     * dark: 0 to 1. from: where the lamp is and which way it points ({ p, d }, world), when that isn't your eye: in third
+     * person your forehead, from angler.js. Without it, the camera: in first person that is your eye.
+     */
+    update(dark, dt, from = null) {
       // (a narrow beam with a soft edge, falling off gently: bright on the deck a few metres on, while your own
-      // hands, low in the view and half a metre from the lamp, sit in its edge and are not burnt out)
-      const want = colour === "off" ? 0 : (colour === "white" ? 8 : 11) * (0.12 + 0.88 * dark);
+      // hands, low in the view and half a metre from the lamp, sit in its edge and are not burnt out. Nothing in
+      // daylight, coming up through dusk: a head torch is lost in sunlight, and kept at an eighth by day, as until 15
+      // November, the red one tinted the railing beside you red in the afternoon)
+      const k = clamp((dark - 0.08) / 0.62, 0, 1), want = colour === "off" ? 0 : (colour === "white" ? 8 : 11) * k * k * (3 - 2 * k);
       level += (want - level) * Math.min(1, (dt || 0.016) * 10); light.intensity = level < 0.01 ? 0 : level;
+      if (from) { light.position.copy(from.p); target.position.copy(from.p).addScaledVector(from.d, 6); return; }
+      // (in third person, from the camera, the beam came from behind and above you and lit what was beside the camera)
       camera.getWorldDirection(fwd);
       light.position.copy(camera.position).addScaledVector(camera.up, 0.09);
       target.position.copy(camera.position).addScaledVector(fwd, 6);

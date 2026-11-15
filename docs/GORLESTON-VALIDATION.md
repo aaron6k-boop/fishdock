@@ -39,7 +39,9 @@ from survey data rather than from anyone's memory; this note checks that data ag
 - **Deck height above the water and the wall's height**: taken from the layout's defaults (GROUND.land 2.2 m), not
   measured. The tide at Gorleston ranges about 2 m; the photographs suggest 3 to 4 m freeboard at mid tide.
 - **Railing type by side**: 6234922 shows red-painted railings on the south side and grey on the river side, with
-  a short timber-topped section at the landward end. The model has grey tube railings throughout.
+  a short timber-topped section at the landward end. The model has grey tube railings throughout. **Settled (15
+  Nov): not red.** Aaron, who knows the pier, says the railings aren't red ("Not red from torch": the red in the
+  photograph is taken to be from the light). The grey stays. The timber-topped section is not yet checked.
 - **Roof equipment on the lookout**: the light, fog signal and aerials are approximated (a mast and lanterns).
 - **The north pier's construction** (timber versus steel and concrete) is not confirmed.
 

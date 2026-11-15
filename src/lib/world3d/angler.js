@@ -618,6 +618,19 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // damped, so the weight carries a little past and settles, never snapping to a pose
   const body = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }; let bodyTo = { x: 0, y: 0, z: 0 }; // first person: the rod held where you can see it; leaning over the rail to land a fish
   const toWorld = (v) => v.clone().applyMatrix4(root.matrixWorld);
+  // ---- the head torch's place and aim, from the figure's head (third person) ----
+  // (its forehead, 6 cm above the eyes, and the face's own direction, turned to whichever side of the face your body
+  // faces and tipped down by 15 degrees; without the full model yet, from your eye along the way you face)
+  const tq = new THREE.Quaternion();
+  function headTorchAt() {
+    const fd = new THREE.Vector3(Math.sin(-root.rotation.y), 0, -Math.cos(-root.rotation.y)), g = fig.gaze;
+    if (!g) { const e = toWorld(new THREE.Vector3(0, 1.66, -0.05)); return { p: e, d: fd.clone().setY(-0.27).normalize() }; }
+    fig.group.updateWorldMatrix(true, false); fig.group.getWorldQuaternion(tq);
+    const p = fig.group.localToWorld(g.p.clone()), up = g.up.clone().applyQuaternion(tq), d = g.f.clone().applyQuaternion(tq);
+    if (d.dot(fd) < 0) d.negate();
+    p.addScaledVector(up, 0.06);
+    return { p, d: d.addScaledVector(up, -0.27).normalize() };
+  }
   const toLocal = (v) => root.worldToLocal(v.clone());
   const pts = Array.from({ length: NSEG + 1 }, () => new THREE.Vector3());
 
@@ -1821,7 +1834,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (and a step to the side, to the net on the deck by your left foot: you go to it, rather than an arm reaching a
       // metre across to it; back again for the rope)
       const sx = deckReach ? clamp(reachX * 0.6, -0.6, 0.6) : fp && ph === "landing" && (landStage === "pick" || landStage === "in" || landStage === "rod") && netAt ? clamp(toLocal(netAt).x * 0.4, -0.5, 0) : 0; stepNow += (sx - stepNow) * (1 - Math.exp(-dt * 2.2)); }
-    return { phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
+    // your head torch, seen from outside you (third person): on your forehead, shining where your face points and
+    // tipped down a little, as a head torch is worn. In first person the world uses the camera, which is your eye
+    const torchAt = local && !fp ? headTorchAt() : null;
+    return { torchAt, phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
   // shoulders and your arms together, and your hands still reach the rod
