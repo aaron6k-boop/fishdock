@@ -37,8 +37,11 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   1024 maps, 77 KB in all): fine wrinkles across the back of each finger joint, a firm crease on the palm side, nails
   (paler, glossier, a lighter free edge), redder knuckles and fingertip pads. Laid over the skin as a multiplier, so the
   player's skin colour stays theirs. Subtle at arm's length, as it should be.
-- **Still to do:** the palm's own creases (heart, head and life lines), veins on the back of the hand, a little hair on
-  the forearm, a slightly sweaty sheen in the cold. **Check:** close-ups of the hold and the look at a fish, same frames.
+- **Since:** the palm's own creases (under the fingers, across the middle, round the ball of the thumb), a few faint
+  veins over the back of the hand, and two wrist creases. The wrist creases were baked at the palm's depth and read as
+  a scar across the forearm close to the eye in the cast (15 Nov): now a third as deep and a third as dark.
+- **Still to do:** a little hair on the forearm, a slightly sweaty sheen in the cold. **Check:** close-ups of the hold
+  and the look at a fish, same frames.
 
 ### 3. Frame-time stability on a phone
 - **Wrong:** a 1,551 ms frame lowering a thornback ray back (Ultra, 1.5x) with only 6 ms of the game's code and no
@@ -66,6 +69,11 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   distance you see it from the deck, how the water's colour changes with depth by the wall, and how the near water
   looks looking straight down (where the drop net goes in).
 - **Do:** only what that inspection finds missing. **Check:** the fixed scenes (`tools/scenes.mjs`) before and after.
+- **Looked at (15 Nov):** the white specks on the water looking down over the rail after a cast. They are the sun's
+  glitter on the chop's facets, there only when the sun is ahead of you: with the camera put where a facet need lean
+  only 13 degrees to send the sun to it, the water there is covered in them, as real water is. Glints are now only
+  drawn where a facet would lean no further than a wind sea's slopes do (15 to 25 degrees, more in more wind).
+  Nothing else to change there.
 
 ### 5. The pier at eye level
 - **Already in:** photographed concrete for the deck (with worn patches), rust and weed on the wall, weathering drawn

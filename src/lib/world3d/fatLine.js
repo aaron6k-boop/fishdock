@@ -32,7 +32,7 @@ const VS = /* glsl */`
     gl_Position = c;
   }`;
 const FS = /* glsl */`
-  uniform vec3 uColor, uSunDir, uSunCol, uAmb; uniform float uOpacity, uFeed, uGloss;
+  uniform vec3 uColor, uSunDir, uSunCol, uAmb; uniform float uOpacity, uFeed, uGloss, uMin;
   varying float vD, vHalf, vA, vU; varying vec3 vT, vP;
   float h1(float x){ return fract(sin(x*12.9898)*43758.5453); }
   void main(){
@@ -44,11 +44,21 @@ const FS = /* glsl */`
     float sth = sqrt(max(0., 1. - th*th));
     // (the highlight broken up a little along the line, as a real line's twists and drops of water break it: these
     // marks are on the line, so they ride in or out through the rings with it)
-    float u = vU + uFeed, k = floor(u*7.); // (a mark on the line: wound in, it moves towards the reel)
-    float spark = mix(.55, 1., h1(k))*(.8 + .2*sin(u*41.));
+    // (15 November: the marks were a hard step every 14 cm and a ripple every 15 cm. Seen from the deck or the water,
+    // where a mark is a few pixels long, the glint along the line broke into evenly spaced white dashes, a row of
+    // lamps hanging in the air. Now the marks blend smoothly into each other, and they even out to the glint's mean
+    // where a mark would be shorter than about five pixels, so far off the glint is one soft thread)
+    float u = vU + uFeed, k = floor(u*7.), f = fract(u*7.); // (a mark on the line: wound in, it moves towards the reel)
+    float spark = mix(.62, 1., mix(h1(k), h1(k + 1.), f*f*(3. - 2.*f)));
+    spark = mix(spark, .81, smoothstep(.02, .05, fwidth(u)));
     float spec = (pow(sth, 90.)*.9 + pow(sth, 14.)*.06)*uGloss*spark;
     vec3 col = uColor*(uAmb + uSunCol*diff*.5) + uSunCol*spec;
-    float alpha = a*(uOpacity*vA + min(.6, spec*.5)*mix(vA, 1., .6));
+    // (a line thinner than a pixel has a glint thinner than a pixel too: a little of it still shows, as the sun on fine
+    // line does, but it isn't drawn as a full pixel of sunlight)
+    // (and kept to the light it would really send: the thread is never drawn thinner than 1.4 pixels, so a nearly level
+    // line doesn't break into a row of dots as it crosses the pixels' rows (a pixel wide, it lit one pixel fully, then two
+    // by halves, over and over); the glint's share is scaled back by as much as it's widened)
+    float alpha = a*(uOpacity*vA + min(.6, spec*.5)*mix(vA, 1., .35)*max(vA, 1./uMin));
     gl_FragColor = vec4(col, clamp(alpha, 0., 1.));
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -74,7 +84,7 @@ function readLights(scene) {
  * thick: the real line's diameter in metres. Call mesh.userData.sync() whenever its points change, and set
  * mesh.userData.feed (metres of line wound in) to move the glints with the line.
  */
-export function fatLine(src, count, { color = 0xb2bec6, opacity = 0.6, thick = 0.00035, minPx = 1, fade = 0.22, gloss = 1 } = {}) {
+export function fatLine(src, count, { color = 0xb2bec6, opacity = 0.6, thick = 0.00035, minPx = 1.4, fade = 0.16, gloss = 1 } = {}) {
   const N = src.length / 3;
   const geo = new THREE.BufferGeometry();
   const P = new Float32Array(N * 2 * 3), Nx = new Float32Array(N * 2 * 3), Vx = new Float32Array(N * 2 * 3), S = new Float32Array(N * 2), U = new Float32Array(N * 2);
