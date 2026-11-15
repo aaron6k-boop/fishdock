@@ -8,7 +8,7 @@
 .fs-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #0b162088; z-index: 2; }
 .fs-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 10px max(14px, env(safe-area-inset-bottom)); }
 .fs-overlay button, .fs-overlay a { pointer-events: auto; }
-.fs-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-right: 42px; }
+.fs-top { position: relative; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-right: 42px; }
 .fs-fsbtn { position: absolute; top: 10px; right: 10px; z-index: 4; }
 .fscene.is-fs .fs-fsbtn { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); }
 .center-text { text-align: center; margin: -4px 0 0; }
@@ -757,3 +757,17 @@ html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-
 .ft-biteclock .ft-bitewin { fill: none; stroke: #5fd38d; stroke-width: 2.2; opacity: .95; stroke-linecap: round; }
 .ft-main.ft-strike.bite-knock { animation-duration: 1.6s; }
 .ft-main.ft-strike.bite-pull { animation-duration: .45s; color: #ffd27a; border-color: #ffd27a; }
+
+/* the match in a public place (TryLive, src/lib/pierMatch.js): its chip in the top bar and its board */
+.match-chip { display: inline-flex; align-items: center; gap: 5px; pointer-events: auto; }
+.match-chip svg { width: 14px; height: 14px; }
+.match-chip.on { background: #1f6f4ad9; border-color: #6fdc9f66; }
+/* (the overlay sits under the view's own corner pieces, the frame-rate meter and the compass: raised while the board's
+   open so they don't print over it) */
+.fs-overlay:has(.match-board) { z-index: 8; }
+.match-board { position: absolute; top: calc(100% + 6px); left: 0; right: 0; max-width: 360px; z-index: 7; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; border: 1px solid #ffffff26; background: #0a141be8; color: #fff; pointer-events: auto; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.match-board .tiny { color: #c7d2d6; font-size: 12px; line-height: 1.35; }
+.match-board ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.match-board li { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+.match-board li .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-board li.mine { color: #ffd98a; }
