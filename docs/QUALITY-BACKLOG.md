@@ -170,3 +170,5 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 15 Nov | Skin patches stay on the skin as the arm moves | `tests/fpRig.test.js` (taken before skinning) |
 | 15 Nov | Your arms wet in the rain: skin and coat glossier and darker, wet through in a minute, dry over a few | the coat's roughness 0.80 dry, 0.44 after 90 s of rain; the cast in rain at the start and after; `tests/fpRig.test.js` |
 | 15 Nov | Looking down at the drop net, the sleeve near your eye no longer a screen of dots (the cut's dither band 5 cm to 1.2 cm; the cast unchanged) | the landing and the cast's frame 48 with the band as it was, hard and 1.2 cm; `tests/fpRig.test.js` |
+| 15 Nov | Your head torch shines from your head in third person (it came from the camera and lit the railing beside it red), and not at all by day | third person at night, torch off, white and red, and red by day, before and after; `tests/nightKit.test.js` |
+| 15 Nov | Splash drops drawn as clear streaks along their path, not near-solid white discs (the net coming up stood in a halo of snow) | the net coming out of the water, before and after; `tests/rockSpray.test.js` |

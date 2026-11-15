@@ -36,3 +36,17 @@ test("no splash can use up the whole pool of points", () => {
   const big = splashPlan(5, 10);
   assert.ok(big.crown + big.jet + big.mist * 2 + big.foam < SPRAY.max / 3, JSON.stringify(big)); // (the mist is thrown twice: the sheet and the puff)
 });
+
+// (15 November: every drop was a near-solid white disc; a net coming up out of the water stood in a halo of snow)
+test("drops are drawn as clear streaks along their path, the mist as puffs", async () => {
+  const THREE = await import("three"); const { createRockSpray } = await import("../src/lib/world3d/rockSpray.js");
+  const sp = createRockSpray(new THREE.Scene()), g = sp.points.geometry;
+  sp.splash(0, 0, 0, 0.9); sp.update(0.05, 0.05, { swell: 0, wind: 0 }, () => -5, null, 800, 60);
+  const v = g.attributes.aVel.array, s = g.attributes.aSeed.array;
+  let moving = 0; for (let i = 0; i < s.length; i++) if (s[i] >= 2 && Math.hypot(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]) > 0.5) moving++;
+  assert.ok(moving > 20, `the drops' speeds go to the shader (${moving})`);
+  const vs = sp.points.material.vertexShader, fs = sp.points.material.fragmentShader;
+  assert.match(vs, /vStretch = clamp\(1\.0 \+ len \/ max\(px, 1\.5\), 1\.0, 5\.0\)/, "drawn out by how far it moves on screen, five times its size at most");
+  assert.match(fs, /vFade \* 0\.75 \/ mix\(1\.0, vStretch, 0\.6\)/, "three quarters at most, fainter as it's drawn out");
+  sp.dispose();
+});
