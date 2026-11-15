@@ -13,7 +13,7 @@ const [out, base = "http://localhost:8820", only = ""] = process.argv.slice(2);
 rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
 const b = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const ctx = await b.newContext({ viewport: { width: 390, height: 780 }, deviceScaleFactor: 1 });
-await ctx.addInitScript(() => { window.__fdFilm = true; localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "low", fishCam: "first" })); });
+await ctx.addInitScript(() => { window.__fdFilm = true; localStorage.setItem("fishdock.playerName", "Tester"); /* (or the name prompt covers the picture) */ localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "low", fishCam: "first" })); });
 const p = await ctx.newPage(); const cdp = await ctx.newCDPSession(p);
 const errors = []; p.on("pageerror", (e) => { errors.push(e.message); console.log("ERR", e.message); });
 await p.goto(`${base}/#play/gorleston-south-pier`);

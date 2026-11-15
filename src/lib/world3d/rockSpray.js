@@ -43,27 +43,42 @@ export function createRockSpray(scene, edge = []) {
   const N = SPRAY.max, pos = new Float32Array(N * 3), vel = new Float32Array(N * 3), age = new Float32Array(N), life = new Float32Array(N), size = new Float32Array(N), fade = new Float32Array(N), seed = new Float32Array(N), kind = new Uint8Array(N), grow = new Float32Array(N);
   for (let i = 0; i < N; i++) pos[i * 3 + 1] = -50;
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("aSize", new THREE.BufferAttribute(size, 1)); geo.setAttribute("aFade", new THREE.BufferAttribute(fade, 1)); geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1));
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("aSize", new THREE.BufferAttribute(size, 1)); geo.setAttribute("aFade", new THREE.BufferAttribute(fade, 1)); geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1)); geo.setAttribute("aVel", new THREE.BufferAttribute(vel, 3));
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uLight: { value: new THREE.Color(1, 1, 1) }, uScale: { value: 600 } },
+    uniforms: { uLight: { value: new THREE.Color(1, 1, 1) }, uScale: { value: 600 }, uBlur: { value: 1 / 40 } },
     transparent: true, depthWrite: false,
     vertexShader: /* glsl */`
-      attribute float aSize, aFade, aSeed; uniform float uScale; varying float vFade, vSeed;
+      attribute float aSize, aFade, aSeed; attribute vec3 aVel; uniform float uScale, uBlur; varying float vFade, vSeed, vStretch; varying vec2 vDir;
       void main() {
         vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv; vSeed = aSeed;
         float px = aSize * uScale / max(0.3, -mv.z);
         // (a drop too far off to cover a pixel is drawn as one pixel, fainter by as much: a far splash still glitters)
-        vFade = aFade * min(1.0, px / 1.5); gl_PointSize = clamp(px, 1.5, 240.0);
+        vFade = aFade * min(1.0, px / 1.5); vStretch = 1.0; vDir = vec2(0.0, 1.0);
+        if (aSeed >= 2.0) {
+          // a drop moving fast is seen as a short streak along its path, as the eye and a camera both see it: how far it
+          // goes on the screen in about a fortieth of a second, in pixels (the view's height in pixels from uScale and
+          // the projection), against its own size
+          vec4 q = projectionMatrix * (mv + modelViewMatrix * vec4(aVel * uBlur, 0.0));
+          float hPx = uScale * 2.0 / projectionMatrix[1][1], aspect = projectionMatrix[1][1] / projectionMatrix[0][0];
+          vec2 d = (q.xy / q.w - gl_Position.xy / gl_Position.w) * 0.5 * vec2(hPx * aspect, hPx);
+          float len = length(d); vStretch = clamp(1.0 + len / max(px, 1.5), 1.0, 5.0); if (len > 1e-4) vDir = d / len;
+        }
+        gl_PointSize = clamp(px * vStretch, 1.5, 240.0);
       }`,
     fragmentShader: /* glsl */`
-      uniform vec3 uLight; varying float vFade, vSeed;
+      uniform vec3 uLight; varying float vFade, vSeed, vStretch; varying vec2 vDir;
       float h2(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
       float vn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h2(i), h2(i + vec2(1.0, 0.0)), f.x), mix(h2(i + vec2(0.0, 1.0)), h2(i + vec2(1.0, 1.0)), f.x), f.y); }
       void main() {
         vec2 c = gl_PointCoord - 0.5; float r = length(c) * 2.0, a, shade;
         if (vSeed >= 2.0) {
-          // a drop: small and bright, a touch brighter on its upper side where the sky is
-          a = (1.0 - smoothstep(0.45, 1.0, r)) * vFade * 0.92; shade = 1.0 + 0.12 * (0.5 - gl_PointCoord.y);
+          // a drop: small, bright where it catches the sky, and clear water rather than paint: three quarters at most,
+          // a streak along its path when it's moving fast, as thin as the drop and fainter as it's drawn out (until
+          // 15 November every drop was a near-solid white disc, and a net coming up out of the water stood in a halo
+          // of snow). gl_PointCoord runs down the screen, the direction up it
+          vec2 cc = vec2(c.x, -c.y); float al = dot(cc, vDir), ac = dot(cc, vec2(-vDir.y, vDir.x));
+          r = length(vec2(al, ac * vStretch)) * 2.0;
+          a = (1.0 - smoothstep(0.45, 1.0, r)) * vFade * 0.75 / mix(1.0, vStretch, 0.6); shade = 1.0 + 0.12 * (0.5 - gl_PointCoord.y);
         } else {
           // mist: a puff densest in the middle, broken up by its own pattern (no two alike) so a burst reads as torn
           // water and not a row of discs; lit from above, a little shaded underneath
@@ -159,7 +174,7 @@ export function createRockSpray(scene, edge = []) {
         }
         pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
       }
-      geo.attributes.position.needsUpdate = true; geo.attributes.aSize.needsUpdate = true; geo.attributes.aFade.needsUpdate = true; geo.attributes.aSeed.needsUpdate = true;
+      geo.attributes.position.needsUpdate = true; geo.attributes.aVel.needsUpdate = true; geo.attributes.aSize.needsUpdate = true; geo.attributes.aFade.needsUpdate = true; geo.attributes.aSeed.needsUpdate = true;
       if (light) mat.uniforms.uLight.value.copy(light);
       mat.uniforms.uScale.value = pxH / (2 * Math.tan((fovDeg * Math.PI) / 360));
     },

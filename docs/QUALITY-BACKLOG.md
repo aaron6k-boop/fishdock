@@ -38,6 +38,18 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   sleeve, exactly where the skinning puts it (4.7 cm out from the forearm's axis, as on the left). Two real faults
   made it look wrong: a dark line across the wrist (item 2) and the cuff's edge, a sawtooth where the lining was
   left out. Both fixed. **Check:** `fpbones.mjs`-style bone paint of the cast's frame 48; the cuff before and after.
+- **Open (15 Nov): the drop net's landing, leaning out.** For 3 frames (0.3 s) of `tools/rail-test.mjs dropnet` the
+  right upper arm still measures 6.7 to 7.3 cm into the top rail (main: 8 frames, 7.1 cm). You lean out past the wall's
+  top to work the rope; most likely the shoulder is then so near the rail that turning the elbow can't take the upper arm clear.
+  From your eye the worst frame reads as the arm over the rail. The fix is the authored haul clip above, or a lean
+  that stops the shoulders short of the rail while the hands go over.
+- **Open (15 Nov): the strike, in `tools/arm-steady.mjs`.** The rod's middle moves fastest in the frame after the
+  strike, and how fast varies from run to run on the same build: 72 to 139 mm in a frame over 7 runs of this branch's
+  last commits (over the check's 100 mm in 4), 77 to 84 mm in 3 runs of the commits before 15 November's landing work. The
+  code changed in between runs only on the drop net's rope and for the ray, not at a bass's strike, so the likeliest
+  cause is timing (the film clock is exact, but pictures and models arrive in real time). Not settled: needs a run
+  that loads everything before the catch starts, then the strike's sweep (about 6 frames, up to 9 cm a frame) judged
+  on its own.
 
 ### 2. Skin and fingers close up
 - **Was wrong:** the hands were one flat colour with no creases, knuckles or nails; at dusk they read as a pale model.
@@ -100,6 +112,8 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Do:** model them in Blender (tripod with screw legs and rest heads, seat box, bucket, mat with real quilting and a
   ruler), PBR textures at 512 to 1k, one LOD each. **Cost:** modest triangles, replaces the code shapes.
 - **Check:** close-ups at the landing, looking down.
+- **Done (15 Nov):** the tripod's leg locks have their levers and its head the hook sea tripods carry for a bag or a
+  weight.
 - **Done (14 Nov), the tripod's fit:** the rod lies in the cradle and comes out of it without going through anything
   (`tools/tripod-check.mjs`). The shapes themselves are still made by code.
 
@@ -115,8 +129,14 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   ballan wrasse, black bream, coalfish, dab, flounder, garfish, gurnard, lesser spotted dogfish, pouting, smoothhound,
   sole, thick-lipped mullet, thornback ray and tope. Close up the difference is modest (a rounder body, eyes standing
   proud), as the lofted ones were already shaped by the same pictures.
-- **Still to look at:** the perch has no cut-out picture; a ray with a properly raised back and thorns along its tail
-  would want modelling by hand rather than lofting. **Check:** a ray and a dogfish landed and looked at
+- **Done (15 Nov), the thornback ray (`fishRay.js`):** its lofted back was an even lens and its tail a flat strip a few
+  millimetres thick. Shaped when it loads: a hump along the spine with the wings thinning away from it, a flatter belly,
+  the body running into a round tail, and the thorns a thornback has: a row of pale hooked thorns down the middle of the
+  back and tail, a row down each side of the tail and ten bucklers on the disc, part of its own mesh so they bend with
+  it. Other rays drawn from its picture get the back and tail, not the thorns.
+- **Done (15 Nov):** the plain stand-in shown before a fish's picture is ready is a mid tone of its colours, not pale
+  grey (a cod coming up to the net in the first moments read as a white plastic fish).
+- **Still to look at:** the perch has no cut-out picture. **Check:** a ray and a dogfish landed and looked at
   (`conger_look`), before and after.
 
 ### 8. Sound
@@ -170,3 +190,10 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 15 Nov | Skin patches stay on the skin as the arm moves | `tests/fpRig.test.js` (taken before skinning) |
 | 15 Nov | Your arms wet in the rain: skin and coat glossier and darker, wet through in a minute, dry over a few | the coat's roughness 0.80 dry, 0.44 after 90 s of rain; the cast in rain at the start and after; `tests/fpRig.test.js` |
 | 15 Nov | Looking down at the drop net, the sleeve near your eye no longer a screen of dots (the cut's dither band 5 cm to 1.2 cm; the cast unchanged) | the landing and the cast's frame 48 with the band as it was, hard and 1.2 cm; `tests/fpRig.test.js` |
+| 15 Nov | Your head torch shines from your head in third person (it came from the camera and lit the railing beside it red), and not at all by day | third person at night, torch off, white and red, and red by day, before and after; `tests/nightKit.test.js` |
+| 15 Nov | Splash drops drawn as clear streaks along their path, not near-solid white discs (the net coming up stood in a halo of snow) | the net coming out of the water, before and after; `tests/rockSpray.test.js` |
+| 15 Nov | A wet patch on the deck where your dripping net and your fish are put down: darker, a satin sheen, a ragged edge; half dry in two minutes, gone in ten | third person, the net down, 6 s and 4 min later; `tests/wetLook.test.js` |
+| 15 Nov | Hauling the drop net in first person: your hands at arm's length on the rope (58 cm along your sight, not 46), so the elbows sit out past the shoulders (35 to 44 cm from the eye, not 25) and the sleeves aren't cut open in front of you or the forearms bunched up under your eye; the trousers below the knee left out looking down (scraps of navy along the bottom) | the haul at 34, 42, 46 and 50 frames, before and after, with each joint's distance from the eye; `tests/fpRig.test.js` |
+| 15 Nov | The drop net's landing: fewer frames with an arm into the top rail (8 on main, now 3; the right upper arm about 7 cm in on both, measured with the arm as a 5 cm tube and the rail 2.6 cm): where the elbow's eased turn would put the upper arm or forearm into the rail, it is turned clear by the least turn that does it, followed at up to 14 radians a second (turned at once, the forearm snapped 21 cm in a frame); each hand kept 7 cm off the rail; the rope kept at arm's length (lifting the hands to clear the rail brought the sleeves back into the camera) | `tools/rail-test.mjs dropnet` on main and after (3 frames, 6.7 to 7.3 cm over runs; the worst frame's picture reads as the arm over the rail from your eye); `tools/arm-steady.mjs` (rope: 1 flick, 83 to 92 mm at most) |
+| 15 Nov | The thornback ray's hump, round tail and thorns; the stand-in fish's colour; the tripod's levers and hook | the ray landed and held up, on the mat from above and the side; `tests/fishRay.test.js` |
+| 15 Nov | A fish's size eased over a third of a second when its modelled shape comes in mid-fight, and a thornback's thorns left out of it (counted, the ray came in half as thick again and the fish, line and rod jumped 13 cm) | found in `tools/arm-steady.mjs`'s frame log of the ray (10 to 13 cm in a frame as its model came in); not yet measured on its own after |

@@ -228,6 +228,7 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
     get top() { return (H || stand).top; },
     get headAt() { return who().headAt; },
     get eyeAt() { return who().eyeAt; },
+    get gaze() { return H ? H.gaze : null; },
     hand(i) { return who().hand(i); },
     get chest() { return H ? H.chest : null; },
     setFirstPerson(on) { fp = !!on; H?.setFirstPerson(fp); show(); },
@@ -816,6 +817,12 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     get top() { return wFigSafe(B("Head")).y + (top0 - headY0) * k; },
     get headAt() { return wFigSafe(B("Head")); },
     get eyeAt() { const a = B("LEye"), b = B("REye"); if (!a || !b) return wFigSafe(B("Head")).add(V(0, 0.1, -0.08)); return wFigSafe(a).add(wFigSafe(b)).multiplyScalar(0.5).add(V(0, 0, -0.02)); },
+    /** where the face points (the figure's space): the eyes' middle, and a unit vector out of the face, square to the
+     * line between the eyes and to the neck's line up into the head. A head torch shines this way. Which of the two
+     * ways out of the face is forward is left to the caller, who knows which way the figure faces */
+    get gaze() { const l = B("LEye"), r = B("REye"), h = B("Head"), n = B("Neck"); if (!l || !r || !h || !n) return null;
+      const L = wFigSafe(l), R = wFigSafe(r), up = wFigSafe(h).sub(wFigSafe(n)), f = up.clone().cross(R.clone().sub(L));
+      return f.lengthSq() > 1e-10 ? { p: L.add(R).multiplyScalar(0.5), f: f.normalize(), up: up.normalize() } : null; },
     hand(i) { return wFigSafe(B(i ? "R_Hand" : "L_Hand")); },
     /** the shoulders' middle (the figure's space) and which way they face: a carried rod moves with them */
     get chest() { const l = wFigSafe(B("L_UpperArm")), r = wFigSafe(B("R_UpperArm")); return { p: l.clone().add(r).multiplyScalar(0.5), yaw: Math.atan2(-(l.z - r.z), l.x - r.x) }; },
