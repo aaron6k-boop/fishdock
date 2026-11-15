@@ -30,6 +30,12 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   12 cm a frame (7 m/s), and an arm let go of it dropped at 11 cm. Hands on the hoop now go no quicker than 2.5 m/s and
   a let-go arm drops in 0.45 s: lifting the net 118 to 56 mm a frame at most, bringing it in 113 to 44.
 - **Check:** the fixed drop-net film (`haul_frames`) before and after; `tools/rail-test.mjs dropnet`; `tools/arm-steady.mjs`.
+- **Found (15 Nov), not fixed yet:** holding the rod and through the cast, your right forearm shows bare from the
+  wrist almost to the elbow, where the sleeve ends in a ragged ring; the left sleeve is right. It isn't the cut near
+  your eye or the lining: with every cut in the coat's shader switched off the forearm is still bare, and with the
+  skin hidden nothing is drawn over it. Giving the sleeves the arm's own bone weights made no difference either. So
+  the right sleeve itself is out of place in that pose: to look at in Blender on the PC (its shape and weights
+  against the hold and cast clips).
 
 ### 2. Skin and fingers close up
 - **Was wrong:** the hands were one flat colour with no creases, knuckles or nails; at dusk they read as a pale model.
@@ -151,3 +157,7 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | The rod in its tripod: the cradle square to the rod (it went 7.3 mm through its rubber), the head's bar under it, still in its rest (it swayed 4 cm in a breeze), lifted out of the cup and the cradle; the front feet clear of the railing; bank sticks with rest heads | `tools/tripod-check.mjs`; `tests/tripod.test.js` |
 | 14 Nov | Camera: the fish kept in view while you lay the rod on the rail (first person); the net set down and the fish on the deck shot with the railing behind you, not across you (third person) | `tools/landing-view.mjs` (rod on the rail: fish seen 14% of the time before, 100% after); before and after pictures |
 | 14 Nov | The rod no longer jumps: laid on the rail to land a ray (1.2 m in a frame: its easing had been switched off since 13 Nov), brought up to land (47 cm), the strike (17 to 49 cm) | `tools/arm-steady.mjs` (now watches the rod too: 79 mm at most outside the cast) |
+| 15 Nov | The pier wall's rust no longer repeats pan by pan (a second, shifted copy blended in in slow patches) | the wall from the water, before and after |
+| 15 Nov | Rows of white dots along the far railings (on the pier wall seen from the water, and over you seen close): the weathering's relief came out as not a number on the thin rails' ends | the bright pixels in that patch of the wall: 41 before, 0 after; 0 with the rails hidden |
+| 15 Nov | Your line's glint as one soft thread instead of evenly spaced white dashes | the line from where it glints, 6 m and 18 m off, before and after |
+| 15 Nov | Faint wrist creases (they read as a scar across the forearm close up in the cast) | the cast's frame 48, before and after |

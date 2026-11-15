@@ -414,9 +414,13 @@ export function weather(mat, o = {}) {
         #endif
         vFdP = transformed * sc; vFdN = objectNormal;${o.wood === "y" ? " vFdP = vFdP.yxz; vFdN = vFdN.yxz;" : ""}` : "vFdP = fw.xyz; vFdN = normalize(mat3(modelMatrix) * fn);"}
       }`);
+    // (the relief's tilt is only worked out where the surface has a size on screen: on a triangle too small or too thin
+    // to span a pixel, the thin railings' rounded ends seen from 20 m, its slopes came out as nothing, the tilt as not a
+    // number, and each such pixel was drawn as a white dot: rows of them along the railings, on the pier wall seen from
+    // the water and on you seen close (15 November))
     sh.fragmentShader = `uniform sampler2D fdNoise;\nuniform float fdWet;\nuniform float fdScale;\nuniform float fdMottle;\nuniform vec3 fdGrime;\nuniform vec3 fdStreaks;\nuniform vec4 fdRust;\nuniform vec2 fdRough;\nuniform float fdBump;\n${wood ? "uniform sampler2D fdWood;\n" : ""}varying vec3 vFdW;\nvarying vec3 vFdP;\nvarying vec3 vFdN;
       vec4 fdTri(sampler2D t, vec3 p, vec3 n, vec2 k) { vec3 w = pow(abs(n), vec3(4.0)); w /= (w.x + w.y + w.z + 1e-5); return texture2D(t, p.zy * k) * w.x + texture2D(t, p.xz * k) * w.y + texture2D(t, p.xy * k) * w.z; }
-      vec3 fdPerturb(vec3 sp, vec3 sn, vec2 dh, float fd) { vec3 sx = normalize(dFdx(sp)), sy = normalize(dFdy(sp)); vec3 r1 = cross(sy, sn), r2 = cross(sn, sx); float det = dot(sx, r1) * fd; return normalize(abs(det) * sn - sign(det) * (dh.x * r1 + dh.y * r2)); }
+      vec3 fdPerturb(vec3 sp, vec3 sn, vec2 dh, float fd) { vec3 ex = dFdx(sp), ey = dFdy(sp); if (dot(ex, ex) < 1e-16 || dot(ey, ey) < 1e-16) return sn; vec3 sx = normalize(ex), sy = normalize(ey); vec3 r1 = cross(sy, sn), r2 = cross(sn, sx); float det = dot(sx, r1) * fd; vec3 r = abs(det) * sn - sign(det) * (dh.x * r1 + dh.y * r2); return dot(r, r) > 1e-12 ? normalize(r) : sn; }
       ` + sh.fragmentShader
       .replace("#include <map_fragment>", `#include <map_fragment>
         vec3 fdN = normalize(vFdN); vec3 fdP = vFdP / fdScale;
