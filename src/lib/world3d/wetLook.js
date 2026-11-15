@@ -4,6 +4,25 @@
 // a low roughness on all of it caught the sun as a large white patch. Needs vertex colours, vMapUv and uWet; the rings
 // of rain in the puddles need #define FD_WET_RINGS and uWetT (seconds).
 
+import * as THREE from "three";
+
+// ---- wet patches on the deck ----
+// Where a dripping drop net or a fish is put down, the concrete under it goes dark with water and dries over several
+// minutes, from the edge in. Four at most (the oldest or driest goes). x, z: where (world, m); r: how far it spreads (m);
+// w: how wet (1 just put down, to 0 dry). The shader reads them through WET_SPOTS (uWetSpots).
+export const WET_SPOTS = { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) };
+/** a wet patch at (x, z), r across: a new one, or the one already there kept wet and as wide as either */
+export function wetSpotAt(x, z, r) {
+  const L = WET_SPOTS.value; let near = null, low = L[0];
+  for (const v of L) { if (v.w > 0 && Math.hypot(v.x - x, v.y - z) < Math.max(v.z, r) * 0.5) near = v; if (v.w < low.w) low = v; }
+  if (near) { near.z = Math.max(near.z, r); near.w = 1; return near; }
+  low.set(x, z, r, 1); return low;
+}
+/** each frame: dt (s). A patch loses about half its water in two minutes (wet concrete on a dry day), gone in ten */
+export function dryWetSpots(dt) {
+  for (const v of WET_SPOTS.value) if (v.w > 0) { v.w *= Math.exp(-(dt || 0) / 180); if (v.w < 0.03) v.w = 0; }
+}
+
 // (after map_fragment: works out fdWet, how wet it looks, and fdShine, how much it shines)
 export const WET_PREP = /* glsl */`
   float fdWet = 0., fdShine = 0., fdPud = 0.; vec2 fdRip = vec2(0.);
@@ -47,6 +66,19 @@ export const WET_PREP = /* glsl */`
     #undef FDH
     fdWet = uWet * (1. - fdGrass * .5);
     fdShine = uWet * fdLevel * fdNear * (1. - fdGrass);
+    // wet patches where a dripping net or a fish was put down (wetSpotAt, below): darker, with a satin sheen, a ragged
+    // edge, drying from the edge in (needs #define FD_WET_SPOTS and uWetSpots; the deck's uv is metres over 8)
+    #ifdef FD_WET_SPOTS
+    {
+      vec2 fdW = vMapUv * 8.; float fdSp = 0.;
+      for (int i = 0; i < 4; i++) {
+        vec4 S = uWetSpots[i]; if (S.w <= 0.) continue;
+        float d = length(fdW - S.xy) / max(S.z * (.45 + .55 * sqrt(S.w)), .05);
+        fdSp = max(fdSp, (1. - smoothstep(.55, 1., d + (fn2 - .5) * .45 + (fn3 - .5) * .3)) * min(1., S.w * 1.6));
+      }
+      fdWet = max(fdWet, fdSp * (1. - fdGrass * .5)); fdShine = max(fdShine, fdSp * fdLevel * fdNear * .7);
+    }
+    #endif
   }
 `;
 // (a factor for diffuseColor: wet concrete is darker, puddles darker still)
