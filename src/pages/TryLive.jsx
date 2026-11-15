@@ -23,6 +23,7 @@ import LookPicker, { myLook, lookOnly } from "../components/LookPicker.jsx";
 import { saveLook } from "../lib/world3d/people.js";
 import { landedCatches } from "../lib/landed.js";
 import { useParty, joinPublic, publicSeat, forgetPublic, momentText } from "../lib/party.js";
+import { matchAt, matchBoard, ukClock, countdown } from "../lib/pierMatch.js";
 import { playerName, setPlayerName, cleanName, addCatch, setOutcome, diary as readDiary } from "../lib/diary.js";
 import { progress, afterCatch, medalFor, CHALLENGE_XP } from "../lib/progress.js";
 import { drawFish } from "../lib/fishDraw.js";
@@ -224,6 +225,24 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
     toast({ xp, title: `${what[0].toUpperCase()}${what.slice(1)}${r.first ? " · New kind" : r.best ? " · Your biggest" : ""}`,
       lines: [r.levelUp ? `Level ${r.level} reached` : null, ...r.challenges.map((c) => `Challenge done: ${c.name}`), ...r.badges.slice(0, 2).map((b) => `Badge: ${b.name}`)].filter(Boolean).slice(0, 3) }, "good reward"); };
   const anglers3d = useMemo(() => [{ id: "you", name: "You", spot: meRoom?.spot || (placeId === initialPlace && point) || 1, outfit: look.outfit, look: lookOnly(look), local: true, inspect: true, events, fishHint: { species: sp.id, lengthCm: length } }, ...others.map((m) => ({ id: m.id, name: m.name + (m.online ? "" : " (away)"), spot: m.spot, outfit: m.outfit, look: m.look || null, local: false, inspect: false, real: false, events: Proom.events.filter((e) => e.who === m.id), fishHint: null }))], [events, sp.id, length, look, placeId, point, meRoom?.spot, others, Proom.events]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ---- the match: the first 20 minutes of every hour, everyone here in it, by total length (src/lib/pierMatch.js) ----
+  const [matchOpen, setMatchOpen] = useState(false), [clockNow, setClockNow] = useState(() => Date.now());
+  const inRoom = Proom.status === "live";
+  useEffect(() => { if (!inRoom) return undefined; const t = setInterval(() => setClockNow(Date.now()), 1000); return () => clearInterval(t); }, [inRoom]);
+  const serverNow = clockNow + (Proom.offset || 0), round = matchAt(serverNow);
+  const shown = round.on ? round : round.last, roomEvents = useMemo(() => (Proom.events || []).map((e) => ({ ...e, t: e.t + (Proom.offset || 0) })), [Proom.events, Proom.offset]);
+  const board = useMemo(() => matchBoard(roomEvents, shown), [roomEvents, shown.startsAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nameOf = (id) => (id === Proom.me?.id ? "You" : Proom.members.find((m) => m.id === id)?.name || "Someone");
+  const myPlace = board.findIndex((s) => s.who === Proom.me?.id);
+  // (at the final whistle, who won: said once, to anyone who was here for it)
+  const wasOn = useRef(null);
+  useEffect(() => {
+    if (!inRoom) { wasOn.current = null; return; }
+    if (wasOn.current && !round.on) { const b = matchBoard(roomEvents, round.last), w = b[0];
+      toast(!w ? "Match over: no fish this time" : w.who === Proom.me?.id ? `Match over: you won, ${w.totalCm} cm from ${w.n} fish` : `Match over: ${nameOf(w.who)} won, ${w.totalCm} cm from ${w.n} fish`, "join"); }
+    wasOn.current = round.on;
+  }, [round.on, inRoom]); // eslint-disable-line react-hooks/exhaustive-deps
+  const matchChip = !inRoom ? null : round.on ? `Match · ${countdown(round.endsAt - serverNow)} left${myPlace >= 0 ? ` · ${["1st", "2nd", "3rd", "4th"][myPlace] || `${myPlace + 1}th`}` : ""}` : round.soon ? `Match in ${countdown(round.startsAt - serverNow)}` : null;
   const facing3d = v.facing ?? (venue === "river" || venue === "lake" ? 200 : 110); // which way the 3D place faces (the sea at about east-south-east)
   const overlay = (
     <>
@@ -233,6 +252,14 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${fishLabel} at ${place.name}: change`}>{fishLabel}</button>
               <button type="button" className="fs-chip lvl-chip" onClick={() => { setDiaryList(readDiary()); setDiaryOpen(true); }} aria-label={`Level ${prog.level}: your logbook`} title="Your logbook"><LevelBar p={prog} compact /></button>
               {others.length ? <span className="fs-chip here-chip" title={others.map((m) => m.name).join(", ")}><Icon name="users" />{others.length + 1} here</span> : null}
+              {matchChip ? <button type="button" className={`fs-chip match-chip${round.on ? " on" : ""}`} onClick={() => setMatchOpen(!matchOpen)} aria-expanded={matchOpen} aria-label={`${matchChip}: the match board`}><Icon name="trophy" />{matchChip}</button> : null}
+              {matchChip && matchOpen ? (
+                <div className="match-board" role="dialog" aria-label="The match board">
+                  <b>{round.on ? "Match on" : "Next match"}: {ukClock(round.startsAt)} to {ukClock(round.endsAt)}</b>
+                  <span className="tiny">Everyone fishing here is in it. Every fish counts: the greatest total length wins, each fish measured and put back. The game only.</span>
+                  {round.on ? (board.length ? <ol>{board.slice(0, 4).map((s, i) => <li key={s.who} className={s.who === Proom.me?.id ? "mine" : ""}><b>{i + 1}</b><span className="grow">{nameOf(s.who)}</span><span>{s.totalCm} cm</span><span className="tiny">{s.n} fish</span></li>)}</ol> : <span className="tiny">No fish yet: the first one leads.</span>) : null}
+                </div>
+              ) : null}
               <span className="grow" />
               {/* in 3D these live in the view's one menu (top right); the photo view keeps its buttons */}
               {!view3d ? <>
