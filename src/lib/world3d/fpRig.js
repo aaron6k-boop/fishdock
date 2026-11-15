@@ -397,6 +397,13 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     }
     return best.a;
   }
+  // (how far an arm goes into the top rail, in metres: the deeper of its upper arm and forearm, in the body's own frame,
+  // the rail along x at (rail.y, rail.z); below 0, clear by that much)
+  function railPen(shW, ik, rail) {
+    const sh = shW.clone().applyMatrix4(MgInv), e = ik.elbow.clone().applyMatrix4(MgInv), w = ik.wrist.clone().applyMatrix4(MgInv);
+    const d = (a, b) => { const dy = b.y - a.y, dz = b.z - a.z, l2 = dy * dy + dz * dz, t = l2 ? clamp(((rail.y - a.y) * dy + (rail.z - a.z) * dz) / l2, 0, 1) : 0; return Math.hypot(a.y + dy * t - rail.y, a.z + dz * t - rail.z); };
+    return Math.max(0.05 + 0.026 + 0.005 - d(sh, e), 0.04 + 0.026 + 0.005 - d(e, w));
+  }
   function solveArm(A, S, target, bodyQ, h, search, dt, rail = null, castT = null) {
     const casting = castT != null;
     let shW = A.U.getWorldPosition(V());
@@ -435,6 +442,15 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       const ax = dir0.clone().cross(want); if (ax.lengthSq() > 1e-8) { const q = new THREE.Quaternion().setFromAxisAngle(ax.normalize(), ang).multiply(A.sh.getWorldQuaternion(new THREE.Quaternion())); setWorldQuat(A.sh, q); }
       shW = A.U.getWorldPosition(V()); ik = twoBone(shW, target.pos, A.L1, A.L2, pole);
     }
+    // (and never into the rail: where the turn chosen, still easing round, puts the elbow or the forearm into the top rail,
+    // the elbow is turned about the shoulder-to-hand line by the least that clears it, at once. Leaning out quickly to
+    // lower the drop net, the elbow sagged onto the rail while its turn caught up: the upper arm 7 cm into it in
+    // tools/rail-test.mjs, 15 November. Measured as that test measures: an upper arm 5 cm thick, a forearm 4, the rail 2.6)
+    if (rail) { const pen = railPen(shW, ik, rail);
+      if (pen > 0) { const ax = target.pos.clone().sub(shW).normalize(); let best = null;
+        for (let k = 1; k <= 12 && !(best && best.pen <= 0); k++) for (const sg of [1, -1]) { const a = sg * k * (Math.PI / 24), ik2 = twoBone(shW, target.pos, A.L1, A.L2, pole.clone().applyAxisAngle(ax, a)), p2 = railPen(shW, ik2, rail);
+          if (!best || p2 < best.pen) best = { pen: p2, ik: ik2, a }; }
+        if (best && best.pen < pen) { ik = best.ik; pole = pole.clone().applyAxisAngle(ax, best.a); } } }
     const n = ik.elbow.clone().sub(shW).cross(ik.wrist.clone().sub(ik.elbow)); if (n.lengthSq() < 1e-10) n.copy(pole).cross(ik.wrist.clone().sub(shW)); n.normalize();
     setWorldQuat(A.U, pairRotation(A.aU, A.nU, ik.elbow.clone().sub(shW), n));
     setWorldQuat(A.F, pairRotation(A.aF, A.nF, ik.wrist.clone().sub(ik.elbow), n));

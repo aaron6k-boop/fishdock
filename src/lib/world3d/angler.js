@@ -3,6 +3,7 @@
 // remote angler animates the same on every phone, and a viewer who joins midway sees the right moment. Timings,
 // bites, fights and landings are the same rules as the photo scene (sceneActors.js): biteTaps, fightProfile,
 // fishLoad, landingTech and landingTimes.
+import { shapeRay, rayThornMaterial } from "./fishRay.js";
 import { fishLine } from "./fishLine.js";
 import { overRail } from "./netPath.js";
 import * as THREE from "three";
@@ -34,7 +35,10 @@ function rng(seed) { let a = seed || 1; return () => { a = (a + 0x6d2b79f5) | 0;
 const n1 = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); const h = (k) => { const s = Math.sin(k * 127.1) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }; return h(i) * (1 - u) + h(i + 1) * u; };
 
 // ---- your hands on the drop net's rope, first person (see ropeFp) ----
-export const FP_ROPE_OUT = 0.58, FP_ROPE_NEAR = [0.14, 0.1];
+// (along your line of sight to the net, then out level towards it: reaching 58 cm down that line put the hands at the
+// top rail's height out beyond it, and the arms went 7 cm into the rail, tools/rail-test.mjs, 15 November)
+export const FP_ROPE_OUT = 0.46, FP_ROPE_REACH = 0.12, FP_ROPE_NEAR = [0.14, 0.1];
+const ropeReach = (E, sight) => { const h = new THREE.Vector3(sight.x, 0, sight.z); if (h.lengthSq() > 1e-8) h.normalize(); return E.clone().addScaledVector(sight, FP_ROPE_OUT).addScaledVector(h, FP_ROPE_REACH); };
 
 /** Clothes: a jacket, trousers and hat for each angler (chosen, or from their id). */
 export const OUTFITS = [
@@ -521,9 +525,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // is one: the same picture over it, the same bending
         if (MODELLED_FISH.has(pic)) loadPart(fishPart(pic)).then((sc) => {
           if (fishFor !== key) return;
-          const geoBlend = modelledFish(sc, pic); if (!geoBlend) return;
+          let geoBlend = modelledFish(sc, pic); if (!geoBlend) return;
           if (donor && donor[1] !== 1) { const p = geoBlend.attributes.position.array; for (let i = 1; i < p.length; i += 3) p[i] *= donor[1]; geoBlend.computeVertexNormals(); }
-          useGeometry(geoBlend, [mats.body, mats.fin, mats.eye]);
+          // (a ray: its back raised along the spine and its tail round, and a thornback's thorns: fishRay.js)
+          if (pic === "thornback-ray") geoBlend = shapeRay(geoBlend, { thorns: species === "thornback-ray" });
+          useGeometry(geoBlend, geoBlend.groups.some((q) => q.materialIndex === 3) ? [mats.body, mats.fin, mats.eye, rayThornMaterial()] : [mats.body, mats.fin, mats.eye]);
         }).catch(() => {});
       } catch { /* keep the generic fish */ }
     };
@@ -1373,6 +1379,19 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // A hand that low near the rail's line is drawn back towards you, behind the rail, the rope running from it over
     // the top: lifting it instead took the arm over the rail and into it. By degrees, the lower it is the further back,
     // so it never jumps)
+    // (and an arm reaching out over the rail to a hand beyond it goes over the rail, not through it: if the line from the
+    // shoulder to the hand would pass the top rail closer than an upper arm's thickness and the rail's (11 cm between
+    // their middles), the hand comes up until it clears. Reaching low and far, the arm lay nearly straight along that
+    // line and the upper arm went 7 cm into the rail, hauling up the drop net: tools/rail-test.mjs, 15 November. The
+    // shoulders are taken from your eye: 24 cm below it, 17 cm to each side, 6 cm back)
+    const armClear = (hs, E) => { hs.forEach((hh, i) => { const rl = hh?.rail; if (!rl || !hh.at || !E) return;
+      const S = E.clone().add(V3(i ? 0.17 : -0.17, -0.24, 0.06)), H = hh.at; if (!(H.z < rl.z && S.z > rl.z)) return;
+      const t = (S.z - rl.z) / (S.z - H.z), y = S.y + (H.y - S.y) * t, need = rl.y + 0.11;
+      if (y < need) H.y += (need - y) / Math.max(t, 0.2); });
+      // (and the hand itself kept a hand's thickness off the rail, pushed straight away from it: leaning out to lower the
+      // net, the left hand passed 4 cm into the rail for a frame)
+      for (const hh of hs) { const rl = hh?.rail; if (!rl || !hh.at) continue; const dy = hh.at.y - rl.y, dz = hh.at.z - rl.z, d = Math.hypot(dy, dz), want = 0.09;
+        if (d < want) { const k = d > 1e-4 ? want / d : 0; if (k) { hh.at.y = rl.y + dy * k; hh.at.z = rl.z + dz * k; } else hh.at.y = rl.y + want; } } };
     const ropeClear = (hs) => { for (const hh of hs) { const rl = hh.rail; if (!rl || !hh.at) continue; const low = ease(clamp((rl.y + 0.1 - hh.at.y) / 0.08, 0, 1)); if (low <= 0) continue; const back = rl.z + 0.12 - hh.at.z; if (back > 0 && back < 0.3) hh.at.z += back * low; } };
     // (each hand's grip lies along the rope where that hand is: towards the other hand if that's the one nearer the
     // net, else straight to the net)
@@ -1453,11 +1472,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const base = fp ? (() => { const E = fpEye(), nt = netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
             // (once the net is past the rail, on your line of sight down to it, as when letting a fish go: out at eye height
             // the upper arms came in from the top corner of the screen while you looked down)
-            if (nt && (nt.y < -0.3 || nt.z < railZ)) return E.clone().addScaledVector(nt.clone().sub(E).normalize(), FP_ROPE_OUT).add(V3(-0.07, 0, 0.03)); // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
+            if (nt && (nt.y < -0.3 || nt.z < railZ)) return ropeReach(E, nt.clone().sub(E).normalize()).add(V3(-0.07, 0, 0.03)); // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
             // (before that, from the view itself: low and to the left of wherever you look. Fixed below and ahead of the
             // eye, looking steeply down at the net on the deck put the hands at the top edge of the picture, the forearms
             // coming up into it from below: the 8 November recording)
-            const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, FP_ROPE_OUT).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
+            const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, 0.5).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
           // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1474,7 +1493,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (in first person each hand closes round the rope as round the reel's knob: the rope across the fingers, the
           // thumb side up, the hand turned about the rope to line up with the forearm)
           if (fp) { const R2 = ropeFp(base, rd, fpEye(), landStage === "haul" ? ropePull : null, landStage === "lower" ? 0.45 : 0.08);
-            hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); ropeSocks(hands, netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : base.clone().add(rd), rd); }
+            hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands, fpEye()); ropeSocks(hands, netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : base.clone().add(rd), rd); }
           fpRope = fp; lean = fp ? 0.3 : 0.22; crouch = 0.06; brace = landStage === "haul" ? 0.25 : 0; lookAtW = netAt ? netAt.clone() : lookAtW;
         } else if (landStage === "done") { lookAtW = netAt ? netAt.clone() : lookAtW; lean = 0.05; brace = 0;
         } else if (landStage === "in" && net0) {
@@ -1553,7 +1572,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // forearms hanging in from the top edge, upside down, holding nothing you could see)
       const netTop = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
       const sight = netTop ? netTop.clone().sub(E).normalize() : V3(0, -0.8, -0.6).normalize();
-      const base = fp ? (netTop && (netTop.y < -0.3 || netTop.z < -Math.max(0.3, edge - 0.22)) ? E.clone().addScaledVector(sight, FP_ROPE_OUT).add(V3(-0.07, 0, 0.03)) : (() => { const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, FP_ROPE_OUT).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })()) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
+      const base = fp ? (netTop && (netTop.y < -0.3 || netTop.z < -Math.max(0.3, edge - 0.22)) ? ropeReach(E, sight).add(V3(-0.07, 0, 0.03)) : (() => { const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, 0.5).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })()) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1568,7 +1587,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } };
         hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } }; }
       if (fp) { const R2 = ropeFp(base, rd, E, relStep === "haul" ? ropePull : null, 0.08);
-        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true; }
+        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands, E); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true; }
       lean = 0.22; crouch = 0.06; brace = relStep === "haul" ? 0.2 : 0; lookAtW = releaseInfo?.fish || (netAt ? netAt.clone() : lookAtW);
     }
     if (kept?.state === "release" && relStep === "haul" && releaseInfo?.over && netAt) {

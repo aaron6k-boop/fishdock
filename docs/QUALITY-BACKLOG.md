@@ -100,6 +100,8 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Do:** model them in Blender (tripod with screw legs and rest heads, seat box, bucket, mat with real quilting and a
   ruler), PBR textures at 512 to 1k, one LOD each. **Cost:** modest triangles, replaces the code shapes.
 - **Check:** close-ups at the landing, looking down.
+- **Done (15 Nov):** the tripod's leg locks have their levers and its head the hook sea tripods carry for a bag or a
+  weight.
 - **Done (14 Nov), the tripod's fit:** the rod lies in the cradle and comes out of it without going through anything
   (`tools/tripod-check.mjs`). The shapes themselves are still made by code.
 
@@ -115,8 +117,14 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   ballan wrasse, black bream, coalfish, dab, flounder, garfish, gurnard, lesser spotted dogfish, pouting, smoothhound,
   sole, thick-lipped mullet, thornback ray and tope. Close up the difference is modest (a rounder body, eyes standing
   proud), as the lofted ones were already shaped by the same pictures.
-- **Still to look at:** the perch has no cut-out picture; a ray with a properly raised back and thorns along its tail
-  would want modelling by hand rather than lofting. **Check:** a ray and a dogfish landed and looked at
+- **Done (15 Nov), the thornback ray (`fishRay.js`):** its lofted back was an even lens and its tail a flat strip a few
+  millimetres thick. Shaped when it loads: a hump along the spine with the wings thinning away from it, a flatter belly,
+  the body running into a round tail, and the thorns a thornback has: a row of pale hooked thorns down the middle of the
+  back and tail, a row down each side of the tail and ten bucklers on the disc, part of its own mesh so they bend with
+  it. Other rays drawn from its picture get the back and tail, not the thorns.
+- **Done (15 Nov):** the plain stand-in shown before a fish's picture is ready is a mid tone of its colours, not pale
+  grey (a cod coming up to the net in the first moments read as a white plastic fish).
+- **Still to look at:** the perch has no cut-out picture. **Check:** a ray and a dogfish landed and looked at
   (`conger_look`), before and after.
 
 ### 8. Sound
@@ -174,3 +182,5 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 15 Nov | Splash drops drawn as clear streaks along their path, not near-solid white discs (the net coming up stood in a halo of snow) | the net coming out of the water, before and after; `tests/rockSpray.test.js` |
 | 15 Nov | A wet patch on the deck where your dripping net and your fish are put down: darker, a satin sheen, a ragged edge; half dry in two minutes, gone in ten | third person, the net down, 6 s and 4 min later; `tests/wetLook.test.js` |
 | 15 Nov | Hauling the drop net in first person: your hands at arm's length on the rope (58 cm along your sight, not 46), so the elbows sit out past the shoulders (35 to 44 cm from the eye, not 25) and the sleeves aren't cut open in front of you or the forearms bunched up under your eye; the trousers below the knee left out looking down (scraps of navy along the bottom) | the haul at 34, 42, 46 and 50 frames, before and after, with each joint's distance from the eye; `tests/fpRig.test.js` |
+| 15 Nov | The drop net's landing: arms no longer into the top rail (5 frames over 1 cm, the upper arm 7.3 cm in, also on main at 8 frames and 7.1 cm): the line from each shoulder to a hand beyond the rail kept clear, hands kept a hand's thickness off it, and the elbow turned clear when its eased turn would put it in; the rope held out level towards the net rather than further down | `tools/rail-test.mjs` before and after (one frame left: the left hand 4.6 cm in for 100 ms, blending between grips) |
+| 15 Nov | The thornback ray's hump, round tail and thorns; the stand-in fish's colour; the tripod's levers and hook | the ray landed and held up, on the mat from above and the side; `tests/fishRay.test.js` |
