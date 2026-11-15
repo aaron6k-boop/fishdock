@@ -81,6 +81,8 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 - **Do:** model them in Blender (tripod with screw legs and rest heads, seat box, bucket, mat with real quilting and a
   ruler), PBR textures at 512 to 1k, one LOD each. **Cost:** modest triangles, replaces the code shapes.
 - **Check:** close-ups at the landing, looking down.
+- **Done (14 Nov), the tripod's fit:** the rod lies in the cradle and comes out of it without going through anything
+  (`tools/tripod-check.mjs`). The shapes themselves are still made by code.
 
 ### 7. Fish models
 - **Was wrong:** six species have Blender bodies (bass, cod, mackerel, plaice, pollack, whiting); the rest are lofted
@@ -138,3 +140,6 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 14 Nov | The conger and the eel as long bodies (Blender, from straightened pictures) | the conger in the net and in the hands, before and after |
 | 14 Nov | Hands on the drop net's hoop at a hand's pace; a fish swung in taken once within reach | frame logs of a 77 cm ray and a 44 cm bass; `tools/arm-steady.mjs` |
 | 14 Nov | Knuckle creases, nails and fingertip pads on your hands | close-ups of the hold before and after; `tests/fpRig.test.js` (the hands' uvs) |
+| 14 Nov | The rod in its tripod: the cradle square to the rod (it went 7.3 mm through its rubber), the head's bar under it, still in its rest (it swayed 4 cm in a breeze), lifted out of the cup and the cradle; the front feet clear of the railing; bank sticks with rest heads | `tools/tripod-check.mjs`; `tests/tripod.test.js` |
+| 14 Nov | Camera: the fish kept in view while you lay the rod on the rail (first person); the net set down and the fish on the deck shot with the railing behind you, not across you (third person) | `tools/landing-view.mjs` (rod on the rail: fish seen 14% of the time before, 100% after); before and after pictures |
+| 14 Nov | The rod no longer jumps: laid on the rail to land a ray (1.2 m in a frame: its easing had been switched off since 13 Nov), brought up to land (47 cm), the strike (17 to 49 cm) | `tools/arm-steady.mjs` (now watches the rod too: 79 mm at most outside the cast) |

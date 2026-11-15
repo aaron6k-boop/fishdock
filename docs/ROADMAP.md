@@ -66,9 +66,9 @@ working backlog, kept for its detail.
 12. **Distant scenery.** Low priority.
 13. **Shop.** Later: game credits from fishing, cosmetic gear only, nothing that locks places.
 
-## Next action (checkpoint, 14 November, about 15:00)
+## Next action (checkpoint, 14 November, about 22:00)
 
-1. Aaron's review of `people-walk`.
+1. Aaron's review of `visuals-6` (the rod in its tripod, the landing camera).
 2. His phone's FPS display on the next stall (the worst-frame line names page or graphics card).
 3. Blender on his PC: the runner (`source-assets/blender/queue_watcher.py`) was started in his open Blender 5.2 this
    session; scripts go into `Documents/FishDock-assets/queue`, results come back from `exports/`. Next there: the
@@ -81,6 +81,9 @@ working backlog, kept for its detail.
 ## Evidence kept
 
 - `tools/arm-steady.mjs`: the arms at 60 frames a second (all checks pass on #119).
+- `tools/tripod-check.mjs`: the rod against its tripod, cup and reel, waiting and picked up (visuals-6).
+- `tools/landing-view.mjs`: the fish, the net and you in the picture at each stage of a drop-net landing, first or
+  third person (visuals-6).
 - `tools/scenes.mjs`: the fixed scenes, now 12 (11 sea fret, 12 storm caught in a lightning flash); `ONLY=<pattern>`
   draws a few.
 - `tools/party-smoke.mjs`: public places and the map's fishing-now count, in workerd.

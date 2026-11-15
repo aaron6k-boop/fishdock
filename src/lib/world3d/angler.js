@@ -13,7 +13,7 @@ import { hasArt, artUrl } from "../../data/fishart.js";
 import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway, bodyWaveSlope } from "../fishMotion.js";
 import { fishMaterials, donorOf, paintSkin } from "./fishLook.js";
 import { castPoint, dirOf } from "./spots.js";
-import { tripodPlan, buildTripod } from "./tripod.js";
+import { tripodPlan, buildTripod, TRIPOD, restHead } from "./tripod.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpRig, castAt as rigCastAt, rodFrame, holdView, bodyUp } from "./fpRig.js";
@@ -256,11 +256,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the bend along the rod: curvature goes with the bending moment (most at the butt, none at the tip) over the blank's
   // stiffness (its radius to the fourth: the slim tip gives most), and none along the handle, the stiff butt section.
   // BEND[i]: how much of the total turn the rod has made by point i (0 at the butt, 1 at the tip)
-  const BEND = (() => {
-    const s0 = Math.min(0.5, (R.handle[R.handle.length - 1][1] + 0.02) / R.len), k = [], out = [0];
+  const bendFrom = (s0) => {
+    const k = [], out = [0];
     for (let i = 0; i < NSEG; i++) { const s = (i + 0.5) / NSEG, r = (R.r0 + (R.r1 - R.r0) * Math.pow(s, 0.8)) / R.r0; k.push(s < s0 ? 0 : (1.05 - s) / Math.pow(r, 4)); }
     const tot = k.reduce((a, b) => a + b, 0); let c = 0; for (const x of k) { c += x / tot; out.push(c); } return out;
-  })();
+  };
+  const BEND = bendFrom(Math.min(0.5, (R.handle[R.handle.length - 1][1] + 0.02) / R.len));
+  // (in its rest the rod is held at the cradle as well as the butt, so it bends only beyond the cradle: bending from the
+  // handle, the line's pull took the blank down into the cradle's rubber)
+  let BEND_REST = null;
   // the line: one thread from the spool, over the line roller, through every ring and out to the rig or the fish
   // (fishLine.js), in the world's space
   const fLine = fishLine(GUIDES.length); world.add(fLine.mesh);
@@ -275,7 +279,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let restTop = null, restButt = null, tripod = null;
   if (venue === "river" || venue === "lake") {
     restTop = new THREE.Vector3(0.45, 0.42, -0.85); restButt = new THREE.Vector3(0.45, 0.22, 0.25);
-    for (const p of [restTop, restButt]) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), mMetal); between(l, new THREE.Vector3(p.x, 0, p.z), p); rest.add(l); }
+    // (each stick up to a rubber rest head the rod lies in: the front one under the blank, the back one under the
+    // handle a hand's width up from the butt. The sticks used to come up into the middle of the rod)
+    const d = restTop.clone().sub(restButt).normalize(), gripR = R.handle[1][2], mRub = new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.62 });
+    for (const [p, r] of [[restTop, R.r0 + (R.r1 - R.r0) * Math.pow(restTop.distanceTo(restButt) / R.len, 0.8)], [restButt.clone().addScaledVector(d, 0.12), gripR]]) {
+      const h = restHead(p, d, r), l = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 6), mMetal); between(l, new THREE.Vector3(h.foot.x, 0, h.foot.z), h.foot); rest.add(l);
+      const u = new THREE.Mesh(h.geo, mRub); u.castShadow = true; rest.add(u); }
   } else {
     // (to your right and a little ahead, where your right hand reaches the reel; set up for the spot in place())
     restTop = new THREE.Vector3(0.35, 1.55, -0.75); restButt = new THREE.Vector3();
@@ -283,7 +292,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   }
   // (the tripod's head 12 cm in from a pier's railing, or from the edge where there's none, and never more than 75 cm
   // ahead of you: the reel stays in reach of your right hand)
-  function setRest() { if (!tripod) return; const front = rail ? -Math.max(0.3, edge - 0.22) : -(edge - 0.1); restTop.z = Math.max(front + 0.12, -0.75); const P = tripodPlan(restTop); restButt.copy(P.butt); tripod.place(P); }
+  // (the cradle made to fit this rod: the blank's own radius where it lies in it, as rodKit.js tapers it)
+  const restR = R.r0 + (R.r1 - R.r0) * Math.pow(Math.hypot(TRIPOD.rise, TRIPOD.back) / R.len, 0.8);
+  function setRest() { if (!tripod) return; const front = rail ? -Math.max(0.3, edge - 0.22) : -(edge - 0.1); restTop.z = Math.max(front + 0.12, -0.75); const P = tripodPlan(restTop, restR); restButt.copy(P.butt); tripod.place(P); }
   // ---- the seat box's padded seat (charcoal cloth with a stitched border) and its badge ----
   function canvasPad() {
     const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
@@ -600,7 +611,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
   const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0, out: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
-  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0;
+  let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0, fpEN = null, fpYN = null; // (fpEN/fpYN: the held rod's angle in your own view, eased)
   // ---- your body's weight in first person (metres from where the eye would be: x right, y up, z back) ----
   // the eye rides on it, and the rod and your hands hang off the eye: rocking back for a cast and throwing the weight
   // forwards through it, leaning back against a fish and being pulled towards it on a surge. A spring, a touch under
@@ -663,7 +674,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     let fishPose = null; // (the fish swimming: where its mouth is, which way its body lies, how hard it beats its tail)
     let jumpWatch = false, jumpAt = null, netRest = 0; // netRest: 0 hanging, 1 set down on the deck (the bag flattens)
     let netOn = false, netAt = null, ropesOn = false, poleFrom = null, inNet = false, actNow = null; // (actNow: a retargeted move played on cue: human3d ACTS)
-    let fpE = 0.9, fpYaw = -0.03, fpView = null, fpPull = 0, fpArm = null, fpCast = null, fpRest = null, fpUp = null; // first person: the rod's angle up from level, and a little towards the middle
+    let fpStrike = 0, fpE = 0.9, fpYaw = -0.03, fpView = null, fpPull = 0, fpArm = null, fpCast = null, fpRest = null, fpUp = null; // first person: the rod's angle up from level, and a little towards the middle
     landStage = null; landWater = null; dropRig = null; ropePull = null; releaseInfo = null; releaseRope = null; matOn = false; releasePole = false;
     const ph = info.phase; if (ph !== "landing") liftTook = false; // (a new landing: the fish not yet taken in the hand)
     jumpWatch = false; jumpAt = null;
@@ -802,7 +813,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       fpE = 0.95 - 0.22 * surge * tk + 0.28 * pump; fpYaw = -0.08 + clamp(run * 0.15 * st.runWidth, -0.22, 0.22); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
       // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
-      pitch += 0.38 * strikeK; fpE += 0.32 * strikeK; bendT += 0.25 * strikeK;
+      pitch += 0.38 * strikeK; fpStrike = 0.32 * strikeK; bendT += 0.25 * strikeK;
       bodyTo.z += 0.07 * strikeK; bodyTo.y -= 0.015 * strikeK; // (your weight thrown back into the strike)
       P.tension = tension;
       if (crossed(0.02)) { if (!local) onSound?.("reelOn", at); else onSound?.("swish", at); feel("hooked", {}, true); } // (the strike: the rod swept up)
@@ -1190,7 +1201,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (from the lower right, leaning in a little towards the middle, so it doesn't run straight up the view)
       // (as you'd hold it yourself: the reel low in the middle of the view, the rod rising away up and to the left,
       // both hands on it, the water and the line beyond)
-      const e = fpCast ? fpCast.e : fpE - FPROD.de, sw = fpCast ? fpCast.sw : fpYaw - FPROD.dsw;
+      // (the held angle eased from one moment to the next, the strike's own sweep added on top unchanged: at the strike the
+      // angle for playing a fish replaced the one for a bite in a frame, and the rod's middle went 17 cm, up to 49 cm when
+      // the fish ran off to the side; eased over a tenth of a second the step is gone, the strike as sharp as before)
+      if (fpEN == null || fpCast) { fpEN = fpE; fpYN = fpYaw; } else { const kE = 1 - Math.exp(-dt * 10); fpEN += (fpE - fpEN) * kE; fpYN += (fpYaw - fpYN) * kE; }
+      const e = fpCast ? fpCast.e : fpEN + fpStrike - FPROD.de, sw = fpCast ? fpCast.sw : fpYN - FPROD.dsw;
       dir = vf.clone().multiplyScalar(Math.cos(e) * Math.cos(sw)).addScaledVector(vu, Math.sin(e)).addScaledVector(vr, Math.cos(e) * Math.sin(sw)).normalize();
       fpView = { vr, vu, vf };
       { const e0 = 0.9 - FPROD.de, s0 = -0.03 - FPROD.dsw; fpRest = vf.clone().multiplyScalar(Math.cos(e0) * Math.cos(s0)).addScaledVector(vu, Math.sin(e0)).addScaledVector(vr, Math.cos(e0) * Math.sin(s0)).normalize(); fpUp = bodyUp(vf, vu); } // (the rod's direction in the hold, for its roll: below)
@@ -1230,17 +1245,34 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // frame, and the hands shook a millimetre thirty times a second)
       if (inHand == null || walking) inHand = want; else inHand = want > inHand ? Math.min(want, inHand + dt / 0.8) : want < inHand ? Math.max(want, inHand - dt / 0.9) : want; }
     const lift = walking ? 1 : ease((inHand - 0.3) / 0.7);
-    if (lift < 1) { butt = restB.clone().lerp(butt, lift); dir = restD.clone().lerp(dir, lift).normalize(); }
+    // (lifted out as it's done: up its own line first, the butt out of the cup and the blank sliding along the cradle,
+    // then up out of the cradle's open side, then swung to you. Going straight to your hands, the butt went out through
+    // the side of the cup, 5 mm round the rod, and the blank tipped forwards through the cradle and the bar under it)
+    // (8 cm out of the cradle before it swings: at 5 cm the swing still took it 2 mm into the cradle's rubber)
+    if (lift < 1) { const k = ease((lift - 0.3) / 0.7), open = new THREE.Vector3(0, 1, 0).addScaledVector(restD, -restD.y).normalize();
+      // (and up over the tripod's head on the way: the rod is held further out than it rests, so going straight there
+      // its blank passed forwards through the bar across the head, 7 mm in)
+      butt = restB.clone().addScaledVector(restD, 0.08 * ease(lift / 0.2)).addScaledVector(open, 0.08 * ease((lift - 0.08) / 0.24)).lerp(butt, k); butt.y += 0.12 * Math.sin(Math.PI * k); dir = restD.clone().lerp(dir, k).normalize(); }
     held = walking || inHand > 0;
     // from one way of holding the rod to the next (into your hands, walking off with it) the rod moves there over a
     // moment rather than jumping
-    { const key = `${held}|${fp && !fpRodDown}|${!!walking}`; // (and the rod put down to land a fish in first person: it went 30 cm in a frame) if (key !== rodS.key) { if (rodS.key) rodS.until = t + 0.75; rodS.key = key; }
+    // (and the rod put down to land a fish in first person: it went 30 cm in a frame. From 13 November to 14 November this
+    // didn't run at all, the line that starts it having ended up inside the note above it: laying the rod on the rail to
+    // land a ray its middle went 1.2 m in a frame. Picked up from its rest or put back it needs none: that's eased
+    // already, along a path clear of the tripod, which a lag would cut across)
+    // (and into a landing and out of it: bringing the fish up, the rod's held angle changes at once, and its middle went
+    // 47 cm in a frame)
+    { const key = `${fp && !fpRodDown}|${!!walking}|${ph === "landing"}`; if (key !== rodS.key) { if (rodS.key) { rodS.until = t + 0.75; rodS.from = t; } rodS.key = key; }
       // (and catches up smoothly at the end, quicker and quicker, rather than jumping the last of the way: picking the
       // rod up on a bite, it was still 15 cm behind when the moment ended, and the rod and both hands leapt up)
       const late = Math.max(0, t - rodS.until), behind = rodS.ok && (rodS.butt.distanceTo(butt) > 0.001 || rodS.dir.angleTo(dir) > 0.002);
-      if (rodS.ok && (t < rodS.until || (behind && late < 1))) { const k2 = 1 - Math.exp(-dt * (6 + 90 * late)); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
+      // (starting gently: easing at full rate from the first frame, laying the rod on the rail its middle still went 12 cm
+      // in that frame; it now gathers speed over the first 0.3 s)
+      if (rodS.ok && (t < rodS.until || (behind && late < 1))) { const k2 = 1 - Math.exp(-dt * (6 * clamp((t - (rodS.from ?? -9)) / 0.3, 0.15, 1) + 90 * late)); rodS.butt.lerp(butt, k2); rodS.dir.lerp(dir, k2).normalize(); butt = rodS.butt.clone(); dir = rodS.dir.clone(); }
       else { rodS.butt.copy(butt); rodS.dir.copy(dir); rodS.ok = true; } }
-    dir.x += sway; dir.y += breath; dir.normalize();
+    // (the sway of holding it, and your breathing, only while it's in your hands: in its rest it lies still, the butt in
+    // the cup and the blank in the cradle. In a fresh breeze it swayed there too, 4 cm side to side at the cradle, in and out of the rubber)
+    dir.x += sway * lift; dir.y += breath * lift; dir.normalize();
     // the bend is towards the line
     const target = rigAt ? toLocal(rigAt) : butt.clone().add(dir.clone().multiplyScalar(R.len * 2)).add(new THREE.Vector3(0, -2, 0));
     const toT = target.clone().sub(butt).normalize();
@@ -1258,8 +1290,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const toLine = Math.acos(clamp(toT.dot(dir), -1, 1));
     const turn = Math.sign(k) * Math.min(Math.abs(k) * 3.0, castBend ? 0.6 : Math.max(0.15, toLine * 0.98));
     pts[0].copy(butt);
+    const BR = lift < 1 ? (BEND_REST ||= bendFrom(Math.min(0.9, (tripod ? Math.hypot(TRIPOD.rise, TRIPOD.back) : restTop.distanceTo(restButt)) / R.len + 0.02))) : null;
     for (let i = 0; i < NSEG; i++) {
-      const s = (i + 0.5) / NSEG, th = turn * (BEND[i] + BEND[i + 1]) / 2 + spr.tip * 2.2 * Math.pow(s, 5);
+      const s = (i + 0.5) / NSEG, b0 = BEND[i] + (BR ? (BR[i] - BEND[i]) * (1 - lift) : 0), b1 = BEND[i + 1] + (BR ? (BR[i + 1] - BEND[i + 1]) * (1 - lift) : 0), th = turn * (b0 + b1) / 2 + spr.tip * 2.2 * Math.pow(s, 5);
       pts[i + 1].copy(pts[i]).addScaledVector(dir, Math.cos(th) * R.len / NSEG).addScaledVector(bendDir, Math.sin(th) * R.len / NSEG);
     }
     for (let i = 0; i < NSEG; i++) between(rodSegs[i].m, pts[i], pts[i + 1], rodSegs[i].r);
