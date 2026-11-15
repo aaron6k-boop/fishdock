@@ -186,14 +186,46 @@ test("skin: warm light round the shadow's edge and a little variation, worked in
   const lib = THREE.ShaderLib.physical;
   const sh = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} };
   skinShade(sh);
-  // (the scatter goes into the diffuse light only, after three's own; the patches follow the skinned hand)
+  // (the scatter goes into the diffuse light only, after three's own; the patches are worked out from the point before
+  // the bones move it, so they stay on the skin as the arm moves rather than the arm moving through them)
   assert.match(sh.fragmentShader, /reflectedLight\.directDiffuse \+= irradiance \* BRDF_Lambert\( material\.diffuseColor \);\s*\{ float fpW/);
   assert.ok(!sh.fragmentShader.includes("#include <lights_physical_pars_fragment>"), "the lighting chunk is written out with the scatter in it");
-  assert.match(sh.vertexShader, /#include <skinning_vertex>\nvSkinP = transformed;/);
+  assert.match(sh.vertexShader, /vSkinP = transformed;\n#include <skinning_vertex>/);
+  assert.ok(sh.vertexShader.indexOf("vSkinP = transformed;") < sh.vertexShader.indexOf("#include <skinning_vertex>"), "taken before skinning");
   assert.match(sh.fragmentShader, /varying vec3 vSkinP;/);
   assert.match(sh.fragmentShader, /diffuseColor\.rgb \*= mix\(/);
   // (the scatter adds light only on the dark side of the edge: max(w - dotNL, 0) is never negative)
   assert.match(sh.fragmentShader, /max\( fpW - dotNL, 0\.0 \)/);
+});
+
+// ---- your arms in the rain ----
+test("rain: skin and coat wet through in about a minute, glossier and a touch darker, and dry slowly after", async () => {
+  const { setHandsWet, setHandsDim, handsWet } = await import("../src/lib/world3d/fpRig.js");
+  const mats = []; R.scene.traverse((o) => { if (o.isMesh) mats.push(o.material); });
+  const coat = mats.find((m) => m.type === "MeshPhysicalMaterial"), skin = mats.find((m) => m !== coat);
+  setHandsWet(0, 1e6); setHandsDim(1);
+  const dry = { coat: coat.roughness, skin: skin.roughness, coatL: coat.color.r + coat.color.g + coat.color.b };
+  for (let i = 0; i < 60 * 10; i++) setHandsWet(0.8, 0.1); // (a minute of steady rain)
+  assert.ok(handsWet() > 0.7, `wet after a minute of rain (${handsWet().toFixed(2)})`);
+  assert.ok(coat.roughness < dry.coat * 0.7 && skin.roughness < dry.skin * 0.8, "both glossier");
+  assert.ok(coat.color.r + coat.color.g + coat.color.b < dry.coatL * 0.95, "the coat darker");
+  setHandsWet(0, 60); // (a minute after it stops: still damp)
+  assert.ok(handsWet() > 0.4, `still damp a minute after (${handsWet().toFixed(2)})`);
+  for (let i = 0; i < 60 * 15; i++) setHandsWet(0, 1); // (a quarter of an hour)
+  assert.ok(handsWet() < 0.01, `dry a quarter of an hour after (${handsWet().toFixed(3)})`);
+  assert.ok(Math.abs(coat.roughness / dry.coat - 1) < 0.01 && Math.abs(skin.roughness / dry.skin - 1) < 0.01, "as glossy as before, within 1%");
+  // (one long step never overshoots)
+  setHandsWet(1, 1e6); assert.ok(handsWet() <= 1); setHandsWet(0, 1e6); assert.equal(handsWet(), 0);
+});
+
+// ---- the coat's cut near the eye (15 November: a 5 cm dither showed as a screen of dots over the sleeve, looking down) ----
+test("the coat's cut near your eye is softened over a narrow band only", () => {
+  let coat = null; R.scene.traverse((o) => { if (o.isMesh && o.material?.type === "MeshPhysicalMaterial") coat = o.material; });
+  const lib = THREE.ShaderLib.physical, sh = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} };
+  coat.onBeforeCompile(sh, {});
+  const m = /fpNearCut \+ \(fpB4\(gl_FragCoord\.xy\) - 0\.5\) \* ([0-9.]+)/.exec(sh.fragmentShader);
+  assert.ok(m, "the cut is there, with its dither");
+  assert.ok(+m[1] <= 0.015, `the dither's band ${(+m[1] * 100).toFixed(1)} cm wide`);
 });
 
 // ---- the jacket's lining (14 November: a dark ring round the forearm looking down a sleeve cut near the eye) ----

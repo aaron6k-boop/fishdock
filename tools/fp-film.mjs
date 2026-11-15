@@ -19,7 +19,7 @@ const dir = `${out}/${shape}`; rmSync(dir, { recursive: true, force: true }); mk
 
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const ctx = await browser.newContext({ viewport: VP, deviceScaleFactor: 1 });
-await ctx.addInitScript(() => { window.__fdFilm = true; window.__fdPerfOn = true; localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "high", fishCam: "first" })); });
+await ctx.addInitScript(() => { window.__fdFilm = true; window.__fdPerfOn = true; localStorage.setItem("fishdock.playerName", "Tester"); /* (or the name prompt covers the bottom of every frame) */ localStorage.setItem("fishdock.view3d.v1", JSON.stringify({ gfx: "high", fishCam: "first" })); });
 const page = await ctx.newPage(); const cdp = await ctx.newCDPSession(page);
 const errors = []; page.on("pageerror", (e) => { errors.push(e.message); console.log("ERR", e.message); });
 await page.goto(`${base}/#play/gorleston-south-pier`);
