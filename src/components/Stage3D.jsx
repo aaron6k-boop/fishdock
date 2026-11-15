@@ -6,6 +6,7 @@ import { setVolumes } from "../lib/sceneAudio.js";
 import { WorldCtx, SceneCtx } from "./WorldContext.js";
 import { CatchCard } from "./FishingScene.jsx";
 import { Icon } from "./ui.jsx";
+import { PHRASES } from "../lib/chatPhrases.js";
 import { speciesById } from "../data/species.js";
 import { catchInfo } from "../lib/catchInfo.js";
 import { landingTech } from "../lib/sceneActors.js";
@@ -14,7 +15,7 @@ const TORCHES = ["off", "white", "red", "green"], TORCH_NAMES = { off: "Off", wh
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
-export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, fightLive = null, tipLight = "auto", toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, fight = null, reelOpts = null, onReelOpts, onDecide = null, rateCatch = null }) {
+export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, fightLive = null, tipLight = "auto", toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, chat = null, chatMode = null, onSay, onChat, fight = null, reelOpts = null, onReelOpts, onDecide = null, rateCatch = null }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState(() => (loadView().fishCam === "third" ? "third" : "first")), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
   const others = anglers.filter((a) => !a.local);
@@ -83,6 +84,21 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   // voice chat: a light above whoever's talking
   const spokeRef = useRef(new Set());
   useEffect(() => { const now = speaking || new Set(); for (const id of spokeRef.current) if (!now.has(id)) w.current?.setSpeaking(id, false); for (const id of now) w.current?.setSpeaking(id, true); spokeRef.current = new Set(now); }, [speaking]);
+  // ---- chat (Fish Together and public places): each new line in a bubble over whoever said it, and a chat panel ----
+  // (chat: [{ seq, who: the angler's id here, name, text, mine }], oldest first; chatMode: "phrases" in a public place,
+  // where strangers can only pick from src/lib/chatPhrases.js; "free" in a party with chat on, typed lines as well)
+  const [chatOpen, setChatOpen] = useState(false), [chatDraft, setChatDraft] = useState(""), [unread, setUnread] = useState(0);
+  const seenSeq = useRef(null);
+  useEffect(() => {
+    if (!chat) return;
+    const top = chat.length ? chat[chat.length - 1].seq : 0;
+    if (seenSeq.current == null) { seenSeq.current = top; return; } // (what was said before you arrived isn't bubbled again)
+    const fresh = chat.filter((c) => c.seq > seenSeq.current); seenSeq.current = Math.max(seenSeq.current, top);
+    if (view.bubbles !== false) for (const c of fresh) w.current?.say(c.who, c.text);
+    if (!chatOpen && fresh.some((c) => !c.mine)) setUnread((n) => n + fresh.filter((c) => !c.mine).length);
+  }, [chat]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (chatOpen) setUnread(0); }, [chatOpen]);
+  const sendChat = (e) => { e.preventDefault(); const t = chatDraft.trim(); if (!t) return; onChat?.(t); setChatDraft(""); };
   // other people walking about (Fish Together): their poses straight to the 3D view
   useEffect(() => { if (!poseBus) return undefined; const f = (e) => w.current?.setRemotePose(e.detail.who, e.detail.p); poseBus.addEventListener("pose", f); return () => poseBus.removeEventListener("pose", f); }, [poseBus]);
   // ---- your landed fish: it waits in the net; tap it (or Look at it) to hold it up, then keep it or put it back ----
@@ -229,6 +245,19 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
             </div>
           ) : null}
         </div>
+        {chatMode && !busyFishing ? <button type="button" className={`w3d-chatbtn${chatOpen ? " on" : ""}`} onClick={() => setChatOpen(!chatOpen)} aria-label={unread ? `Chat, ${unread} new` : "Chat"} aria-expanded={chatOpen} title="Chat"><Icon name="chat" />{unread ? <span className="w3d-unread" aria-hidden="true">{Math.min(9, unread)}</span> : null}</button> : null}
+        {chatMode && chatOpen ? (
+          <div className="w3d-chat" role="dialog" aria-label="Chat">
+            <div className="w3d-chat-head"><b>Chat</b>
+              <button type="button" className={`ft-pill w3d-chat-bub${view.bubbles !== false ? " on" : ""}`} aria-pressed={view.bubbles !== false} onClick={() => setOpt("bubbles", view.bubbles === false)} title="Show what people say over their heads">Bubbles</button>
+              <button type="button" className="xbtn" onClick={() => setChatOpen(false)} aria-label="Close chat"><Icon name="close" /></button></div>
+            <ol className="w3d-chat-lines" aria-live="polite">{(chat || []).slice(-8).map((c) => <li key={c.seq} className={c.mine ? "mine" : ""}><b>{c.mine ? "You" : c.name}:</b> {c.text}</li>)}
+              {!(chat || []).length ? <li className="w3d-chat-none">Nobody's said anything yet.</li> : null}</ol>
+            {chatMode === "phrases" ? <p className="w3d-chat-note">You're fishing with strangers here, so chat is set phrases only.</p> : null}
+            <div className="w3d-chat-phrases">{PHRASES.map((ph) => <button key={ph.id} type="button" className="ft-pill" onClick={() => onSay?.(ph.id)}>{ph.text}</button>)}</div>
+            {chatMode === "free" ? <form className="w3d-chat-form" onSubmit={sendChat}><input value={chatDraft} onChange={(e) => setChatDraft(e.target.value)} maxLength={200} placeholder="Say something" aria-label="Message" enterKeyHint="send" /><button type="submit" className="ft-pill on" disabled={!chatDraft.trim()}>Send</button></form> : null}
+          </div>
+        ) : null}
         {/* walking about: its own button, bottom right (while walking, the walking controls take its place) */}
         {!walk && !busyFishing ? <button type="button" className="w3d-walkbtn" onClick={() => startWalk()} aria-label="Walk about" title="Walk about (Beta)"><Icon name="walk" /></button> : null}
         {finePointer && !menu ? <div className="w3d-keys" aria-hidden="true">W A S D walk · Shift sprint · Space cast, strike, reel · E land or fish here · drag to look</div> : null}

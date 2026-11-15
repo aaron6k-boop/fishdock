@@ -17,8 +17,9 @@
 //   phone and never through FishDock.
 // - Public places (13 November): everyone playing the game at one of FishDock's documented marks is put in that mark's
 //   own room without joining anyone (POST /api/party/public), so whoever's fishing Gorleston South Pier sees the others
-//   there. Up to four anglers a room; a fifth goes in the mark's next room. Virtual only, no host, no chat and no voice
-//   (strangers); the names people chose, their looks, their fishing and their walking about. Nobody's kept for long:
+//   there. Up to four anglers a room; a fifth goes in the mark's next room. Virtual only, no host, no typed chat and no
+//   voice (strangers): only the fixed phrases of src/lib/chatPhrases.js ("say", by id, 15 November); the names people
+//   chose, their looks, their fishing and their walking about. Nobody's kept for long:
 //   anyone gone two hours is dropped. Still never anyone's coordinates: the mark is a public place.
 //   The map shows how many are fishing each place now (GET /api/party/public): each public room tells one board its
 //   count of connected anglers when it changes, and the board adds them up by mark. Numbers by place only.
@@ -31,6 +32,7 @@ import { ipKey } from "./ipKey.js";
 import { assignSpots, layoutFor, MAX_ANGLERS } from "../src/lib/world3d/spots.js";
 import { markFor } from "./place3d.js";
 import { cleanLook } from "../src/lib/world3d/people.js";
+import { phraseText } from "../src/lib/chatPhrases.js";
 
 /** A walking pose: { x, y, z, face, air } within the 3D place, null (back at their spot), or an emote ({ emote });
  * undefined if it's not one. */
@@ -219,7 +221,7 @@ export class PartyRoom {
     return {
       t: "hello", now, you: { id: mid, role: me.role, host: me.role === "host" },
       party: { code: S.code, public: !!S.public, mode: S.mode, venue: S.venue, place: S.place, light: S.light || "now", expiresAt: S.expiresAt, closed: S.closed, locked: S.locked, codeOn: S.codeOn, chatOn: S.chatOn, voiceOn: S.voiceOn, anglersOn: S.anglersOn, challenge: S.challenge, ...(me.role === "host" ? { secret: S.secret } : {}) },
-      members: this.members(), events: S.events.slice(-600), chat: (S.chatOn ? S.chat : S.chat.filter((c) => c.sys)).slice(-50),
+      members: this.members(), events: S.events.slice(-600), chat: (S.chatOn ? S.chat : S.chat.filter((c) => c.sys || (S.public && c.say))).slice(-50),
     };
   }
   settingsOut(forHost = false) { const S = this.s; return { t: "settings", light: S.light || "now", locked: S.locked, codeOn: S.codeOn, chatOn: S.chatOn, voiceOn: S.voiceOn, anglersOn: S.anglersOn, challenge: S.challenge, closed: S.closed, ...(forHost ? { secret: S.secret } : {}) }; }
@@ -314,11 +316,22 @@ export class PartyRoom {
         return res();
       }
       case "chat": {
-        if (!S.chatOn) { out.push({ to: mid, msg: { t: "error", code: "chat_off", message: "The host has turned chat off." } }); return res(); }
+        if (!S.chatOn) { out.push({ to: mid, msg: { t: "error", code: "chat_off", message: S.public ? "Typed chat isn't open in public places: pick a phrase instead." : "The host has turned chat off." } }); return res(); }
         const text = cleanLine(msg.text, PARTY.chatChars);
         if (!text) return res();
         if (this.chatLimited(mid, now)) { out.push({ to: mid, msg: { t: "error", code: "chat_slow", message: "Slow down a little: you can send another message in a moment." } }); return res(); }
         const c = { seq: ++S.seq, at: now, who: mid, text };
+        S.chat.push(c); if (S.chat.length > PARTY.maxChat) S.chat.shift();
+        out.push({ to: "*", msg: { t: "chat", c } });
+        return res({ save: true });
+      }
+      case "say": {
+        // (one of the fixed phrases, by its id: in a public place's room, where there's no typed chat, and in a party
+        // while the host has chat on)
+        if (!S.public && !S.chatOn) { out.push({ to: mid, msg: { t: "error", code: "chat_off", message: "The host has turned chat off." } }); return res(); }
+        if (!phraseText(msg.id)) return res();
+        if (this.chatLimited(mid, now)) { out.push({ to: mid, msg: { t: "error", code: "chat_slow", message: "Slow down a little: you can send another message in a moment." } }); return res(); }
+        const c = { seq: ++S.seq, at: now, who: mid, say: msg.id };
         S.chat.push(c); if (S.chat.length > PARTY.maxChat) S.chat.shift();
         out.push({ to: "*", msg: { t: "chat", c } });
         return res({ save: true });
