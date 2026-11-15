@@ -145,10 +145,18 @@ function scaleNormalMap() {
  * eyes (glassy). `map` is the skin (picture or painted); `aspect` the picture's height over its width (the scales are
  * drawn round, not stretched); `len` the fish's length in metres (a small fish's scales are fine enough not to show).
  */
+// (the plain stand-in shown for a moment before a fish's picture is ready: half way between its back and its flank, or
+// a sea fish's grey-olive where its colours aren't listed. It was a pale grey for every fish, and a cod coming up to
+// the net in the first moments read as a white plastic fish)
+export function standInHex(species) {
+  const k = FISH_SKINS[species] || { back: [62, 70, 66], side: [140, 146, 140] }, c = k.back.map((v, i) => Math.round((v + k.side[i]) / 2));
+  return (c[0] << 16) | (c[1] << 8) | c[2];
+}
 export function fishMaterials(species, { map = null, aspect = 320 / 480, len = 0.45, look = null } = {}) {
   const K = { ...lookOf(species), ...(look || {}) }; // (look: to make a given kind of skin, for building its shaders ahead)
+  const plain = standInHex(species);
   const body = new THREE.MeshPhysicalMaterial({
-    map, color: map ? 0xffffff : 0xb8c0c4, roughness: K.rough, metalness: 0.05 + K.silver * 0.3, side: THREE.DoubleSide, alphaTest: 0.5,
+    map, color: map ? 0xffffff : plain, roughness: K.rough, metalness: 0.05 + K.silver * 0.3, side: THREE.DoubleSide, alphaTest: 0.5,
     clearcoat: 0.35 + 0.6 * K.slime, clearcoatRoughness: 0.08 + 0.1 * (1 - K.slime), // (the wet sheen, brightest at a glancing angle)
     iridescence: K.silver * 0.8, iridescenceIOR: 1.35, iridescenceThicknessRange: [180, 420],
     specularIntensity: 0.6 + 0.4 * K.silver, envMapIntensity: 1,
@@ -161,7 +169,7 @@ export function fishMaterials(species, { map = null, aspect = 320 / 480, len = 0
     body.clearcoatNormalMap = t; body.clearcoatNormalScale = new THREE.Vector2(0.12, 0.12);
   }
   const fin = new THREE.MeshPhysicalMaterial({
-    map, color: map ? 0xffffff : 0xb8c0c4, roughness: 0.35, metalness: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.86, alphaTest: 0.22,
+    map, color: map ? 0xffffff : plain, roughness: 0.35, metalness: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.86, alphaTest: 0.22,
     depthWrite: false, clearcoat: 0.5, clearcoatRoughness: 0.15, emissive: 0x000000,
   });
   // light through a thin fin: lit a little from either side, so a fin held against the sky glows rather than going black

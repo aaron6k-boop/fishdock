@@ -94,7 +94,15 @@ export function buildTripod() {
       bs.push(tube(P.hub, mid, 0.0145, 0.0145, 10)); ms.push(tube(mid, f.clone().add(V(0, 0.025, 0)), 0.011, 0.011, 10));
       bs.push(tube(mid.clone().lerp(P.hub, 0.05), mid.clone().lerp(f, 0.04), 0.018, 0.018, 10));
       bs.push(tube(f, f.clone().add(V(0, 0.03, 0)), 0.017, 0.015, 10));
+      // (the clamp's lever, folded flat along the outer tube on its outside, as a leg lock is when it's shut)
+      const ax = f.clone().sub(P.hub).normalize(), out = V(f.x - P.hub.x, 0, f.z - P.hub.z); if (out.lengthSq() < 1e-8) out.set(0, 0, 1); out.normalize();
+      const side = out.clone().addScaledVector(ax, -out.dot(ax)).normalize(), l0 = mid.clone().lerp(P.hub, 0.03).addScaledVector(side, 0.021);
+      bs.push(tube(l0, l0.clone().addScaledVector(ax, -0.055).addScaledVector(side, 0.004), 0.0045, 0.0035, 6));
     }
+    // (the hook under the head, for a bag or a weight to steady it in a wind, as sea tripods have: a short stem and an
+    // open hook)
+    { const h0 = P.hub.clone().add(V(0, -0.035, 0)), h1 = h0.clone().add(V(0, -0.05, 0)); ms.push(tube(h0, h1, 0.0028, 0.0028, 6));
+      const hk = new THREE.TorusGeometry(0.012, 0.0028, 5, 10, Math.PI * 1.3); hk.rotateZ(Math.PI * 0.85); hk.translate(h1.x + 0.012 * Math.cos(Math.PI * 0.85 + Math.PI), h1.y - 0.004, h1.z); ms.push(hk); }
     // the head: a block the legs meet at, a bar across it, a short post up to each cradle
     bs.push(tube(P.hub.clone().add(V(0, -0.035, 0)), P.hub.clone().add(V(0, 0.03, 0)), 0.03, 0.026, 12));
     const hx = (s) => P.hub.clone().add(V(s * (TRIPOD.side + 0.04), 0.02, 0));
