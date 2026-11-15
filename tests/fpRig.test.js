@@ -218,6 +218,16 @@ test("rain: skin and coat wet through in about a minute, glossier and a touch da
   setHandsWet(1, 1e6); assert.ok(handsWet() <= 1); setHandsWet(0, 1e6); assert.equal(handsWet(), 0);
 });
 
+// ---- the coat's cut near the eye (15 November: a 5 cm dither showed as a screen of dots over the sleeve, looking down) ----
+test("the coat's cut near your eye is softened over a narrow band only", () => {
+  let coat = null; R.scene.traverse((o) => { if (o.isMesh && o.material?.type === "MeshPhysicalMaterial") coat = o.material; });
+  const lib = THREE.ShaderLib.physical, sh = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} };
+  coat.onBeforeCompile(sh, {});
+  const m = /fpNearCut \+ \(fpB4\(gl_FragCoord\.xy\) - 0\.5\) \* ([0-9.]+)/.exec(sh.fragmentShader);
+  assert.ok(m, "the cut is there, with its dither");
+  assert.ok(+m[1] <= 0.015, `the dither's band ${(+m[1] * 100).toFixed(1)} cm wide`);
+});
+
 // ---- the jacket's lining (14 November: a dark ring round the forearm looking down a sleeve cut near the eye) ----
 test("the jacket's inward-facing lining is left out when the rig is built, and what's left faces outwards", async () => {
   const { dropLining } = await import("../src/lib/world3d/fpRig.js");

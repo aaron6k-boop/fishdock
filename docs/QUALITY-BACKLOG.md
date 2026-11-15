@@ -30,6 +30,9 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   12 cm a frame (7 m/s), and an arm let go of it dropped at 11 cm. Hands on the hoop now go no quicker than 2.5 m/s and
   a let-go arm drops in 0.45 s: lifting the net 118 to 56 mm a frame at most, bringing it in 113 to 44.
 - **Check:** the fixed drop-net film (`haul_frames`) before and after; `tools/rail-test.mjs dropnet`; `tools/arm-steady.mjs`.
+- **Still open:** looking down, the sleeve nearest your eye is cut away by the sphere round the camera, and through the
+  opening you see the water: clean-edged now, but a hollow look. The fix is first-person arms authored to end outside
+  the view (Blender on the PC, with the haul clips above).
 - **Looked at again (15 Nov): the sleeve wasn't missing.** Painted flat by bone in the cast's frame 48, what read as a
   bare forearm is your right hand seen edge on from 25 cm as the rod goes back, then about 6 cm of wrist, then the
   sleeve, exactly where the skinning puts it (4.7 cm out from the forearm's axis, as on the left). Two real faults
@@ -166,3 +169,4 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 15 Nov | The "bare right forearm" was the hand seen edge on from 25 cm; the cuff's sawtooth edge made whole (the hem's half-squares kept when the lining is left out); the wrist creases taken out (still a scar) | bone paint and the cast's frame 48, before and after; `tests/fpRig.test.js` |
 | 15 Nov | Skin patches stay on the skin as the arm moves | `tests/fpRig.test.js` (taken before skinning) |
 | 15 Nov | Your arms wet in the rain: skin and coat glossier and darker, wet through in a minute, dry over a few | the coat's roughness 0.80 dry, 0.44 after 90 s of rain; the cast in rain at the start and after; `tests/fpRig.test.js` |
+| 15 Nov | Looking down at the drop net, the sleeve near your eye no longer a screen of dots (the cut's dither band 5 cm to 1.2 cm; the cast unchanged) | the landing and the cast's frame 48 with the band as it was, hard and 1.2 cm; `tests/fpRig.test.js` |
