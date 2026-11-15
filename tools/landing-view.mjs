@@ -4,12 +4,13 @@
 // inside the picture, clear of the controls along the bottom, and not hidden behind the pier (window.__fdWorld.blocked).
 // Prints the share of each landing stage where each is seen; checks the stages where it must be:
 //   first person: the fish brought up, the rod laid on the rail, the net let down, the fish led over it, hauled up;
-//   third person: from the rod on the rail to the net set down on the deck, the fish, the net and you.
+//   third person: from the rod on the rail to the net set down on the deck, what each shot must show (landCam.js).
 // (Picking the net up off the deck, you look at the net, not the fish; the fish coming over the rail passes close by.)
 // Drawn in software here: right for the framing, not for how smoothly a phone runs it.
 //   FISHDOCK_FILM=1 node tools/build.mjs && node tests/e2e/server.mjs 8820 --dist &
 //   node tools/landing-view.mjs http://localhost:8820 first     (or third)
 import { createRequire } from "node:module";
+import { SHOTS } from "../src/lib/world3d/landCam.js";
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require("playwright")); } catch { console.log("SKIP  Playwright isn't installed here"); process.exit(0); }
 const base = (process.argv[2] || "http://localhost:8820").replace(/\/$/, ""), cam = process.argv[3] === "third" ? "third" : "first";
@@ -42,8 +43,10 @@ const pct = (x) => (x[1] ? Math.round((100 * x[0]) / x[1]) : null);
 console.log(`${cam} person, landing a 52 cm bass with the drop net at Gorleston (share of each stage seen):`);
 for (const st of STAGES) { const s = by[st]; if (!s) continue; console.log(`  ${st.padEnd(6)} ${String(s.n).padStart(3)} checks   fish ${pct(s.fish) ?? "-"}%   net ${pct(s.net) ?? "-"}%   ${cam === "third" ? `you ${pct(s.head) ?? "-"}%` : ""}`); }
 let fails = 0; const check = (pass, msg) => { console.log(`${pass ? "PASS" : "FAIL"}  ${msg}`); if (!pass) fails++; };
+// (third person: each framed shot's own "must" list in landCam.js, the things it's built to keep in the picture; you
+// are only a "want" while the fish is led over the net, shown when it fits)
 const must = cam === "first" ? [["up", "fish"], ["rod", "fish"], ["lower", "net"], ["lead", "fish"], ["lead", "net"], ["haul", "net"]]
-  : ["rod", "pick", "lower", "lead", "haul", "in", "done"].flatMap((st) => [[st, "fish"], [st, "net"], [st, "head"]]);
+  : ["rod", "pick", "lower", "lead", "haul", "in", "done"].flatMap((st) => SHOTS[st].must.filter((k) => k === "fish" || k === "net" || k === "head").map((k) => [st, k]));
 for (const [st, k] of must) { const v = by[st] ? pct(by[st][k]) : null; check(v != null && v >= 85, `${st}: the ${k === "head" ? "angler" : k} in the picture ${v ?? "-"}% of the time (85% or more)`); }
 check(!errors.length, errors.length ? `page errors: ${errors.slice(0, 2).join(" | ")}` : "no page errors");
 console.log(fails ? `\n${fails} check(s) failed` : "\nAll checks passed"); process.exit(fails ? 1 : 0);
