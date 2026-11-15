@@ -474,7 +474,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let fishFor = "", fishLen = 0.45, prof = fightProfile(null), load = 1, LT = landingTimes(null, 45, null, venue), tech = "lift";
   // the mesh's own size (in fish lengths): the spine to the back and to the belly, and half its thickness, so it can be
   // laid on a mat, held in the hands or sat at the surface without going into anything
-  let fishBox = { up: 0.12, down: 0.12, thick: 0.05 };
+  let fishBox = { up: 0.12, down: 0.12, thick: 0.05 }, fishBoxWant = null;
+  // (eased over about a third of a second when a new shape comes in mid-fight, so the fish doesn't jump: the line and
+  // the rod jumped with it, 10 to 13 cm in a frame as a ray's modelled shape, thicker along its spine, replaced the
+  // picture's, tools/arm-steady.mjs, 15 November. A fish not yet shown takes its size at once)
+  const easeFishBox = (dt) => { if (!fishBoxWant) return; const k = 1 - Math.exp(-Math.max(0, dt || 0) / 0.35); for (const q of ["up", "down", "thick"]) fishBox[q] += (fishBoxWant[q] - fishBox[q]) * k; };
   function useGeometry(geo, materials) {
     assetsN++;
     fish.geometry = fishGeo = geo; fishBase = geo.attributes.position.array.slice(); fishBaseN = baseNormals(geo);
@@ -483,7 +487,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // half as thick again the moment its model came in mid-fight, and the fish, the line and the rod jumped 13 cm)
     const sizeEnd = (geo.userData.thornFrom ?? fishBase.length / 3) * 3;
     for (let i = 0; i < sizeEnd; i += 3) { const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2]; if (u < 0.02 || u > 0.8) continue; up = Math.max(up, y); down = Math.max(down, -y); thick = Math.max(thick, Math.abs(z)); }
-    fishBox = { up: up || 0.12, down: down || 0.12, thick: thick || 0.05 };
+    fishBoxWant = { up: up || 0.12, down: down || 0.12, thick: thick || 0.05 }; if (!fish.visible) fishBox = { ...fishBoxWant };
     fish.material = materials;
   }
   function setMats(next) { for (const m of Object.values(mats)) { if (m.normalMap) m.normalMap.dispose(); m.dispose(); } mats = next; }
@@ -647,6 +651,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const pts = Array.from({ length: NSEG + 1 }, () => new THREE.Vector3());
 
   function frame(t, now, dt, env) {
+    easeFishBox(dt);
     if (fpv && !fpvCounted && fpv.ready) { fpvCounted = true; assetsN++; } // (your arms loaded: their shaders built with the rest)
     root.updateMatrixWorld(true); tNow = t;
     reel.userData.slipping = false;
