@@ -228,7 +228,9 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   coatMat.onBeforeCompile = (sh) => {
     sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nvarying float vTorso;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso;");
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nvarying float vTorso;").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
+    // (the cut's edge feathered by a fine ordered dither over 5 cm, rather than a hard line: through the folds of a sleeve
+    // close to your eye, swinging the rod through a cast, a hard cut left a sawtooth edge like torn cloth)
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nvarying float vTorso;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * 0.05 || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
   };
   clothe(coatMat);
   // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)

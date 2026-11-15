@@ -454,7 +454,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // (further off the slope maps' mip levels have averaged the facets away, so the glitter path is drawn as the
         // facets' spread instead: a broader, dimmer highlight that widens with distance and wind)
         float farR = smoothstep(15., 160., dist);
-        col += uFft > .5 ? sunC*(pow(sp, 700.)*1.6*(1. - farR*.6) + pow(sp, mix(150., 28., farR))*mix(.05, .4, farR)*(.4 + .6*uWind))*sunVis : sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis;
+        // (only facets the sea really has: to send the sun to your eye a facet must lean halfway between straight up and
+        // the line from it to your eye mirrored to the sun. A wind sea's slopes rarely lean more than 15 to 25 degrees
+        // (more in more wind), so looking down over the rail with the sun up, where a facet would have to lean 30 degrees,
+        // there are almost no glints: the spectrum's small facets lit the water under you with white confetti)
+        float lean = degrees(acos(clamp(normalize(v + uSunDir).y, 0., 1.))), leanMax = 15. + 10.*clamp(uWind, 0., 1.);
+        float canLean = 1. - smoothstep(leanMax, leanMax + 9., lean);
+        col += uFft > .5 ? sunC*(pow(sp, 700.)*1.6*(1. - farR*.6) + pow(sp, mix(150., 28., farR))*mix(.05, .4, farR)*(.4 + .6*uWind))*sunVis*canLean : sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis*canLean;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
@@ -466,7 +472,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
             // was a round patch a quarter of the sea wide under a low sun)
             float az = max(dot(normalize(rd.xz + vec2(1e-5)), normalize(uSunDir.xz + vec2(1e-5))), 0.);
             float path = pow(az, 90./(.6 + 1.4*uWind + .6*uSwell))*pow(sp, 5.);
-            col += mix(sunC, vec3(1., .95, .85), .3)*glit*(path*1.3 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell);
+            col += mix(sunC, vec3(1., .95, .85), .3)*glit*(path*1.3 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell)*canLean;
           }
         #endif
         float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
