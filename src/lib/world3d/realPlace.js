@@ -239,11 +239,16 @@ function pilingMaterial(sp, quality) {
   const rv = (wallH / 1.2).toFixed(3), mv = (wallH / 1.5).toFixed(3); // (the photographs' tiles kept square: 1.2 m and 1.5 m)
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { wRust: { value: rust }, wRustN: { value: rustN }, wRustR: { value: rustR }, wMoss: { value: moss }, wNoise: { value: noise } });
-    sh.fragmentShader = "uniform sampler2D wRust;\nuniform sampler2D wRustN;\nuniform sampler2D wRustR;\nuniform sampler2D wMoss;\nuniform sampler2D wNoise;\nfloat fdBelow = 0.0;\nvec2 fdRu = vec2(0.0);\n" + sh.fragmentShader
+    sh.fragmentShader = "uniform sampler2D wRust;\nuniform sampler2D wRustN;\nuniform sampler2D wRustR;\nuniform sampler2D wMoss;\nuniform sampler2D wNoise;\nfloat fdBelow = 0.0;\nvec2 fdRu = vec2(0.0);\nvec2 fdRu2 = vec2(0.0);\nfloat fdRw = 0.0;\n" + sh.fragmentShader
       .replace("#include <map_fragment>", `#include <map_fragment>
       {
         fdRu = vec2(vMapUv.x * 2.0, vMapUv.y * ${rv}); // (u: 2.4 m a unit)
-        vec3 r = texture2D(wRust, fdRu).rgb / max(texture2D(wRust, vec2(0.5), 10.0).rgb, vec3(0.02));
+        // (the photograph's rust runs repeated every 1.2 m: from out on the water every other pan of the piling showed the
+        // same dark drip, like a row of figures. A second copy, shifted and a little larger, is blended in in slow
+        // patches, so no two pans along the wall look the same; no seams, as both are whole tiles)
+        fdRu2 = fdRu * vec2(0.71, 0.83) + vec2(0.37, 0.61);
+        fdRw = smoothstep(0.4, 0.6, texture2D(wNoise, vec2(vMapUv.x * 0.11, vMapUv.y * 0.17 + 0.3)).g);
+        vec3 r = mix(texture2D(wRust, fdRu).rgb, texture2D(wRust, fdRu2).rgb, fdRw) / max(texture2D(wRust, vec2(0.5), 10.0).rgb, vec3(0.02));
         r = mix(vec3(dot(r, vec3(0.3, 0.59, 0.11))), r, 0.25);
         vec4 n = texture2D(wNoise, vec2(vMapUv.x * 0.37, vMapUv.y * 0.9));
         float v = vMapUv.y, tide = ${vTide.toFixed(3)} + (n.g - 0.5) * 0.07;
@@ -260,12 +265,12 @@ function pilingMaterial(sp, quality) {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.6, 0.55), bar * 0.6 * (1.0 - weed * 0.6));
       }`)
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-      roughnessFactor = mix(mix(0.6, 1.0, texture2D(wRustR, fdRu).g), 0.62, fdBelow);`)
+      roughnessFactor = mix(mix(0.6, 1.0, mix(texture2D(wRustR, fdRu).g, texture2D(wRustR, fdRu2).g, fdRw)), 0.62, fdBelow);`)
       .replace("#include <metalnessmap_fragment>", "#include <metalnessmap_fragment>\n      metalnessFactor *= 1.0 - fdBelow;")
       .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
-      ${quality < 1 ? "" : `{ vec3 rn = texture2D(wRustN, fdRu).xyz * 2.0 - 1.0; normal = normalize(normal + tbn * vec3(rn.xy * 0.6, 0.0)); }`}`);
+      ${quality < 1 ? "" : `{ vec3 rn = mix(texture2D(wRustN, fdRu).xyz, texture2D(wRustN, fdRu2).xyz, fdRw) * 2.0 - 1.0; normal = normalize(normal + tbn * vec3(rn.xy * 0.6, 0.0)); }`}`);
   };
-  mat.customProgramCacheKey = () => "fdpile1" + (quality < 1 ? "p" : "");
+  mat.customProgramCacheKey = () => "fdpile2" + (quality < 1 ? "p" : "");
   return mat;
 }
 
