@@ -33,6 +33,9 @@ function hashSeed(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { 
 function rng(seed) { let a = seed || 1; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const n1 = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); const h = (k) => { const s = Math.sin(k * 127.1) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }; return h(i) * (1 - u) + h(i + 1) * u; };
 
+// ---- your hands on the drop net's rope, first person (see ropeFp) ----
+export const FP_ROPE_OUT = 0.58, FP_ROPE_NEAR = [0.14, 0.1];
+
 /** Clothes: a jacket, trousers and hat for each angler (chosen, or from their id). */
 export const OUTFITS = [
   { jacket: 0x1f3a5f, trousers: 0x2b2b2e, hat: 0xd8a631, name: "Navy jacket" },
@@ -1351,9 +1354,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // (the rope comes up from the net to the far hand and runs in from there to the near hand by your chest: looking
     // down you see one hand beyond the other with the rope between them. Both held on your line of sight to the net,
     // one hid the other and they read as a single lump)
+    // (how far out along your line of sight to the net the rope is held, and the near hand's place from there: down the
+    // view, and back towards you. At 46 cm, with the near hand 20 cm down the view, both elbows came up to 25 cm from
+    // your eye, nearer than your shoulders: the sleeves went past the camera and were cut open, the forearms filled the
+    // bottom of the picture, and as the elbow swung round to catch up a wrist wrung through up to 174 degrees. Hauling
+    // over a rail you reach out and down to the rope, your arms nearly straight. 15 November)
     const ropeFp = (base, rd, E, pull, slack) => {
       // (the near hand: towards you from the far one, which in your view is below it and a little nearer)
-      const vw = viewVecs(), far = base.clone().addScaledVector(rd, 0.05), C = base.clone().addScaledVector(vw.vu, -0.2).addScaledVector(vw.vf, -0.07).addScaledVector(vw.vr, 0.05);
+      const vw = viewVecs(), far = base.clone().addScaledVector(rd, 0.05), C = base.clone().addScaledVector(vw.vu, -FP_ROPE_NEAR[0]).addScaledVector(vw.vf, -FP_ROPE_NEAR[1]).addScaledVector(vw.vr, 0.05);
       if (!pull) return { at: [far, C], loose: [slack, slack] };
       const u = pull.u, e = ease(clamp((u - 0.12) / 0.78, 0, 1)), r = ease(clamp(u / 0.85, 0, 1));
       const puller = far.clone().lerp(C, e), reacher = C.clone().lerp(far, r);
@@ -1445,11 +1453,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const base = fp ? (() => { const E = fpEye(), nt = netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
             // (once the net is past the rail, on your line of sight down to it, as when letting a fish go: out at eye height
             // the upper arms came in from the top corner of the screen while you looked down)
-            if (nt && (nt.y < -0.3 || nt.z < railZ)) return E.clone().addScaledVector(nt.clone().sub(E).normalize(), 0.46).add(V3(-0.07, 0, 0.03)); // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
+            if (nt && (nt.y < -0.3 || nt.z < railZ)) return E.clone().addScaledVector(nt.clone().sub(E).normalize(), FP_ROPE_OUT).add(V3(-0.07, 0, 0.03)); // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
             // (before that, from the view itself: low and to the left of wherever you look. Fixed below and ahead of the
             // eye, looking steeply down at the net on the deck put the hands at the top edge of the picture, the forearms
             // coming up into it from below: the 8 November recording)
-            const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, 0.5).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
+            const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, FP_ROPE_OUT).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })() : V3(-0.3, 1.12, railZ + 0.2); // (first person: at arm's length out and down from your eye as you lean over the rail, a little to your left, so you look down past your hands to the net and the fish rather than straight through them)
           // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);
@@ -1545,7 +1553,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // forearms hanging in from the top edge, upside down, holding nothing you could see)
       const netTop = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
       const sight = netTop ? netTop.clone().sub(E).normalize() : V3(0, -0.8, -0.6).normalize();
-      const base = fp ? (netTop && (netTop.y < -0.3 || netTop.z < -Math.max(0.3, edge - 0.22)) ? E.clone().addScaledVector(sight, 0.46).add(V3(-0.07, 0, 0.03)) : (() => { const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, 0.5).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })()) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
+      const base = fp ? (netTop && (netTop.y < -0.3 || netTop.z < -Math.max(0.3, edge - 0.22)) ? E.clone().addScaledVector(sight, FP_ROPE_OUT).add(V3(-0.07, 0, 0.03)) : (() => { const vw = viewVecs(); return E.clone().addScaledVector(vw.vf, FP_ROPE_OUT).addScaledVector(vw.vu, -0.2).addScaledVector(vw.vr, -0.2); })()) /* (along the sight only once the net is down past the wall: while it was still on the deck the hands followed it down to the concrete) */ : V3(-0.3, 1.12, -Math.max(0.3, edge - 0.22) + 0.2); // (first person: out to your left, so looking straight down past them at the fish your arms are at the side of the view, not up the middle of it)
       // (in first person the two hands sit one behind the other along the rope as it runs down to the net, about a hand's
           // width apart, so both show past each other from above, as they would looking down at your own hands)
           const rd = fp && netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)).sub(base).normalize() : V3(0, -1, 0);

@@ -199,7 +199,10 @@ export function dropLining(mesh) {
 // ---- which of the jacket is its body (chest, back, shoulders, hips) rather than its sleeves ----
 // A vertex's share hanging from the spine, chest, hips and shoulder bones, as an attribute (fpTorso) for the coat's
 // shader, which leaves the body out when you look down. On this rig's own copy of the jacket, never the shared model's.
-const TORSO_BONE = /^DEF-(spine|breast|pelvis|shoulder|thigh)/;
+// (and the trousers below the knee: the jacket's mesh carries them, and with the thighs hidden the shins, a metre and
+// more below your eye and past the cut, were left as scraps of navy along the bottom of the picture looking down over
+// the rail at the drop net. 15 November)
+const TORSO_BONE = /^DEF-(spine|breast|pelvis|shoulder|thigh|shin|foot|toe)/;
 export function markTorso(mesh) {
   const g = mesh.geometry, si = g?.attributes?.skinIndex, sw = g?.attributes?.skinWeight, sk = mesh.skeleton;
   if (!si || !sw || !sk) return 0;

@@ -244,12 +244,16 @@ test("the jacket's inward-facing lining is left out when the rig is built, and w
   assert.ok(used.size < 0.8 * pos.count, `fewer vertices in use (${used.size} of ${pos.count})`);
 });
 
-test("the jacket's body is marked for leaving out when you look down (chest, shoulders, hips), the sleeves aren't", async () => {
+test("the jacket's body is marked for leaving out when you look down (chest, shoulders, hips, the trousers), the sleeves aren't", async () => {
   const { markTorso, dropLining } = await import("../src/lib/world3d/fpRig.js");
   const { clone: cloneSkinned } = await import("three/examples/jsm/utils/SkeletonUtils.js");
   const sc = cloneSkinned(gltf.scene); let jacket = null; sc.traverse((o) => { if (o.isSkinnedMesh && /jacket/i.test(o.name)) jacket = o; });
   const shared = jacket.geometry; dropLining(jacket); const share = markTorso(jacket);
-  assert.ok(share > 0.1 && share < 0.75, `the body is part of the jacket, not all of it (${(share * 100).toFixed(0)}%)`);
+  assert.ok(share > 0.1 && share < 0.85, `the body and trousers are part of the jacket's mesh, not all of it (${(share * 100).toFixed(0)}%)`);
+  // (the trousers below the knee too: left in, looking down over the rail they were scraps of navy along the bottom)
+  const legs = jacket.skeleton.bones.map((b) => /^DEF-(shin|foot|toe)/.test(b.name)), si0 = jacket.geometry.attributes.skinIndex, sw0 = jacket.geometry.attributes.skinWeight, ft0 = jacket.geometry.attributes.fpTorso;
+  let shinN = 0; for (let i = 0; i < si0.count; i++) { let w = 0; for (let k = 0; k < 4; k++) if (legs[si0.getComponent(i, k)]) w += sw0.getComponent(i, k); if (w > 0.5) { shinN++; assert.ok(ft0.getX(i) > 0.5); } }
+  assert.ok(shinN > 0, "the mesh has shins to leave out");
   assert.ok(jacket.geometry.attributes.fpTorso && !shared.attributes.fpTorso, "on this rig's copy only");
   // (the vertices hanging from the forearms are never the body)
   const sk = jacket.skeleton, fi = sk.bones.findIndex((b) => /forearm/.test(b.name)), si = jacket.geometry.attributes.skinIndex, sw = jacket.geometry.attributes.skinWeight, ft = jacket.geometry.attributes.fpTorso;
