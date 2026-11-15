@@ -148,10 +148,12 @@ def main(glb, out):
     for spec in (
         ([(0.80, 1.02), (0.79, 0.75), (0.83, 0.5), (0.9, 0.3), (0.95, 0.22)], 0.38, 0.55),  # (across under the fingers, from the little finger's side)
         ([(0.74, -0.02), (0.69, 0.25), (0.63, 0.55), (0.6, 0.78)], 0.38, 0.55),  # (across the middle, from the index finger's side)
-        ([(0.73, 0.02), (0.55, 0.06), (0.35, 0.12), (0.18, 0.2), (0.04, 0.28)], 0.42, 0.6),  # (round the ball of the thumb)
-        # (the wrist: faint, as wrist creases are; at the depth and darkness of the palm's own they read, close to the eye
-        # in the cast, as a scar across the forearm)
-        ([(0.0, 0.1), (0.0, 0.5), (0.02, 0.9)], 0.12, 0.45, 0.05), ([(-0.06, 0.15), (-0.05, 0.85)], 0.09, 0.4, 0.04),
+        # (round the ball of the thumb, stopping short of the wrist: carried on to it, its end was cut off at the edge of
+        # the wrist's own small patch of the map and showed as a dark blot)
+        ([(0.73, 0.02), (0.55, 0.06), (0.35, 0.12), (0.18, 0.2)], 0.42, 0.6),
+        # (no wrist creases: the wrist is its own small patch of the map, squeezed, and two faint creases there came out as
+        # one dark broken line, a scar across the wrist close to the eye in the cast, even at a third of the palm's depth.
+        # 15 November)
     ):
         poly, depth, wdt, dark = (*spec, 0.16) if len(spec) == 3 else spec
         ln = palmS * np.exp(-0.5 * (pdist(poly) / (wdt * mm)) ** 2)

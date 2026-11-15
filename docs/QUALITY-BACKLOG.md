@@ -30,12 +30,11 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   12 cm a frame (7 m/s), and an arm let go of it dropped at 11 cm. Hands on the hoop now go no quicker than 2.5 m/s and
   a let-go arm drops in 0.45 s: lifting the net 118 to 56 mm a frame at most, bringing it in 113 to 44.
 - **Check:** the fixed drop-net film (`haul_frames`) before and after; `tools/rail-test.mjs dropnet`; `tools/arm-steady.mjs`.
-- **Found (15 Nov), not fixed yet:** holding the rod and through the cast, your right forearm shows bare from the
-  wrist almost to the elbow, where the sleeve ends in a ragged ring; the left sleeve is right. It isn't the cut near
-  your eye or the lining: with every cut in the coat's shader switched off the forearm is still bare, and with the
-  skin hidden nothing is drawn over it. Giving the sleeves the arm's own bone weights made no difference either. So
-  the right sleeve itself is out of place in that pose: to look at in Blender on the PC (its shape and weights
-  against the hold and cast clips).
+- **Looked at again (15 Nov): the sleeve wasn't missing.** Painted flat by bone in the cast's frame 48, what read as a
+  bare forearm is your right hand seen edge on from 25 cm as the rod goes back, then about 6 cm of wrist, then the
+  sleeve, exactly where the skinning puts it (4.7 cm out from the forearm's axis, as on the left). Two real faults
+  made it look wrong: a dark line across the wrist (item 2) and the cuff's edge, a sawtooth where the lining was
+  left out. Both fixed. **Check:** `fpbones.mjs`-style bone paint of the cast's frame 48; the cuff before and after.
 
 ### 2. Skin and fingers close up
 - **Was wrong:** the hands were one flat colour with no creases, knuckles or nails; at dusk they read as a pale model.
@@ -43,10 +42,13 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   1024 maps, 77 KB in all): fine wrinkles across the back of each finger joint, a firm crease on the palm side, nails
   (paler, glossier, a lighter free edge), redder knuckles and fingertip pads. Laid over the skin as a multiplier, so the
   player's skin colour stays theirs. Subtle at arm's length, as it should be.
-- **Since:** the palm's own creases (under the fingers, across the middle, round the ball of the thumb), a few faint
-  veins over the back of the hand, and two wrist creases. The wrist creases were baked at the palm's depth and read as
-  a scar across the forearm close to the eye in the cast (15 Nov): now a third as deep and a third as dark.
-- **Still to do:** a little hair on the forearm, a slightly sweaty sheen in the cold. **Check:** close-ups of the hold
+- **Since:** the palm's own creases (under the fingers, across the middle, round the ball of the thumb) and a few faint
+  veins over the back of the hand. Wrist creases were tried and taken out (15 Nov): the wrist is its own small,
+  squeezed patch of the map, and two faint creases there came out as one dark broken line, a scar across the wrist in
+  the cast. The skin's patches of colour are now worked out from the skin at rest, so they stay on it as the arm
+  moves (they were worked out after skinning, and the arm slid through them). In rain your skin and coat wet through
+  in about a minute, glossier and a little darker, and dry over a few once it stops.
+- **Still to do:** a little hair on the forearm and the back of the hand. **Check:** close-ups of the hold
   and the look at a fish, same frames.
 
 ### 3. Frame-time stability on a phone
@@ -161,3 +163,6 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
 | 15 Nov | Rows of white dots along the far railings (on the pier wall seen from the water, and over you seen close): the weathering's relief came out as not a number on the thin rails' ends | the bright pixels in that patch of the wall: 41 before, 0 after; 0 with the rails hidden |
 | 15 Nov | Your line's glint as one soft thread instead of evenly spaced white dashes | the line from where it glints, 6 m and 18 m off, before and after |
 | 15 Nov | Faint wrist creases (they read as a scar across the forearm close up in the cast) | the cast's frame 48, before and after |
+| 15 Nov | The "bare right forearm" was the hand seen edge on from 25 cm; the cuff's sawtooth edge made whole (the hem's half-squares kept when the lining is left out); the wrist creases taken out (still a scar) | bone paint and the cast's frame 48, before and after; `tests/fpRig.test.js` |
+| 15 Nov | Skin patches stay on the skin as the arm moves | `tests/fpRig.test.js` (taken before skinning) |
+| 15 Nov | Your arms wet in the rain: skin and coat glossier and darker, wet through in a minute, dry over a few | the coat's roughness 0.80 dry, 0.44 after 90 s of rain; the cast in rain at the start and after; `tests/fpRig.test.js` |

@@ -82,9 +82,22 @@ export function castAt(t, k0 = holdView()) {
   return out;
 }
 
-let DIM = 1; const liveMats = new Set();
+let DIM = 1, WET = 0; const liveMats = new Set();
+const tint = (m) => m.color.copy(m.userData.base).multiplyScalar(DIM * (1 - (m.userData.wetDark || 0) * WET));
 /** the arms in the dark: the colours scaled down at night unless a torch is on (world.js) */
-export function setHandsDim(k) { DIM = clamp(k, 0.2, 1); for (const m of liveMats) m.color.copy(m.userData.base).multiplyScalar(DIM); }
+export function setHandsDim(k) { DIM = clamp(k, 0.2, 1); for (const m of liveMats) tint(m); }
+// ---- your arms in the rain ----
+// Wet skin and a wet nylon coat are glossier and a little darker: water fills the skin's fine grain and soaks the
+// coat's weave. They wet through in about a minute of rain and dry over a few once it stops, rather than with the
+// weather's every change. No shader is rebuilt: only the roughness and colour the materials already have.
+/** rain: the weather's rain (0 to 1); dt: seconds since the last call (world.js, every frame) */
+export function setHandsWet(rain, dt = 0.016) {
+  const want = clamp((rain || 0) * 1.4, 0, 1), k = Math.min(1, dt / (want > WET ? 40 : 180));
+  WET += (want - WET) * k; if (WET < 1e-4) WET = 0;
+  for (const m of liveMats) { m.roughness = m.userData.dryRough * (1 - (m.userData.wetGloss || 0) * WET); tint(m); }
+}
+/** how wet your arms are (0 dry to 1 wet through), for tests and the diagnostics */
+export const handsWet = () => WET;
 
 /** a clip's tracks bound to the cloned skeleton's bones, to be sampled at any moment (Blender's frame n is at n / fps
  * seconds: the first frame of each clip, frame 1, at 1 / fps) */
@@ -115,7 +128,9 @@ float fpSkinNoise( vec3 x ) { vec3 i = floor( x ), f = fract( x ); f = f * f * (
   return mix( mix( mix( fpSkinHash( i ), fpSkinHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 0 ) ), fpSkinHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
     mix( mix( fpSkinHash( i + vec3( 0, 0, 1 ) ), fpSkinHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 1 ) ), fpSkinHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z ); }`;
 export function skinShade(sh) {
-  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSkinP;").replace("#include <skinning_vertex>", "#include <skinning_vertex>\nvSkinP = transformed;");
+  // (the point as the model was made, before the bones move it: taken after skinning, as it was until 15 November, the
+  // patches stayed where they were while the arm moved through them, sliding over the skin as you cast or wound)
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSkinP;").replace("#include <skinning_vertex>", "vSkinP = transformed;\n#include <skinning_vertex>");
   const chunk = THREE.ShaderChunk.lights_physical_pars_fragment;
   if (!chunk.includes(SKIN_BLEED)) return; // (a three.js whose lighting is written differently: plain skin, as before)
   sh.fragmentShader = sh.fragmentShader
@@ -170,7 +185,11 @@ export function dropLining(mesh) {
   const nb = Array.from({ length: N }, () => []);
   for (let t = 0; t < src.length; t += 3) for (let a = 0; a < 3; a++) { const i = src[t + a]; nb[i].push(src[t + (a + 1) % 3], src[t + (a + 2) % 3]); }
   for (let it = 0; it < 3; it++) { const was = inner.slice(); for (let i = 0; i < N; i++) { const l = nb[i]; if (!l.length) continue; let sum = was[i]; for (const k of l) sum += was[k]; inner[i] = sum * 2 > l.length + 1 ? 1 : 0; } }
-  for (let t = 0; t < src.length; t += 3) if (inner[src[t]] + inner[src[t + 1]] + inner[src[t + 2]] < 2) keep.push(src[t], src[t + 1], src[t + 2]);
+  // (a triangle goes only if all three corners are the lining's: at a cuff or the hem the cloth's edge is a band of
+  // squares joining the outer layer to the lining, each split into one triangle with two outer corners and one with two
+  // lining corners. Dropping the second kind, as until 15 November, left every edge a sawtooth, the cuff round your right
+  // wrist a ragged ring through the cast; kept, the edge is whole and shows the cloth's thickness, as a real hem does)
+  for (let t = 0; t < src.length; t += 3) if (inner[src[t]] + inner[src[t + 1]] + inner[src[t + 2]] < 3) keep.push(src[t], src[t + 1], src[t + 2]);
   const dropped = 1 - keep.length / src.length;
   if (dropped < 0.25 || dropped > 0.65) return 0; // (not a lined cloth as expected: left whole)
   mesh.geometry = g.clone(); mesh.geometry.userData.fpOwn = true; mesh.geometry.setIndex(keep);
@@ -244,10 +263,13 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // skin keeps the player's own colour; nothing waits on it: the plain skin until it's in)
   if (!gloves && typeof document !== "undefined") {
     const tl = new THREE.TextureLoader(), got = {};
-    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.roughness = 1; skinMat.normalScale.set(1, 1); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
+    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 1; skinMat.roughness = 1 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(1, 1); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
     for (const [k, f] of [["map", "hand_colour"], ["normalMap", "hand_normal"], ["roughnessMap", "hand_rough"]]) tl.load(TEX_BASE + f + ".webp", (t) => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; got[k] = t; done(); }, undefined, () => {});
   }
-  for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.color.copy(m.userData.base).multiplyScalar(DIM); liveMats.add(m); }
+  // (wet: the skin's roughness down by 40% and its colour 4% darker; the coat's roughness down by half and 12% darker,
+  // as soaked nylon goes. Gloves are rubber-coated: their shine changes less)
+  skinMat.userData.wetGloss = gloves ? 0.25 : 0.4; skinMat.userData.wetDark = gloves ? 0.03 : 0.04; coatMat.userData.wetGloss = 0.5; coatMat.userData.wetDark = 0.12;
+  for (const m of [skinMat, coatMat]) { m.userData.base = m.color.clone(); m.userData.dryRough = m.roughness; m.roughness *= 1 - m.userData.wetGloss * WET; tint(m); liveMats.add(m); }
   let R = null, failed = false;
   const hands = [0, 1].map((i) => ({ side: i ? "R" : "L", kind: undefined, cur: null, from: null, u: 1, want: null, fing: null, fingFrom: null, cyl: null, wrist: null }));
 

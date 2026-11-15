@@ -11,7 +11,7 @@ import { setShadowReach } from "./realPlace.js";
 import { createAngler, waveHeight } from "./angler.js";
 import { createRockSpray } from "./rockSpray.js";
 import { createTipLights, createHeadTorch } from "./nightKit.js";
-import { setHandsDim, setRigView } from "./fpRig.js";
+import { setHandsDim, setHandsWet, setRigView } from "./fpRig.js";
 import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
@@ -935,7 +935,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
-      tipLights.update(tipList, dark, t, tipMode); torch.update(dark, dt || 0.016); setHandsDim(1 - 0.5 * (c.night ?? 0) * (torch.colour === "off" ? 1 : 0.4)); }
+      tipLights.update(tipList, dark, t, tipMode); torch.update(dark, dt || 0.016); setHandsWet(c.rain ?? 0, dt || 0.016); setHandsDim(1 - 0.5 * (c.night ?? 0) * (torch.colour === "off" ? 1 : 0.4)); }
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera); simT = t;
     adapt();
