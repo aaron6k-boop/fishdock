@@ -18,7 +18,7 @@ test("the stick moves you the way the camera looks, at walking or sprinting spee
   assert.ok(Math.abs(s.z - (10 - WALK.speed)) < 0.45, `walked north about ${WALK.speed} m (z ${s.z})`);
   assert.ok(Math.abs(s.x) < 1e-6);
   let t = walker(0, 10, 0, 2); t = run(t, { x: 0, y: 1, camYaw: 0, sprint: true }, 1);
-  assert.ok(10 - t.z > 10 - s.z + 1.6, "sprinting is quicker (getting up to a sprint takes a moment longer)");
+  assert.ok(10 - t.z > 10 - s.z + (WALK.sprint - WALK.speed) * 0.6, `sprinting is quicker (getting up to a sprint takes a moment longer): ${(10 - t.z).toFixed(2)} m against ${(10 - s.z).toFixed(2)}`);
   // the camera turned to face east: pushing forwards walks east, and you turn to face east
   // (you turn to face it as you set off, and stride out once you're round: no sliding off sideways)
   let e0 = walker(0, 0, 0, 2); e0 = run(e0, { x: 0, y: 1, camYaw: Math.PI / 2 }, 0.15);
