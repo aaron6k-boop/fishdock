@@ -105,7 +105,7 @@ export function shapeRay(geo, { thorns = true } = {}) {
   const all = [...idx, ...tri]; out.setIndex(v > 65535 ? new THREE.Uint32BufferAttribute(all, 1) : new THREE.Uint16BufferAttribute(all, 1));
   for (const q of g.groups) out.addGroup(q.start, q.count, q.materialIndex);
   out.addGroup(idx.length, tri.length, 3);
-  out.computeVertexNormals(); out.userData.thorns = cone.length;
+  out.computeVertexNormals(); out.userData.thorns = cone.length; out.userData.thornFrom = n; // (where the thorns' vertices start: angler.js leaves them out of the fish's size)
   return out;
 }
 

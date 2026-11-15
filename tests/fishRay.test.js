@@ -32,6 +32,7 @@ test("the thornback: a hump along the spine, the body running into a round tail,
   const geo = await rayGeo(), before = geo.attributes.position.array.slice(), out = R.shapeRay(geo), m0 = midline(geo), m1 = midline(out);
   assert.deepEqual(Array.from(geo.attributes.position.array), Array.from(before), "the model given is left as it was");
   assert.ok(out.userData.thorns > 40, `thorns down the back and tail, and bucklers (${out.userData.thorns})`);
+  assert.equal(out.userData.thornFrom, geo.attributes.position.count, "the thorns' vertices after the fish's own, so its size can leave them out");
   const g3 = out.groups.find((q) => q.materialIndex === 3); assert.ok(g3 && g3.count === out.userData.thorns * 6 * 3, "in their own group, in the fish's own mesh");
   for (const v of out.attributes.position.array) assert.ok(Number.isFinite(v));
   // (a hump: the middle of the disc a good deal higher than lofted)

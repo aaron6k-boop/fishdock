@@ -479,7 +479,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     assetsN++;
     fish.geometry = fishGeo = geo; fishBase = geo.attributes.position.array.slice(); fishBaseN = baseNormals(geo);
     let up = 0, down = 0, thick = 0;
-    for (let i = 0; i < fishBase.length; i += 3) { const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2]; if (u < 0.02 || u > 0.8) continue; up = Math.max(up, y); down = Math.max(down, -y); thick = Math.max(thick, Math.abs(z)); }
+    // (a thornback's thorns left out: they don't change how the fish lies or sits in the water. Counted, they made it
+    // half as thick again the moment its model came in mid-fight, and the fish, the line and the rod jumped 13 cm)
+    const sizeEnd = (geo.userData.thornFrom ?? fishBase.length / 3) * 3;
+    for (let i = 0; i < sizeEnd; i += 3) { const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2]; if (u < 0.02 || u > 0.8) continue; up = Math.max(up, y); down = Math.max(down, -y); thick = Math.max(thick, Math.abs(z)); }
     fishBox = { up: up || 0.12, down: down || 0.12, thick: thick || 0.05 };
     fish.material = materials;
   }
