@@ -4,10 +4,8 @@ import { useApp } from "../lib/store.js";
 import { Icon } from "./ui.jsx";
 
 // Licensed layers only. Depth shading is coarse modelled bathymetry, not a chart: never for navigation.
-export const BASES = {
-  map: { label: "Map", url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: "© OpenStreetMap contributors", maxZoom: 19 },
-  satellite: { label: "Satellite", url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", attribution: "Imagery © Esri, Maxar, Earthstar Geographics", maxZoom: 19 },
-};
+import { BASES, baseTileOptions } from "../lib/mapBases.js";
+export { BASES, baseTileOptions };
 export const OVERLAYS = {
   depth: { label: "Depth shading (EMODnet)", wms: "https://ows.emodnet-bathymetry.eu/wms", layers: "emodnet:mean_multicolour", attribution: "Bathymetry © EMODnet Bathymetry Consortium", opacity: 0.55, note: "Modelled seabed depth on a coarse grid (about 115 m). Shows broad channels, banks and drop-offs, not small features. Not for navigation." },
   seamarks: { label: "Sea marks (OpenSeaMap)", url: "https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png", attribution: "Sea marks © OpenSeaMap contributors", opacity: 1, note: "Buoys, beacons, harbour features. Community data." },
@@ -61,7 +59,8 @@ export default function MapView({ spots = NONE, marks = NONE, pins = NONE, dropp
     const { L, m } = mm;
     for (const k of Object.keys(tiles.current)) { m.removeLayer(tiles.current[k]); delete tiles.current[k]; }
     const b = BASES[base] || BASES.map;
-    tiles.current.base = L.tileLayer(b.url, { attribution: b.attribution, maxZoom: b.maxZoom, keepBuffer: 4 }).addTo(m);
+    tiles.current.base = L.tileLayer(b.url, baseTileOptions(b, L, { keepBuffer: 4 })).addTo(m);
+    if (b.labels) tiles.current.labels = L.tileLayer(b.labels, baseTileOptions({ ...b, attribution: "" }, L, { keepBuffer: 2, pane: "overlayPane" })).addTo(m);
     for (const k of overlays || []) {
       const o = OVERLAYS[k]; if (!o) continue;
       tiles.current[k] = o.wms ? L.tileLayer.wms(o.wms, { layers: o.layers, format: "image/png", transparent: true, opacity: o.opacity, attribution: o.attribution }).addTo(m)

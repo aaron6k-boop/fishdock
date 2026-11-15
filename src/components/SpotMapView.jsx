@@ -4,7 +4,7 @@
 // quick however many spots there are. A tap on a group zooms in until it splits; a tap on a spot picks it. A green
 // number on a marker or group: how many are fishing there in the game now (here: { spot id: n }).
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { BASES } from "./MapView.jsx";
+import { BASES, baseTileOptions } from "./MapView.jsx";
 import { clusterSpots, clusterType, expandZoom } from "../lib/spotMap.js";
 
 // the UK and Ireland's coasts, with a little sea round them
@@ -22,10 +22,10 @@ export const TYPE_GLYPH = {
 };
 const svg = (d, size = 16) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 
-const SpotMapView = forwardRef(function SpotMapView({ spots, selectedId = null, here = null, onPick, onFail, onMove }, ref) {
-  const el = useRef(null), map = useRef(null), layer = useRef(null);
+const SpotMapView = forwardRef(function SpotMapView({ spots, selectedId = null, here = null, onPick, onFail, onMove, base = "chart" }, ref) {
+  const el = useRef(null), map = useRef(null), layer = useRef(null), tiles = useRef([]);
   const cb = useRef({}); cb.current = { onPick, onMove };
-  const data = useRef({ spots, selectedId, here }); data.current = { spots, selectedId, here };
+  const data = useRef({ spots, selectedId, here, base }); data.current = { spots, selectedId, here, base };
   const [failed, setFailed] = useState(false), [noTiles, setNoTiles] = useState(false);
 
   useEffect(() => {
@@ -34,21 +34,29 @@ const SpotMapView = forwardRef(function SpotMapView({ spots, selectedId = null, 
       let L;
       try { L = (await import("../lib/leafletLoader.js")).default; if (!L?.map) throw new Error("no leaflet"); } catch { if (!cancelled) { setFailed(true); onFail?.(); } return; }
       if (cancelled || !el.current) return;
-      const m = L.map(el.current, { zoomControl: false, attributionControl: true, minZoom: 4, maxZoom: 17, maxBounds: [[44, -20], [64, 12]], maxBoundsViscosity: 0.8, tap: true, zoomSnap: 0.5 });
+      // (smooth: quarter-zoom steps for a pinch, half for the buttons and the wheel, a longer glide after a flick)
+      const m = L.map(el.current, { zoomControl: false, attributionControl: true, minZoom: 4, maxZoom: 17, maxBounds: [[44, -20], [64, 12]], maxBoundsViscosity: 0.8, tap: true, zoomSnap: 0.25, zoomDelta: 0.5, wheelPxPerZoomLevel: 90, inertiaDeceleration: 2400, inertiaMaxSpeed: 2200 });
       m.fitBounds(UK_BOUNDS, { padding: [8, 8] });
       L.control.zoom({ position: "bottomright" }).addTo(m);
-      const b = BASES.map;
-      // map pictures that can't load (offline, blocked) leave the spots usable, and say so
-      let bad = 0, good = 0;
-      L.tileLayer(b.url, { attribution: b.attribution, maxZoom: b.maxZoom, keepBuffer: 3, updateWhenIdle: true }).on("tileerror", () => { if (++bad >= 4 && !good && !cancelled) setNoTiles(true); }).on("tileload", () => { good++; if (!cancelled) setNoTiles(false); }).addTo(m);
-      layer.current = L.layerGroup().addTo(m);
       map.current = { L, m };
+      setTiles(data.current.base);
+      layer.current = L.layerGroup().addTo(m);
       m.on("zoomend moveend", () => { draw(); cb.current.onMove?.({ zoom: m.getZoom() }); });
       draw();
     })();
-    return () => { cancelled = true; map.current?.m.remove(); map.current = null; };
+    return () => { cancelled = true; if (map.current) map.current.gone = true; map.current?.m.remove(); map.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ---- the base map (sea chart, street map or satellite), swapped in place; map pictures that can't load (offline,
+  // blocked) leave the spots usable, and say so ----
+  function setTiles(key) {
+    const mm = map.current; if (!mm) return; const { L, m } = mm, b = BASES[key] || BASES.chart;
+    for (const t of tiles.current) m.removeLayer(t);
+    let bad = 0, good = 0;
+    const base = L.tileLayer(b.url, baseTileOptions(b, L, { keepBuffer: 3, updateWhenIdle: true })).on("tileerror", () => { if (++bad >= 4 && !good && !map.current?.gone) setNoTiles(true); }).on("tileload", () => { good++; setNoTiles(false); }).addTo(m);
+    tiles.current = [base, ...(b.labels ? [L.tileLayer(b.labels, baseTileOptions({ ...b, attribution: "" }, L, { keepBuffer: 2, updateWhenIdle: true, pane: "overlayPane" })).addTo(m)] : [])];
+  }
+  useEffect(() => { setTiles(base); }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
   // ---- the markers: only the groups in view (with a margin), rebuilt as the map moves or the list changes ----
   function draw() {
     const mm = map.current; if (!mm || !layer.current) return;
