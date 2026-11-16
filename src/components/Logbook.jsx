@@ -65,7 +65,7 @@ export default function Logbook({ list, name, onClose }) {
               <div key={e.id} className="li diary-li">
                 {hasArt(e.species) ? <img src={artUrl(e.species, "s")} alt="" className="diary-art" /> : <span className="diary-art ph"><Icon name="fish" /></span>}
                 <span className="grow"><span className="t">{e.name}{e.lengthCm ? `, ${e.lengthCm} cm` : ""} <MedalPill medal={r?.medal} />{r?.first ? <span className="log-tag">New kind</span> : r?.best ? <span className="log-tag">Best</span> : null}</span>
-                  <span className="s">{[e.placeName, new Date(e.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), e.outcome === "kept" ? "kept" : e.outcome === "released" ? "put back" : null].filter(Boolean).join(" · ")}</span></span>
+                  <span className="s">{[e.placeName, new Date(e.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), e.bait ? `on ${e.bait.replace(/ \(.*\)$/, "").replace(/ or .*$/, "").toLowerCase()}` : null, e.outcome === "kept" ? "kept" : e.outcome === "released" ? "put back" : null].filter(Boolean).join(" · ")}</span></span>
                 {r ? <span className="log-xp">+{r.xp}</span> : null}
               </div>
             ); })}</div>

@@ -25,10 +25,10 @@ export function diary() {
 function save(list) { try { store()?.setItem(DIARY_KEY, JSON.stringify(list.slice(0, MAX))); } catch { /* full or blocked */ } }
 
 /** Adds a landed catch (once: the same catch event again changes nothing). Returns the entry. */
-export function addCatch({ id, species, name, lengthCm, weightKg = null, place = null, placeName = null, at = Date.now(), night = false, rough = false }) {
+export function addCatch({ id, species, name, lengthCm, weightKg = null, place = null, placeName = null, at = Date.now(), night = false, rough = false, bait = null }) {
   if (!id || !species) return null;
   const list = diary(); const had = list.find((e) => e.id === String(id)); if (had) return had;
-  const e = { id: String(id), species, name: name || species, lengthCm: Number.isFinite(lengthCm) ? Math.round(lengthCm) : null, weightKg: Number.isFinite(weightKg) ? weightKg : null, place, placeName, at, outcome: null, ...(night ? { night: true } : {}), ...(rough ? { rough: true } : {}) };
+  const e = { id: String(id), species, name: name || species, lengthCm: Number.isFinite(lengthCm) ? Math.round(lengthCm) : null, weightKg: Number.isFinite(weightKg) ? weightKg : null, place, placeName, at, outcome: null, ...(night ? { night: true } : {}), ...(rough ? { rough: true } : {}), ...(bait ? { bait: String(bait).slice(0, 40) } : {}) }; // (bait: what was on the hook, by name)
   save([e, ...list]); return e;
 }
 /** Kept or put back. */
