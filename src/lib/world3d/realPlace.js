@@ -18,7 +18,7 @@ import { WET_PREP, WET_DARKEN, WET_NORMAL, wetRough, WET_SPOTS } from "./wetLook
 import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
-import { columnGeometry, lanternAt, lampPools, COLUMN } from "./lamps3d.js";
+import { columnGeometry, lanternAt, lampPools, shadeFromOwnLantern, COLUMN } from "./lamps3d.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -287,6 +287,11 @@ export function splitByDistance(points, x, z, near2) {
   points.forEach((p, q) => { const dx = p[0] - x, dz = p[1] - z; (dx * dx + dz * dz < near2 ? near : far).push(q); });
   return [near, far];
 }
+/** Whether a thing at (x, z) would stand at least `min` metres from every one already in `list` (each [x, z, ...], or
+ * [x, y, z, ...] with iz = 2). Things along a wall are tens of metres apart; closer is the same one twice. */
+export const PLACED_APART = 3;
+export function farFromAll(list, x, z, iz = 1, min = PLACED_APART) { return list.every((p) => Math.hypot(p[0] - x, p[iz] - z) >= min); }
+
 export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const local = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
   const fenceKind = (x, z, nx, nz) => (local?.fence ? local.fence(x, z, nx, nz) : "rail");
@@ -837,6 +842,13 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // the lamps' lanterns: lit after dark with the rest (environment.js drives buildingGlow)
   const glowGlass = new THREE.MeshStandardMaterial({ color: 0xe8e2d2, emissive: new THREE.Color().setRGB(2.4, 1.75, 0.95), emissiveIntensity: 0, roughness: 0.15, transparent: true, opacity: 0.85 });
   let acc = 0; const columns = [], grates = [], rings = [], ladders = [];
+  // (each thing is placed where the walk along the walls passes a mark every so many metres. The walk goes a metre at
+  // a time along each wall from its start, so at a corner the next wall's first metre goes back over part of the last
+  // metre of the one before, and a mark there is passed twice: two of whatever it was, a few centimetres to a metre
+  // apart either side of the corner. Two lamp posts stood 11 cm apart at the pier head's bend and two more 27 cm
+  // apart, double lanterns lighting each other's poles; two mooring rings and two bollards were doubled the same way.
+  // A second try is still made, as the first may have found no room)
+  const apart = (list, q, iz = 1) => farFromAll(list, q[0], q[1], iz);
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
     if (Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > 200) { acc += len; continue; }
@@ -845,9 +857,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const inAt = (m) => [ex - nx * m, ez - nz * m];
       const clearOfSpots = (q) => spots.every((sp) => Math.hypot(q[0] - sp.at[0], q[1] - sp.at[2]) > 4);
       if (Math.floor(d / 28) !== Math.floor((d - 1) / 28)) {
-        const q = inAt(0.75); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps === "column") {
+        const q = inAt(0.75); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps === "column" && apart(columns, q)) {
           columns.push([q[0], q[1], ry, nx, nz]); { const L = lanternAt(); perches.push([q[0] - nx * L.z, LAND + L.top, q[1] - nz * L.z]); } // (a gull's place: on the lantern)
-        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q)) {
+        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps !== "column" && apart(props.lamp, q, 2)) {
           addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], LAND + 2.5, q[1]);
           const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, LAND + 4.95, q[1] - nz * 0.35, ry);
           addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, LAND + 4.85, q[1] - nz * 0.7, ry); void arm;
@@ -856,7 +868,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         }
       }
       if (Math.floor((d + 14) / 55) !== Math.floor((d + 13) / 55)) {
-        const q = inAt(0.6); if (landAt(q) && clearOfSpots(q)) {
+        const q = inAt(0.6); if (landAt(q) && clearOfSpots(q) && apart(props.station, q, 2)) {
           addAt(new THREE.BoxGeometry(0.62, 0.95, 0.22), mBox, q[0], LAND + 0.9, q[1], ry);
           const buoy = addAt(new THREE.TorusGeometry(0.27, 0.07, 8, 18), mBuoy, q[0] + nx * 0.13, LAND + 0.95, q[1] + nz * 0.13, ry); void buoy;
           addAt(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mPost, q[0], LAND + 0.25, q[1]);
@@ -865,15 +877,15 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       }
       // the small things a working wall has: a drain grate in the deck now and then, mooring rings on the cap's face,
       // and a steel ladder down the wall to the water every 70 m or so (all kept clear of the fishing spots)
-      if (Math.floor((d + 3) / 23) !== Math.floor((d + 2) / 23)) { const q = inAt(1.15); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q)) grates.push([q[0], q[1], ry]); }
-      if (Math.floor((d + 9) / 17) !== Math.floor((d + 8) / 17) && clearOfSpots(inAt(0.5))) rings.push([ex + nx * 0.135, ez + nz * 0.135, ry]);
-      if (Math.floor((d + 31) / 71) !== Math.floor((d + 30) / 71) && clearOfSpots(inAt(0.5))) ladders.push([ex + nx * 0.19, ez + nz * 0.19, ry]);
+      if (Math.floor((d + 3) / 23) !== Math.floor((d + 2) / 23)) { const q = inAt(1.15); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && apart(grates, q)) grates.push([q[0], q[1], ry]); }
+      if (Math.floor((d + 9) / 17) !== Math.floor((d + 8) / 17) && clearOfSpots(inAt(0.5)) && apart(rings, [ex, ez])) rings.push([ex + nx * 0.135, ez + nz * 0.135, ry]);
+      if (Math.floor((d + 31) / 71) !== Math.floor((d + 30) / 71) && clearOfSpots(inAt(0.5)) && apart(ladders, [ex, ez])) ladders.push([ex + nx * 0.19, ez + nz * 0.19, ry]);
       // mooring bollards just inside the railing, every 30 m or so
       if (Math.floor((d + 7) / 30) !== Math.floor((d + 6) / 30)) {
-        const q = inAt(0.55); if (landAt(q) && clearOfSpots(q)) props.bollard.push([q[0], LAND, q[1], ry]);
+        const q = inAt(0.55); if (landAt(q) && clearOfSpots(q) && apart(props.bollard, q, 2)) props.bollard.push([q[0], LAND, q[1], ry]);
       }
       if (Math.floor((d + 20) / 40) !== Math.floor((d + 19) / 40)) {
-        const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q)) {
+        const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q) && apart(props.bench, q, 2)) {
           const ax = -nz, az = nx; // along the edge
           for (const [h, back, th] of [[0.45, 0, 0.42], [0.8, -0.2, 0.08]]) addAt(new THREE.BoxGeometry(1.8, th === 0.42 ? 0.06 : 0.36, th === 0.42 ? 0.42 : 0.05), mWood, q[0] - nx * back, LAND + h, q[1] - nz * back, ry);
           for (const s2 of [-0.8, 0.8]) addAt(new THREE.BoxGeometry(0.06, 0.45, 0.42), mPost, q[0] + ax * s2, LAND + 0.22, q[1] + az * s2, ry);
@@ -891,8 +903,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   if (columns.length) {
     const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), CH = COLUMN.h;
     const { pole, lens } = columnGeometry(), L = lanternAt();
-    // galvanised, weathered dull grey, darker and rust-spotted towards its foot, runs down from the head
-    const colMat = weather(new THREE.MeshStandardMaterial({ color: 0x969b9c, roughness: 0.6, metalness: 0.45 }), { scale: 0.9, mottle: 0.3, bump: 0.5, rust: [0.22, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.9, 0.3], streaks: [LAND + CH, 4, 0.12], rough: [0.8, 1.2], wet: place.deckWet });
+    // galvanised, weathered dull grey, darker and rust-spotted towards its foot, runs down from the head; lit little
+    // by its own lantern (lamps3d.js shadeFromOwnLantern)
+    const colMat = shadeFromOwnLantern(weather(new THREE.MeshStandardMaterial({ color: 0x969b9c, roughness: 0.6, metalness: 0.45 }), { scale: 0.9, mottle: 0.3, bump: 0.5, rust: [0.22, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.9, 0.3], streaks: [LAND + CH, 4, 0.12], rough: [0.8, 1.2], wet: place.deckWet }));
     const pm = new THREE.InstancedMesh(pole, colMat, columns.length), lm = new THREE.InstancedMesh(lens, lensMat, columns.length);
     columns.forEach(([x, z, ry, nx, nz], k) => {
       mx.compose(v.set(x, LAND, z), q.setFromAxisAngle(up, ry + Math.PI), one); pm.setMatrixAt(k, mx); lm.setMatrixAt(k, mx); // (the door and the bracket towards the deck)

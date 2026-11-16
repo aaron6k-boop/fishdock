@@ -59,6 +59,34 @@ export function columnGeometry(C = COLUMN) {
   return { pole, lens: lens.toNonIndexed() };
 }
 
+// ---- its own lantern's light kept off the pole ----
+// The lamp lights are points, which shine every way alike, so the light under a lantern lit its own pole's whole side
+// facing it: the top half of the pole came out several times brighter than the deck under the lamp, a cream tube
+// running up to the lantern at dusk and at night. An LED lantern's optics send its light down and out over the deck,
+// with little thrown back towards the pole behind it (a street light's "backlight"); the next lamp along still lights
+// the pole from the side as it should.
+/** the share of a light from steeply above (its own lantern) that still reaches a lighting column */
+export const BACKLIGHT = 0.15;
+/** How much of a lamp light reaches the pole, by the cosine between the way to the light and straight up: all of it
+ * from the side, BACKLIGHT from steeply above (as the shader works it out, for the tests). */
+export function backlight(up, share = BACKLIGHT) { const t = Math.min(1, Math.max(0, (up - 0.35) / 0.45)); return 1 + (share - 1) * t * t * (3 - 2 * t); }
+const CUT_AT = "getPointLightInfo( pointLight, geometryPosition, directLight );";
+/** A lighting column's material, with each point light's colour scaled by backlight() in its shader's light loop.
+ * Chained on whatever the material's shader does already (the weathering). */
+export function shadeFromOwnLantern(mat, share = BACKLIGHT) {
+  const chunk = THREE.ShaderChunk?.lights_fragment_begin; if (!chunk?.includes(CUT_AT)) return mat;
+  const prev = mat.onBeforeCompile, prevKey = mat.customProgramCacheKey;
+  mat.onBeforeCompile = function (sh, r) {
+    prev.call(this, sh, r);
+    sh.uniforms.fdBack = { value: share };
+    sh.fragmentShader = "uniform float fdBack;\n" + sh.fragmentShader.replace("#include <lights_fragment_begin>", "vec3 fdUp = normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz );\n" +
+      chunk.replace(CUT_AT, `${CUT_AT}\n\t\tdirectLight.color *= mix( 1.0, fdBack, smoothstep( 0.35, 0.8, dot( directLight.direction, fdUp ) ) );`));
+  };
+  mat.customProgramCacheKey = function () { return prevKey.call(this) + "fdback1"; };
+  mat.needsUpdate = true;
+  return mat;
+}
+
 // ---- the pools of lamplight on the deck ----
 let POOL_TEX = null;
 function poolTex() {
