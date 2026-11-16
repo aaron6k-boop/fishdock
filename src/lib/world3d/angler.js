@@ -481,6 +481,17 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     r.onBeforeRender = () => { if (map) map.repeat.set(1, Math.max(1, r.scale.y / 0.035)); }; // (a strand round every 3.5 cm, whatever the length)
     world.add(r); r.visible = false; return r;
   });
+  // the drop net's rope, coiled on the deck behind the net and to the left of the seat box: a loose flat coil of the
+  // 10 mm haul rope, a few turns lying over each other, its end running off to the net (or up to your hands). The rope
+  // used to end at a point on the deck, inside the seat box, and while the net lay waiting it had no rope at all
+  const COIL_AT = new THREE.Vector3(-1.05, 0, 0.42);
+  const coilRope = (() => {
+    const pts = [], N = 260, turns = 4.6;
+    for (let i = 0; i <= N; i++) { const u = i / N, a = u * Math.PI * 2 * turns, r = 0.07 + 0.08 * u + 0.01 * Math.sin(a * 2.3 + 1), y = 0.006 + 0.01 * (0.5 + 0.5 * Math.sin(a * 0.7 + u * 9)) * (1 - u * 0.4); pts.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r)); }
+    const map = ropeTex ? ropeTex.clone() : null; if (map) { map.needsUpdate = true; map.repeat.set(95, 1); }
+    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 420, 0.005, 6, false), new THREE.MeshStandardMaterial({ color: map ? 0xffffff : 0x1c1d20, map, roughness: 0.92 }));
+    m.castShadow = true; m.receiveShadow = true; m.visible = false; m.userData.end = pts[N].clone(); world.add(m); return m;
+  })();
 
   // ---- line, rig, fish: in the world ----
   const floatRig = venue === "river" || venue === "lake";
@@ -1880,17 +1891,22 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (matOn) matOut = true;
     mat.visible = matOn || (matOut && !walking);
     if (mat.visible) { mat.position.copy(toWorld(matAtL())); mat.rotation.y = root.rotation.y; }
-    net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r, i) => (r.visible = i < 6 && net.visible && !netIdle && (tech === "dropnet" || ropesOn))); // (6 and 7, through the fists, only where they are placed, below)
+    net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r, i) => (r.visible = i < 6 && net.visible && (netIdle ? i < 4 : tech === "dropnet" || ropesOn))); // (6 and 7, through the fists, only where they are placed, below)
+    coilRope.visible = net.visible && venue === "pier" && !walking && (netIdle || tech === "dropnet" || ropesOn);
+    if (coilRope.visible) { coilRope.position.copy(toWorld(COIL_AT)); coilRope.rotation.y = root.rotation.y; coilRope.updateMatrixWorld(); }
     if (net.visible) {
       net.position.copy(netAt);
       if ((tech === "net" || releasePole) && poleFrom) between(pole, poleFrom, netAt, 1);
-      if (tech === "dropnet" && !netIdle) {
+      if (tech === "dropnet" || netIdle) {
         // three bridles from the hoop to the knot; from the knot the rope goes up over the top rail to your hands and
         // on to its coil on the deck (while the net hangs), or lies from the knot to the coil (the net on the deck or in
         // your hands): never a net without its rope
-        const knot = netAt.clone().add(new THREE.Vector3(0, 0.72 * net.scale.x * (1 - netRest * 0.8), 0));
+        let knot = netAt.clone().add(new THREE.Vector3(0, 0.72 * net.scale.x * (1 - netRest * 0.8), 0));
+        // (lying in wait on the deck the cords lie flat, gathered to the knot just past the hoop on the rope's side, not
+        // held up in a tent over it)
+        if (netIdle) { const toC = toWorld(COIL_AT).sub(netAt).setY(0); if (toC.lengthSq() > 1e-6) toC.normalize(); knot = netAt.clone().addScaledVector(toC, 0.5 * net.scale.x); knot.y = toWorld(new THREE.Vector3(0, 0.012, 0)).y; }
         ropes.forEach((r, i) => { if (i > 2) return; const a = (i / 3) * Math.PI * 2; between(r, knot, netAt.clone().add(new THREE.Vector3(Math.cos(a) * 0.35 * net.scale.x, 0, Math.sin(a) * 0.35 * net.scale.x)), 1); });
-        const coil = dropRig?.coil || toWorld(new THREE.Vector3(-0.42, 0.02, 0.18));
+        const coil = coilRope.localToWorld(coilRope.userData.end.clone()); // (the coil's outer end)
         if (dropRig?.hanging) {
           fig.group.updateMatrixWorld(true);
           const hw = [0, 1].map((i) => { if (fp) return toWorld(handsNow[i]); const h = fig.hand(i); return h ? fig.group.localToWorld(h) : toWorld(handsNow[i]); }); // (in first person, through the hands you see on it)
