@@ -382,6 +382,9 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
     const hipY = J.hips.y - 0.022 - st.crouch * 0.13 - st.brace * 0.05 - wk * 0.025 + wk * 0.028 * Math.cos(2 * ph) + Math.sin(t * 1.5) * 0.003;
     const pelvisYaw = 0.13 * Math.sin(ph) * Math.min(1, wk) + st.twist * 0.25;
     const hipP = V(shift + 0.012 * Math.sin(ph) * Math.min(1, wk), hipY, st.brace * 0.05);
+    // (sitting in the chair, chair.js: the hips down and back onto its seat, as far as o.sit.w)
+    const sitW = o.sit && !o.walk ? clamp(o.sit.w || 0, 0, 1) : 0;
+    if (sitW > 0) hipP.lerp(V(...o.sit.hips), sitW);
     // the spine: leaning (back against a fish when braced), turning against the hips as they walk
     const lean = st.lean - st.brace * 0.12, chestYaw = st.twist - pelvisYaw * 1.4;
     const breath = Math.sin(t * 1.6 + (L.seed % 5)) * 0.012;
@@ -420,7 +423,8 @@ export function createFigure({ id = "", look = null, outfit, venue = "pier" } = 
       let pitchF = 0;
       if (!idle && !air) { foot.z += -A * Math.sin(a); foot.y += lift * Math.max(0, Math.cos(a)) ** 1.4; pitchF = 0.35 * Math.sin(a) * Math.min(1, wk); }
       if (air) { foot = V(J["an" + k].x, hipY - 0.6, -0.08 + (s < 0 ? -0.1 : 0.05)); pitchF = -0.3; }
-      const knee = twoBone(hip, foot, LEN.th, LEN.shn, footF.clone().add(V(s * 0.12, 0, 0)));
+      if (sitW > 0) foot.lerp(V(o.sit.hips[0] + s * (o.sit.feetX ?? 0.12), J["an" + k].y, o.sit.feetZ), sitW);
+      const knee = twoBone(hip, foot, LEN.th, LEN.shn, footF.clone().add(V(s * 0.12, sitW * 0.6, 0)));
       setBone("th" + k, hip, knee.B, footF); setBone("shn" + k, knee.B, knee.C, footF);
       const fd = footF.clone().applyAxisAngle(V(1, 0, 0).applyAxisAngle(UPV, -pelvisYaw * 0.5), pitchF).multiplyScalar(LEN.ft);
       fd.y += J["to" + k].y - J["an" + k].y;
