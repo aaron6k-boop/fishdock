@@ -25,10 +25,14 @@ test("the chair: its seat at its height, four feet on the deck, the back leaning
   const g = buildChair(); g.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(g);
   assert.ok(Math.abs(box.min.y) < 0.003, `its feet on the deck (lowest ${box.min.y.toFixed(3)} m)`);
-  let seatTop = 0, backTop = 0, backZ = -1, feet = 0;
-  g.traverse((o) => { if (!o.isMesh) return; const b = new THREE.Box3().setFromObject(o); if (o.geometry.type === "CylinderGeometry" && b.max.y < 0.02) feet++;
-    if (o.material === g.children[0].material) { if (b.max.y < 0.5) seatTop = Math.max(seatTop, b.max.y); else { backTop = Math.max(backTop, b.max.y); backZ = Math.max(backZ, b.max.z); } } });
-  assert.equal(feet, 4, "four mud feet");
+  const meshes = g.children.filter((o) => o.isMesh);
+  assert.ok(meshes.length <= 5, `${meshes.length} meshes: one per finish, so a chair is a handful of draws`);
+  // (the feet: the deck-level points, one cluster at each corner; the cushions: the cloth's points)
+  let seatTop = 0, backTop = 0, backZ = -1; const corners = new Set();
+  for (const m of meshes) { const p = m.geometry.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); if (v.y < 0.005) corners.add(`${Math.sign(v.x)}${Math.sign(v.z)}`);
+      if (m.material.name === "" && m.material.normalScale && m.material.roughness > 0.9) { if (v.y < 0.5) seatTop = Math.max(seatTop, v.y); else { backTop = Math.max(backTop, v.y); backZ = Math.max(backZ, v.z); } } } }
+  assert.equal(corners.size, 4, "four mud feet on the deck");
   assert.ok(Math.abs(seatTop - CHAIR.seat) < 0.003, `the cushion's top at ${seatTop.toFixed(3)} m`);
   assert.ok(backTop > CHAIR.seat + 0.45 && backZ > CHAIR.d / 2 + 0.05, "a back, leaning back behind the seat");
   // (where angler.js puts it, beside the seat box at (-0.55, 0.25), 46 by 31 cm, and the bucket at (-0.52, 0.64), 27 cm across)

@@ -6,6 +6,7 @@
 // behind the rod in its tripod, watching the tip. You sit once the cast has settled and you're waiting, and get up
 // when a bite comes (or you walk off, or reel in).
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 /** the chair's place (the spot's own frame: x right, z back from where you stand, facing the water at -z) and size */
 export const CHAIR = { x: 0.06, z: 0.42, seat: 0.42, w: 0.5, d: 0.44, back: 0.58, recline: 0.21 };
@@ -118,6 +119,11 @@ export function buildChair() {
   const bc = new THREE.Mesh(roundBox(w - 0.02, back - 0.04, 0.055, 0.022), M.cloth);
   bc.position.copy(V(0, fy, hz - 0.012)).addScaledVector(up, 0.04 + (back - 0.04) / 2); bc.rotation.x = recline; g.add(bc);
   { const uv = bc.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 2.2); }
-  g.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-  return g;
+  // (drawn as one mesh per finish, five in all: built from 32 parts, it cost 32 draws a chair, 40 more a frame with
+  // its shadows)
+  g.updateMatrixWorld(true);
+  const by = new Map(); for (const m of g.children) if (m.isMesh) { const geo = m.geometry.clone().applyMatrix4(m.matrix); (by.get(m.material) || by.set(m.material, []).get(m.material)).push(geo); m.geometry.dispose(); }
+  const out = new THREE.Group(); out.name = "chair";
+  for (const [mat, list] of by) { const mesh = new THREE.Mesh(mergeGeometries(list, false), mat); mesh.castShadow = true; mesh.receiveShadow = true; out.add(mesh); for (const x of list) x.dispose(); }
+  return out;
 }
