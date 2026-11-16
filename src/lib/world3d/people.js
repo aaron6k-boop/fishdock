@@ -44,6 +44,13 @@ export const PEOPLE = [
   // clothes: their own modelled jacket, trousers and wellies (made in Blender on the man with short hair:
   // source-assets/blender/make_angler_clothes.py), coloured as their kit
   { file: "angler1", sex: "m", name: "Angler, fishing jacket", skin: 0, hair: 1, beard: 1, hem: 0.475, clothes: true },
+  // (16 November: six more from the same library, everyday clothes for a pier; source-assets/tools/rocketbox_to_glb.mjs)
+  { file: "m02", sex: "m", name: "Man, jumper", skin: 1, hair: 1, beard: 0, hem: 0.53 },
+  { file: "m07", sex: "m", name: "Man, tweed jacket", skin: 1, hair: 1, beard: 0, hem: 0.47 },
+  { file: "m14", sex: "m", name: "Man, grey shirt", skin: 0, hair: 2, beard: 0, hem: 0.52 },
+  { file: "m20", sex: "m", name: "Man, brown hoodie", skin: 1, hair: 1, beard: 0, hem: 0.5 },
+  { file: "f08", sex: "f", name: "Woman, long dark hair", skin: 1, hair: 0, beard: 0, hem: 0.53 },
+  { file: "f15", sex: "f", name: "Woman, auburn hair", skin: 1, hair: 4, beard: 0, hem: 0.52 },
 ];
 // who your own angler is until you choose: the angler in their fishing clothes, so the jacket you see on your arms in
 // first person is the one you see them wearing from behind
