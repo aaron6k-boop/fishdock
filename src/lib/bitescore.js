@@ -127,7 +127,7 @@ export function conditionsAt(cond, t) {
  * the 3D view: a deck stays dark, with puddles, for a while after a shower has passed. Each finished hour's rain
  * (Open-Meteo's precipitation, the hour up to its time) counts for less the longer ago it fell, halving about every
  * 1.4 hours (dryH 2: a rough guide to concrete drying on a mild day, not a measurement). Hours still to come don't
- * count. 0 without hourly rows or rain.
+ * count, nor those before the rows start (the forecast's rows begin at midnight). 0 without hourly rows or rain.
  */
 export function groundWetness(cond, t, dryH = 2) {
   const rows = cond?.hourly; if (!rows?.length) return 0;
