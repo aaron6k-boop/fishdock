@@ -157,8 +157,9 @@ test("your fingers on the reel seat stay outside it: none in the metal, the foam
     const P = place(pitch, holdView(), yaw), row = TURN[0];
     pose(P, [crankSpec(P, row), seatSpec(P)], 20);
     const before = intoHandle(P, prof), A = R.arm.R, hand = at(A.H), handQ = A.H.getWorldQuaternion(new THREE.Quaternion());
-    // (as it was: the index finger 4.2 mm and the thumb 2.4 mm inside the lock nut, the far trim through the index finger)
-    if (pitch === rigP0()) assert.ok(before["DEF-f_index02R"] > 3 && before["DEF-thumb03R"] > 2, JSON.stringify(before));
+    // (as it was: the index finger 4.2 mm and the thumb 2.4 mm inside the lock nut, the far trim through the index finger;
+    // with the fingers slimmed, 16 November, source-assets/hands/slim_fingers.py, 2.7 and 1.8)
+    if (pitch === rigP0()) assert.ok(before["DEF-f_index02R"] > 2 && before["DEF-thumb03R"] > 1.4, JSON.stringify(before));
     pose(P, [crankSpec(P, row), { ...seatSpec(P), prof }], 20);
     const after = intoHandle(P, prof), worst = Math.max(...Object.values(after));
     assert.ok(worst < 0.25, `pitch ${pitch}: a finger ${worst.toFixed(2)} mm inside the handle (${JSON.stringify(after)})`);
