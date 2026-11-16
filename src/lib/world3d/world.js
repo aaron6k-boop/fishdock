@@ -980,7 +980,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       if (o.bloom != null) { G.bloom = o.bloom ? 1 : 0; post.setBloom(!!G.bloom); }
       if (o.aa != null) { G.aa = o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(G.aa); }
       if (o.sharp != null) { G.sharp = Math.max(0, Math.min(1, +o.sharp || 0)); post.setSharp(G.sharp); }
-      if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer); }
+      if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer, { bigOnly: Q.q < 2 }); } // (Medium: the big things only, environment.js)
       if (o.sea != null) G.sea = env.setFftSea(!!o.sea, renderer) ? 1 : 0; // (the spectrum sea: Settings, or Ultra's default)
     }
     const sun = env.sun;

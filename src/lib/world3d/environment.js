@@ -884,6 +884,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     if (rough && (R.n & 1)) return;
     c.fov = camera.fov; c.aspect = camera.aspect; c.zoom = camera.zoom; c.near = camera.near; c.far = Math.min(camera.far, rough ? 220 : R.far);
     c.updateMatrixWorld(); c.updateProjectionMatrix(); // (its own projection, so the shorter far plane culls what it can't see)
+    // (Medium: only the big things are mirrored, the dune and the walls, the far piers, the buildings and the photographs
+    // of the shore, a few draws; the kit, the rails, the lamps and the people, each its own draw, are left to the
+    // waves. Marked once, the first time: layer 2, beside the usual layer 0)
+    if (R.big) { if (!R.tagged) { R.tagged = true; const sph = new THREE.Sphere(); scene.traverse((o) => { if (o.isLight) { o.layers.enable(2); return; } if (!o.isMesh || !o.geometry) return; if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); sph.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld); if (sph.radius > 4 || o.userData.backdrop) o.layers.enable(2); }); } c.layers.set(2); } else c.layers.set(0);
     const tm = wU.uReflMat.value; tm.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1); tm.multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
     // (an oblique near plane on the water's surface, so nothing under the water shows in the mirror)
     R.plane.setFromNormalAndCoplanarPoint(N, P).applyMatrix4(c.matrixWorldInverse);
@@ -900,10 +904,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     [sky.visible, water.visible, rain.visible] = was; hide.forEach((o, i) => { if (o) o.visible = was[3 + i]; });
   }
   /** Settings → Graphics → Reflections: 0 the sky only, 1 the scene at half size every other frame, 2 every frame */
-  function setReflections(level, renderer) {
-    level = Math.max(0, Math.min(2, level | 0));
+  function setReflections(level, renderer, { bigOnly = false } = {}) {
+    level = Math.max(0, Math.min(2, level | 0)); R.bigOnly = bigOnly;
     if (!level) { R.rt?.dispose(); R.rt = null; wU.uRefl.value = null; wU.uReflOn.value = 0; return; }
     R.every = level >= 2 ? 1 : 2; R.scale = level >= 2 ? 0.5 : 0.4; R.far = level >= 2 ? 500 : 300; // (how far the mirror sees)
+    R.big = level === 1 && !!R.bigOnly; // (Medium's mirror: the big things only, above)
     sizeReflections(renderer);
   }
   function sizeReflections(renderer) {

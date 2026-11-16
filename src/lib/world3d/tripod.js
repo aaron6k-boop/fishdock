@@ -54,16 +54,25 @@ function tube(a, b, r0, r1 = r0, seg = 10, open = false) {
 }
 function cradle(at, P) {
   // a U of rubber the rod lies in, square to the rod, its inside resting on the rod's underside
-  const { cradleR: R, cradleT: r } = TRIPOD, g = new THREE.TorusGeometry(R, r, 6, 16, Math.PI); g.rotateZ(Math.PI);
+  const { cradleR: R, cradleT: r } = TRIPOD, g = new THREE.TorusGeometry(R, r, 8, 20, Math.PI); g.rotateZ(Math.PI);
   // (the torus lies in its own x-y plane, the half drawn below its middle: x across the rod, y the open side, z along it)
   const x = new THREE.Vector3().crossVectors(P.open, P.dir).normalize();
   const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, P.open, P.dir));
   return g.applyMatrix4(new THREE.Matrix4().compose(at.clone().addScaledVector(P.open, R - r - P.rodR), q, V(1, 1, 1)));
 }
 function cup(at, dir) {
-  // a butt cup: open at the top, round the end of the rod, the butt standing on its floor
-  const bottom = at.clone().addScaledVector(dir, -0.001), top = at.clone().addScaledVector(dir, 0.07);
-  return [tube(bottom, top, 0.021, 0.025, 14, true), tube(bottom.clone().addScaledVector(dir, -0.006), bottom, 0.021, 0.021, 14)];
+  // a butt cup: open at the top, round the end of the rod, the butt standing on its floor; flared, with a rolled rim
+  const bottom = at.clone().addScaledVector(dir, -0.001), top = at.clone().addScaledVector(dir, 0.075);
+  const rim = new THREE.TorusGeometry(0.0285, 0.0032, 8, 22); rim.applyMatrix4(new THREE.Matrix4().compose(top, new THREE.Quaternion().setFromUnitVectors(V(0, 0, 1), dir), V(1, 1, 1)));
+  return [tube(bottom, top, 0.022, 0.0285, 22, true), tube(bottom.clone().addScaledVector(dir, -0.008), bottom, 0.023, 0.022, 22), rim];
+}
+// a rest head's rubber is thicker than the U the rod lies in: a rim round its outside, the same shape, wider and further
+// out (never nearer the rod than the U itself)
+function outerU(at, P) {
+  const { cradleR: R, cradleT: r } = TRIPOD, g = new THREE.TorusGeometry(R + 0.006, r + 0.004, 8, 20, Math.PI); g.rotateZ(Math.PI);
+  const x = new THREE.Vector3().crossVectors(P.open, P.dir).normalize();
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, P.open, P.dir));
+  return g.applyMatrix4(new THREE.Matrix4().compose(at.clone().addScaledVector(P.open, R - r - P.rodR), q, V(1, 1, 1)));
 }
 /**
  * A bank stick's rest head for a rod lying along `dir` with its axis through `at` (radius rodR there): the rubber U,
@@ -77,44 +86,70 @@ const flat = (gs) => mergeGeometries(gs.map((g) => (g.index ? g.toNonIndexed() :
 
 let mats = null;
 const materials = () => (mats ||= {
-  metal: new THREE.MeshStandardMaterial({ color: 0xb5b9bd, metalness: 0.75, roughness: 0.38 }), // (anodised aluminium)
-  black: new THREE.MeshStandardMaterial({ color: 0x1d1f22, metalness: 0.05, roughness: 0.62 }), // (moulded plastic, rubber)
+  // (16 November, Aaron: the rest "just looks blocky". It was thin black sticks and a small black block: now drawn as a
+  // sea tripod is made, silver anodised legs with black clamps and a red-anodised trim ring at each, a cast head the
+  // legs hinge from, rubber feet, a chunky rubber rest head on each post and flared butt cups)
+  metal: new THREE.MeshStandardMaterial({ color: 0xc9cdd2, metalness: 0.9, roughness: 0.3 }), // (anodised aluminium, satin)
+  black: new THREE.MeshStandardMaterial({ color: 0x17191c, metalness: 0.05, roughness: 0.5 }), // (moulded plastic: the clamps, caps and cups)
+  rubber: new THREE.MeshStandardMaterial({ color: 0x0d0e0f, metalness: 0, roughness: 0.9 }), // (the rest heads and the feet)
+  cast: new THREE.MeshStandardMaterial({ color: 0x3a3d42, metalness: 0.65, roughness: 0.45 }), // (the head's cast body)
+  trim: new THREE.MeshStandardMaterial({ color: 0xb3202a, metalness: 0.6, roughness: 0.35 }), // (a red anodised ring at each clamp)
 });
 
 /** The tripod as a group, and place(plan) to set it up for a plan from tripodPlan. */
 export function buildTripod() {
   const M = materials(), group = new THREE.Group(); group.name = "tripod";
-  const metal = new THREE.Mesh(new THREE.BufferGeometry(), M.metal), black = new THREE.Mesh(new THREE.BufferGeometry(), M.black);
-  metal.castShadow = black.castShadow = true; group.add(metal, black);
+  const parts = Object.fromEntries(Object.keys(M).map((k) => { const m = new THREE.Mesh(new THREE.BufferGeometry(), M[k]); m.castShadow = true; m.receiveShadow = true; group.add(m); return [k, m]; }));
   function place(P) {
-    const ms = [], bs = [];
+    const G = { metal: [], black: [], rubber: [], cast: [], trim: [] };
+    // a collar round a tube: its axis from a to b, radius r (a clamp, a cap)
+    const collar = (k, a, b, r, seg = 18) => G[k].push(tube(a, b, r, r, seg));
+    const up = V(0, 1, 0);
     for (const f of P.feet) {
-      // each leg: the inner tube out of a thicker outer one, a clamp where they meet, a rubber foot
-      const mid = P.hub.clone().lerp(f, 0.52);
-      bs.push(tube(P.hub, mid, 0.0145, 0.0145, 10)); ms.push(tube(mid, f.clone().add(V(0, 0.025, 0)), 0.011, 0.011, 10));
-      bs.push(tube(mid.clone().lerp(P.hub, 0.05), mid.clone().lerp(f, 0.04), 0.018, 0.018, 10));
-      bs.push(tube(f, f.clone().add(V(0, 0.03, 0)), 0.017, 0.015, 10));
-      // (the clamp's lever, folded flat along the outer tube on its outside, as a leg lock is when it's shut)
       const ax = f.clone().sub(P.hub).normalize(), out = V(f.x - P.hub.x, 0, f.z - P.hub.z); if (out.lengthSq() < 1e-8) out.set(0, 0, 1); out.normalize();
-      const side = out.clone().addScaledVector(ax, -out.dot(ax)).normalize(), l0 = mid.clone().lerp(P.hub, 0.03).addScaledVector(side, 0.021);
-      bs.push(tube(l0, l0.clone().addScaledVector(ax, -0.055).addScaledVector(side, 0.004), 0.0045, 0.0035, 6));
+      const side = out.clone().addScaledVector(ax, -out.dot(ax)).normalize(), across = new THREE.Vector3().crossVectors(ax, side).normalize();
+      // (each leg hinges from the head's side: it starts at the cast body's edge, not its middle)
+      const start = P.hub.clone().addScaledVector(ax, 0.045), mid = P.hub.clone().lerp(f, 0.52), end = f.clone().addScaledVector(ax, -0.03);
+      // the upper (outer) tube, 31 mm, and the lower (inner) one sliding out of it, 24 mm
+      G.metal.push(tube(start, mid, 0.0155, 0.0155, 20), tube(mid, end, 0.012, 0.012, 20));
+      // the hinge at the head: a lug either side of the leg's top and the pin across them
+      G.cast.push(tube(start.clone().addScaledVector(across, -0.02), start.clone().addScaledVector(across, 0.02), 0.012, 0.012, 14));
+      // the leg lock: a black collar where the tubes meet, a red trim ring at its top, the lever folded flat along it
+      collar("black", mid.clone().addScaledVector(ax, -0.045), mid.clone().addScaledVector(ax, 0.02), 0.0205);
+      collar("trim", mid.clone().addScaledVector(ax, -0.051), mid.clone().addScaledVector(ax, -0.045), 0.021);
+      const l0 = mid.clone().addScaledVector(ax, -0.035).addScaledVector(side, 0.024);
+      G.black.push(tube(l0, l0.clone().addScaledVector(ax, 0.07).addScaledVector(side, 0.004), 0.0065, 0.005, 10));
+      // a black end cap on the upper tube's top, under the hinge
+      collar("black", start.clone().addScaledVector(ax, -0.004), start.clone().addScaledVector(ax, 0.012), 0.0165);
+      // the rubber foot: a cup flaring to the deck
+      G.rubber.push(tube(f, end.clone().addScaledVector(ax, 0.008), 0.026, 0.0145, 18));
     }
-    // (the hook under the head, for a bag or a weight to steady it in a wind, as sea tripods have: a short stem and an
-    // open hook)
-    { const h0 = P.hub.clone().add(V(0, -0.035, 0)), h1 = h0.clone().add(V(0, -0.05, 0)); ms.push(tube(h0, h1, 0.0028, 0.0028, 6));
-      const hk = new THREE.TorusGeometry(0.012, 0.0028, 5, 10, Math.PI * 1.3); hk.rotateZ(Math.PI * 0.85); hk.translate(h1.x + 0.012 * Math.cos(Math.PI * 0.85 + Math.PI), h1.y - 0.004, h1.z); ms.push(hk); }
-    // the head: a block the legs meet at, a bar across it, a short post up to each cradle
-    bs.push(tube(P.hub.clone().add(V(0, -0.035, 0)), P.hub.clone().add(V(0, 0.03, 0)), 0.03, 0.026, 12));
+    // the head: a cast body the legs hinge from, a cap on it, and the hook under it for a bag or a weight to steady it in
+    // a wind, as sea tripods have
+    G.cast.push(tube(P.hub.clone().add(V(0, -0.05, 0)), P.hub.clone().add(V(0, 0.025, 0)), 0.042, 0.036, 24));
+    G.black.push(tube(P.hub.clone().add(V(0, 0.025, 0)), P.hub.clone().add(V(0, 0.034, 0)), 0.03, 0.026, 24));
+    { const h0 = P.hub.clone().add(V(0, -0.05, 0)), h1 = h0.clone().add(V(0, -0.055, 0)); G.metal.push(tube(h0, h1, 0.0032, 0.0032, 8));
+      const hk = new THREE.TorusGeometry(0.014, 0.0032, 6, 14, Math.PI * 1.3); hk.rotateZ(Math.PI * 0.85); hk.translate(h1.x + 0.014 * Math.cos(Math.PI * 1.85), h1.y - 0.004, h1.z); G.metal.push(hk); }
+    // the rest bar across the head (under the rod: tripod.test.js), black caps on its ends
     const hx = (s) => P.hub.clone().add(V(s * (TRIPOD.side + 0.04), 0.02, 0));
-    ms.push(tube(hx(-1), hx(1), 0.0095, 0.0095, 10));
-    // (each post leans forward a little, up from the bar into the bottom of its U)
-    for (const c of P.cradles) { const foot = cradleFoot(P, c); ms.push(tube(V(c.x, P.hub.y + 0.02, c.z), foot.addScaledVector(P.open, -TRIPOD.cradleT * 0.5), 0.007, 0.007, 8)); bs.push(cradle(c, P)); }
-    // the cup bar, clamped to the rear leg, and the two cups on it
+    G.metal.push(tube(hx(-1), hx(1), 0.0095, 0.0095, 18));
+    for (const sgn of [-1, 1]) collar("black", hx(sgn), hx(sgn).add(V(sgn * 0.014, 0, 0)), 0.0115);
+    // each post leans forward a little, up from the bar into the bottom of its rest head: a thumb-screw where it meets
+    // the bar, and the rest head's rubber: the U the rod lies in, a thicker rim round its outside and a boss under it
+    for (const c of P.cradles) {
+      const foot = cradleFoot(P, c), base = V(c.x, P.hub.y + 0.02, c.z), top = foot.clone().addScaledVector(P.open, -TRIPOD.cradleT * 0.5);
+      G.metal.push(tube(base, top, 0.0075, 0.0075, 12));
+      G.black.push(tube(base.clone().add(V(0, 0, 0.012)), base.clone().add(V(0, 0, 0.03)), 0.007, 0.007, 12), tube(base.clone().add(V(0, 0, 0.03)), base.clone().add(V(0, 0, 0.036)), 0.011, 0.011, 12));
+      G.rubber.push(cradle(c, P), outerU(c, P), tube(top.clone().addScaledVector(P.open, -0.022), top.clone().addScaledVector(P.open, 0.002), 0.011, 0.013, 14));
+    }
+    // the cup bar, clamped to the rear leg (black clamp, red ring), black caps on its ends, and the two cups on it
     const bx = (s) => P.bar.clone().add(V(s * (TRIPOD.side + 0.04), 0, 0));
-    ms.push(tube(bx(-1), bx(1), 0.0095, 0.0095, 10)); bs.push(tube(P.bar.clone().add(V(0, -0.025, 0)), P.bar.clone().add(V(0, 0.025, 0)), 0.02, 0.02, 10));
-    for (const c of P.cups) { bs.push(...cup(c, P.dir)); ms.push(tube(V(c.x, P.bar.y, c.z), c.clone().addScaledVector(P.dir, -0.018), 0.007, 0.007, 8)); }
-    metal.geometry.dispose(); black.geometry.dispose();
-    metal.geometry = flat(ms); black.geometry = flat(bs);
+    G.metal.push(tube(bx(-1), bx(1), 0.0095, 0.0095, 18));
+    for (const sgn of [-1, 1]) collar("black", bx(sgn), bx(sgn).add(V(sgn * 0.014, 0, 0)), 0.0115);
+    collar("black", P.bar.clone().add(V(0, -0.03, 0)), P.bar.clone().add(V(0, 0.025, 0)), 0.021);
+    collar("trim", P.bar.clone().add(V(0, 0.025, 0)), P.bar.clone().add(V(0, 0.031, 0)), 0.0215);
+    for (const c of P.cups) { G.black.push(...cup(c, P.dir)); G.metal.push(tube(V(c.x, P.bar.y, c.z), c.clone().addScaledVector(P.dir, -0.018), 0.007, 0.007, 10)); }
+    for (const k of Object.keys(parts)) { parts[k].geometry.dispose(); parts[k].geometry = G[k].length ? flat(G[k]) : new THREE.BufferGeometry(); }
   }
   return { group, place };
 }
