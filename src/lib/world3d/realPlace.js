@@ -59,7 +59,7 @@ function segIndex(segs, cell = 8) {
 export const PIER_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/pier_concrete_"; // (__fdAssetBase: only a self-contained preview page sets it, its files beside it; the app leaves it unset)
 const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
 function pierConcrete(mat, quality = 1, axis = 0) {
-  const wet = { value: 0, clock: { value: 0 } }; // (clock: seconds, for the rain's rings in the puddles; environment.js keeps both)
+  const wet = { value: 0, clock: { value: 0 }, rain: { value: 0 } }; // (clock: seconds, and rain: how hard it is raining, for the rain's rings in the puddles; environment.js keeps them)
   if (typeof document === "undefined") return wet;
   const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t;
@@ -69,10 +69,10 @@ function pierConcrete(mat, quality = 1, axis = 0) {
     nor.repeat.set(PHOTO_TILE, PHOTO_TILE); rough.repeat.set(PHOTO_TILE, PHOTO_TILE);
     mat.normalMap = nor; mat.roughnessMap = rough; mat.normalScale.set(0.9, 0.9);
     mat.onBeforeCompile = (sh) => {
-      sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWetSpots = WET_SPOTS; sh.uniforms.uWet = wet; sh.uniforms.uWetT = wet.clock; sh.uniforms.pWorn = { value: worn }; sh.uniforms.pNoise = { value: noise };
+      sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWetSpots = WET_SPOTS; sh.uniforms.uWet = wet; sh.uniforms.uWetT = wet.clock; sh.uniforms.uWetRain = wet.rain; sh.uniforms.pWorn = { value: worn }; sh.uniforms.pNoise = { value: noise };
       sh.uniforms.uAxis = { value: new THREE.Vector2(Math.cos(axis), Math.sin(axis)) };
       sh.vertexShader = "attribute float aDamp;\nvarying float vDamp;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvDamp = aDamp;");
-      sh.fragmentShader = (quality < 1 ? "" : "#define FD_WET_RINGS\n") + "#define FD_WET_SPOTS\nuniform vec4 uWetSpots[4];\nuniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform float uWetT;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
+      sh.fragmentShader = (quality < 1 ? "" : "#define FD_WET_RINGS\n") + "#define FD_WET_SPOTS\nuniform vec4 uWetSpots[4];\nuniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform float uWetT;\nuniform float uWetRain;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
         .replace("#include <map_fragment>", `#include <map_fragment>
         ${WET_PREP}
         {

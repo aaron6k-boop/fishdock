@@ -122,6 +122,24 @@ export function conditionsAt(cond, t) {
   };
 }
 
+/**
+ * How wet the ground still is from the rain of the last few hours (0 dry, towards 1 soaked), for the pier's look in
+ * the 3D view: a deck stays dark, with puddles, for a while after a shower has passed. Each finished hour's rain
+ * (Open-Meteo's precipitation, the hour up to its time) counts for less the longer ago it fell, halving about every
+ * 1.4 hours (dryH 2: a rough guide to concrete drying on a mild day, not a measurement). Hours still to come don't
+ * count, nor those before the rows start (the forecast's rows begin at midnight). 0 without hourly rows or rain.
+ */
+export function groundWetness(cond, t, dryH = 2) {
+  const rows = cond?.hourly; if (!rows?.length) return 0;
+  let sum = 0;
+  for (const h of rows) {
+    const end = Date.parse(h.t), age = (t - end) / H; // (hours since the end of that hour)
+    if (!(age >= 0 && age < 12) || !(h.precipMm > 0)) continue;
+    sum += h.precipMm * Math.exp(-(age + 0.5) / dryH);
+  }
+  return sum > 0 ? Math.round((1 - Math.exp(-sum / 0.5)) * 100) / 100 : 0;
+}
+
 const WEIGHTS = {
   sea: { light: 0.26, tide: 0.3, weather: 0.2, season: 0.19, moon: 0.05 },
   river: { light: 0.3, water: 0.25, weather: 0.2, season: 0.2, moon: 0.05 },

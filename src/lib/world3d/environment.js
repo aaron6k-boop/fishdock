@@ -36,7 +36,7 @@ vec3 noised(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3. - 2.*f), 
 `;
 // (SKYQ 1 shades the clouds, lit on the sun's side and grey beneath; 0, for Performance, leaves that out)
 const GLSL_SKY = /* glsl */`
-uniform vec3 uSunDir, uMoonDir;
+uniform vec3 uSunDir, uMoonDir, uSunSky;
 uniform float uDay, uDusk, uNight, uCloud, uRain, uTime, uMoonLight, uFret, uFlash;
 // ---- the clear sky in a direction, with the haze along the horizon (no sun disc, no clouds) ----
 // skyLook.js's horizonColour mirrors the horizon here: the land's haze is the same colour
@@ -110,6 +110,34 @@ vec4 cloudAt(vec3 d, float q){
   cc = mix(cc, skyBase(d), exp(-d.y*16.)*.45); // (only the last few degrees melt into the haze: it washed the whole lower sky out)
   return vec4(cc, cover*smoothstep(0., .05, d.y));
 }
+// ---- the moon's face, seen in direction d (inside its disc) ----
+// Its seas (maria) where they are on the near side, as seen from Britain with the moon's north up: placed by their
+// selenographic latitude and longitude (rounded) and sized roughly, soft-edged, with a little mottling. The light comes
+// from the sun's side (uSunSky, the sun where it really is, below the horizon at night), at the angle the moon's phase
+// gives (uMoonLight: the share of the disc lit), so the bright limb faces the sun and the terminator falls where it should.
+float mSea(vec2 p, vec2 c, vec2 r){ return 1. - smoothstep(.45, 1.1, length((p - c)/r)); }
+vec3 moonFace(vec3 d){
+  vec3 m = uMoonDir, rt = normalize(cross(m, vec3(0., 1., 0.))), up = cross(rt, m);
+  const float R = .0243; // (the sine of the disc's radius, 1.4 degrees: its edge at dot .9997)
+  vec3 q = (d - m*dot(d, m))/R; vec2 p = vec2(dot(q, rt), dot(q, up)); float r2 = min(dot(p, p), 1.);
+  vec3 n = q - m*sqrt(1. - r2); // (the face's normal, towards us)
+  vec3 sp = uSunSky - m*dot(uSunSky, m); vec3 t = dot(sp, sp) > 1e-6 ? normalize(sp) : up;
+  float cph = clamp(2.*uMoonLight - 1., -1., 1.); vec3 L = -m*cph + t*sqrt(1. - cph*cph);
+  float lit = smoothstep(-.05, .07, dot(n, L));
+  // (Procellarum, Imbrium, Frigoris, Serenitatis, Tranquillitatis, Crisium, Fecunditatis, Nectaris, Nubium, Humorum,
+  // Insularum, Vaporum, Cognitum; their edges ragged)
+  vec2 w = p + (vec2(noise(p*4.1 + vec2(1.7, 5.3)), noise(p*4.1 + vec2(8.2, 2.9))) - .5)*.08;
+  float sea = mSea(w, vec2(-.62, .15), vec2(.3, .5)) + mSea(w, vec2(-.25, .5), vec2(.3, .24)) + mSea(w, vec2(0., .82), vec2(.45, .08))
+    + mSea(w, vec2(.27, .45), vec2(.18, .17)) + mSea(w, vec2(.47, .15), vec2(.26, .22)) + mSea(w, vec2(.8, .28), vec2(.09, .15))
+    + mSea(w, vec2(.7, -.12), vec2(.15, .24)) + mSea(w, vec2(.5, -.3), vec2(.1, .11)) + mSea(w, vec2(-.25, -.35), vec2(.2, .17))
+    + mSea(w, vec2(-.55, -.42), vec2(.11, .12)) + mSea(w, vec2(-.3, .12), vec2(.18, .12)) + mSea(w, vec2(.05, .25), vec2(.1, .08))
+    + mSea(w, vec2(-.38, -.15), vec2(.12, .1));
+  sea = clamp(sea*1.3, 0., 1.)*(.9 + .2*noise(p*5.3 + 3.1));
+  float ray = 1. - smoothstep(.0, .09, length(p - vec2(-.14, -.68))); // (Tycho, the bright crater low down)
+  float low = 1. - smoothstep(.05, .4, max(m.y, 0.));
+  vec3 mc = mix(vec3(.86, .88, .93), vec3(1., .8, .56), low*.8)*mix(1.45, 1.05, low);
+  return mc*(lit*(1. - .5*sea + .25*ray)*(.96 + .04*noise(p*19.)) + (1. - lit)*.02);
+}
 vec3 skyColour(vec3 d){
   vec3 c = skyBase(d);
   float sd = max(dot(d, uSunDir), 0.), md = max(dot(d, uMoonDir), 0.);
@@ -122,13 +150,18 @@ vec3 skyColour(vec3 d){
     vec3 sunC = mix(vec3(1., .93, .8), vec3(1., .66, .34), low*.85);
     c += sunC*disc*(.75 + .25*limb)*(uDay + uDusk)*mix(2.2, 1.3, low);
     c += sunC*(pow(sd, 900.)*.5 + pow(sd, 180.)*.12 + pow(sd, 60.)*.03)*(uDay + uDusk*.8)*(1. - .6*uCloud); }
-  c += vec3(.85, .88, .95)*smoothstep(.9996, .99985, md)*uNight*uMoonLight*1.6;
+  // the moon: lit on the side towards the sun, as much of it as its phase lights (a half moon was a full disc at half
+  // the brightness), the dark seas on its face, warmer and dimmer low down; the faint earthshine on its dark part, which
+  // hides the stars behind it. Drawn about five times its real size (2.8 degrees across), the size it was, with a
+  // crisper edge (its soft edge took in the outer third of the face)
+  float mdisc = smoothstep(.99966, .99976, md)*smoothstep(0., .03, uMoonLight);
+  if (mdisc > 0.) { c += moonFace(d)*mdisc*uNight; }
   if (d.y > 0.) {
     #ifndef ENV_PASS
       // stars on a clear night: small points of different brightness, fewer low down, twinkling a little
       vec2 sp = d.xz/(d.y + .3)*260.; float sh = hash(floor(sp));
       float st = step(.9972, sh)*smoothstep(.42, .05, length(fract(sp) - .5))*(.3 + .7*fract(sh*913.))*(.8 + .2*sin(uTime*3. + sh*80.));
-      c += vec3(.9, .93, 1.)*st*uNight*(1. - smoothstep(.5, .9, uCloud))*smoothstep(.04, .25, d.y)*1.3;
+      c += vec3(.9, .93, 1.)*st*uNight*(1. - smoothstep(.5, .9, uCloud))*smoothstep(.04, .25, d.y)*1.3*(1. - mdisc);
     #endif
     vec4 cl = cloudAt(d, 1.);
     c = mix(c, cl.rgb, cl.a);
@@ -171,7 +204,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   const L = layoutFor(venue);
   const group = new THREE.Group(); scene.add(group);
   const U = {
-    uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(0.3, 0.5, -0.8).normalize() }, uMoonDir: { value: new THREE.Vector3(-0.3, 0.4, -0.8).normalize() },
+    uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(0.3, 0.5, -0.8).normalize() }, uMoonDir: { value: new THREE.Vector3(-0.3, 0.4, -0.8).normalize() }, uSunSky: { value: new THREE.Vector3(0.3, 0.5, -0.8).normalize() },
     uDay: { value: 1 }, uDusk: { value: 0 }, uNight: { value: 0 }, uCloud: { value: 0.3 }, uRain: { value: 0 }, uMoonLight: { value: 0.5 }, uFret: { value: 0 }, uFlash: { value: 0 },
     // with post-processing (post.js) the picture is tone mapped once at the end: the sky and sea write the colours
     // they mean to show, so under post they're turned back into linear light at the exposure (world.js sets uExpo)
@@ -783,7 +816,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   const bolt = { next: null, pulses: [], flash: 0 }; // (the storm's lightning, update below)
   function apply(st) {
     U.uDay.value = st.day; U.uDusk.value = st.dusk; U.uNight.value = st.night; U.uCloud.value = st.cloud; U.uRain.value = st.rain; U.uMoonLight.value = st.moonLight; U.uFret.value = st.fog || 0;
-    U.uSunDir.value.copy(st.sunDir); if (typeof window !== "undefined" && FILM && window.__fdSun) U.uSunDir.value.set(...window.__fdSun).normalize(); /* (film only: the sun put where a check needs it) */ U.uMoonDir.value.copy(st.moonDir);
+    U.uSunDir.value.copy(st.sunDir); if (typeof window !== "undefined" && FILM && window.__fdSun) U.uSunDir.value.set(...window.__fdSun).normalize(); /* (film only: the sun put where a check needs it) */ U.uMoonDir.value.copy(st.moonDir); if (st.sunSky) U.uSunSky.value.copy(st.sunSky); // (uSunSky: the sun where it really is, for the moon's phase)
     wind = st.wind; windDir = [st.windDir.x, st.windDir.y];
     wU.uWind.value = st.wind; wU.uWindDir.value.copy(st.windDir).normalize(); wU.uSwell.value = st.swell;
     // ---- light (skyLook.js): the sun by day, the moon at night, gold and low at dusk; cloud hides it and the sky's
@@ -814,8 +847,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     for (const pl of pointLights) { pl.intensity = lampOn * (pl.userData.cd || 60); pl.visible = lampOn > 0.02; }
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     for (let i = 0; i < 4; i++) { const q = lampSpots[i]; wU.uLamps.value[i].set(q ? q[0] : 0, q ? q[1] : 0, q ? q[2] : 0, q ? lampOn : 0); }
-    sandWet.value = Math.min(1, st.rain * 1.4);
-    if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain (wetLook.js)
+    // the ground darkens and shines in the rain (wetLook.js), and stays wet a while after it (st.wet: from the last
+    // hours' rain); the rings in the puddles only while it is raining
+    const wetNow = Math.max(Math.min(1, st.rain * 1.4), st.wet || 0);
+    sandWet.value = wetNow;
+    if (real?.deckWet) { real.deckWet.value = wetNow; if (real.deckWet.rain) real.deckWet.rain.value = Math.min(1, st.rain * 1.4); }
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
   // ---- reflections of the scene in the water: the scene drawn again from a camera mirrored in the water's surface,
@@ -910,7 +946,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       fft.update(t, { windKph: wind * 45, windDir, fetchKm: 80, gain, lambda: 1.4 });
       wU.uFoam0.value = fft.foam;
     },
-    /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM }; facing: bearing of -z */
+    /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM, groundWet }; facing: bearing of -z
+     * (groundWet: 0 to 1, how wet the ground still is from the last hours' rain, bitescore.js groundWetness) */
     setEnv({ light = {}, cond = {}, facing = 180 } = {}) {
       const toDir = (alt, az) => { const a = (alt * Math.PI) / 180, b = (((az ?? 180) - facing) * Math.PI) / 180; return new THREE.Vector3(Math.sin(b) * Math.cos(a), Math.sin(a), -Math.cos(b) * Math.cos(a)); };
       const sa = light.sunAlt ?? 35, ma = light.moonAlt ?? -10;
@@ -921,11 +958,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       // the waves run the way the wind blows (it comes from windDir)
       const wb = cond.windDir != null ? (((cond.windDir + 180) - facing) * Math.PI) / 180 : 0.4;
       target = {
-        day, dusk, night, cloud, rain: r, wind: w, moonLight: (light.moonIllum ?? 0.5) * (ma > 0 ? 1 : 0), fog: fs.fog, thunder: fs.thunder,
-        sunDir: toDir(Math.max(sa, -6), light.sunAz), moonDir: toDir(Math.max(ma, 2), light.moonAz), windDir: new THREE.Vector2(Math.sin(wb), -Math.cos(wb)),
+        day, dusk, night, cloud, rain: r, wet: Math.min(1, Math.max(0, cond.groundWet || 0)), wind: w, moonLight: (light.moonIllum ?? 0.5) * (ma > 0 ? 1 : 0), fog: fs.fog, thunder: fs.thunder,
+        sunDir: toDir(Math.max(sa, -6), light.sunAz), sunSky: toDir(sa, light.sunAz), moonDir: toDir(Math.max(ma, 2), light.moonAz), windDir: new THREE.Vector2(Math.sin(wb), -Math.cos(wb)),
         swell: venue === "river" || venue === "lake" ? 0 : cond.waveM != null ? Math.min(1, cond.waveM / 1.5) : Math.min(1, 0.15 + w * 0.6),
       };
-      if (!cur) { cur = { ...target, sunDir: target.sunDir.clone(), moonDir: target.moonDir.clone(), windDir: target.windDir.clone() }; apply(cur); }
+      if (!cur) { cur = { ...target, sunDir: target.sunDir.clone(), sunSky: target.sunSky.clone(), moonDir: target.moonDir.clone(), windDir: target.windDir.clone() }; apply(cur); }
       return { day, dusk, night, cloud, rain: r, wind: w, moonLight: target.moonLight, fog: fs.fog, thunder: fs.thunder };
     },
     /** ripples: up to 8 [x, z, age seconds, strength] */
@@ -942,8 +979,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       if (target && cur) {
         const k = 1 - Math.exp(-dt * EASE);
         let moved = false;
-        for (const key of ["day", "dusk", "night", "cloud", "rain", "wind", "swell", "moonLight", "fog", "thunder"]) { const d = target[key] - cur[key]; if (Math.abs(d) > 1e-4) { cur[key] += d * k; moved = true; } }
-        for (const key of ["sunDir", "moonDir", "windDir"]) { if (cur[key].distanceTo(target[key]) > 1e-4) { cur[key].lerp(target[key], k); moved = true; } }
+        for (const key of ["day", "dusk", "night", "cloud", "rain", "wet", "wind", "swell", "moonLight", "fog", "thunder"]) { const d = target[key] - cur[key]; if (Math.abs(d) > 1e-4) { cur[key] += d * k; moved = true; } }
+        for (const key of ["sunDir", "sunSky", "moonDir", "windDir"]) { if (cur[key].distanceTo(target[key]) > 1e-4) { cur[key].lerp(target[key], k); moved = true; } }
         if (moved) apply(cur);
       }
       wildlife?.update(t, dt, { night: cur?.night ?? 0, swell: cur?.swell ?? 0.3 });

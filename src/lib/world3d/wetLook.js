@@ -2,7 +2,8 @@
 // Everything darkens in rain. Only level, hard ground close by gets the shine, and most of all in shallow puddles,
 // which mirror the sky (the environment map). Slopes, grass (the dune across the harbour) and the far side stay matt:
 // a low roughness on all of it caught the sun as a large white patch. Needs vertex colours, vMapUv and uWet; the rings
-// of rain in the puddles need #define FD_WET_RINGS and uWetT (seconds).
+// of rain in the puddles need #define FD_WET_RINGS, uWetT (seconds) and uWetRain (how hard it is raining: the ground
+// stays wet after the rain has stopped, with no drops landing in its puddles).
 
 import * as THREE from "three";
 
@@ -50,14 +51,14 @@ export const WET_PREP = /* glsl */`
     // raindrops landing in them: rings that spread and die in about a second, two sizes of drop (wetLook.js WET_NORMAL
     // tilts the puddle's mirror by fdRip)
     #ifdef FD_WET_RINGS
-    if (uWet * fdPud > .02) {
+    if (uWetRain * fdPud > .02) {
       vec2 wp = vMapUv * 8.;
       for (int l = 0; l < 2; l++) {
         vec2 q = wp * (l == 0 ? 3.3 : 5.9) + float(l) * 17.3; fi = floor(q); vec2 cf = fract(q);
         float h1 = FDH(vec2(0.)), h2 = FDH(vec2(7.7, 1.9));
         float tt = fract(uWetT * (.75 + .5 * h2) + h1);
         vec2 dv = cf - (vec2(.3) + .4 * vec2(FDH(vec2(1.3, 5.1)), FDH(vec2(4.1, 2.7)))); float dd = length(dv);
-        float w = (dd - tt * .4) * 30., live = step(h2, .35 + uWet * .6); // (fewer drops in light rain)
+        float w = (dd - tt * .4) * 30., live = step(h2, .35 + uWetRain * .6); // (fewer drops in light rain)
         fdRip += dv / max(dd, 1e-3) * sin(w) * exp(-w * w * .22) * (1. - tt) * (1. - tt) * live;
       }
       fdRip *= .55;
