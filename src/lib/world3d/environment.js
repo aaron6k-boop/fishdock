@@ -814,8 +814,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     for (const pl of pointLights) { pl.intensity = lampOn * (pl.userData.cd || 60); pl.visible = lampOn > 0.02; }
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     for (let i = 0; i < 4; i++) { const q = lampSpots[i]; wU.uLamps.value[i].set(q ? q[0] : 0, q ? q[1] : 0, q ? q[2] : 0, q ? lampOn : 0); }
-    sandWet.value = Math.min(1, st.rain * 1.4);
-    if (real?.deckWet) real.deckWet.value = Math.min(1, st.rain * 1.4); // the deck darkens and shines in the rain (wetLook.js)
+    // the ground darkens and shines in the rain (wetLook.js), and stays wet a while after it (st.wet: from the last
+    // hours' rain); the rings in the puddles only while it is raining
+    const wetNow = Math.max(Math.min(1, st.rain * 1.4), st.wet || 0);
+    sandWet.value = wetNow;
+    if (real?.deckWet) { real.deckWet.value = wetNow; if (real.deckWet.rain) real.deckWet.rain.value = Math.min(1, st.rain * 1.4); }
     rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
   }
   // ---- reflections of the scene in the water: the scene drawn again from a camera mirrored in the water's surface,
@@ -910,7 +913,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       fft.update(t, { windKph: wind * 45, windDir, fetchKm: 80, gain, lambda: 1.4 });
       wU.uFoam0.value = fft.foam;
     },
-    /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM }; facing: bearing of -z */
+    /** light: { sunAlt, sunAz, moonAlt, moonAz, moonIllum } (degrees); cond: { windKph, windDir, cloudPct, precipMm, waveM, groundWet }; facing: bearing of -z
+     * (groundWet: 0 to 1, how wet the ground still is from the last hours' rain, bitescore.js groundWetness) */
     setEnv({ light = {}, cond = {}, facing = 180 } = {}) {
       const toDir = (alt, az) => { const a = (alt * Math.PI) / 180, b = (((az ?? 180) - facing) * Math.PI) / 180; return new THREE.Vector3(Math.sin(b) * Math.cos(a), Math.sin(a), -Math.cos(b) * Math.cos(a)); };
       const sa = light.sunAlt ?? 35, ma = light.moonAlt ?? -10;
@@ -921,7 +925,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       // the waves run the way the wind blows (it comes from windDir)
       const wb = cond.windDir != null ? (((cond.windDir + 180) - facing) * Math.PI) / 180 : 0.4;
       target = {
-        day, dusk, night, cloud, rain: r, wind: w, moonLight: (light.moonIllum ?? 0.5) * (ma > 0 ? 1 : 0), fog: fs.fog, thunder: fs.thunder,
+        day, dusk, night, cloud, rain: r, wet: Math.min(1, Math.max(0, cond.groundWet || 0)), wind: w, moonLight: (light.moonIllum ?? 0.5) * (ma > 0 ? 1 : 0), fog: fs.fog, thunder: fs.thunder,
         sunDir: toDir(Math.max(sa, -6), light.sunAz), moonDir: toDir(Math.max(ma, 2), light.moonAz), windDir: new THREE.Vector2(Math.sin(wb), -Math.cos(wb)),
         swell: venue === "river" || venue === "lake" ? 0 : cond.waveM != null ? Math.min(1, cond.waveM / 1.5) : Math.min(1, 0.15 + w * 0.6),
       };
@@ -942,7 +946,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       if (target && cur) {
         const k = 1 - Math.exp(-dt * EASE);
         let moved = false;
-        for (const key of ["day", "dusk", "night", "cloud", "rain", "wind", "swell", "moonLight", "fog", "thunder"]) { const d = target[key] - cur[key]; if (Math.abs(d) > 1e-4) { cur[key] += d * k; moved = true; } }
+        for (const key of ["day", "dusk", "night", "cloud", "rain", "wet", "wind", "swell", "moonLight", "fog", "thunder"]) { const d = target[key] - cur[key]; if (Math.abs(d) > 1e-4) { cur[key] += d * k; moved = true; } }
         for (const key of ["sunDir", "moonDir", "windDir"]) { if (cur[key].distanceTo(target[key]) > 1e-4) { cur[key].lerp(target[key], k); moved = true; } }
         if (moved) apply(cur);
       }

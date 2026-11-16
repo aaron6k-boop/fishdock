@@ -32,7 +32,7 @@ import { gameBaits, gameBait, biteWeight, takesHere, DEFAULT_BAIT } from "../lib
 import { BaitThumb } from "../components/BaitPhoto.jsx";
 import { FILM } from "../lib/world3d/film.js";
 import Logbook, { LevelBar } from "../components/Logbook.jsx";
-import { conditionsAt } from "../lib/bitescore.js";
+import { conditionsAt, groundWetness } from "../lib/bitescore.js";
 import { getConditions } from "../lib/api.js";
 import { spotById } from "../data/spots.js";
 import { SPECIES, speciesById } from "../data/species.js";
@@ -175,7 +175,7 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
 
   const t = timeFor(light, place);
   const live = conditionsAt(cond, t);
-  const c = wx === "live" ? (live ? { windKph: live.windKph, windDir: live.windDir, cloudPct: live.cloudPct, precipMm: live.precipMm, waveM: live.waveM, visibilityM: live.visibilityM, code: live.code } : DEMO_WX.breezy) : DEMO_WX[wx];
+  const c = wx === "live" ? (live ? { windKph: live.windKph, windDir: live.windDir, cloudPct: live.cloudPct, precipMm: live.precipMm, waveM: live.waveM, visibilityM: live.visibilityM, code: live.code, groundWet: groundWetness(cond, t) } : DEMO_WX.breezy) : DEMO_WX[wx];
   const sun = ASTRO.sunPos(t, place.lat, place.lon), moon = ASTRO.moonPos(t, place.lat, place.lon);
   const lightNow = { sunAlt: sun.alt, sunAz: sun.az, moonAlt: moon.alt, moonAz: moon.az, moonIllum: ASTRO.moonIllum(t).fraction };
   // at dusk the demo faces the sunset, so the glitter path shows
