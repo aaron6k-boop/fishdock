@@ -51,9 +51,16 @@ export let PEOPLE_HD = false;
 export function setPeopleDetail(on) { PEOPLE_HD = !!on; }
 const personGLB = (name) => (PEOPLE_HD ? loadGLB(name + "_hd").catch(() => loadGLB(name)) : loadGLB(name));
 // the walks' own speeds where a clip carries no travel of its own (measured from the feet), m/s at the model's size
-const LOCO = ["walk_slow", "walk", "walk_fast", "run"];
-// (where a walk becomes a run, m/s at the model's size: the brisk walk up to the first, the run from the second)
-export const GAIT = [1.95, 2.25];
+const LOCO = ["walk_slow", "walk", "walk_fast", "run", "sprint"];
+// (where a walk becomes a run, m/s at the model's size: the brisk walk up to the first, the run from the second; and
+// where the jog (Rocketbox's own run, captured at 2.4 m/s) gives way to the full run (SPRINT), both running gaits with
+// their footfalls lined up by calibrate())
+export const GAIT = [1.95, 2.25], RUN_UP = [2.7, 3.0];
+// (the full run: Mixamo's "Standard Run", retargeted onto the same skeleton in Blender with the other Mixamo movements
+// (anims2.glb x_run, source-assets/blender/retarget_mixamo.py) and in place. Its speed, from its own planted foot
+// moving back under the hips, about 3.3 m/s at 2.7 steps a second, against the same measure on the Rocketbox walk and
+// jog (within 2 and 7 per cent of their stated 1.39 and 2.42 m/s): 15 November)
+export const SPRINT_SPEED = 3.35;
 /**
  * The movements' weights at a speed vs (m/s), from the clips' own speeds sp (walk_slow, walk, walk_fast, run) at the
  * person's size k: { w: { idle, walk_slow, walk, walk_fast, run }, stretch } (stretch: how much longer than the clips'
@@ -69,13 +76,15 @@ export const GAIT = [1.95, 2.25];
  * runner's 2.7 to 3 (the planted foot is held by the leg IK, so a stretched stride doesn't slide).
  */
 export function gaitWeights(vs, sp, k = 1) {
-  const w = { idle: 0, walk_slow: 0, walk: 0, walk_fast: 0, run: 0 };
+  const w = { idle: 0, walk_slow: 0, walk: 0, walk_fast: 0, run: 0, sprint: 0 };
   if (vs < 0.05) w.idle = 1;
   else if (vs < sp[0]) { const f = vs / sp[0]; w.idle = 1 - f; w.walk_slow = f; }
   else if (vs <= sp[2]) { let i = 0; while (i < 2 && vs > sp[i + 1]) i++; const f = clamp((vs - sp[i]) / Math.max(0.01, sp[i + 1] - sp[i]), 0, 1); w[LOCO[i]] = 1 - f; w[LOCO[i + 1]] = f; }
-  else { const g = ease((vs - GAIT[0] * k) / ((GAIT[1] - GAIT[0]) * k)); w.walk_fast = 1 - g; w.run = g; }
-  let ws = 0, vClip = 0; LOCO.forEach((key, i) => { ws += w[key]; vClip += w[key] * sp[i]; });
-  const share = 0.5 + 0.3 * (ws > 0 ? w.run / ws : 0);
+  else { const g = ease((vs - GAIT[0] * k) / ((GAIT[1] - GAIT[0]) * k)); w.walk_fast = 1 - g; w.run = g;
+    // (and the jog into the full run, where there is one)
+    if (sp[4] > 0 && g >= 1) { const h = ease((vs - RUN_UP[0] * k) / ((RUN_UP[1] - RUN_UP[0]) * k)); w.run = 1 - h; w.sprint = h; } }
+  let ws = 0, vClip = 0; LOCO.forEach((key, i) => { if (!(sp[i] > 0)) return; ws += w[key]; vClip += w[key] * sp[i]; });
+  const share = 0.5 + 0.3 * (ws > 0 ? (w.run + w.sprint) / ws : 0);
   return { w, stretch: ws > 0 && vClip > 0 && vs >= sp[0] ? clamp((vs / (vClip / ws)) ** share, 0.85, 1.35) : 1 };
 }
 // the retargeted poses blended in while standing (fish_idle: holding a rod; kneel and inspect: down by the fish or the
@@ -92,7 +101,7 @@ function clipSet() {
     // Mixamo movements retargeted onto the same skeleton in Blender (anims2.glb, source-assets/blender/
     // retarget_mixamo.py): a fishing stance, kneeling, crouching, kneeling to look closely at something. Both sexes.
     // Without it (offline, an old cache) the procedural poses stand in, as before
-    try { const g2 = await loadGLB("anims2"); for (const c of g2.animations) { const key = c.name.slice(2); if (c.name.startsWith("x_") && (POSES.includes(key) || ACTS.includes(key))) out.m[key] = out.f[key] = c; } } catch { /* the procedural poses */ }
+    try { const g2 = await loadGLB("anims2"); for (const c of g2.animations) { const key = c.name.slice(2); if (c.name.startsWith("x_") && (POSES.includes(key) || ACTS.includes(key))) out.m[key] = out.f[key] = c; if (c.name === "x_run") out.m.sprint = out.f.sprint = prepClip(c, SPRINT_SPEED); } } catch { /* the procedural poses */ }
     return out;
   });
   clipsP.catch(() => { clipsP = null; });
@@ -492,7 +501,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     // (without the turning steps, as before: small steps of the slow walk)
     const turning = !canPivot && o.walk && st.v < 0.4 ? clamp((st.turn - 0.8) / 2, 0, 1) : 0;
     const vs = Math.max(st.v, turning * 0.55 * speedOf("walk_slow"));
-    const sp = LOCO.map(speedOf), { w, stretch } = gaitWeights(vs, sp, k);
+    const sp = LOCO.map((key) => (key === "sprint" && !clips.sprint ? 0 : speedOf(key))), { w, stretch } = gaitWeights(vs, sp, k);
     let stride = 0, ws = 0; for (const key of LOCO) { stride += w[key] * (clips[key]?.userData.travel || 1) * k; ws += w[key]; }
     if (ws > 0) stride *= stretch;
     const adv = moved + turning * 0.55 * speedOf("walk_slow") * dt;

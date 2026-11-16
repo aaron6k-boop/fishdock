@@ -2,12 +2,14 @@
 // a mixture of the two, at speeds people actually walk and run at.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gaitWeights, GAIT } from "../src/lib/world3d/human3d.js";
+import { gaitWeights, GAIT, RUN_UP, SPRINT_SPEED } from "../src/lib/world3d/human3d.js";
 import { WALK } from "../src/lib/world3d/walker.js";
 
-// (the motion-captured clips' own speeds, m/s: slow walk, walk, brisk walk, run; men's and women's)
-const SP = { m: [0.81, 1.39, 1.49, 2.42], f: [0.88, 1.28, 1.51, 2.25] };
+// (the motion-captured clips' own speeds, m/s: slow walk, walk, brisk walk, jog, and the full run where it's loaded;
+// men's and women's, and without the full run, as before it arrives)
+const SP = { m: [0.81, 1.39, 1.49, 2.42, SPRINT_SPEED], f: [0.88, 1.28, 1.51, 2.25, SPRINT_SPEED], old: [0.81, 1.39, 1.49, 2.42] };
 const walks = (w) => w.walk_slow + w.walk + w.walk_fast;
+const runs = (w) => w.run + (w.sprint || 0);
 
 test("walking at the game's walking pace is all walk, at the clip's own stride", () => {
   for (const sp of Object.values(SP)) {
@@ -17,18 +19,25 @@ test("walking at the game's walking pace is all walk, at the clip's own stride",
   }
 });
 
-test("sprinting is all run, quicker mostly by a longer stride: the steps' pace no more than a tenth up on the captured run", () => {
-  for (const sp of Object.values(SP)) {
-    const { w, stretch } = gaitWeights(WALK.sprint, sp), pace = WALK.sprint / sp[3] / stretch;
-    assert.equal(w.run, 1); assert.ok(stretch > 1.15 && stretch <= 1.35, `stride ${stretch.toFixed(3)}`); assert.ok(pace >= 1 && pace < 1.1, `pace ${pace.toFixed(3)}`);
+test("sprinting is the full run near the speed it was captured at; without it, the jog quicker mostly by a longer stride", () => {
+  for (const sp of [SP.m, SP.f]) {
+    const { w, stretch } = gaitWeights(WALK.sprint, sp), pace = WALK.sprint / sp[4] / stretch;
+    assert.equal(w.sprint, 1); assert.ok(Math.abs(stretch - 1) < 0.06, `stride ${stretch.toFixed(3)}`); assert.ok(Math.abs(pace - 1) < 0.03, `pace ${pace.toFixed(3)}`);
   }
+  const { w, stretch } = gaitWeights(WALK.sprint, SP.old), pace = WALK.sprint / SP.old[3] / stretch;
+  assert.equal(w.run, 1); assert.ok(stretch > 1.15 && stretch <= 1.35, `stride ${stretch.toFixed(3)}`); assert.ok(pace >= 1 && pace < 1.1, `pace ${pace.toFixed(3)}`);
+});
+
+test("the full run takes over from the jog only above jogging pace, and the two runs are never mixed with a walk", () => {
+  assert.ok(RUN_UP[0] > GAIT[1] && WALK.sprint > RUN_UP[1]);
+  for (let v = 0.06; v <= 4; v += 0.01) { const { w } = gaitWeights(v, SP.m); if (w.sprint > 0) { assert.ok(v > RUN_UP[0], `full run at ${v.toFixed(2)}`); assert.equal(walks(w), 0); } }
 });
 
 test("between them, a walk or a run: both only in the short band where one gives way to the other", () => {
   for (const sp of Object.values(SP)) for (let v = 0.06; v <= 4; v += 0.01) {
     const { w } = gaitWeights(v, sp);
-    if (w.run > 0 && walks(w) > 0) assert.ok(v > GAIT[0] && v < GAIT[1], `walking and running both at ${v.toFixed(2)} m/s`);
-    assert.ok(Math.abs(w.idle + walks(w) + w.run - 1) < 1e-9);
+    if (runs(w) > 0 && walks(w) > 0) assert.ok(v > GAIT[0] && v < GAIT[1], `walking and running both at ${v.toFixed(2)} m/s`);
+    assert.ok(Math.abs(w.idle + walks(w) + runs(w) - 1) < 1e-9);
   }
   assert.ok(GAIT[1] - GAIT[0] <= 0.4 && GAIT[0] > 1.8, "people break into a run at about 2 m/s");
 });
