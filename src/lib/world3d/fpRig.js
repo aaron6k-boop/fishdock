@@ -211,8 +211,15 @@ export function skinShade(sh) {
     // (the light that wraps round past the shadow's edge, a third of the way into the dark side, warm)
     .replace("#include <lights_physical_pars_fragment>", chunk.replace(SKIN_BLEED, `${SKIN_BLEED}\n\t{ float fpW = saturate( ( dot( geometryNormal, directLight.direction ) + 0.5 ) / 1.5 ); reflectedLight.directDiffuse += max( fpW - dotNL, 0.0 ) * directLight.color * vec3( 0.9, 0.26, 0.15 ) * BRDF_Lambert( material.diffuseColor ); }`))
     // (patches 3 to 10 cm across, a few per cent redder or paler; the knuckles' and palms' sheen varies with them)
-    .replace("#include <color_fragment>", "#include <color_fragment>\n{ float fpN = fpSkinNoise( vSkinP * 11.0 ) * 0.6 + fpSkinNoise( vSkinP * 34.0 ) * 0.4; diffuseColor.rgb *= mix( vec3( 1.04, 0.96, 0.95 ), vec3( 0.97, 1.02, 1.03 ), fpN ); }")
-    .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, 0.3, 1.0 );");
+    // (the baked creases, knuckles, nails and veins at twice their strength: drawn true to life they were too faint to
+    // see at the size a phone shows your hands, which read as smooth and even as a mannequin's, 16 November)
+    .replace("#include <map_fragment>", "#ifdef USE_MAP\n{ vec4 fpMap = texture2D( map, vMapUv ); diffuseColor.rgb *= max( vec3( 0.0 ), 0.85 + ( fpMap.rgb - 0.85 ) * 2.0 ); }\n#endif")
+    .replace("#include <color_fragment>", "#include <color_fragment>\n{ float fpN = fpSkinNoise( vSkinP * 11.0 ) * 0.6 + fpSkinNoise( vSkinP * 34.0 ) * 0.4; diffuseColor.rgb *= mix( vec3( 1.07, 0.94, 0.92 ), vec3( 0.95, 1.02, 1.04 ), fpN ); }")
+    .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, 0.3, 1.0 );")
+    // (and towards its outline skin is lighter, not darker: the fine hairs catch the light and light scattered inside
+    // comes back out near the edge. Without it a finger's outline went dark like a painted model's, the plastic look
+    // Aaron called "PS2 graphics", 16 November)
+    .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n{ float fpRim = pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 2.5 ); reflectedLight.indirectDiffuse *= 1.0 + 0.8 * fpRim; reflectedLight.directDiffuse *= 1.0 + 0.3 * fpRim; }");
 }
 
 // ---- the jacket's lining left out ----
@@ -340,7 +347,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // skin keeps the player's own colour; nothing waits on it: the plain skin until it's in)
   if (!gloves && typeof document !== "undefined") {
     const tl = new THREE.TextureLoader(), got = {};
-    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 1; skinMat.roughness = 1 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(1, 1); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
+    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 0.86; skinMat.roughness = 0.86 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(2.2, 2.2); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
     for (const [k, f] of [["map", "hand_colour"], ["normalMap", "hand_normal"], ["roughnessMap", "hand_rough"]]) tl.load(TEX_BASE + f + ".webp", (t) => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; got[k] = t; done(); }, undefined, () => {});
   }
   // (wet: the skin's roughness down by 40% and its colour 4% darker; the coat's roughness down by half and 12% darker,

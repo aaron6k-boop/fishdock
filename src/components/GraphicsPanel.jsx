@@ -11,9 +11,9 @@ const NAME = Object.fromEntries(PRESETS);
 // what each preset starts from (world.js QUALITY3D sets the rest)
 export const PRESET_GFX = {
   performance: { res: 1, fps: 0, shadows: 0, shadowDist: 30, ao: 0, bloom: 0, aa: 0, refl: 0, tex: 4, sea: 0 },
-  balanced: { res: 1, fps: 0, shadows: 1, shadowDist: 30, ao: 0, bloom: 1, aa: 4, sharp: 0.5, refl: 0, tex: 16, sea: 0 },
-  high: { res: 1, fps: 0, shadows: 2, shadowDist: 30, ao: 1, bloom: 1, aa: 4, sharp: 0.5, refl: 1, tex: 16, sea: 0 },
-  ultra: { res: 1, fps: 0, shadows: 2, shadowDist: 80, ao: 2, bloom: 1, aa: 4, sharp: 0.5, refl: 2, tex: 16, sea: 1 },
+  balanced: { res: 1, fps: 0, shadows: 1, shadowDist: 30, ao: 0, bloom: 1, aa: 4, sharp: 0.7, refl: 0, tex: 16, sea: 0 },
+  high: { res: 1, fps: 0, shadows: 2, shadowDist: 30, ao: 1, bloom: 1, aa: 4, sharp: 0.7, refl: 1, tex: 16, sea: 0 },
+  ultra: { res: 1, fps: 0, shadows: 2, shadowDist: 80, ao: 2, bloom: 1, aa: 4, sharp: 0.7, refl: 2, tex: 16, sea: 1 },
 };
 // Battery saver: 30 frames a second, three quarters of the pixels, no contact shade, glow or mirrored scene
 export const BATTERY = { fps: 30, res: 0.75, ao: 0, bloom: 0, refl: 0 };

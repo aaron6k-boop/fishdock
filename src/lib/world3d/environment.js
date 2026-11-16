@@ -53,8 +53,11 @@ vec3 skyBase(vec3 d){
   // dusk: blue overhead, a pale gold glow low towards the sun, lilac-grey away from it (not an orange wash)
   vec3 dusk = mix(mix(vec3(.50, .50, .62), vec3(.96, .70, .48), ts*ts), vec3(.15, .20, .40), pow(hp, .38));
   dusk += vec3(.55, .32, .16)*pow(sd, 8.)*(1. - hp);
-  // night: near black overhead, the glow of the town and the moon low down
-  vec3 night = mix(vec3(.050, .060, .088), vec3(.010, .016, .036), t) + vec3(.05, .06, .08)*pow(max(dot(normalize(d), uMoonDir), 0.), 6.)*uMoonLight;
+  // night: a deep navy overhead, never black (a town's sky never is), and low all round the sodium-and-LED glow of the
+  // town and the port on the haze, warmest at the horizon; the moon's glow round it
+  // (16 November: it was near black overhead and the picture after dark read as one dark mud, "like PS2 graphics")
+  vec3 night = mix(vec3(.070, .078, .108), vec3(.016, .027, .062), t) + vec3(.05, .06, .08)*pow(max(dot(normalize(d), uMoonDir), 0.), 6.)*uMoonLight;
+  night += vec3(.062, .040, .022)*(1. - smoothstep(0., .22, hp));
   vec3 c = day*uDay + dusk*uDusk + night*uNight;
   // overcast: a soft grey, a little brighter overhead; darker and cooler in rain
   // (a coastal overcast is bright: a pale silvery grey, whitest high up and over the sun's side, a little darker and
@@ -94,7 +97,7 @@ vec4 cloudAt(vec3 d, float q){
   float cover = max(smoothstep(thr, thr + .1 + .12*(1. - q), n1), smoothstep(.78, 1., uCloud));
   float thick = smoothstep(thr, thr + .42, n1);
   vec3 lit = vec3(1., .98, .95)*uDay + vec3(1., .80, .64)*uDusk*.9 + vec3(.11, .12, .15)*uNight*(.3 + uMoonLight);
-  vec3 dark = vec3(.50, .55, .64)*uDay + vec3(.34, .31, .40)*uDusk + vec3(.025, .028, .04)*uNight;
+  vec3 dark = vec3(.50, .55, .64)*uDay + vec3(.34, .31, .40)*uDusk + vec3(.052, .046, .050)*uNight; // (at night their undersides lit dimly by the town, a warm grey, so they stand out against the sky)
   vec3 cc = mix(dark, lit, clamp(shade, 0., 1.)*(1. - thick*.35));
   // the bright rim where thin cloud passes in front of the sun
   float sd = max(dot(d, uSunDir), 0.);

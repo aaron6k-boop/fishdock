@@ -20,9 +20,9 @@ import { OutputPass } from "./vendor/three-post/postprocessing/OutputPass.js";
 // little noise so the sky's long gradients don't band ----
 export const GradeShader = {
   name: "FishDockGrade",
-  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.22 }, uSat: { value: 0.94 }, uVignette: { value: 0.3 }, uSeed: { value: 0 }, uFade: { value: 1 }, uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 1024) }, uSharp: { value: 0.5 } },
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.3 }, uSat: { value: 1.0 }, uVib: { value: 0.3 }, uVignette: { value: 0.3 }, uSeed: { value: 0 }, uFade: { value: 1 }, uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 1024) }, uSharp: { value: 0.5 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVignette, uSeed, uSharp, uFade; uniform vec2 uTexel; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVib, uVignette, uSeed, uSharp, uFade; uniform vec2 uTexel; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed)*43758.5453); }
     void main(){
       vec4 t = texture2D(tDiffuse, vUv); vec3 c = t.rgb;
@@ -39,7 +39,12 @@ export const GradeShader = {
       }
       // contrast round mid grey, kept off the ends so nothing clips
       c = mix(c, smoothstep(0., 1., c), uContrast - 1.);
-      float l = dot(c, vec3(.2126, .7152, .0722)); c = max(mix(vec3(l), c, uSat), 0.);
+      // colour: the dull colours lifted more than the strong ones (vibrance), so a grey-green sea, a dusk sky and a navy
+      // sleeve come alive while skin, the lifebuoy and the signs don't go garish (16 November: Aaron, "like PS2
+      // graphics": every colour had been taken down 6%, and the picture read as murky, at dusk most of all)
+      float l = dot(c, vec3(.2126, .7152, .0722)), mxc = max(c.r, max(c.g, c.b)), mnc = min(c.r, min(c.g, c.b));
+      float chroma = (mxc - mnc)/max(mxc, 1e-3);
+      c = max(mix(vec3(l), c, uSat*(1. + uVib*(1. - smoothstep(.05, .6, chroma)))), 0.);
       // (a photograph's look on a grey coast: the shadows a touch cool, the highlights a touch warm, a little deeper
       // in the darks; the grade was so gentle the picture read flat and milky next to a real photo)
       c *= mix(vec3(.95, .99, 1.05), vec3(1.03, 1.01, .97), smoothstep(.15, .8, l));
