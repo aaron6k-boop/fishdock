@@ -200,6 +200,19 @@ float fpSkinHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return
 float fpSkinNoise( vec3 x ) { vec3 i = floor( x ), f = fract( x ); f = f * f * ( 3.0 - 2.0 * f );
   return mix( mix( mix( fpSkinHash( i ), fpSkinHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 0 ) ), fpSkinHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
     mix( mix( fpSkinHash( i + vec3( 0, 0, 1 ) ), fpSkinHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 1 ) ), fpSkinHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z ); }`;
+// ---- a soft key light on your own arms ----
+// A close shot is lit: your arms are the nearest thing in the picture, and under a flat light (a grey day, dusk, the
+// "Dusk" the game shows after dark) the sky lit them from all round alike and they had no form, a smooth tan shape
+// (Aaron, 16 November: "like PS2 graphics"). Some of the sky's own light (never more: at night there is little, so
+// little is added) is brought round from above and to the left of your view, wrapped softly over the skin or the
+// cloth, with a faint sheen, and the even all-round part of it a little less; the total stays about the same.
+/** GLSL put after the lights: k how much of the sky's light comes from the side, s and p the sheen, fill what's left all round. */
+export const fpKeyLight = (k, s, p, fill) => `
+{ vec3 fpL = normalize( vec3( -0.45, 0.75, 0.5 ) ), fpH = normalize( fpL + geometryViewDir );
+  float fpWrap = saturate( ( dot( geometryNormal, fpL ) + 0.35 ) / 1.35 );
+  reflectedLight.directDiffuse += BRDF_Lambert( material.diffuseColor ) * irradiance * fpWrap * ${k.toFixed(2)};
+  reflectedLight.directSpecular += irradiance * pow( saturate( dot( geometryNormal, fpH ) ), ${p.toFixed(1)} ) * ${s.toFixed(3)};
+  reflectedLight.indirectDiffuse *= ${fill.toFixed(2)}; }`;
 export function skinShade(sh) {
   // (the point as the model was made, before the bones move it: taken after skinning, as it was until 15 November, the
   // patches stayed where they were while the arm moved through them, sliding over the skin as you cast or wound)
@@ -219,7 +232,7 @@ export function skinShade(sh) {
     // (and towards its outline skin is lighter, not darker: the fine hairs catch the light and light scattered inside
     // comes back out near the edge. Without it a finger's outline went dark like a painted model's, the plastic look
     // Aaron called "PS2 graphics", 16 November)
-    .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n{ float fpRim = pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 2.5 ); reflectedLight.indirectDiffuse *= 1.0 + 0.8 * fpRim; reflectedLight.directDiffuse *= 1.0 + 0.3 * fpRim; }");
+    .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(1.1, 0.07, 28, 0.75) + "\n{ float fpRim = pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 2.5 ); reflectedLight.indirectDiffuse *= 1.0 + 0.8 * fpRim; reflectedLight.directDiffuse *= 1.0 + 0.3 * fpRim; }");
 }
 
 // ---- the jacket's lining left out ----
@@ -336,6 +349,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nvarying float vTorso;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * 0.012 || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
   };
   clothe(coatMat);
+  { const prev = coatMat.onBeforeCompile; coatMat.onBeforeCompile = (sh, r) => { prev.call(coatMat, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(0.9, 0.025, 10, 0.75)); }; }
   // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)
   skinMat.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .07) discard;\n#include <opaque_fragment>");

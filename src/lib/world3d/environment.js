@@ -476,7 +476,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         body += vec3(.004, .008, .014)*uNight;
         // the dark of a wall or bank mirrored close to it
         refl = mix(refl, vec3(.16, .15, .13)*lit, (1. - smoothstep(0., 7., sd))*.45*(1. - rd.y));
-        vec3 col = mix(body, refl, clamp(F*1.05, 0., .9));
+        // (a sea with a chop mirrors more of the sky than one flat facet's Fresnel says: many of its facets lean towards
+        // you at a glancing angle. At dusk most of all the water should carry the sky's colour, not a flat dark teal; it
+        // read as green mud on a phone, 16 November)
+        float Fr = F + (1. - F)*(.05 + .11*uDusk + .03*uNight)*(.4 + .6*clamp(uWind*1.5, 0., 1.));
+        vec3 col = mix(body, refl, clamp(Fr*1.05, 0., .9));
         // after dark the water still catches the glow of the sky and the town, enough to see the swell move
         col += vec3(.016, .020, .034)*uNight*(.4 + F*1.6)*(.8 + .4*smoothstep(-.3, .4, h));
         // the sun's glitter (a gold path at dusk, never a red one) and the moon's
