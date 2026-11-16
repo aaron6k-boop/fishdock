@@ -71,9 +71,14 @@ vec3 skyBase(vec3 d){
 // cloud lies between each point and the sun (two steps towards it), so the sunlit side is bright and the far side
 // and the base go grey, with a bright rim on thin edges round the sun)
 float cloudDens(vec2 cp, vec2 warp){ return fbm3(cp*.36 + warp*.45)*.66 + fbm(cp*1.55 + warp)*.46 - .07; }
+// (the layer's scale: a fine heap about 650 m across, a cluster of them a few kilometres, at a cumulus base about
+// 1.5 km up. At a third of this the field was so coarse that the whole sky overhead fell inside one patch of it, so
+// half cover gave a cloudless sky above 30 degrees and the clouds all sat on the horizon. And the cover is the share of
+// the sky that's cloud: the threshold is read from the density's own spread (worked out in tests/sky.test.js); it
+// was set high, so 45 per cent cover drew about a quarter even where the field was fine enough)
 vec4 cloudAt(vec3 d, float q){
-  vec2 cp = d.xz/(d.y + .075)*.62 + vec2(uTime*.004, uTime*.0016);
-  float thr = mix(.66, .30, uCloud);
+  vec2 cp = d.xz/(d.y + .075)*1.5 + vec2(25.9 + uTime*.0097, 51.6 + uTime*.0039); // (starting over a stretch of the field as cloudy overhead as low down: tests/sky.test.js)
+  float thr = mix(.64, .24, uCloud);
   float n1, shade = .62;
   if (q > .5) {
     vec2 warp = vec2(fbm3(cp*.42), fbm3(cp*.42 + 5.2))*.8;
