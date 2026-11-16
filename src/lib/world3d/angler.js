@@ -16,6 +16,7 @@ import { fishMaterials, donorOf, paintSkin } from "./fishLook.js";
 import { castPoint, dirOf } from "./spots.js";
 import { tripodPlan, buildTripod, TRIPOD, restHead } from "./tripod.js";
 import { buildChair, CHAIR, SEAT, SIT_EYE, wantsSit, sitStep, sitEase } from "./chair.js";
+import { WALK } from "./walker.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpRig, castAt as rigCastAt, rodFrame, holdView, bodyUp } from "./fpRig.js";
@@ -654,7 +655,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const railFix = new THREE.Vector3(); let railTilt = 0; // (first person: how far the hold is moved to keep clear of the railing, eased)
   const holdSway = { x: 0, y: 0, vx: 0, vy: 0, yaw: null, pitch: null }; // (first person: the hold lagging a turn of your head, on a spring)
   const figOff = new THREE.Vector3(); // (the body shuffled in towards a fish it's kneeling by: see the person's pose)
-  const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0, out: 0 }; // carrying it as you walk: its sway with your steps
+  const carry = { base: null, yaw: 0, d: new THREE.Vector3(), sway: 0, trail: 0, tilt: 0, up: 0, out: 0, run: 0, lift: 0 }; // carrying it as you walk: its sway with your steps
   const wrapR = (a) => Math.atan2(Math.sin(a), Math.cos(a));
   let sitU = 0, sitNow = 0, sitPref = true; // (sitting in the chair: how far down, 0 to 1, and that eased: chair.js; and whether you want to)
   let fp = false, leanNow = 0, eyeH = 1.6, tNow = 0, fpPullNow = 0, stoopNow = 0, stepNow = 0, fpEN = null, fpYN = null; // (fpEN/fpYN: the held rod's angle in your own view, eased)
@@ -1241,13 +1242,24 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const reachOk = walking.ahead == null ? 9 : Math.max(0.4, walking.ahead - 0.25);
       const along = R.len * (1 - 0.7 * R.seat / R.len), fwd0 = 0.81 * along, up = fwd0 > reachOk ? Math.acos(clamp(reachOk / along, 0.2, 0.81)) - Math.acos(0.81) : 0;
       carry.up += (up - carry.up) * (1 - Math.exp(-dt * (up > carry.up ? 9 : 3)));
-      const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + carry.d.y * 0.6, az = -0.086 + carry.trail + carry.sway * 0.35;
+      // (and running, more upright: held at 36 degrees a 3.6 m rod reached nearly three metres out in front, and a body
+      // turning at a run (up to 4.6 rad/s) swept its tip across at 14 m/s, the rod flailing round the screen in Aaron's
+      // 16 November recording. A runner holds it up, close to upright, and raises it more through a quick turn)
+      carry.run += (clamp((walking.speed - WALK.speed - 0.2) / (WALK.sprint - WALK.speed - 0.2), 0, 1) - carry.run) * (1 - Math.exp(-dt * 3));
+      carry.lift += (clamp(Math.abs(walking.turnRate || 0) / 3, 0, 1) - carry.lift) * (1 - Math.exp(-dt * (Math.abs(walking.turnRate || 0) / 3 > carry.lift ? 14 : 2)));
+      const raise = Math.min(0.52, carry.run * 0.45 + carry.lift * 0.35) * (1 - clamp(carry.up / 0.6, 0, 1));
+      // (the rod's weight: it comes round after the body, not rigidly with it, a short moment behind as you turn)
+      if (carry.wy == null) carry.wy = walking.face;
+      carry.wy += wrapR(walking.face - carry.wy) * (1 - Math.exp(-dt * 7)); const lagAz = clamp(wrapR(walking.face - carry.wy), -0.5, 0.5);
+      const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + raise + carry.d.y * 0.6, az = -0.086 + carry.trail + carry.sway * 0.35 + lagAz;
       dir = new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
       // (and held a little further out from your side while you turn: stepping round, the right leg came out under the
       // rod and the hand holding it went into the thigh)
       carry.out += (0.06 * clamp(Math.abs(walking.turnRate || 0) / 2.5, 0, 1) - carry.out) * kt;
-      butt = new THREE.Vector3(0.25 + carry.out, 0.86, -0.05).addScaledVector(carry.d, 0.8).addScaledVector(dir, -R.seat * 0.7); held = true; showLine = false; showFish = false;
-    } else carry.base = null;
+      // (held up, its butt comes down by the knee: the hand goes a little forwards and out at a run, so the butt rides
+      // clear of the leg swinging past it)
+      butt = new THREE.Vector3(0.25 + carry.out + 0.04 * carry.run, 0.86 + 0.03 * carry.run, -0.05 - 0.12 * carry.run).addScaledVector(carry.d, 0.8).addScaledVector(dir, -R.seat * 0.7); held = true; showLine = false; showFish = false;
+    } else { carry.base = null; carry.wy = null; }
     // first person: whenever the line is out the rod is in your hands, low and to the right with the reel in view and
     // the tip pointing out towards the line (a portrait phone sees only about 35° side to side, so it can't be off to
     // one side on a rest)
@@ -1865,7 +1877,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     }
     prevAge = age;
     // test diagnostics only (FILM, never in the app): where the reel, its handle and your hands are this frame
-    if (local && typeof window !== "undefined" && FILM) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, rod: pts.map((p) => toWorld(p).toArray()), lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2),
+    if (local && typeof window !== "undefined" && FILM) { fig.group.updateMatrixWorld(true); window.__fdProbe = { seat: toWorld(seat.p).toArray(), tip: toWorld(pts[NSEG]).toArray(), reelQ: reel.getWorldQuaternion(new THREE.Quaternion()).toArray(), knob: toWorld(knob).toArray(), hands: fp && fpv ? fpv.wrists.map((w) => (w ? toWorld(w).toArray() : null)) : [0, 1].map((i) => { const h = fig.hand(i); return h ? fig.group.localToWorld(h).toArray() : null; }), spin: reel.userData.spin || 0, fp, fish: fish.visible ? fish.position.toArray().map((v) => +v.toFixed(2)) : null, water: fish.visible ? +wh(fish.position.x, fish.position.z).toFixed(2) : null, fishEnds: fish.visible ? [fish.position.toArray(), fish.position.clone().addScaledVector(fBase, fishLen).toArray()] : null, net: net.visible && !netIdle ? net.position.toArray() : null, head: fig.eyeAt ? fig.group.localToWorld(fig.eyeAt.clone()).toArray() : null, feet: root.position.toArray(), stage: releaseInfo ? 'r-' + releaseInfo.stage : landStage || ph, kept: kept?.state || null, rod: pts.map((p) => toWorld(p).toArray()), lean: +leanNow.toFixed(2), stoop: +stoopNow.toFixed(2), edge: +edge.toFixed(2),
       // (and, for the railing checks, in the angler's own frame: the railing, the rod, and your arms' joints and fingertips)
       local: { specs: fpSpecs, shown: fpv?.internals?.scene ? fpv.internals.scene.visible : null, rail: rail ? { y: 1.12, z: -Math.max(0.3, edge - 0.22) } : null, rod: pts.map((p) => p.toArray()), reel: seat.p.toArray(), eye: fpEye().toArray(), view: viewIn ? [viewIn.yaw, viewIn.pitch] : null, inHand, sway: [holdSway.x, holdSway.y],
         arms: fp && fpv?.internals && fpv.group.visible ? ["L", "R"].map((S) => { const A = fpv.internals.arm[S], P = (b) => toLocal(b.getWorldPosition(new THREE.Vector3())).toArray(); const tips = []; for (const [n, b] of fpv.internals.bones) if (n.endsWith(S) && /^DEF-(f_(index|middle|ring|pinky)|thumb)03/.test(n)) tips.push(P(b)); const d = fpv.debug[S === "L" ? 0 : 1] || {}; return { S, U: P(A.U), F: P(A.F), H: P(A.H), tips, kind: d.kind, turn: d.turn, short: d.short }; }) : null } }; }
