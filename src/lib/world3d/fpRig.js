@@ -196,6 +196,7 @@ function sampler(clip, bones) {
 // worked out from where each point is on the hand itself, so they move with the fingers and never swim.
 const SKIN_BLEED = "reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );";
 const SKIN_NOISE = `varying vec3 vSkinP;
+varying vec3 vHair;
 float fpSkinHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
 float fpSkinNoise( vec3 x ) { vec3 i = floor( x ), f = fract( x ); f = f * f * ( 3.0 - 2.0 * f );
   return mix( mix( mix( fpSkinHash( i ), fpSkinHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 0 ) ), fpSkinHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
@@ -213,10 +214,17 @@ export const fpKeyLight = (k, s, p, fill) => `
   reflectedLight.directDiffuse += BRDF_Lambert( material.diffuseColor ) * irradiance * fpWrap * ${k.toFixed(2)};
   reflectedLight.directSpecular += irradiance * pow( saturate( dot( geometryNormal, fpH ) ), ${p.toFixed(1)} ) * ${s.toFixed(3)};
   reflectedLight.indirectDiffuse *= ${fill.toFixed(2)}; }`;
+// (x: how much hair grows there, 0 to 1; y: along the arm, metres; z: round it, metres)
+const FP_HAIR = `{ vec2 hc = vec2( vHair.y * 95.0, vHair.z * 520.0 ), ci = floor( hc ), cf = fract( hc );
+  float aa = clamp( fwidth( hc.y ), 0.0, 4.0 ), pick = fpSkinHash( vec3( ci, 3.1 ) ), slant = ( fpSkinHash( vec3( ci, 7.3 ) ) - 0.5 ) * 0.9;
+  float x = cf.y - 0.5 - ( cf.x - 0.5 ) * slant, w = 0.14 + 0.35 * aa, len = 0.45 + 0.5 * fpSkinHash( vec3( ci, 5.7 ) );
+  float strand = ( 1.0 - smoothstep( w * 0.3, w, abs( x ) ) ) * step( 0.3, pick ) * smoothstep( 0.0, 0.12, cf.x ) * ( 1.0 - smoothstep( len - 0.2, len, cf.x ) );
+  float k = mix( strand * min( 1.0, 0.24 / w ), 0.12, smoothstep( 0.45, 1.2, aa ) );
+  diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 0.6, 0.52, 0.47 ), k * vHair.x ); }`;
 export function skinShade(sh) {
   // (the point as the model was made, before the bones move it: taken after skinning, as it was until 15 November, the
   // patches stayed where they were while the arm moved through them, sliding over the skin as you cast or wound)
-  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSkinP;").replace("#include <skinning_vertex>", "vSkinP = transformed;\n#include <skinning_vertex>");
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSkinP;\nattribute vec3 fpHair;\nvarying vec3 vHair;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvHair = fpHair;").replace("#include <skinning_vertex>", "vSkinP = transformed;\n#include <skinning_vertex>");
   const chunk = THREE.ShaderChunk.lights_physical_pars_fragment;
   if (!chunk.includes(SKIN_BLEED)) return; // (a three.js whose lighting is written differently: plain skin, as before)
   sh.fragmentShader = sh.fragmentShader
@@ -227,8 +235,13 @@ export function skinShade(sh) {
     // (the baked creases, knuckles, nails and veins at twice their strength: drawn true to life they were too faint to
     // see at the size a phone shows your hands, which read as smooth and even as a mannequin's, 16 November)
     .replace("#include <map_fragment>", "#ifdef USE_MAP\n{ vec4 fpMap = texture2D( map, vMapUv ); diffuseColor.rgb *= max( vec3( 0.0 ), 0.85 + ( fpMap.rgb - 0.85 ) * 2.0 ); }\n#endif")
+    // (and the hair on your forearms and the backs of your hands: short fine strands lying along the arm, each a couple
+    // of millimetres apart and a centimetre or so long, more on the outside of the arm than the inside, drawn darker
+    // than the skin. Where a strand would be finer than a pixel they even out into the slight darkening hair gives
+    // skin seen from further off, so they never shimmer. The coordinates come with the rig: hairCoords)
+    .replace("#include <color_fragment>", "#include <color_fragment>\n" + FP_HAIR)
     .replace("#include <color_fragment>", "#include <color_fragment>\n{ float fpN = fpSkinNoise( vSkinP * 11.0 ) * 0.6 + fpSkinNoise( vSkinP * 34.0 ) * 0.4; diffuseColor.rgb *= mix( vec3( 1.07, 0.94, 0.92 ), vec3( 0.95, 1.02, 1.04 ), fpN ); }")
-    .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, 0.3, 1.0 );")
+    .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, roughnessFactor < 0.32 ? 0.15 : 0.3, 1.0 );")
     // (and towards its outline skin is lighter, not darker: the fine hairs catch the light and light scattered inside
     // comes back out near the edge. Without it a finger's outline went dark like a painted model's, the plastic look
     // Aaron called "PS2 graphics", 16 November)
@@ -389,6 +402,10 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     for (const [n] of bones) { const m = /^DEF-(f_\w+|thumb|palm)\d*(L|R)$/.exec(n); if (m) fingerBones[m[2]].push(n); }
     const grips = {};
     RIG.grips.forEach((name, k) => { grips[name] = { L: new Map(), R: new Map() }; for (const S of "LR") for (const n of fingerBones[S]) { const v = clips.grips?.value((k + 1) / RIG.fps, n); if (v) grips[name][S].set(n, new THREE.Quaternion().fromArray(v)); } });
+    // (the right middle finger on the reel seat opened 0.15 radians at its two outer joints: as Blender left it, the pad
+    // of its tip was a millimetre into the side of the reel's foot, under the seat, and the tip seemed to come out
+    // through the reel. Aaron's screenshot, 16 November. Measured in the game: no point of it inside the reel after)
+    for (const n of ["DEF-f_middle02R", "DEF-f_middle03R"]) grips.hold?.R.get(n)?.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -0.15));
     // the hold, as Blender left it: each arm's bones' lengths, which way its elbow bends and the forearm's twist at rest
     clips.hold.apply(1 / RIG.fps); scene.updateMatrixWorld(true);
     const wp = (b) => b.getWorldPosition(V()), wq = (b) => b.getWorldQuaternion(new THREE.Quaternion());
@@ -407,7 +424,43 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     }
     // (the eye: where it is at the hold, carried in the head bone's own frame so it moves with the head)
     const head = B(RIG.eye.bone), eyeLocal = A3(RIG.eye.hold).applyMatrix4(head.matrixWorld.clone().invert());
+    hairCoords(scene, B);
     return { scene, bones, B, clips, rest, grips, arm, head, eyeLocal, fingerBones, fingers: fingerSkin(scene, grips) };
+  }
+
+  // ---- where hair grows on your arms, and its lie ----
+  // For each point of the skin: how much hair (the forearm, more on its outside, thinning towards the elbow under the
+  // sleeve; the back of the hand, a little, as far as the knuckles; none on the palm or the fingers), how far along the
+  // arm it is and how far round it, both in metres, from the rig as it was made. The skin's shader draws the strands.
+  function hairCoords(scene, B) {
+    let skin = null; scene.traverse((o) => { if (o.isSkinnedMesh && o.material === skinMat && !skin) skin = o; });
+    if (!skin || skin.geometry.attributes.fpHair) return;
+    const g = skin.geometry, pos = g.attributes.position, nor = g.attributes.normal, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, sk = skin.skeleton;
+    const out = new Float32Array(pos.count * 3), at = (b) => new THREE.Matrix4().copy(sk.boneInverses[sk.bones.indexOf(b)]).invert();
+    const sides = {};
+    for (const S of "LR") {
+      const F = B(`DEF-forearm.${S}`), F1 = B(`DEF-forearm.${S}.001`), H = B(`DEF-hand.${S}`); if (!F || !F1 || !H) return;
+      const mF = at(F), mH = at(H), elbow = V().setFromMatrixPosition(mF), wrist = V().setFromMatrixPosition(mH), ax = wrist.clone().sub(elbow).normalize();
+      // (the back of the hand and the outside of the forearm: the hand bone's -z, as the hand maps are baked)
+      const back = V(0, 0, -1).transformDirection(mH); back.addScaledVector(ax, -back.dot(ax)).normalize();
+      const side = new THREE.Vector3().crossVectors(ax, back).normalize();
+      sides[S] = { idx: new Set([F, F1, H].map((b) => sk.bones.indexOf(b))), hand: sk.bones.indexOf(H), elbow, wrist, ax, back, side, len: wrist.distanceTo(elbow) };
+    }
+    const p = V(), n = V(), r = V();
+    for (let i = 0; i < pos.count; i++) {
+      let S = null, wArm = 0, wHand = 0;
+      for (let k = 0; k < 4; k++) { const b = si.getComponent(i, k), w = sw.getComponent(i, k); for (const s of "LR") if (sides[s].idx.has(b)) { S = s; wArm += w; if (b === sides[s].hand) wHand += w; } }
+      if (!S || wArm < 0.05) continue;
+      const D = sides[S]; p.fromBufferAttribute(pos, i); n.fromBufferAttribute(nor, i);
+      r.copy(p).sub(D.wrist); const along = r.dot(D.ax), out1 = r.dot(D.back), out2 = r.dot(D.side);
+      const facing = n.dot(D.back); // (1 on the outside of the arm and the back of the hand, -1 on the inside and the palm)
+      let dens = wArm * (0.35 + 0.65 * Math.max(0, Math.min(1, (facing + 0.4) / 1.2)));
+      dens *= Math.min(1, Math.max(0, (along + D.len) / (0.5 * D.len))); // (thinning towards the elbow)
+      if (along > 0) dens *= (1 - Math.min(1, along / 0.075)) * Math.max(0, Math.min(1, (facing - 0.2) / 0.5)) * 0.7; // (the back of the hand: as far as the knuckles, sparser)
+      dens *= 1 - 0.85 * (wHand > 0.5 && facing < 0 ? 1 : 0);
+      out[i * 3] = Math.max(0, Math.min(1, dens)); out[i * 3 + 1] = along; out[i * 3 + 2] = Math.atan2(out2, out1) * 0.032;
+    }
+    g.setAttribute("fpHair", new THREE.BufferAttribute(out, 3));
   }
 
   // ---- the fingers' own skin, for keeping them out of what they hold ----

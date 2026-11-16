@@ -763,7 +763,7 @@
    "attribution": "Not required",
    "type": "models",
    "resolution": "7,230 skin + 12,000 jacket vertices; 73 deform bones; clips hold, reel, cast, grips",
-   "use": "your arms and hands in first person (public/models/fp_rig.glb), replacing fp_body.glb and fp_arms.glb; the fingers slimmed about an eighth round their bones (source-assets/hands/slim_fingers.py)",
+   "use": "your arms and hands in first person (public/models/fp_rig.glb), replacing fp_body.glb and fp_arms.glb; the fingers slimmed about an eighth round their bones (source-assets/hands/slim_fingers.py); the wrists filled out up to 4 mm (source-assets/hands/thicker_wrists.py)",
    "files": []
   },
   {
