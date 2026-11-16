@@ -1117,10 +1117,12 @@ function buildRocks(group, cls, xs, n, area, quality) {
   // four boulder shapes: a ball pushed about at two scales, then split flat on a few planes, as quarried armour stone
   // is (angular blocks with broken faces, never round pebbles). Each face gets its own projection of the photographed-
   // style granite (made in source-assets/make_granite.py) at about 1.4 m a tile, so nothing stretches
-  const shapes = [];
-  for (let v = 0; v < 4; v++) {
-    const g = new THREE.IcosahedronGeometry(0.5, 3), p = g.attributes.position, P = new THREE.Vector3();
-    const cuts = Array.from({ length: 4 + v }, () => { const d = new THREE.Vector3(rnd() - 0.5, (rnd() - 0.5) * 1.4, rnd() - 0.5).normalize(); return [d, 0.3 + rnd() * 0.14]; });
+  // (and each shape again from a coarser ball, for the stones beyond the reach of the sun's shadows, 40 m or more
+  // away and most of a long breakwater: 80 faces, not 320, where a stone is a few tens of pixels across at most. Its
+  // corners are among the fine one's, pushed and split the same, so it is the same stone with fewer facets)
+  const shapes = [], farShapes = [];
+  const boulder = (detail, v, cuts) => {
+    const g = new THREE.IcosahedronGeometry(0.5, detail), p = g.attributes.position, P = new THREE.Vector3();
     for (let i = 0; i < p.count; i++) {
       P.fromBufferAttribute(p, i);
       const f = 1 + 0.22 * (noise2(P.x * 2.1 + v * 7, P.z * 2.1 + P.y * 1.7, 1e6, 21) - 0.5) + 0.07 * (noise2(P.x * 7 + v, P.y * 7 - P.z * 3, 1e6, 22) - 0.5);
@@ -1135,7 +1137,11 @@ function buildRocks(group, cls, xs, n, area, quality) {
       const nx = Math.abs(fn.getX(t)), ny = Math.abs(fn.getY(t)), nz = Math.abs(fn.getZ(t));
       for (let q = t; q < t + 3; q++) { const [u, w] = ny > nx && ny > nz ? [fp.getX(q), fp.getZ(q)] : nx > nz ? [fp.getZ(q), fp.getY(q)] : [fp.getX(q), fp.getY(q)]; uvs[q * 2] = u / 1.4 + v * 0.31; uvs[q * 2 + 1] = w / 1.4 + v * 0.17; }
     }
-    flat.setAttribute("uv", new THREE.BufferAttribute(uvs, 2)); shapes.push(flat);
+    flat.setAttribute("uv", new THREE.BufferAttribute(uvs, 2)); return flat;
+  };
+  for (let v = 0; v < 4; v++) {
+    const cuts = Array.from({ length: 4 + v }, () => { const d = new THREE.Vector3(rnd() - 0.5, (rnd() - 0.5) * 1.4, rnd() - 0.5).normalize(); return [d, 0.3 + rnd() * 0.14]; });
+    shapes.push(boulder(3, v, cuts)); farShapes.push(boulder(1, v, cuts));
   }
   const map = photoTex("rock_granite_diff"), nor = photoTex("rock_granite_nor", { srgb: false }), rough = photoTex("rock_granite_rough", { srgb: false });
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap: nor, normalScale: new THREE.Vector2(1.4, 1.4), roughnessMap: rough, roughness: 1, metalness: 0 });
@@ -1153,7 +1159,7 @@ function buildRocks(group, cls, xs, n, area, quality) {
     if (!list.length) return;
     // (two meshes of the same stones: those near enough for their shadows to fall inside the sun's shadow map cast
     // them; the rest, most of a long breakwater, are drawn without being drawn a second time into that map)
-    const mesh = new THREE.InstancedMesh(shapes[v], mat, list.length), away = new THREE.InstancedMesh(shapes[v], mat, list.length);
+    const mesh = new THREE.InstancedMesh(shapes[v], mat, list.length), away = new THREE.InstancedMesh(farShapes[v], mat, list.length);
     const mats = [], cols = [];
     list.forEach(([x, y, z, s]) => {
       e.set((rnd() - 0.5) * 1.2, rnd() * 6.28, (rnd() - 0.5) * 1.2); q4.setFromEuler(e); // (lying roughly flat, as placed stone settles)
