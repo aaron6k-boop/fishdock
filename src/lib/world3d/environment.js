@@ -664,8 +664,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 48, 1.2); pl.position.set(c[0], c[1] + 8, c[2]); pl.userData.cd = 30; group.add(pl); pointLights.push(pl); // (a soft wash along the fishing stretch)
       // the lamp posts nearest the anglers cast warm pools on the deck round them: a light at each of the nearest few
       // (none on Performance, two on Balanced, three on High quality), and the nearest four shine on the water
-      lampPools(real.perches || [], [c[0], c[2]], 4).forEach((q, i) => {
-        const at = [q[0], q[1] + 0.8, q[2]]; lampSpots.push(at);
+      // (from the lamp's lens where the place knows it, just under it: a lighting column's lantern reaches 65 cm out
+      // from its pole, and a light above the lantern lit the pole's whole side; otherwise 80 cm over the lamp's top)
+      lampPools(real.lampHeads || real.perches || [], [c[0], c[2]], 4).forEach((q, i) => {
+        const at = real.lampHeads ? [q[0], q[1] - 0.12, q[2]] : [q[0], q[1] + 0.8, q[2]]; lampSpots.push(at);
         if (i < LQ.lampLights) { const pk = poolLight(at[1] - c[1]), l = new THREE.PointLight(0xffc98a, 0, pk.distance, 2); l.position.set(at[0], at[1], at[2]); l.userData.cd = pk.intensity; group.add(l); pointLights.push(l); }
       });
       if (!lampSpots.length) lampSpots.push(pl.position.toArray());
