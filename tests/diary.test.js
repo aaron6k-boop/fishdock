@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 
 const mem = new Map();
 globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
-const { cleanName, playerName, setPlayerName, diary, addCatch, setOutcome, summary, clearDiary } = await import("../src/lib/diary.js");
+const { cleanName, playerName, setPlayerName, guestName, diary, addCatch, setOutcome, summary, clearDiary } = await import("../src/lib/diary.js");
 
 test("a fishing name: 2 to 20 letters, numbers, spaces, hyphens or apostrophes, tidied", () => {
   assert.equal(cleanName("  Aaron   the  Angler "), "Aaron the Angler");
@@ -15,6 +15,15 @@ test("a fishing name: 2 to 20 letters, numbers, spaces, hyphens or apostrophes, 
   assert.equal(playerName(), null, "none until chosen");
   assert.equal(setPlayerName("  Gary  "), "Gary"); assert.equal(playerName(), "Gary");
   assert.equal(setPlayerName("!"), null); assert.equal(playerName(), "Gary", "a bad name doesn't replace a good one");
+});
+
+test("before you choose a name, the others see you as Angler and four digits, the same every visit", () => {
+  mem.delete("fishdock.guestName");
+  const g = guestName(() => 0.4321);
+  assert.equal(g, "Angler 4888"); assert.ok(cleanName(g), "a name the room takes");
+  assert.equal(guestName(() => 0.9), g, "kept on this phone");
+  mem.set("fishdock.guestName", "<b>"); assert.match(guestName(() => 0), /^Angler 1000$/, "a spoilt one is made again");
+  assert.equal(playerName(), "Gary", "never your chosen name");
 });
 
 test("the diary: each landed fish once, newest first, kept or put back, with totals by day", () => {
