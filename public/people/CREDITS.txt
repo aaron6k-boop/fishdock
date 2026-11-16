@@ -7,6 +7,10 @@ reduced in size, the facial animation and finger detail left out, the walks take
 The *_hd.glb files (loaded on the High quality and Ultra settings) are the same people with the library's own
 source textures at full size: colour maps at 2048 px and normal maps at 1024 px (source-assets/people_hd.py).
 
+Six more (16 November 2026), converted with source-assets/tools/rocketbox_to_glb.mjs (three.js's FBX loader and glTF
+exporter, as the first twelve): m02.glb Adults/Male_Adult_02, m07.glb Adults/Male_Adult_07, m14.glb Adults/Male_Adult_14,
+m20.glb Adults/Male_Adult_20, f08.glb Adults/Female_Adult_08, f15.glb Adults/Female_Adult_15, with *_hd.glb versions.
+
 Avatars from the original source files:
   gardener.glb  Professions/Gardener_Male_01     f04.glb  Adults/Female_Adult_04
   m03.glb       Adults/Male_Adult_03             f07.glb  Adults/Female_Adult_07

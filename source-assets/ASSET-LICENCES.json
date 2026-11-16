@@ -765,6 +765,294 @@
    "resolution": "7,230 skin + 12,000 jacket vertices; 73 deform bones; clips hold, reel, cast, grips",
    "use": "your arms and hands in first person (public/models/fp_rig.glb), replacing fp_body.glb and fp_arms.glb",
    "files": []
+  },
+  {
+   "id": "rocketbox:Male_Adult_02",
+   "name": "Microsoft Rocketbox Male Adult 02",
+   "source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/Adults/Male_Adult_02",
+   "author": "Microsoft Rocketbox",
+   "licence": "MIT",
+   "attribution": "Credited in public/people/CREDITS.txt",
+   "type": "models",
+   "resolution": "2048 px textures; in the game 1024 px colour and 512 px normal maps (HD: 2048 and 1024)",
+   "use": "a person to play as and to see on the pier (public/people/m02.glb, m02_hd.glb, m02.webp)",
+   "downloaded": "2026-11-16",
+   "files": [
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_02/Export/Male_Adult_02.fbx",
+     "bytes": 539920,
+     "sha256": "1c65e292e9057a23f7f70969f6971c631c1316fcaaf93e575a4557201c835018",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_02/Export/Male_Adult_02.fbx"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_body_color.tga",
+     "bytes": 12582956,
+     "sha256": "52ef8bad71600de972eabeab2845019cf8ce6e274f11b9c7fbd315566c51e232",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_body_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_body_normal.tga",
+     "bytes": 12582956,
+     "sha256": "531408d53eb369c8b546af69dac123ac8fb88e3238abb8e4cd7dd923580275eb",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_body_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_head_color.tga",
+     "bytes": 12582956,
+     "sha256": "f7d7d06bc9e3bee73bb037a0c55ca2915593fa5ef7b08da3f6a59409ed5cfc8f",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_head_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_head_normal.tga",
+     "bytes": 12582956,
+     "sha256": "92c0dc60b1df8eec91a7528a5bde296ccc8f278c8c92945620c6d87435d67764",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_head_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_opacity_color.tga",
+     "bytes": 16777260,
+     "sha256": "2c0751e05d78587d3898ce60bbea8b3f23e78150b7e497b7e97fe8c66e91ee1e",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_02/Textures/m003_opacity_color.tga"
+    }
+   ]
+  },
+  {
+   "id": "rocketbox:Male_Adult_07",
+   "name": "Microsoft Rocketbox Male Adult 07",
+   "source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/Adults/Male_Adult_07",
+   "author": "Microsoft Rocketbox",
+   "licence": "MIT",
+   "attribution": "Credited in public/people/CREDITS.txt",
+   "type": "models",
+   "resolution": "2048 px textures; in the game 1024 px colour and 512 px normal maps (HD: 2048 and 1024)",
+   "use": "a person to play as and to see on the pier (public/people/m07.glb, m07_hd.glb, m07.webp)",
+   "downloaded": "2026-11-16",
+   "files": [
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_07/Export/Male_Adult_07.fbx",
+     "bytes": 516064,
+     "sha256": "acad3095ae886a583ec5f30878123b933f2cd5f24030c4bcddc000113a75c0cb",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_07/Export/Male_Adult_07.fbx"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_body_color.tga",
+     "bytes": 12582956,
+     "sha256": "60aa05b5c4bca75696619faba64e9601eb8ad13911b0ae5c541ef420a830f268",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_body_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_body_normal.tga",
+     "bytes": 12582956,
+     "sha256": "546063ddc69ae30707f241df15986220d03458508266df41c87df30e1831b8a5",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_body_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_head_color.tga",
+     "bytes": 12582956,
+     "sha256": "a3db4a4013f39b2e38f307588b5353398e08b6fa017f5e2554287be19f454789",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_head_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_head_normal.tga",
+     "bytes": 12582956,
+     "sha256": "6ad892bd8b044b53a0ab94cdb11a0afcfdacacba08003e7425c185347ea7dd2a",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_head_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_opacity_color.tga",
+     "bytes": 16777260,
+     "sha256": "d5b075decc3904150c0af6afabae65bd66ceb8a5c6b192e93557e094f9af605d",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_07/Textures/m013_opacity_color.tga"
+    }
+   ]
+  },
+  {
+   "id": "rocketbox:Male_Adult_14",
+   "name": "Microsoft Rocketbox Male Adult 14",
+   "source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/Adults/Male_Adult_14",
+   "author": "Microsoft Rocketbox",
+   "licence": "MIT",
+   "attribution": "Credited in public/people/CREDITS.txt",
+   "type": "models",
+   "resolution": "2048 px textures; in the game 1024 px colour and 512 px normal maps (HD: 2048 and 1024)",
+   "use": "a person to play as and to see on the pier (public/people/m14.glb, m14_hd.glb, m14.webp)",
+   "downloaded": "2026-11-16",
+   "files": [
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_14/Export/Male_Adult_14.fbx",
+     "bytes": 486032,
+     "sha256": "9d3ecf5c94a84e22b081ddadebf57da18d79541e48e792fa598335553f2dc399",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_14/Export/Male_Adult_14.fbx"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_body_color.tga",
+     "bytes": 12582956,
+     "sha256": "04b656f0f0119ca6b5a4aa00fdccc19918fd18976a446f2f192753a4e73f0147",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_body_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_body_normal.tga",
+     "bytes": 12582956,
+     "sha256": "4d65bd9f3bfeaaf381a6cb7eeb4ed4afdf0b7c96cefda55a26334cf5114cb784",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_body_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_head_color.tga",
+     "bytes": 12582956,
+     "sha256": "520e067d7c117af8471f32e6e66dd80b0e87717c1218f0a3759dfd6db504a729",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_head_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_head_normal.tga",
+     "bytes": 12582956,
+     "sha256": "0b6a9318003c5485de34c0de36bf3ddf1a19bb06a431f6146d9f95534d3dc820",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_14/Textures/m012_head_normal.tga"
+    }
+   ]
+  },
+  {
+   "id": "rocketbox:Male_Adult_20",
+   "name": "Microsoft Rocketbox Male Adult 20",
+   "source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/Adults/Male_Adult_20",
+   "author": "Microsoft Rocketbox",
+   "licence": "MIT",
+   "attribution": "Credited in public/people/CREDITS.txt",
+   "type": "models",
+   "resolution": "2048 px textures; in the game 1024 px colour and 512 px normal maps (HD: 2048 and 1024)",
+   "use": "a person to play as and to see on the pier (public/people/m20.glb, m20_hd.glb, m20.webp)",
+   "downloaded": "2026-11-16",
+   "files": [
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_20/Export/Male_Adult_20.fbx",
+     "bytes": 519408,
+     "sha256": "78c6ffd6899afe415f7e22f088ac36f153046592a6867e5a9e80a10695d996c6",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_20/Export/Male_Adult_20.fbx"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_body_color.tga",
+     "bytes": 12582956,
+     "sha256": "54cf6fe03676bea4cd9190ee2057c826e43f49d2f82170a92d1c0413eb153500",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_body_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_body_normal.tga",
+     "bytes": 12582956,
+     "sha256": "ba4034af7ffee065bd32e346d2a14f9d6caa35298601bf1641c33efc40f5415d",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_body_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_head_color.tga",
+     "bytes": 12582956,
+     "sha256": "61c117bea375ea983f697c5b1acdf0ebff86ff69e21c956d27d10bc4ecc9be63",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_head_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_head_normal.tga",
+     "bytes": 12582956,
+     "sha256": "7540154d2ed542248ea23633e4bea1b026b8af302722aaac999a994dc163b9e1",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Male_Adult_20/Textures/m027_head_normal.tga"
+    }
+   ]
+  },
+  {
+   "id": "rocketbox:Female_Adult_08",
+   "name": "Microsoft Rocketbox Female Adult 08",
+   "source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/Adults/Female_Adult_08",
+   "author": "Microsoft Rocketbox",
+   "licence": "MIT",
+   "attribution": "Credited in public/people/CREDITS.txt",
+   "type": "models",
+   "resolution": "2048 px textures; in the game 1024 px colour and 512 px normal maps (HD: 2048 and 1024)",
+   "use": "a person to play as and to see on the pier (public/people/f08.glb, f08_hd.glb, f08.webp)",
+   "downloaded": "2026-11-16",
+   "files": [
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_08/Export/Female_Adult_08.fbx",
+     "bytes": 594640,
+     "sha256": "cf857fe04595edee9174caaf3f0d18dd5d5cc4d0702c8851f2cc413dd8cfea9e",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_08/Export/Female_Adult_08.fbx"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_body_color.tga",
+     "bytes": 12582956,
+     "sha256": "13fad57cdcfaee92264172ef076539d928bbc1ba86309f493cd7dae06137d4fa",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_body_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_body_normal.tga",
+     "bytes": 12582956,
+     "sha256": "f972d479856273160ea49b01e0e4f5a15fb557d9651053bbd530bc4e106c4791",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_body_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_head_color.tga",
+     "bytes": 12582956,
+     "sha256": "17e73fd0e0fb4e769b2a29c85922bad356a55d1fa0d4628c906ead0403793d35",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_head_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_head_normal.tga",
+     "bytes": 12582956,
+     "sha256": "547c1ff67a6308f2a1396af71b9dfe30d133525cf0d2b632085302b51a800ca9",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_head_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_opacity_color.tga",
+     "bytes": 16777260,
+     "sha256": "9d2fdbbf9df2ecbb34082541c82bf1d464fbddc3b5f8683d0ea060a667cdeb8e",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_08/Textures/f008_opacity_color.tga"
+    }
+   ]
+  },
+  {
+   "id": "rocketbox:Female_Adult_15",
+   "name": "Microsoft Rocketbox Female Adult 15",
+   "source": "https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/Adults/Female_Adult_15",
+   "author": "Microsoft Rocketbox",
+   "licence": "MIT",
+   "attribution": "Credited in public/people/CREDITS.txt",
+   "type": "models",
+   "resolution": "2048 px textures; in the game 1024 px colour and 512 px normal maps (HD: 2048 and 1024)",
+   "use": "a person to play as and to see on the pier (public/people/f15.glb, f15_hd.glb, f15.webp)",
+   "downloaded": "2026-11-16",
+   "files": [
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_15/Export/Female_Adult_15.fbx",
+     "bytes": 651088,
+     "sha256": "49300e70f72ec0238a17ea583610d41fd34ae78135ee1c0fda5ed9493e49a56a",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_15/Export/Female_Adult_15.fbx"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_body_color.tga",
+     "bytes": 12582956,
+     "sha256": "d3e41b8a2845b2dd546c2ffb166b18541bf2937b8a336d6cadf4d4c725047df5",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_body_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_body_normal.tga",
+     "bytes": 12582956,
+     "sha256": "a0e0920403e9c1329d4b41a34444257bfa1861f82f09a2cf8224bdc393c0df32",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_body_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_head_color.tga",
+     "bytes": 12582956,
+     "sha256": "48fef42795a7bc800c305de504126f079925f297ff19e0ed377eff2668eb81f8",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_head_color.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_head_normal.tga",
+     "bytes": 12582956,
+     "sha256": "379cfc3b594ce12095931bf90aae58dd6c2d9056246124cc0967459d12192b5b",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_head_normal.tga"
+    },
+    {
+     "file": "downloads/rocketbox/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_opacity_color.tga",
+     "bytes": 16777260,
+     "sha256": "879270fb466c3f2e264d45ac6c6c694b94bb58e94cfb035721567b04109546f2",
+     "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_opacity_color.tga"
+    }
+   ]
   }
  ]
 }
