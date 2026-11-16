@@ -18,6 +18,7 @@ import { WET_PREP, WET_DARKEN, WET_NORMAL, wetRough, WET_SPOTS } from "./wetLook
 import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
+import { columnGeometry, lanternAt, lampPools, COLUMN } from "./lamps3d.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -845,7 +846,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const clearOfSpots = (q) => spots.every((sp) => Math.hypot(q[0] - sp.at[0], q[1] - sp.at[2]) > 4);
       if (Math.floor(d / 28) !== Math.floor((d - 1) / 28)) {
         const q = inAt(0.75); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps === "column") {
-          columns.push([q[0], q[1], ry, nx, nz]); perches.push([q[0], LAND + 6.6, q[1]]);
+          columns.push([q[0], q[1], ry, nx, nz]); { const L = lanternAt(); perches.push([q[0] - nx * L.z, LAND + L.top, q[1] - nz * L.z]); } // (a gull's place: on the lantern)
         } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q)) {
           addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], LAND + 2.5, q[1]);
           const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, LAND + 4.95, q[1] - nz * 0.35, ry);
@@ -882,28 +883,29 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     }
     acc += len;
   }
-  // plain lighting columns (where photographs show them): a tapered grey pole and a slim head leaning over the deck
+  // plain lighting columns (where photographs show them): a modern LED street light, a tapered galvanised pole rising
+  // into a swan-neck bracket over the deck with a slim lantern on it, lit only at its lens (lamps3d.js). It was a plain
+  // pole with a glowing grey brick on top
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0xf2efe6, emissive: new THREE.Color().setRGB(3.2, 2.55, 1.7), emissiveIntensity: 0, roughness: 0.2, side: THREE.DoubleSide }); // (LED white, a little warm; bright enough to bloom)
+  const pools = [], heads = []; // (heads: each column's lens, where its light comes from: environment.js)
   if (columns.length) {
-    const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), CH = 6.5;
-    // the pole with a wider root section, its access door and a flange bolted to the deck (one mesh)
-    const pole = mergeGeometries([
-      new THREE.CylinderGeometry(0.05, 0.09, CH, 7, 1, true).translate(0, CH / 2, 0),
-      new THREE.CylinderGeometry(0.105, 0.11, 1.1, 8, 1, true).translate(0, 0.55, 0),
-      new THREE.CylinderGeometry(0.098, 0.105, 0.05, 8, 1).translate(0, 1.12, 0),
-      new THREE.BoxGeometry(0.1, 0.42, 0.03).translate(0, 0.62, 0.1),
-      new THREE.CylinderGeometry(0.17, 0.18, 0.025, 8, 1).translate(0, 0.012, 0),
-    ].map((g2) => { g2.deleteAttribute("uv"); return g2.toNonIndexed(); }));
-    const head = new THREE.BoxGeometry(0.62, 0.09, 0.2); // (its length turned to lean in over the deck)
+    const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), CH = COLUMN.h;
+    const { pole, lens } = columnGeometry(), L = lanternAt();
     // galvanised, weathered dull grey, darker and rust-spotted towards its foot, runs down from the head
     const colMat = weather(new THREE.MeshStandardMaterial({ color: 0x969b9c, roughness: 0.6, metalness: 0.45 }), { scale: 0.9, mottle: 0.3, bump: 0.5, rust: [0.22, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.9, 0.3], streaks: [LAND + CH, 4, 0.12], rough: [0.8, 1.2], wet: place.deckWet });
-    const pm = new THREE.InstancedMesh(pole, colMat, columns.length), hm = new THREE.InstancedMesh(head, glowLamp, columns.length);
+    const pm = new THREE.InstancedMesh(pole, colMat, columns.length), lm = new THREE.InstancedMesh(lens, lensMat, columns.length);
     columns.forEach(([x, z, ry, nx, nz], k) => {
-      mx.compose(v.set(x, LAND, z), q.setFromAxisAngle(up, ry + Math.PI), one); pm.setMatrixAt(k, mx); // (the door towards the deck)
-      mx.compose(v.set(x - nx * 0.28, LAND + CH + 0.02, z - nz * 0.28), q.setFromAxisAngle(up, Math.atan2(nz, -nx)), one); hm.setMatrixAt(k, mx);
+      mx.compose(v.set(x, LAND, z), q.setFromAxisAngle(up, ry + Math.PI), one); pm.setMatrixAt(k, mx); lm.setMatrixAt(k, mx); // (the door and the bracket towards the deck)
+      pools.push([x - nx * L.z, LAND, z - nz * L.z, 3.6]); heads.push([x - nx * (L.z + 0.35), LAND + L.y - COLUMN.lantern[1] / 2, z - nz * (L.z + 0.35)]); // (the light a little beyond the lens: right under it, 65 cm from the pole, it lit the pole's top as bright as the lens; a lantern's housing keeps its light off its own pole)
     });
-    for (const m of [pm, hm]) { m.castShadow = true; m.computeBoundingSphere(); group.add(m); }
+    pm.castShadow = true; lm.castShadow = false;
+    for (const m of [pm, lm]) { m.computeBoundingSphere(); group.add(m); }
   }
-  place.buildingGlow = [glowLamp, glowGlass];
+  // and the pools of lamplight on the deck, under every lamp (the modelled pier lamps' too), lit with them after dark
+  for (const [x, y, z] of props.lamp) pools.push([x, y, z, 2.6]);
+  const pool = lampPools(pools); if (pool.mesh) group.add(pool.mesh);
+  place.buildingGlow = [glowLamp, glowGlass, lensMat, pool.material];
+  if (heads.length) place.lampHeads = heads;
   if (Object.values(props).some((l) => l.length)) placeProps(group, stand, props, glowGlass, place.deckWet);
   wallDetails(group, { posts, grates, rings, ladders, spots, props, capRuns, wet: place.deckWet, railH: RAIL.h });
 
