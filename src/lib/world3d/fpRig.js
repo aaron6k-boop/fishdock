@@ -45,6 +45,79 @@ export function rodFrame(t, rest = null, upRef = null) {
   const up0 = (d, u0) => { const up = (u0 ? u0.clone() : new THREE.Vector3(0, 1, 0)).addScaledVector(d, -d.dot(u0 || new THREE.Vector3(0, 1, 0))); if (up.lengthSq() < 1e-4) up.set(1, 0, 0); up.normalize(); return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(up, d), up, d)); };
   return rest && t.dot(rest) > -0.95 ? new THREE.Quaternion().setFromUnitVectors(rest, t).multiply(up0(rest, upRef)) : up0(t);
 }
+// ---- fingers on a handle: kept outside it ----
+// The handle's outline (rodKit.js handleProfile: [along, radius, soft] from the reel), looked at 1.2 mm either side of
+// each point so a 1 mm trim ring can't slip between two points of a finger. CLEAR: the skin kept that far off metal
+// (foam lets a finger press in by its soft).
+const CLEAR = 0.0006;
+function outlineAt(prof, z) {
+  if (!prof?.length || z < prof[0][0] || z > prof[prof.length - 1][0]) return null;
+  let i = 0; while (i < prof.length - 2 && prof[i + 1][0] < z) i++;
+  const [z0, r0, s0] = prof[i], [z1, r1, s1] = prof[i + 1], f = z1 > z0 ? clamp((z - z0) / (z1 - z0), 0, 1) : 0;
+  return { r: r0 + (r1 - r0) * f, soft: Math.min(s0, s1) };
+}
+/** the handle's radius at z (metres along the rod from the reel) and how far a finger may press in there; null off it */
+export function profileAt(prof, z) {
+  let best = null;
+  for (const dz of [-0.0012, 0, 0.0012]) { const q = outlineAt(prof, z + dz); if (q && (!best || q.r - q.soft > best.r - best.soft)) best = q; }
+  return best;
+}
+const _w = new THREE.Vector3(), _v = new THREE.Vector3(), _l = new THREE.Vector3(), _J = new THREE.Vector3(), _hx = new THREE.Vector3(), _arm = new THREE.Vector3(), _qx = new THREE.Quaternion(), _m = new THREE.Matrix4(), _M = new THREE.Matrix4();
+/** a skin point where the graphics card draws it (world): its bind place carried by each of its bones by its weight */
+function skinAt(pt, M, out) {
+  out.set(0, 0, 0);
+  for (let k = 0; k < 4; k++) { const w = pt.w[k]; if (w < 1e-4) continue; _m.multiplyMatrices(pt.bones[k].matrixWorld, pt.inv[k]); out.addScaledVector(_v.copy(pt.p).applyMatrix4(_m), w); }
+  return out.applyMatrix4(M);
+}
+/** Each finger of a hand on the reel seat opened at its joints just enough that none of its skin is inside the handle
+ * (fingers: fpRig's fingerSkin for that hand; spec: what it holds, its sock and outline, profAxis "x" for the reel's knob,
+ * whose axis is the reel's x), then its outer joints curled back in by as much as stays outside, so a
+ * finger lifted at the knuckle still wraps the handle. The finger's deepest point at a time, lifted by the joint nearest
+ * the fingertip that can, each joint turning about its own bending axis only, so a finger lifts off the lock nut the way
+ * a finger does, never sideways. Returns how far the skin was inside at worst before (metres). */
+export function clearFingers(fingers, spec, Mg, qg) {
+  if (!fingers?.skin) return 0;
+  const sq = spec.sock.quat.clone().premultiply(qg), sp = spec.sock.pos.clone().applyMatrix4(Mg), sqi = sq.clone().invert(), alongX = spec.profAxis === "x";
+  _M.multiplyMatrices(fingers.skin.matrixWorld, fingers.skin.bindMatrixInverse);
+  /** the chain's deepest point inside the handle: how far, where (world), which way is out, on which bone */
+  const deepest = (segs) => {
+    let need = 0, at = null, ur = null, si = 0;
+    segs.forEach((sg, j) => { for (const pt of sg.pts) {
+      skinAt(pt, _M, _w); _l.copy(_w).sub(sp).applyQuaternion(sqi);
+      if (alongX) _l.set(_l.y, _l.z, _l.x); // (a knob: its axis the reel's x, the crank's axle)
+      const pr = profileAt(spec.prof, _l.z); if (!pr) continue;
+      const r = Math.hypot(_l.x, _l.y), d = pr.r - pr.soft + CLEAR - r;
+      if (d > need && r > 1e-6) { need = d; at = _w.clone(); ur = (alongX ? new THREE.Vector3(0, _l.x / r, _l.y / r) : new THREE.Vector3(_l.x / r, _l.y / r, 0)).applyQuaternion(sq); si = j; }
+    } });
+    return { need, at, ur, si };
+  };
+  const turn = (sg, a) => { sg.b.quaternion.multiply(_qx.setFromAxisAngle(sg.ax, a)); sg.b.updateMatrixWorld(true); };
+  let most = 0;
+  for (const segs of fingers) {
+    const turned = segs.map(() => 0);
+    for (let it = 0; it < 10; it++) {
+      const { need, at, ur, si } = deepest(segs);
+      if (!it) most = Math.max(most, need - CLEAR);
+      if (need < 1e-4) break;
+      // (the joint nearest the fingertip that can lift it: its own, or one nearer the knuckle only where that moves it
+      // out more than twice as directly)
+      let best = -1, bestOut = 0;
+      for (let j = si; j >= 0; j--) { const { b, ax } = segs[j]; b.getWorldPosition(_J); _hx.copy(ax).transformDirection(b.matrixWorld); _arm.copy(at).sub(_J); const o = _J.crossVectors(_hx, _arm).dot(ur); if (Math.abs(o) > Math.abs(bestOut) * 2) { best = j; bestOut = o; } }
+      if (best < 0 || Math.abs(bestOut) < 0.002) break;
+      const a = clamp((need * 1.15) / bestOut, -0.3, 0.3); turn(segs[best], a); turned[best] += a;
+    }
+    // (the knuckle turned to lift it: the joints past it turned back the other way, up to seven tenths as much, as far as
+    // stays outside, so the finger still wraps the handle. Turned at the knuckle alone, the index finger swung its tip
+    // round onto your thumb)
+    if (Math.abs(turned[0]) > 0.03) for (let j = 1; j < segs.length; j++) {
+      if (turned[j]) continue;
+      let c = -Math.sign(turned[0]) * Math.min(0.3, Math.abs(turned[0]) * 0.7);
+      for (let k = 0; k < 4 && Math.abs(c) > 0.01; k++) { turn(segs[j], c); if (deepest(segs).need < 1e-4) break; turn(segs[j], -c); c /= 2; }
+    }
+  }
+  return Math.max(0, most);
+}
+
 /** your body's up in the view (vf, vu: the view's forward and up): the up the hold's rod is squared to, so the reel
  * hangs the same way in your hands whether you look up or down */
 export const bodyUp = (vf, vu) => vf.clone().multiplyScalar(Math.sin(P0)).addScaledVector(vu, Math.cos(P0)).normalize();
@@ -313,7 +386,36 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     }
     // (the eye: where it is at the hold, carried in the head bone's own frame so it moves with the head)
     const head = B(RIG.eye.bone), eyeLocal = A3(RIG.eye.hold).applyMatrix4(head.matrixWorld.clone().invert());
-    return { scene, bones, B, clips, rest, grips, arm, head, eyeLocal, fingerBones };
+    return { scene, bones, B, clips, rest, grips, arm, head, eyeLocal, fingerBones, fingers: fingerSkin(scene, grips) };
+  }
+
+  // ---- the fingers' own skin, for keeping them out of what they hold ----
+  // Each finger and thumb as a chain of its three bones (each with the axis it bends about: from the relaxed hand to the
+  // hold, as the grips clip has them), and up to 48 points of the skin each bone moves most, with their bind places and
+  // skin weights, so the skin there can be placed exactly as the graphics card will draw it.
+  function fingerSkin(scene, grips) {
+    let skin = null; scene.traverse((o) => { if (o.isSkinnedMesh && o.material === skinMat && !skin) skin = o; });
+    const out = { L: [], R: [], skin }; if (!skin) return out;
+    const g = skin.geometry, pos = g.attributes.position, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, sk = skin.skeleton;
+    const per = new Map();
+    for (let i = 0; i < pos.count; i++) {
+      let bi = 0, bw = -1; for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; bi = si.getComponent(i, k); } }
+      const b = sk.bones[bi]; if (!b || !/^DEF-(f_\w+|thumb)\d+(L|R)$/.test(b.name)) continue;
+      (per.get(b) || per.set(b, []).get(b)).push(i);
+    }
+    const chains = new Map();
+    for (const [b, list] of per) {
+      const m = /^DEF-(f_\w+?|thumb)(\d+)(L|R)$/.exec(b.name); if (!m) continue;
+      const step = Math.max(1, Math.ceil(list.length / 48)), pts = [];
+      for (let j = 0; j < list.length; j += step) { const i = list[j]; pts.push({ p: V().fromBufferAttribute(pos, i).applyMatrix4(skin.bindMatrix), bones: [0, 1, 2, 3].map((k) => sk.bones[si.getComponent(i, k)]), inv: [0, 1, 2, 3].map((k) => sk.boneInverses[si.getComponent(i, k)]), w: [0, 1, 2, 3].map((k) => sw.getComponent(i, k)) }); }
+      // (the bending axis: the turn from the relaxed hand to the hold, in the bone's own frame; x if they're alike)
+      let ax = V(1, 0, 0); const h = grips.hold?.[m[3]]?.get(b.name), r = grips.relax?.[m[3]]?.get(b.name);
+      if (h && r) { const d = r.clone().invert().multiply(h), sn = Math.sqrt(Math.max(0, 1 - d.w * d.w)); if (sn > 0.04) ax = V(d.x, d.y, d.z).multiplyScalar(Math.sign(d.w) / sn).normalize(); }
+      const key = m[3] + m[1]; (chains.get(key) || chains.set(key, { side: m[3], segs: [] }).get(key)).segs.push({ b, k: +m[2], pts, ax });
+    }
+    for (const c of chains.values()) out[c.side].push(c.segs.sort((x, y) => x.k - y.k));
+    out.L.skin = out.R.skin = skin;
+    return out;
   }
 
   // ---- the hand's place on what it holds ----
@@ -562,6 +664,17 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         const G = R.grips[want.grip]?.[S] || R.grips.relax?.[S]; h.fing ||= new Map();
         if (G) for (const [n, q] of G) { const b = R.bones.get(n); if (!b) continue; const f = h.fingFrom?.get(n); const qq = f && e < 1 ? f.clone().slerp(q, e) : q; b.quaternion.copy(qq); h.fing.set(n, qq.clone()); }
         A.H.updateMatrixWorld(true);
+        // (and kept out of what they're round: the reel seat's lock nut, its trims and the grips; the reel's knob. Worked
+        // out again only when the hand moves on it: held still, as it is on the seat while you wait, last frame's answer
+        // is the same; winding, each few degrees of the knob's turn is worked out once and kept)
+        if ((spec?.kind === "seat" || spec?.kind === "crank") && spec.prof && spec.sock) {
+          const sqi = spec.sock.quat.clone().premultiply(qg).invert(), rp = A.H.getWorldPosition(V()).sub(spec.sock.pos.clone().applyMatrix4(Mg)).applyQuaternion(sqi), rq = sqi.multiply(A.H.getWorldQuaternion(new THREE.Quaternion()));
+          const crank = spec.kind === "crank", key = crank ? `k${Math.round((want.th || 0) / 4)}` : "seat";
+          if (h.clears?.prof !== spec.prof) { h.clears = new Map(); h.clears.prof = spec.prof; }
+          const c = h.clears.get(key);
+          if (c && h.u >= 1 && c.p.distanceTo(rp) < (crank ? 0.0015 : 2e-4) && c.q.angleTo(rq) < (crank ? 0.04 : 0.005)) { for (const [b, q] of c.qs) b.quaternion.copy(q); A.H.updateMatrixWorld(true); h.lift = c.lift; }
+          else { h.lift = clearFingers(R.fingers[S], spec, Mg, qg); if (h.u >= 1) h.clears.set(key, { p: rp, q: rq, lift: h.lift, qs: R.fingers[S].flatMap((segs) => segs.map(({ b }) => [b, b.quaternion.clone()])) }); }
+        } else h.lift = 0;
         h.wrist = group.worldToLocal(A.H.getWorldPosition(V()));
       }
       if (leanAdd.lengthSq() > 0) { lean.addScaledVector(leanAdd, Math.min(1, dt * 6)); if (lean.length() > 0.45) lean.setLength(0.45); }
