@@ -512,7 +512,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           // (only where the sun's path is: everywhere else it added nothing but cost four noises a pixel)
           if (sunVis > .01 && sp > .85 && dist < 160. && uFft < .5) {
             float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
-            float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
+            // (and not close under you: there each twinkle was a flat pale fleck several centimetres across, and looking down
+            // over the rail at the net the water read as scattered confetti, 16 November. Close by the sun's own highlight,
+            // broken by the facets above, is the glitter)
+            float glit = smoothstep(.45, .68, tw)*(1. - smoothstep(25., 160., dist))*smoothstep(5., 22., dist);
             // (the path is long towards the sun and narrow across it, wider in more wind, as a real glitter path is: it
             // was a round patch a quarter of the sea wide under a low sun)
             float az = max(dot(normalize(rd.xz + vec2(1e-5)), normalize(uSunDir.xz + vec2(1e-5))), 0.);
@@ -568,11 +571,14 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         if (uShoreOn > .5 && sd < 3. && dist < 90.) { // (only near a wall: three noises a pixel over the whole sea for a band a metre or two wide)
           float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
           float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
+          // (and broken into lace by the bubbles' own fine pattern: whole, each clump was a hard-edged white fleck, and
+          // looking down over the rail the water by the wall read as scattered paper, 16 November)
+          clump *= .45 + .55*smoothstep(.3, .75, noise(p*23. + vec2(uTime*.5, -uTime*.4)));
           float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
           edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
         }
         if (uDbg > .5) { gl_FragColor = vec4(uDbg < 1.5 ? vec3(fftJ) : uDbg < 2.5 ? vec3(cap) : vec3(n.xz*4. + .5, 0.), 1.); return; }
-        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.8*uShoreOn + churn*.7;
+        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.62*uShoreOn + churn*.6;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
         // (a fresh whitecap is the exception: a dense head of bubbles, near white in the day's light)
         foam = max(clamp(foam, 0., .8), capJ*.95);
