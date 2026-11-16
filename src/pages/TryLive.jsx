@@ -28,6 +28,8 @@ import { lineText } from "../lib/chatPhrases.js";
 import { playerName, setPlayerName, cleanName, addCatch, setOutcome, diary as readDiary } from "../lib/diary.js";
 import { progress, afterCatch, medalFor, CHALLENGE_XP } from "../lib/progress.js";
 import { drawFish } from "../lib/fishDraw.js";
+import { gameBaits, gameBait, biteWeight, takesHere, DEFAULT_BAIT } from "../lib/gameBait.js";
+import { BaitThumb } from "../components/BaitPhoto.jsx";
 import { FILM } from "../lib/world3d/film.js";
 import Logbook, { LevelBar } from "../components/Logbook.jsx";
 import { conditionsAt } from "../lib/bitescore.js";
@@ -69,6 +71,13 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   // (a fish chosen on the map, #play/<place>/<fish>, is the one you'll catch)
   const [randomFish, setRandomFish] = useState(!(chosenFish && speciesById(initialSpecies)));
   const setFishMode = (random) => setRandomFish(random);
+  // the bait on your hook (gameBait.js): this water's sourced natural baits, remembered on this phone for sea and fresh
+  // water separately. It's put on as you cast, so a change while a cast is out counts from the next cast
+  const [baits, setBaits] = useState(() => { try { return JSON.parse(localStorage.getItem("fishdock.gameBait") || "{}") || {}; } catch { return {}; } });
+  const water = fresh ? "fresh" : "sea", bait = gameBait(baits[water], fresh) || gameBait(DEFAULT_BAIT[water], fresh) || gameBaits(fresh)[0];
+  const pickBait = (id) => { const next = { ...baits, [water]: id }; setBaits(next); try { localStorage.setItem("fishdock.gameBait", JSON.stringify(next)); } catch { /* no storage */ } };
+  const [baitOpen, setBaitOpen] = useState(false);
+  const castBait = useRef(null);
   const [photos, setPhotos] = useState(null);
   const [pick, setPick] = useState(0);
   const [view, setView] = useState(defaultView());
@@ -195,9 +204,12 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   // already on)
   const castN = events.reduce((n, e) => n + (e.type === "cast" ? 1 : 0), 0);
   useEffect(() => {
-    if (!castN || !randomFish) return;
+    if (!castN) return;
+    castBait.current = bait; // (what's on the hook for this cast, for your logbook)
+    if (!randomFish) return;
     // (the place's own documented fish more often, and a natural spread of sizes with the odd big one: fishDraw.js)
-    const pool = fishList.filter((f) => hasArt(f.id)), f = drawFish(pool.length ? pool : fishList, spotById(placeId)?.species || []);
+    // (and the bait on the hook: the fish that take it far more often; and the season, from species.js's months)
+    const month = new Date().getMonth() + 1, pool = fishList.filter((f) => hasArt(f.id)), f = drawFish(pool.length ? pool : fishList, spotById(placeId)?.species || [], Math.random, (id) => biteWeight(id, { bait: bait?.id, month }));
     if (f) { setSpecies(f.species); setLength(f.lengthCm); }
   }, [castN]); // eslint-disable-line react-hooks/exhaustive-deps
   // (what is on the line isn't known until it is hooked)
@@ -213,7 +225,7 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   // it: Keep it or Put it back. Night and rough weather noted for the badges)
   const rewards = useRef(new Map());
   useEffect(() => { let added = false, before = diaryList; for (const e of catches) if (e?.id && e.data?.species && !before.some((d) => d.id === String(e.id))) {
-    const entry = addCatch({ id: String(e.id), species: e.data.species, name: e.data.name || speciesById(e.data.species)?.name, lengthCm: e.data.lengthCm, weightKg: e.data.weightKg, place: placeId, placeName: place.name.replace(/ \(.*\)$/, ""), at: e.t || Date.now(), night: lightNow.sunAlt < -6, rough: (c?.precipMm || 0) > 0.2 || (c?.windKph || 0) >= 35 });
+    const entry = addCatch({ id: String(e.id), species: e.data.species, name: e.data.name || speciesById(e.data.species)?.name, lengthCm: e.data.lengthCm, weightKg: e.data.weightKg, place: placeId, placeName: place.name.replace(/ \(.*\)$/, ""), at: e.t || Date.now(), night: lightNow.sunAlt < -6, bait: castBait.current?.name || null, rough: (c?.precipMm || 0) > 0.2 || (c?.windKph || 0) >= 35 });
     if (entry) { rewards.current.set(entry.id, afterCatch(before, entry)); before = [entry, ...before]; } added = true; } if (added) setDiaryList(readDiary()); }, [catches.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const prog = useMemo(() => progress(diaryList), [diaryList]);
   // (worked out again once you've decided, so a put-back counts towards the day's challenges)
@@ -253,9 +265,25 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
               {fromMap ? <a className="fs-chip map-back" href={`#play/map/${placeId}`} aria-label="Back to the map" title="Back to the map"><Icon name="back" /><Icon name="explore" /></a> : null}
               <span className="fs-chip">{light === "now" ? "Now" : LIGHT.find((x) => x.value === light).label}{c?.windKph != null ? <> · <Icon name="wind" />{Math.round(c.windKph * 0.621)} mph</> : null}</span>
               <button type="button" className="fs-chip" onClick={() => setSheet(true)} aria-label={`${fishLabel} at ${place.name}: change`}>{fishLabel}</button>
+              {bait ? <button type="button" className="fs-chip bait-chip" onClick={() => { setBaitOpen(!baitOpen); setMatchOpen(false); }} aria-expanded={baitOpen} aria-label={`Bait: ${bait.name}. Change it`} title="The bait on your hook"><Icon name="bait" />{bait.name.replace(/ \(.*\)$/, "").replace(/ or .*$/, "")}</button> : null}
+              {bait && baitOpen ? (() => {
+                const takes = takesHere(bait.id, fishList, new Date().getMonth() + 1, (spotById(placeId)?.species || []).map((x) => x.id)), out = p.phase !== "idle" && p.phase !== "ended";
+                return (
+                  <div className="bait-board" role="dialog" aria-label="Your bait">
+                    <b>Your bait{out ? <span className="tiny"> · on your next cast</span> : null}</b>
+                    <div className="bait-list" role="group" aria-label="Choose a bait">
+                      {gameBaits(fresh).map((b) => <button key={b.id} type="button" className={`bait-b${b.id === bait.id ? " on" : ""}`} aria-pressed={b.id === bait.id} onClick={() => { pickBait(b.id); setBaitOpen(false); }}><BaitThumb bait={b} /><span>{b.name.replace(/ \(.*\)$/, "").replace(/ or .*$/, "")}</span></button>)}
+                    </div>
+                    {takes.length ? [["At its best now", takes.filter((f) => f.season === "peak")], ["Also takes", takes.filter((f) => f.season !== "peak" && f.season !== "out")], ["Rarely caught now", takes.filter((f) => f.season === "out")]].filter(([, l]) => l.length).map(([h, l]) => (
+                      <span key={h} className={`tiny${h === "Rarely caught now" ? " off" : ""}`}><b>{h}:</b> {l.slice(0, 7).map((f) => f.name.toLowerCase()).join(", ")}{l.length > 7 ? ` and ${l.length - 7} more` : ""}</span>
+                    )) : <span className="tiny">No fish here are listed as taking it.</span>}
+                    <span className="tiny muted">Which fish take each bait comes from FishDock's sources; the months are a general guide, not the fishing rules. The game's odds are its own.</span>
+                  </div>
+                );
+              })() : null}
               <button type="button" className="fs-chip lvl-chip" onClick={() => { setDiaryList(readDiary()); setDiaryOpen(true); }} aria-label={`Level ${prog.level}: your logbook`} title="Your logbook"><LevelBar p={prog} compact /></button>
               {others.length ? <span className="fs-chip here-chip" title={others.map((m) => m.name).join(", ")}><Icon name="users" />{others.length + 1} here</span> : null}
-              {matchChip ? <button type="button" className={`fs-chip match-chip${round.on ? " on" : ""}`} onClick={() => setMatchOpen(!matchOpen)} aria-expanded={matchOpen} aria-label={`${matchChip}: the match board`}><Icon name="trophy" />{matchChip}</button> : null}
+              {matchChip ? <button type="button" className={`fs-chip match-chip${round.on ? " on" : ""}`} onClick={() => { setMatchOpen(!matchOpen); setBaitOpen(false); }} aria-expanded={matchOpen} aria-label={`${matchChip}: the match board`}><Icon name="trophy" />{matchChip}</button> : null}
               {matchChip && matchOpen ? (
                 <div className="match-board" role="dialog" aria-label="The match board">
                   <b>{round.on ? "Match on" : "Next match"}: {ukClock(round.startsAt)} to {ukClock(round.endsAt)}</b>

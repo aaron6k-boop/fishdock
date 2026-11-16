@@ -6,7 +6,7 @@ those pages say is listed.
 
 | What they do | Who (source) | FishDock | Fits? |
 |---|---|---|---|
-| Each species behaves differently by time of day, place and what you do | Call of the Wild: The Angler ([Steam](https://store.steampowered.com/app/1408610/)); Russian Fishing 4 ([Wikipedia](https://en.wikipedia.org/wiki/Russian_Fishing_4)) | Bites follow the real weather, tide and light at the place | Yes: more per-species timing where sources support it (backlog item 9) |
+| Each species behaves differently by time of day, place and what you do | Call of the Wild: The Angler ([Steam](https://store.steampowered.com/app/1408610/)); Russian Fishing 4 ([Wikipedia](https://en.wikipedia.org/wiki/Russian_Fishing_4)) | Bites follow the real weather, tide and light at the place; **the bait on your hook decides which fish come to it, and the month which are about (16 November: FishDock's sourced bait lists, species.js's months)** | Yes: more per-species timing where sources support it (backlog item 9) |
 | Many species to collect, harder "legendary" fish | The Angler; RF4 (110 species) | Species book, medals to Specimen, personal bests | Specimens yes; legendary fish no (not real) |
 | Earn and progress: money, gear, new places | RF4 (cafe quests, gear and places bought) | Levels, XP, badges, three daily challenges | Gear progression maybe later; never paying to fish real places |
 | Fish together, up to 12 friends | The Angler | Fish Together parties, public places (four a room) | Yes |
