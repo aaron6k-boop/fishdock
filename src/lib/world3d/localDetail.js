@@ -73,9 +73,13 @@ export const LOCAL = {
     // behind them it rises to Cliff Hill, Marine Parade and the old town, about 15 m up (approximate, from the map's
     // streets and photographs: no survey heights)
     hill: gorlestonHill,
+    // where you can walk: the length of the pier, as far as its root at the quay (x -95, where the quay and Pier Gardens
+    // begin). The town past it is the photographs above, taken on the pier 250 m and more from it: walked up to, a
+    // photograph is flat and soft, so you see the buildings only from where they hold up (16 November 2026)
+    walkArea: (x) => x > -95,
     // (landmarks, above, also: the Pier Hotel; Pavilion Theatre: red brick and terracotta, copper roofs, four domed corner towers at its south end;
     // the bandstand in Pier Gardens; the Cliff Hotel on the cliff top)
-    note: "The lighthouse, lamps, fences, the height of the cliff and the dune across the harbour mouth at Gorleston are modelled from photographs and descriptions; their sizes are estimates. The town is shown by two photographs of it; no other buildings are drawn.",
+    note: "The lighthouse, lamps, fences, the height of the cliff and the dune across the harbour mouth at Gorleston are modelled from photographs and descriptions; their sizes are estimates. The town is shown by two photographs of it; no other buildings are drawn, and you can walk the pier but not on into the town.",
   },
 };
 export const localFor = (id) => LOCAL[id] || null;
