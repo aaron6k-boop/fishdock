@@ -27,3 +27,14 @@ test("Gorleston: river-side railings, timber along the sea side, bars round the 
   assert.equal(G.dunes(0, -100), true);
   assert.equal(G.dunes(0, 0), false);
 });
+
+test("Gorleston: you walk the length of the pier, not on into the town its photographs show", () => {
+  const G = localFor("gorleston-south-pier");
+  for (const [x, z] of [[0, 0], [4, -8], [14, 20], [-60, 6], [-90, 20]]) assert.equal(G.walkArea(x, z), true, `on the pier at ${x}, ${z}`);
+  // the photographs' own standpoints on the pier are inside it
+  for (const b of G.backdrop.filter((b) => b.cam && b.tex)) if (b.cam[0] < 20) assert.equal(G.walkArea(...b.cam), true, b.tex);
+  // the quay, Pier Gardens and the Pier Hotel (bearing 246, 250 m from the town photograph's standpoint) are not
+  for (const [x, z] of [[-110, 30], [-150, 50], [-167, 83], [-250, 140]]) assert.equal(G.walkArea(x, z), false, `in the town at ${x}, ${z}`);
+  // a place without one has no limit beyond its railings and buildings
+  for (const [id, L] of Object.entries(LOCAL)) if (id !== "gorleston-south-pier") assert.equal(L.walkArea, undefined);
+});

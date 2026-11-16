@@ -1043,6 +1043,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const allEdges = [...walls.map((e) => [...e.slice(0, 6), "wall", LAND]), ...fishEdges], nearestEdge = segIndex(allEdges);
   const heightAt = (x, z) => { const j = jettyAt(x, z); if (j) return j.y; const pr = PRh.find((b) => inB([x, z], b)); if (pr) return pr.h; const g = groundAt(x, z); return g || (landAt([x, z]) ? LAND : 0); };
   const walkable = (x, z) => {
+    if (local?.walkArea && !local.walkArea(x, z)) return false; // (as far as the mark's photographs hold up: localDetail.js)
     if (jettyAt(x, z)) return true;
     const onPier = PRh.some((b) => inB([x, z], b));
     if (!onPier && !landAt([x, z])) return false;
