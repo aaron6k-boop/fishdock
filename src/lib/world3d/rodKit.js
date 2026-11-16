@@ -16,6 +16,31 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 export const GUIDE_DROP = 1.85; // (the guide's ring centre below its feet, in ring radii: build_rodkit.py)
 const HANDLE_SEAT = 0.45, HANDLE_R = 0.0152; // (the modelled handle's seat position and rear grip radius: a pier rod's)
 
+// ---- the handle's outline: how far from the rod's axis its surface is along it, for the hand that holds it ----
+// [along, radius, soft] in metres along the modelled handle, measured from rodkit.glb's own parts (the rear grip's
+// swell and taper, the seat's hood, its two blue trims, the barrel the reel's foot screws to, the lock nut's bevel, the
+// fore grip). soft: how far fingers may press in (EVA foam gives a little; metal none). fpRig.js keeps your fingers
+// outside it: holding the seat, the index finger lay 3.7 mm inside the lock nut and the thumb 2.4 mm, with the far blue
+// trim cutting through the index finger.
+const EVA = 0.0015;
+export const HANDLE_PROFILE = [
+  [0.026, 0.0168, EVA], [0.055, 0.016, EVA], [0.09, 0.0162, EVA], [0.18, 0.0165, EVA], [0.245, 0.0163, EVA], [0.305, 0.0157, EVA], [0.365, 0.015, EVA], [0.398, 0.0146, EVA],
+  [0.4, 0.0152, 0], [0.41, 0.0158, 0], [0.424, 0.0156, 0], [0.425, 0.0167, 0], [0.4275, 0.0167, 0], [0.4285, 0.0134, 0],
+  [0.469, 0.0134, 0], [0.4695, 0.0169, 0], [0.4715, 0.0169, 0], [0.472, 0.0136, 0], [0.475, 0.0156, 0], [0.48, 0.016, 0], [0.495, 0.016, 0], [0.5, 0.0154, 0],
+  [0.501, 0.0146, EVA], [0.56, 0.0145, EVA], [0.6, 0.014, EVA], [0.64, 0.0133, EVA], [0.66, 0.0122, EVA],
+];
+// the reel's knob, the same way: [along, radius, soft] along the crank's own x (out from the arm) from its middle, as
+// rodkit.glb's barrel knob is (26 mm long, 19.6 mm across at its widest, a narrow neck at the arm, a rounded end).
+// Holding it, the left hand's middle finger went 5 mm into it.
+export const KNOB_PROFILE = [[-0.013, 0.006, 0.0005], [-0.009, 0.0092, 0.0005], [-0.001, 0.0098, 0.0005], [0.007, 0.0092, 0.0005], [0.012, 0.007, 0.0005], [0.0128, 0.003, 0.0005]];
+/** The handle's outline about the reel seat for one rod (R: angler.js's rod): [along, radius, soft] in metres along the
+ * rod from where the reel sits, as the modelled handle is scaled to that rod (kit), or the simple handle's sections. */
+export function handleProfile(R, kit = true) {
+  if (!kit) return (R.handle || []).flatMap(([a, b, r, part]) => { const s = part === "seat" ? 0 : EVA; return [[a - R.seat + 1e-4, r, s], [b - R.seat - 1e-4, r, s]]; });
+  const gripR = (R.handle?.[1] && R.handle[1][2]) || HANDLE_R, sz = R.seat / HANDLE_SEAT, sr = gripR / HANDLE_R;
+  return HANDLE_PROFILE.map(([z, r, s]) => [(z - HANDLE_SEAT) * sz, r * sr, s]);
+}
+
 // ---- materials: shared by every rod (made once) ----
 let MATS = null;
 function canvasTex(n, draw, srgb = false) {

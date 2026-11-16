@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { createFpRig, castAt, rodFrame, holdView, rigP0, bodyUp } from "../src/lib/world3d/fpRig.js";
+import { createFpRig, castAt, rodFrame, holdView, rigP0, bodyUp, profileAt } from "../src/lib/world3d/fpRig.js";
+import { handleProfile, HANDLE_PROFILE, KNOB_PROFILE } from "../src/lib/world3d/rodKit.js";
 import { RIG } from "../src/lib/world3d/fpRigData.js";
 import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "../src/lib/world3d/fpIk.js";
 
@@ -116,6 +117,77 @@ test("the hold in the game is Gate 1's hold: the right hand and elbow where Blen
   const turned = new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), Math.PI).multiply(qClip);
   assert.ok(deg(A.H.getWorldQuaternion(new THREE.Quaternion()), turned) < 1, `the right hand turned ${deg(A.H.getWorldQuaternion(new THREE.Quaternion()), turned).toFixed(1)} degrees off Gate 1's`);
   assert.ok(deg(A.H.getWorldQuaternion(new THREE.Quaternion()), P.rq.clone().multiply(qBlender(META.rod_grip))) < 1, "and as the rod's grip in Blender has it");
+});
+
+// ---- the fingers on the reel seat ----
+// (angler.js's pier rod, as far as the handle goes: the reel at 45 cm, the rear grip 15.2 mm round)
+const PIER = { name: "Pier rod", seat: 0.45, handle: [[0, 0.02, 0.016, "seat"], [0.02, 0.4, 0.0152, "grip"]] };
+/** how far a hand's finger and thumb skin is inside what it holds at worst, by bone (mm), skinned as drawn: the outline
+ * along the sock's z (the rod), or its x (the reel's knob) */
+function inside(sock, prof, S = "R", alongX = false) {
+  let skin = null; R.scene.traverse((o) => { if (o.isSkinnedMesh && !skin && !/jacket/i.test(o.name)) skin = o; });
+  const qi = sock.quat.clone().invert(), pos = skin.geometry.attributes.position, si = skin.geometry.attributes.skinIndex, sw = skin.geometry.attributes.skinWeight, v = V(), by = {};
+  for (let i = 0; i < pos.count; i++) {
+    let bi = 0, bw = -1; for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; bi = si.getComponent(i, k); } }
+    const n = skin.skeleton.bones[bi].name; if (!new RegExp(`^DEF-(f_|thumb)\\w*${S}$`).test(n)) continue;
+    skin.getVertexPosition(i, v); v.applyMatrix4(skin.matrixWorld).sub(sock.pos).applyQuaternion(qi); if (alongX) v.set(v.y, v.z, v.x);
+    const pr = profileAt(prof, v.z); if (!pr) continue;
+    const d = (pr.r - pr.soft - Math.hypot(v.x, v.y)) * 1000; if (d > (by[n] ?? -1e9)) by[n] = d;
+  }
+  return by;
+}
+const intoHandle = (P, prof) => inside({ pos: P.reel, quat: P.rq }, prof);
+test("the handle's outline: rodkit.glb's measured parts, scaled to each rod as the modelled handle is", () => {
+  for (let i = 1; i < HANDLE_PROFILE.length; i++) assert.ok(HANDLE_PROFILE[i][0] > HANDLE_PROFILE[i - 1][0], "in order along the rod");
+  const p = handleProfile(PIER, true);
+  assert.ok(Math.abs(profileAt(p, 0.0).r - 0.0134) < 1e-4, "the barrel at the reel: 13.4 mm");
+  assert.ok(Math.abs(profileAt(p, 0.0205).r - 0.0169) < 1e-4 && profileAt(p, 0.0205).soft === 0, "the far trim: 16.9 mm, metal");
+  assert.ok(profileAt(p, 0.0013 + 0.0195).r > 0.0168, "a trim is seen from 1.2 mm either side, so it can't pass between two points of a finger");
+  assert.equal(profileAt(p, -0.2).soft, 0.0015, "the rear grip is foam");
+  // (a lighter rod: the handle shrinks with its grip, and the seat's place along it with the rod's)
+  const river = handleProfile({ seat: 0.29, handle: [[0, 0.02, 0.014, "seat"], [0.02, 0.25, 0.0135, "cork"]] }, true);
+  assert.ok(Math.abs(profileAt(river, 0).r - 0.0134 * 0.0135 / 0.0152) < 1e-5);
+  // (and the simple handle's own sections when the modelled one isn't loaded)
+  assert.ok(Math.abs(profileAt(handleProfile(PIER, false), -0.2).r - 0.0152) < 1e-9);
+});
+
+test("your fingers on the reel seat stay outside it: none in the metal, the foam pressed in no more than it gives", () => {
+  const prof = handleProfile(PIER, true);
+  for (const [pitch, yaw] of [[rigP0(), 0], [-0.12, 0], [-0.75, 0.4], [0.35, -0.5]]) {
+    const P = place(pitch, holdView(), yaw), row = TURN[0];
+    pose(P, [crankSpec(P, row), seatSpec(P)], 20);
+    const before = intoHandle(P, prof), A = R.arm.R, hand = at(A.H), handQ = A.H.getWorldQuaternion(new THREE.Quaternion());
+    // (as it was: the index finger 4.2 mm and the thumb 2.4 mm inside the lock nut, the far trim through the index finger)
+    if (pitch === rigP0()) assert.ok(before["DEF-f_index02R"] > 3 && before["DEF-thumb03R"] > 2, JSON.stringify(before));
+    pose(P, [crankSpec(P, row), { ...seatSpec(P), prof }], 20);
+    const after = intoHandle(P, prof), worst = Math.max(...Object.values(after));
+    assert.ok(worst < 0.25, `pitch ${pitch}: a finger ${worst.toFixed(2)} mm inside the handle (${JSON.stringify(after)})`);
+    // (only the fingers move: the hand is still where Gate 1 holds the seat)
+    assert.ok(at(A.H).distanceTo(hand) < 1e-6 && deg(A.H.getWorldQuaternion(new THREE.Quaternion()), handQ) < 0.1, `the hand moved ${(at(A.H).distanceTo(hand) * 1000).toFixed(3)} mm, ${deg(A.H.getWorldQuaternion(new THREE.Quaternion()), handQ).toFixed(3)} degrees`);
+    // (and lifted the way fingers lift, a few degrees at the knuckles, not flung open)
+    for (const segs of R.fingers.R) for (const { b } of segs) assert.ok(b.quaternion.angleTo(R.grips.hold.R.get(b.name)) < 0.35, `${b.name} turned ${(b.quaternion.angleTo(R.grips.hold.R.get(b.name)) * 57.3).toFixed(1)} degrees off the hold`);
+  }
+});
+
+test("your fingers round the reel's knob stay out of it all the way round a turn, on the pier reel and the bigger beach reel", () => {
+  // (the beach reel is the same reel made 1.3 times the size, the hand the same: its knob was 3 mm into the fingers)
+  const BEACH = { name: "Beachcaster", seat: 0.68, reel: 1.3, handle: [[0, 0.03, 0.018, "seat"], [0.03, 0.62, 0.0165, "grip"]] };
+  for (const [rod, big] of [[PIER, false], [BEACH, true]]) {
+    const knob = KNOB_PROFILE.map(([z, r, s]) => [z * (rod.reel || 1), r * (rod.reel || 1), s]), prof = handleProfile(rod, true), P = place(rigP0());
+    let worstBefore = 0;
+    for (const row of TURN) {
+      pose(P, [crankSpec(P, row), seatSpec(P)], 3);
+      const sock = crankSpec(P, row).sock; worstBefore = Math.max(worstBefore, ...Object.values(inside(sock, knob, "L", true)));
+      pose(P, [{ ...crankSpec(P, row), prof: knob, profAxis: "x" }, { ...seatSpec(P), prof }], 3);
+      const after = inside(sock, knob, "L", true), w = Math.max(...Object.values(after)), seat = Math.max(...Object.values(intoHandle(P, prof)));
+      // (on the bigger knob the knuckle's own skin, which the hand carries as much as the finger, can stay under a millimetre in)
+      assert.ok(w < (big ? 1 : 0.3), `${rod.name}, knob at ${row.th} degrees: a finger ${w.toFixed(2)} mm inside it (${JSON.stringify(after)})`);
+      assert.ok(seat < 0.3, `${rod.name}: a finger ${seat.toFixed(2)} mm inside the seat`);
+      const want = inReel(P, [row.hand_rod[0][3], row.hand_rod[1][3], row.hand_rod[2][3]]);
+      assert.ok(at(R.arm.L.H).distanceTo(want) < 0.001, "the hand where Gate 2 has it");
+    }
+    if (big) assert.ok(worstBefore > 2, `the beach reel's knob: ${worstBefore.toFixed(1)} mm into the fingers before`);
+  }
 });
 
 test("winding: the left hand and arm go round with the knob as in Gate 2's turns, wherever you look, arms unstretched", () => {
