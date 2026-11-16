@@ -141,8 +141,8 @@ test("the handle's outline: rodkit.glb's measured parts, scaled to each rod as t
   for (let i = 1; i < HANDLE_PROFILE.length; i++) assert.ok(HANDLE_PROFILE[i][0] > HANDLE_PROFILE[i - 1][0], "in order along the rod");
   const p = handleProfile(PIER, true);
   assert.ok(Math.abs(profileAt(p, 0.0).r - 0.0134) < 1e-4, "the barrel at the reel: 13.4 mm");
-  assert.ok(Math.abs(profileAt(p, 0.0205).r - 0.0169) < 1e-4 && profileAt(p, 0.0205).soft === 0, "the far trim: 16.9 mm, metal");
-  assert.ok(profileAt(p, 0.0013 + 0.0195).r > 0.0168, "a trim is seen from 1.2 mm either side, so it can't pass between two points of a finger");
+  assert.ok(Math.abs(profileAt(p, 0.0205).r - 0.0161) < 1e-4 && profileAt(p, 0.0205).soft === 0, "the far trim's collar: 16.1 mm, metal");
+  assert.ok(profileAt(p, 0.0175).r > 0.016, "a collar is seen from 1.2 mm either side, so it can't pass between two points of a finger");
   assert.equal(profileAt(p, -0.2).soft, 0.0015, "the rear grip is foam");
   // (a lighter rod: the handle shrinks with its grip, and the seat's place along it with the rod's)
   const river = handleProfile({ seat: 0.29, handle: [[0, 0.02, 0.014, "seat"], [0.02, 0.25, 0.0135, "cork"]] }, true);

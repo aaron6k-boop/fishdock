@@ -19,14 +19,14 @@ const HANDLE_SEAT = 0.45, HANDLE_R = 0.0152; // (the modelled handle's seat posi
 // ---- the handle's outline: how far from the rod's axis its surface is along it, for the hand that holds it ----
 // [along, radius, soft] in metres along the modelled handle, measured from rodkit.glb's own parts (the rear grip's
 // swell and taper, the seat's hood, its two blue trims, the barrel the reel's foot screws to, the lock nut's bevel, the
-// fore grip). soft: how far fingers may press in (EVA foam gives a little; metal none). fpRig.js keeps your fingers
-// outside it: holding the seat, the index finger lay 3.7 mm inside the lock nut and the thumb 2.4 mm, with the far blue
-// trim cutting through the index finger.
+// fore grip; the trims as the solid collars buildRod makes of them). soft: how far fingers may press in (EVA foam gives a
+// little; metal none). fpRig.js keeps your fingers outside it: holding the seat, the index finger lay 3.7 mm inside the
+// lock nut and the thumb 2.4 mm, with the far blue trim cutting through the index finger.
 const EVA = 0.0015;
 export const HANDLE_PROFILE = [
   [0.026, 0.0168, EVA], [0.055, 0.016, EVA], [0.09, 0.0162, EVA], [0.18, 0.0165, EVA], [0.245, 0.0163, EVA], [0.305, 0.0157, EVA], [0.365, 0.015, EVA], [0.398, 0.0146, EVA],
-  [0.4, 0.0152, 0], [0.41, 0.0158, 0], [0.424, 0.0156, 0], [0.425, 0.0167, 0], [0.4275, 0.0167, 0], [0.4285, 0.0134, 0],
-  [0.469, 0.0134, 0], [0.4695, 0.0169, 0], [0.4715, 0.0169, 0], [0.472, 0.0136, 0], [0.475, 0.0156, 0], [0.48, 0.016, 0], [0.495, 0.016, 0], [0.5, 0.0154, 0],
+  [0.4, 0.0152, 0], [0.41, 0.0158, 0], [0.424, 0.0156, 0], [0.4245, 0.0161, 0], [0.4285, 0.0161, 0], [0.429, 0.0134, 0],
+  [0.468, 0.0134, 0], [0.4685, 0.0161, 0], [0.4725, 0.0161, 0], [0.475, 0.0156, 0], [0.48, 0.016, 0], [0.495, 0.016, 0], [0.5, 0.0154, 0],
   [0.501, 0.0146, EVA], [0.56, 0.0145, EVA], [0.6, 0.014, EVA], [0.64, 0.0133, EVA], [0.66, 0.0122, EVA],
 ];
 // the reel's knob, the same way: [along, radius, soft] along the crank's own x (out from the arm) from its middle, as
@@ -182,6 +182,16 @@ export function buildRod(scene, R) {
   const H = scene.getObjectByName("rodhandle"), B = scene.getObjectByName("blank"), G = scene.getObjectByName("guide"), W = scene.getObjectByName("wrap"), T = scene.getObjectByName("tiptop");
   if (!H || !B || !G || !W || !T) return null;
   const group = new THREE.Group();
+  // (the seat's two blue trims made solid collars, 4 mm wide, flush with the hood and the lock nut and down to the
+  // barrel: modelled as 1 mm rings standing 3.5 mm proud of the barrel with nothing under them, they showed as loose
+  // wire hoops round the seat, one passing between your fingers)
+  for (const [name, z0] of [["seat_trimA", 0.4245], ["seat_trimB", 0.4685]]) {
+    const o = H.getObjectByName(name); if (!o?.isMesh || o.userData.collar) continue;
+    const w = 0.004, r0 = 0.0134, r1 = 0.0161, c = 0.0006;
+    const g = new THREE.LatheGeometry([[r0, z0], [r1 - c, z0], [r1, z0 + c], [r1, z0 + w - c], [r1 - c, z0 + w], [r0, z0 + w]].map(([r, z]) => new THREE.Vector2(r, z)), 32);
+    g.rotateX(Math.PI / 2); g.computeVertexNormals();
+    o.geometry = g; o.position.set(0, 0, 0); o.quaternion.identity(); o.scale.set(1, 1, 1); o.userData.collar = true;
+  }
   // the handle: scaled along to this rod's seat and round to its grip
   const handle = mergeOwn(H); const gripR = (R.handle[1] && R.handle[1][2]) || HANDLE_R;
   handle.scale.set(gripR / HANDLE_R, gripR / HANDLE_R, R.seat / HANDLE_SEAT); group.add(handle);
