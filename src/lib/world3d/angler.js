@@ -19,7 +19,7 @@ import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
 import { createFpRig, castAt as rigCastAt, rodFrame, holdView, bodyUp } from "./fpRig.js";
 import { loadPart, fitNet } from "./glbParts.js";
-import { fitRodReel, buildRod, rodWet } from "./rodKit.js";
+import { fitRodReel, buildRod, rodWet, handleProfile, KNOB_PROFILE } from "./rodKit.js";
 import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
 import { contactShadow } from "./contactShadow.js";
 import { FILM } from "./film.js";
@@ -277,6 +277,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the rod and reel modelled in Blender (public/models/rodkit.glb, rodKit.js), in place of the simple ones once they've
   // loaded: the same curve bends it, the same handle angle turns the reel (the simple parts are then hidden, not drawn)
   let rodKit = null;
+  // (the handle's outline about the reel, for keeping your fingers out of it in first person: rodKit.js, once per rod)
+  const profs = new Map(), profOf = (rod, kit) => { const k = `${rod.name}|${kit}`; if (!profs.has(k)) profs.set(k, handleProfile(rod, kit)); return profs.get(k); };
+  const knobProf = (rod) => { const k = `${rod.name}|knob`; if (!profs.has(k)) profs.set(k, KNOB_PROFILE.map(([z, r, s]) => [z * (rod.reel || 1), r * (rod.reel || 1), s])); return profs.get(k); };
   loadPart("rodkit").then((sc) => {
     if (!fitRodReel(reel, sc)) return;
     rodKit = buildRod(sc, R); if (!rodKit) return;
@@ -1429,14 +1432,14 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     else if (held) {
       // (sock: the grip's frame on the reel itself: its foot on the rod, z to the tip, the reel below. The hands are set
       // from it, so they go wherever the reel goes and can't drift off it)
-      hands[1] = { ...rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"), stem: along(R.seat).p, sock: { pos: reel.position.clone(), quat: reel.quaternion.clone() }, wristFree: fp && fpCast ? 1.0 * fpCast.k : 0, anat: fp && fpCast ? fpCast.k : 0, trigger: fp && fpCast ? fpCast.trigger : 0 }; // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below
+      hands[1] = { ...rodGrip(R.seat - 0.03, V3(-1, 0.15, 0), "seat"), stem: along(R.seat).p, sock: { pos: reel.position.clone(), quat: reel.quaternion.clone() }, prof: profOf(R, !!rodKit), wristFree: fp && fpCast ? 1.0 * fpCast.k : 0, anat: fp && fpCast ? fpCast.k : 0, trigger: fp && fpCast ? fpCast.trigger : 0 }; // on the side of the rod at the reel seat, palm in, thumb along the top, the reel's stem between the fingers below
       // the other hand: on the butt to cast, on the reel's handle to wind (while a fish is on and landing it); free
       // while you wait
       // (in first person, holding the rod while you wait, the left hand rests lightly on the knob, ready: it hung in the
       // corner of the view with a finger up before)
       // (seen from outside, taking the rod out of its rest and holding it ready through a bite, the left hand's on the
       // butt too)
-      hands[0] = ph === "cast" && age < 2.4 && !fp ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : !fp && (ph === "cast" || ph === "bite" || ph === "missed" || ph === "waiting" || ph === "idle") ? rodGrip(0.14, V3(1, 0.2, 0), "butt") : ph === "cast" && fp && fpCast?.both ? (() => { const a = along(0.065); return { at: a.p, axis: a.t, palm: V3(1, 0.2, 0), kind: "butt", anat: fpCast.k, sock: { pos: a.p.clone(), quat: frame(a.t) } }; })() /* (first person: the left hand round the butt, the pulling hand of the cast, in the grip made for it: grips.js "butt_l") */ : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() } } : null;
+      hands[0] = ph === "cast" && age < 2.4 && !fp ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : !fp && (ph === "cast" || ph === "bite" || ph === "missed" || ph === "waiting" || ph === "idle") ? rodGrip(0.14, V3(1, 0.2, 0), "butt") : ph === "cast" && fp && fpCast?.both ? (() => { const a = along(0.065); return { at: a.p, axis: a.t, palm: V3(1, 0.2, 0), kind: "butt", anat: fpCast.k, sock: { pos: a.p.clone(), quat: frame(a.t) } }; })() /* (first person: the left hand round the butt, the pulling hand of the cast, in the grip made for it: grips.js "butt_l") */ : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() }, prof: rodKit ? knobProf(R) : null, profAxis: "x" } : null;
     }
     // (reaching down to the rod in its rest, seen from outside: the knees bend to it, less as it comes up)
     if (!fp && held && !walking && inHand < 1) { const r = along(R.seat).p; crouch = Math.max(crouch, clamp((1.02 - r.y) * 0.9, 0, 0.35)); lean = Math.max(lean, 0.1 * (1 - lift)); lookAtW = toWorld(r); }
