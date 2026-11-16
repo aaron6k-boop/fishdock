@@ -5,6 +5,7 @@
 import * as THREE from "three";
 import { createFftSea } from "./fftSea.js";
 import { installFogScatter, SCATTER } from "./fogScatter.js";
+import { installSunShade, updateClouds, CLOUDS, CLOUD_GLSL, nearShadowLight, placeNear } from "./sunShade.js";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
@@ -204,6 +205,7 @@ function speckle(g, w, h, base, spread, n = 2600, size = 2) {
 
 export function createEnvironment(scene, { venue = "pier", quality = 1, real = null, pano = null, post = false } = {}) {
   installFogScatter(); // (before any material is made: the haze glows towards the sun)
+  installSunShade(); // (and the clouds' shadows, and the near shadow map's place in the light loop: sunShade.js)
   const L = layoutFor(venue);
   const group = new THREE.Group(); scene.add(group);
   const U = {
@@ -254,6 +256,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // (the shadows' box follows the camera, a 2 m step at a time so their edges don't crawl)
   if (quality >= 1) { sun.castShadow = true; sun.shadow.mapSize.set(LQ.shadowMap, LQ.shadowMap); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 240 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02; }
   group.add(hemi, sun, sun.target);
+  // the near shadow map's light (sunShade.js): after the sun, so it is the second directional light; off until switched on
+  const nearSun = nearShadowLight(); group.add(nearSun, nearSun.target);
   scene.fog = new THREE.FogExp2(0xb8c8d4, 0.0006);
 
   // ---- water ----
@@ -266,6 +270,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
     uNrm: { value: null }, uNrmOn: { value: 0 },
     uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() }, uFdSun: { value: new THREE.Vector3() },
+    fdCloudA: { value: CLOUDS.a }, fdCloudB: { value: CLOUDS.b }, fdCamX: { value: CLOUDS.camX }, fdCamY: { value: CLOUDS.camY }, // (the clouds' shadows, sunShade.js)
     // the spectrum sea (fftSea.js, Ultra): its displacement and slope maps, the size of each cascade's tile, and how
     // much of the sine-train chop stays under it (the trains carry the swell; the CPU rides the same trains)
     uDbg: { value: 0 }, uFft: { value: 0 }, uFoam0: { value: null }, uDisp0: { value: null }, uDer0: { value: null }, uDer1: { value: null }, uL0: { value: 180 }, uL1: { value: 22 }, uChop: { value: 1 },
@@ -338,6 +343,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
       uniform sampler2D uShore, uShoreF, uNrm, uRefl; uniform float uShoreFHalf, uNrmOn, uReflOn; uniform mat4 uReflMat; uniform vec3 uFdSun;
       uniform float uFft, uL0, uL1, uDbg; uniform sampler2D uDer0, uDer1, uFoam0;
+      uniform vec3 fdCamX, fdCamY;
+` + CLOUD_GLSL + /* glsl */`
       // the scene's own light (linear, before the tone curve) to the display colours the water works in: the same
       // neutral curve and sRGB the rest of the picture gets at the end (post.js OutputPass), so the mirrored dune and
       // town match the real ones
@@ -453,6 +460,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // (at dusk the water keeps more of its light: it went near-black under a sky still bright, as on the 6 November
         // recording, where the real sea at that hour mirrors the sky's glow)
         float lit = uDay + uDusk*.75 + uNight*.12, dim = 1. - .25*smoothstep(.5, 1., uCloud) - .15*uRain;
+        // (under a cloud's shadow, drifting over the sea: no glitter, and the water's own sunlit colour darker. sunShade.js)
+        float fdCl = fdCloudA.w > 0. ? fdCloudAt(vec2(dot(fdCamX, vW) - fdCloudB.y, dot(fdCamY, vW) - fdCloudB.z)) : 1.;
         float sd = shoreDist(p), shallow = 1. - smoothstep(0., 16., sd);
         // looking down into it you see the deep colour; at a low angle more of the light scattered back out; the
         // shallows by the land are lighter and greener
@@ -480,11 +489,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // you at a glancing angle. At dusk most of all the water should carry the sky's colour, not a flat dark teal; it
         // read as green mud on a phone, 16 November)
         float Fr = F + (1. - F)*(.05 + .11*uDusk + .03*uNight)*(.4 + .6*clamp(uWind*1.5, 0., 1.));
+        body *= mix(1., fdCl, .55);
         vec3 col = mix(body, refl, clamp(Fr*1.05, 0., .9));
         // after dark the water still catches the glow of the sky and the town, enough to see the swell move
         col += vec3(.016, .020, .034)*uNight*(.4 + F*1.6)*(.8 + .4*smoothstep(-.3, .4, h));
         // the sun's glitter (a gold path at dusk, never a red one) and the moon's
-        float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud));
+        float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud))*fdCl;
         float sp = max(dot(rd, uSunDir), 0.);
         // (the sharp reflection broken up close by into sparkles on the small facets of the chop: whole, it lay in big
         // white blotches the shape of each wave's face, like paper cut-outs on the water)
@@ -824,7 +834,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // comes in over a few seconds instead of jumping (the first one, as the view opens, is applied at once) ----
   let target = null, cur = null;
   const EASE = 0.7; // per second
-  const lightDir = new THREE.Vector3(0.3, 0.5, -0.8), shadowAt = new THREE.Vector3();
+  const lightDir = new THREE.Vector3(0.3, 0.5, -0.8), shadowAt = new THREE.Vector3(), _fw = new THREE.Vector3();
   let look = lightingFor({ day: 1, dusk: 0, night: 0, cloud: 0.3, rain: 0, moonLight: 0 });
   const bolt = { next: null, pulses: [], flash: 0 }; // (the storm's lightning, update below)
   function apply(st) {
@@ -931,6 +941,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     reflect, setReflections, resizeReflections: (renderer) => { if (R.rt) sizeReflections(renderer); },
     get reflections() { return R.rt ? (R.every === 1 ? 2 : 1) : 0; },
     group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids, sun, // (sun: its shadows, set by Settings → Graphics)
+    /** the near shadow map on or off (sunShade.js; world.js, from Settings → Graphics). Every lit material is made again once */
+    setNearShadow(on) { on = !!on; if (nearSun.visible === on) return; nearSun.visible = on; nearSun.castShadow = on; if (!on) { nearSun.shadow.map?.dispose(); nearSun.shadow.map = null; } },
+    get nearShadow() { return nearSun.visible; },
     /** The sky (no stars, the sea below the horizon) for world.js's environment map. */
     envSky,
     /** The conditions as shown right now (eased) and their light (skyLook.js lightingFor). */
@@ -991,9 +1004,14 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       real?.treesUpdate?.(t, cam, wind, windDir); // (the trees' level of detail by distance, and their wind)
       if (real?.beacons) { const nt = cur ? Math.min(1, cur.night + cur.dusk * 0.6) : 0; for (const b of real.beacons) b(t, nt); }
       U.uTime.value = t; wU.uCam.value.set(Math.round(cam.position.x / 4) * 4, 0, Math.round(cam.position.z / 4) * 4);
-      // the shadows' box round the camera, moved a 2 m step at a time
-      const sx = Math.round(cam.position.x / 2) * 2, sz = Math.round(cam.position.z / 2) * 2;
+      // the shadows' box round the camera, moved a 2 m step at a time (with the near map on, which covers your feet, a
+      // third of its width ahead of you: behind you it was half spent on what you can't see)
+      let ax = cam.position.x, az = cam.position.z;
+      if (nearSun.visible) { cam.getWorldDirection(_fw); const h = Math.hypot(_fw.x, _fw.z) || 1, k = (sun.shadow.camera.right * 0.33) / h; ax += _fw.x * k; az += _fw.z * k; }
+      const sx = Math.round(ax / 2) * 2, sz = Math.round(az / 2) * 2;
       if (sx !== shadowAt.x || sz !== shadowAt.z) { shadowAt.set(sx, 0, sz); sun.position.copy(shadowAt).addScaledVector(lightDir, 120); sun.target.position.copy(shadowAt); }
+      if (nearSun.visible) placeNear(nearSun, cam, lightDir);
+      if (cur) { updateClouds({ sun, t, cloud: cur.cloud, day: cur.day, sunY: U.uSunDir.value.y }); if (FILM && typeof window !== "undefined" && window.__fdNoCloudShade) CLOUDS.a.w = 0; } // (film only: a before-and-after check without the clouds' shade, which moves)
       if (target && cur) {
         const k = 1 - Math.exp(-dt * EASE);
         let moved = false;
