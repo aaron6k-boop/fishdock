@@ -592,6 +592,30 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       }
     }
 
+    // ---- sitting in the chair (o.sit: { w 0 to 1 as far down as they've got, hips: [x, y, z] the hip joints' middle on the
+    // seat, feetZ, feetX: where the feet go in front; the figure's space, chair.js) ----
+    // The hips taken down and back onto the seat, the pelvis tipped back against the chair's back, each leg reaching from
+    // the hip to its foot flat on the deck in front, the knee bending up and forwards; as far as w, so sitting down and
+    // getting up go through every place between
+    st.sitW = o.sit && !walking ? clamp(o.sit.w || 0, 0, 1) : 0;
+    if (st.sitW > 0.001) {
+      const sw = st.sitW, S = o.sit;
+      const stand = {}; for (const s of ["L", "R"]) stand[s] = { p: wFig(wp(B(s + "_Foot"))), q: wq(B(s + "_Foot")) };
+      const hipNow = wFig(wp(B("L_Thigh")).add(wp(B("R_Thigh"))).multiplyScalar(0.5)), d = V(...S.hips).sub(hipNow).multiplyScalar(sw);
+      inner.position.x += d.x / k; inner.position.y += d.y / k; inner.position.z += d.z / k; root.updateMatrixWorld(true);
+      const right = figDirW(V(1, 0, 0));
+      // (leaning back in it, the head kept level; and forwards over the feet on the way down and up, as anyone sits down
+      // and gets up: the weight over the feet until the seat takes it)
+      const tip = (S.lean ?? 0.2) * sw - 0.42 * Math.sin(Math.PI * sw);
+      turnW(B("Pelvis"), right, tip); turnW(B("Neck"), right, -0.3 * tip);
+      for (const [s, sx] of [["L", -1], ["R", 1]]) {
+        const sit = V(S.hips[0] + sx * (S.feetX ?? 0.12), stand[s].p.y, S.feetZ), tgt = stand[s].p.clone().lerp(sit, sw);
+        const hip = wp(B(s + "_Thigh")), knee0 = wp(B(s + "_Calf")), L1 = hip.distanceTo(knee0), L2 = knee0.distanceTo(wp(B(s + "_Foot")));
+        const r = twoBone(hip, figW(tgt), L1, L2, figDirW(V(sx * 0.12, 0.55, -1)));
+        aim(B(s + "_Thigh"), B(s + "_Calf"), r.B); aim(B(s + "_Calf"), B(s + "_Foot"), r.C); setWQ(B(s + "_Foot"), stand[s].q);
+      }
+    }
+
     // ---- the feet on the deck: a foot that's come down stays where it landed until it lifts (no sliding however the
     // walk is blended, turned or sped up), set on the ground's own height there; the hips drop if a leg can't reach ----
     // (on the whole time you're walking about: coming to a stop, the feet stay where they came down rather than
@@ -748,6 +772,9 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         else if (em.kind === "cheer") spec = { at: shF.clone().add(V(sg * 0.14, 0.48 + 0.05 * Math.sin(u * 8 + i), -0.04)), kind: "cheer", palm: V(0, 0, -1), pole: V(sg, 0, 0.3) };
         else if (em.kind === "clap") spec = { at: chest.clone().add(V(sg * (0.02 + 0.07 * Math.max(0, Math.sin(u * 11))), 0.06, -0.3)), kind: "clap", palm: V(-sg, 0, 0), pole: V(sg, -0.6, 0.15) };
       }
+      // (sitting, hands resting on the thighs: the wrist a little past the middle of the thigh, palm down, fingers towards
+      // the knee)
+      if (!spec && o.idle === "lap" && st.sitW > 0.4) { const hp = wFig(wp(B(s + "_Thigh"))), kn = wFig(wp(B(s + "_Calf"))); spec = { at: hp.clone().lerp(kn, 0.5).add(V(sg * 0.015, 0.075, 0)), kind: "lap", palm: V(0, -1, 0), pole: V(sg * 0.8, -0.4, 0.35) }; }
       if (!spec && o.idle === "fold" && standing) { const chest = wFig(wp(B("Spine2"))); spec = { at: chest.clone().add(V(-sg * 0.08, 0.03 + (i ? 0.02 : 0), -0.2)), kind: "fold", pole: V(sg * 0.8, -0.45, -0.3), palm: V(0, 0, 1) }; }
       // ease on and off: a free hand goes back to the motion capture
       if (spec) { hs.last = spec; hs.w = Math.min(1, hs.w + dt / 0.3); } else hs.w = Math.max(0, hs.w - dt / 0.35);

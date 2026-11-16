@@ -138,7 +138,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
             if (o.landed && !phases.current[id].landed) { phases.current[id].landed = true; props.current.onLanded?.(id, o.info.ev); }
           }
         });
-        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.fishCam === "cinematic"); W.current?.setTorch(v0.torch || "off"); W.current?.setGfx(effectiveGfx(q, v0.gfxC, !!v0.battery)); }
+        { const v0 = loadView(); W.current?.look.setFeel({ sens: LOOK_SENS[v0.look] ?? 1, smooth: v0.smooth !== false }); W.current?.setLandShot(v0.fishCam === "cinematic"); W.current?.setTorch(v0.torch || "off"); W.current?.setSit(v0.sit !== false); W.current?.setGfx(effectiveGfx(q, v0.gfxC, !!v0.battery)); }
         usedQ.current = q;
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
@@ -212,6 +212,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
     setMode: (m) => { W.current?.setMode(m); setMode(W.current?.mode || m); },
     lookAtRod: () => W.current?.lookAtRod(), lookAtAngler: (id) => W.current?.lookAtAngler(id), lookAtFish: (id) => W.current?.lookAtFish(id),
     setTorch: (c) => W.current?.setTorch(c),
+    setSit: (on) => W.current?.setSit(on),
     setTrack: (on) => W.current?.setTrack(on), setLandShot: (on) => W.current?.setLandShot(on),
     inspectFish: (on) => W.current?.inspectFish(on), keepFish: () => W.current?.keepFish(), releaseFish: () => W.current?.releaseFish(),
     setSpeaking: (id, on) => W.current?.setSpeaking(id, on), say: (id, text) => W.current?.say(id, text),

@@ -272,6 +272,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   const world = new THREE.Group(); scene.add(world);
   const look = createLook({ pitch: -0.12 });
   let homeFor = null;
+  let sitOn = true; // (Settings → Sit while you wait: your own angler sits in the chair once the cast has settled)
   let mode = "first", focusId = null, localId = null, anglers = new Map(), envState = { swell: 0.3, wind: 0.3, windDir: [0.3, -1], kind: 0 };
   let landShot = null, landShotOn = true, lastFight = null, dipAt = null; // (dipAt: a cut in the landing shot comes up from black over a third of a second, rather than jumping) // the landing shot (see updateCamera); turned to watch your fish go back
   let followId = null, followUntil = 0, steering = false; // watching another angler's catch; the camera steering itself
@@ -326,7 +327,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         if (x) x.a.dispose();
         // only your own angler is felt (other people's catches arrive as a party notification instead)
         const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, look: a.look || null, local: !!a.local, real: !!a.real, fineHands: Q.q >= 2, rail: !!real && (venue === "pier" || venue === "estuary"), onSound: (n, p, d) => onSound?.(n, p, a.id, d), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
-        made.onSplash(splash); made.onRipple(ripple);
+        made.onSplash(splash); made.onRipple(ripple); if (a.local) made.setSit(sitOn);
         x = { a: made, spotId: a.spot, outfit: a.outfit, lookKey, name: a.name, out: null };
         anglers.set(a.id, x);
       }
@@ -1147,6 +1148,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     setTipLight(m) { tipMode = m === "on" || m === "off" ? m : "auto"; },
     /** Your head torch: "off", "white", "red" or "green". */
     setTorch(c) { torch.set(c); },
+    /** Settings → Sit while you wait: your angler sits in the chair behind the rod once the cast has settled (chair.js) */
+    setSit(on) { sitOn = on !== false; anglers.get(localId)?.a.setSit(sitOn); },
     get torch() { return torch.colour; },
     setTrack(on) { track = !!on && !reduceMotion; },
     /** the landing shot (the camera stepping back beside you to land a fish): on, or stay where you are */
