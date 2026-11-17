@@ -1819,6 +1819,358 @@
      "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_05/namaqualand_boulder_05_arm_1k.jpg"
     }
    ]
+  },
+  {
+   "id": "commons:fish-skin-cod",
+   "name": "Gadus morhua",
+   "source": "https://commons.wikimedia.org/wiki/File:Gadus_morhua.jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "2400x1800 (a copy 1920x1440 used)",
+   "use": "the cod's skin in the 3D view (public/fish/skin/cod.webp, cod-m.webp and its normal maps cod_n.webp, cod_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/cod_24.jpg",
+     "bytes": 202491,
+     "sha256": "dcaecda59366b022784df0a19ab9ff70d479d2b410e61fd99c8579d16beba3cb",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/8/80/Gadus_morhua.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-bass",
+   "name": "Dicentrarchus labrax (Belgium)",
+   "source": "https://commons.wikimedia.org/wiki/File:Dicentrarchus_labrax_(Belgium).jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "2400x1800 (a copy 1920x1440 used)",
+   "use": "the bass's skin in the 3D view (public/fish/skin/bass.webp, bass-m.webp and its normal maps bass_n.webp, bass_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/bass_3.jpg",
+     "bytes": 286854,
+     "sha256": "6426386ed7f2e8b0c5bbd4be6b3839b5dbdfc65d663b8f7e34caf4ef654cd425",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/c/c0/Dicentrarchus_labrax_%28Belgium%29.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-mackerel",
+   "name": "Scomber scombrus",
+   "source": "https://commons.wikimedia.org/wiki/File:Scomber_scombrus.jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "2955x2216 (a copy 1920x1440 used)",
+   "use": "the mackerel's skin in the 3D view (public/fish/skin/mackerel.webp, mackerel-m.webp and its normal maps mackerel_n.webp, mackerel_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/mackerel_0.jpg",
+     "bytes": 175430,
+     "sha256": "9d9071fa64dd423a922a37f8ab4233198424e8e8d6617d554cfc85870c2e7233",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Scomber_scombrus.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-whiting",
+   "name": "Ecomare - wijting (wijting-3617-ogb)",
+   "source": "https://commons.wikimedia.org/wiki/File:Ecomare_-_wijting_(wijting-3617-ogb).jpg",
+   "author": "Ecomare/Oscar Bos",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Ecomare/Oscar Bos, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "3888x2592 (a copy 1920x1280 used)",
+   "use": "the whiting's skin in the 3D view (public/fish/skin/whiting.webp, whiting-m.webp and its normal maps whiting_n.webp, whiting_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/whiting_13.jpg",
+     "bytes": 264744,
+     "sha256": "3b2d0b6a5f3b2fbd55027840425e2b075e798c431ef7365fb6301b1e9a0fa49a",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/2/25/Ecomare_-_wijting_%28wijting-3617-ogb%29.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-pollack",
+   "name": "Lieu jaune (Pollachius pollachius) (Ifremer 00528-63951 - 6907)",
+   "source": "https://commons.wikimedia.org/wiki/File:Lieu_jaune_(Pollachius_pollachius)_(Ifremer_00528-63951_-_6907).jpg",
+   "author": "Stephane Lesbats (Ifremer)",
+   "licence": "CC BY 4.0",
+   "attribution": "Required: photo by Stephane Lesbats (Ifremer), CC BY 4.0, via Wikimedia Commons. The adapted skin is offered under the same licence.",
+   "type": "photographs",
+   "resolution": "2976x1958 (a copy 1920x1263 used)",
+   "use": "the pollack's skin in the 3D view (public/fish/skin/pollack.webp, pollack-m.webp and its normal maps pollack_n.webp, pollack_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/pollack_4.jpg",
+     "bytes": 298567,
+     "sha256": "0d03a9d19b7497cb2886532d09994eedc55dff777f3d12af41fba479b460261e",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/2/29/Lieu_jaune_%28Pollachius_pollachius%29_%28Ifremer_00528-63951_-_6907%29.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-pouting",
+   "name": "Big pouting Holland on a white background",
+   "source": "https://commons.wikimedia.org/wiki/File:Big_pouting_Holland_on_a_white_background.jpg",
+   "author": "Peter van der Sluijs",
+   "licence": "CC BY-SA 3.0",
+   "attribution": "Required: photo by Peter van der Sluijs, CC BY-SA 3.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 3.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "1600x1104 (a copy 1600x1104 used)",
+   "use": "the pouting's skin in the 3D view (public/fish/skin/pouting.webp, pouting-m.webp and its normal maps pouting_n.webp, pouting_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/pouting_12.jpg",
+     "bytes": 258523,
+     "sha256": "3cad66c4521181625a9822cc173cbc2a45870e5ee384ba1442fc09a33be2488a",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Big_pouting_Holland_on_a_white_background.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-flounder",
+   "name": "Platichthys flesus 1",
+   "source": "https://commons.wikimedia.org/wiki/File:Platichthys_flesus_1.jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "3400x2550 (a copy 1920x1440 used)",
+   "use": "the flounder's skin in the 3D view (public/fish/skin/flounder.webp, flounder-m.webp and its normal maps flounder_n.webp, flounder_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/flounder_0.jpg",
+     "bytes": 390177,
+     "sha256": "6ec721b8af27d7db32a90e0dc0226f4df9dc240629f551705b8ff63a815d11fa",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/2/22/Platichthys_flesus_1.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-plaice",
+   "name": "Pleuronectes platessa",
+   "source": "https://commons.wikimedia.org/wiki/File:Pleuronectes_platessa.jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "1024x771 (a copy 1024x771 used)",
+   "use": "the plaice's skin in the 3D view (public/fish/skin/plaice.webp, plaice-m.webp and its normal maps plaice_n.webp, plaice_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/plaice_0.jpg",
+     "bytes": 103717,
+     "sha256": "c5ed1a002db3232271a2aec2915127b8dc74c5be91c8e1da8d1dfa285f93b38f",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/9/95/Pleuronectes_platessa.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-dab",
+   "name": "Limanda limanda",
+   "source": "https://commons.wikimedia.org/wiki/File:Limanda_limanda.jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "1024x771 (a copy 1024x771 used)",
+   "use": "the dab's skin in the 3D view (public/fish/skin/dab.webp, dab-m.webp and its normal maps dab_n.webp, dab_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/dab_0.jpg",
+     "bytes": 111556,
+     "sha256": "be97edbabbe2f4beeab454cefd55cbe3117a4d1d8a07bd68feee1b0454ca7c6b",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/9/9c/Limanda_limanda.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-sole",
+   "name": "Solea solea 1",
+   "source": "https://commons.wikimedia.org/wiki/File:Solea_solea_1.jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "3106x2330 (a copy 1920x1440 used)",
+   "use": "the sole's skin in the 3D view (public/fish/skin/sole.webp, sole-m.webp and its normal maps sole_n.webp, sole_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/sole_0.jpg",
+     "bytes": 360067,
+     "sha256": "d92d1982bce9ac91b54fd62da8ed2f0070e452ee39fb717ee33ad9cedf0c5273",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Solea_solea_1.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-ballan-wrasse",
+   "name": "Labrus bergylta, North Sea, England, GB imported from iNaturalist photo 223571571",
+   "source": "https://commons.wikimedia.org/wiki/File:Labrus_bergylta,_North_Sea,_England,_GB_imported_from_iNaturalist_photo_223571571.jpg",
+   "author": "rmjb (iNaturalist)",
+   "licence": "CC BY 4.0",
+   "attribution": "Required: photo by rmjb (iNaturalist), CC BY 4.0, via Wikimedia Commons. The adapted skin is offered under the same licence.",
+   "type": "photographs",
+   "resolution": "2048x1536 (a copy 1440x1080 used)",
+   "use": "the ballan wrasse's skin in the 3D view (public/fish/skin/ballan-wrasse.webp, ballan-wrasse-m.webp and its normal maps ballan-wrasse_n.webp, ballan-wrasse_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/ballan-wrasse_19.jpg",
+     "bytes": 421811,
+     "sha256": "e2ba7107f786b724c6b89726664b9c3f35401d6db404bf3d277390ba9cfe847c",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/2/2a/Labrus_bergylta%2C_North_Sea%2C_England%2C_GB_imported_from_iNaturalist_photo_223571571.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-black-bream",
+   "name": "Chopa (Spondyliosoma cantharus), isla de Mouro, Santander, España, 2019-08-14, DD 20",
+   "source": "https://commons.wikimedia.org/wiki/File:Chopa_(Spondyliosoma_cantharus),_isla_de_Mouro,_Santander,_Espa%C3%B1a,_2019-08-14,_DD_20.jpg",
+   "author": "Diego Delso",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Diego Delso, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "2634x1756 (a copy 1800x1200 used)",
+   "use": "the black bream's skin in the 3D view (public/fish/skin/black-bream.webp, black-bream-m.webp and its normal maps black-bream_n.webp, black-bream_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/black-bream_23.jpg",
+     "bytes": 328000,
+     "sha256": "c5dcde4a4586d57f6a2683dc6d82126a41a27996f1bf6d4d1a7ac2fbf2ebc008",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Chopa_%28Spondyliosoma_cantharus%29%2C_isla_de_Mouro%2C_Santander%2C_Espa%C3%B1a%2C_2019-08-14%2C_DD_20.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-garfish",
+   "name": "Ecomare - geep (geep-4296-ogb)",
+   "source": "https://commons.wikimedia.org/wiki/File:Ecomare_-_geep_(geep-4296-ogb).jpg",
+   "author": "Ecomare/Oscar Bos",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Ecomare/Oscar Bos, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "3888x2592 (a copy 1800x1200 used)",
+   "use": "the garfish's skin in the 3D view (public/fish/skin/garfish.webp, garfish-m.webp and its normal maps garfish_n.webp, garfish_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/garfish_29.jpg",
+     "bytes": 262880,
+     "sha256": "884fdc4fe1e9e354881e44f24562c9f02a2620ef903c9018920fca7e1842350c",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/2/27/Ecomare_-_geep_%28geep-4296-ogb%29.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-smoothhound",
+   "name": "Mustelus asterias",
+   "source": "https://commons.wikimedia.org/wiki/File:Mustelus_asterias.jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "3000x2250 (a copy 1800x1350 used)",
+   "use": "the starry smooth-hound's skin in the 3D view (public/fish/skin/smoothhound.webp, smoothhound-m.webp and its normal maps smoothhound_n.webp, smoothhound_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/smoothhound_16.jpg",
+     "bytes": 89901,
+     "sha256": "117ad9ed0181f78bac246b1252457e52d487ba02085204078bce21f7563ce5e1",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/f/fb/Mustelus_asterias.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-thick-lipped-mullet",
+   "name": "Chelon labrosus - dicklippige meeräsche - 0336",
+   "source": "https://commons.wikimedia.org/wiki/File:Chelon_labrosus_-_dicklippige_meer%C3%A4sche_-_0336.jpg",
+   "author": "Amada44",
+   "licence": "CC BY-SA 3.0",
+   "attribution": "Required: photo by Amada44, CC BY-SA 3.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 3.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "4632x2131 (a copy 1800x828 used)",
+   "use": "the thick-lipped grey mullet's skin in the 3D view (public/fish/skin/thick-lipped-mullet.webp, thick-lipped-mullet-m.webp and its normal maps thick-lipped-mullet_n.webp, thick-lipped-mullet_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/thick-lipped-mullet_2.jpg",
+     "bytes": 231387,
+     "sha256": "05a3d62b58f20f7f1b030f1a597ff89ae0d618bdae5f723f27f823dc5ce1b993",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Chelon_labrosus_-_dicklippige_meer%C3%A4sche_-_0336.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-coalfish",
+   "name": "Pollachius virens, Tromsø 2007",
+   "source": "https://commons.wikimedia.org/wiki/File:Pollachius_virens,_Troms%C3%B8_2007.jpg",
+   "author": "Arnstein Rønning",
+   "licence": "CC BY-SA 3.0",
+   "attribution": "Required: photo by Arnstein Rønning, CC BY-SA 3.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 3.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "2100x1373 (a copy 1440x941 used)",
+   "use": "the coalfish's skin in the 3D view (public/fish/skin/coalfish.webp, coalfish-m.webp and its normal maps coalfish_n.webp, coalfish_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/coalfish_7.jpg",
+     "bytes": 323246,
+     "sha256": "1f2e8d524d1d0aeeb94b4714d7c615a7945f264479da37b3ce0fbd8199330b1c",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/7/70/Pollachius_virens%2C_Troms%C3%B8_2007.jpg"
+    }
+   ]
+  },
+  {
+   "id": "commons:fish-skin-thornback-ray",
+   "name": "Raja clavata (juv)",
+   "source": "https://commons.wikimedia.org/wiki/File:Raja_clavata_(juv).jpg",
+   "author": "Hans Hillewaert",
+   "licence": "CC BY-SA 4.0",
+   "attribution": "Required: photo by Hans Hillewaert, CC BY-SA 4.0, via Wikimedia Commons. The adapted skin is itself CC BY-SA 4.0 (share-alike).",
+   "type": "photographs",
+   "resolution": "3446x2585 (a copy 1800x1350 used)",
+   "use": "the thornback ray's skin in the 3D view (public/fish/skin/thornback-ray.webp, thornback-ray-m.webp and its normal maps thornback-ray_n.webp, thornback-ray_n-m.webp): the fish cut out, warped onto the frame of FishDock's own picture of it, the fins redrawn where folded, the pectoral fin painted from the model's shape, the photograph's highlights taken down (source-assets/fish-skins/skins.py)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/commons-fish/thornback-ray_0.jpg",
+     "bytes": 174694,
+     "sha256": "af63777b7a443276a663c8e6e0d7fdedc303c34a3bd611444e1943d413909ccb",
+     "url": "https://upload.wikimedia.org/wikipedia/commons/3/36/Raja_clavata_%28juv%29.jpg"
+    }
+   ]
+  },
+  {
+   "id": "fishdock:fish-skins-drawn",
+   "name": "Fish skins from FishDock's own pictures (generated)",
+   "source": "source-assets/fish-skins/skins.py",
+   "author": "FishDock",
+   "licence": "Made for FishDock: no outside image",
+   "attribution": "None needed",
+   "type": "textures",
+   "resolution": "1920x1280 and 960x640",
+   "use": "the gurnard's, tope's, lesser-spotted dogfish's, conger's and eel's skins in the 3D view (public/fish/skin/): FishDock's own picture of each enlarged four times and sharpened, with drawn fin rays, spots and a normal map",
+   "files": []
   }
  ]
 }

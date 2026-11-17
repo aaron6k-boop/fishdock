@@ -88,3 +88,48 @@ run through the hands for the drop net, and a shoe's steps on concrete (cut by s
 And later the same day, from the same library and licence, all by Joseph Sardin: three claps of thunder, near to far,
 one strike of a small bell for the rod-tip bell, drops of water and water swirling for the net draining and going in,
 and slaps (made duller) for a fish's tail on the mat (cut by source-assets/prepare_sounds3.py).
+
+The 3D fish's skins (public/fish/skin/: <species>.webp and -m.webp, with their normal maps _n.webp and _n-m.webp) are
+made by source-assets/fish-skins/skins.py from one photograph of each species, via Wikimedia Commons. Changes made to
+each: the fish cut out of its background and turned level, warped onto the frame of FishDock's own picture of the
+species (whose outline its 3D model follows), its fins redrawn in their own colours where the photograph shows them
+folded or cut off, its pectoral fin painted afresh in the model's shape, its highlights and colour cast evened out,
+enlarged where smaller than the skin, and a relief map made from its detail with drawn scales and fin rays. Each adapted
+skin is offered under its photograph's licence (the CC BY-SA ones under that same licence, share-alike):
+- cod: "Gadus morhua" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Gadus_morhua.jpg
+- bass: "Dicentrarchus labrax (Belgium)" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Dicentrarchus_labrax_(Belgium).jpg
+- mackerel: "Scomber scombrus" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Scomber_scombrus.jpg
+- whiting: "Ecomare - wijting (wijting-3617-ogb)" by Ecomare/Oscar Bos, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Ecomare_-_wijting_(wijting-3617-ogb).jpg
+- pollack: "Lieu jaune (Pollachius pollachius) (Ifremer 00528-63951 - 6907)" by Stephane Lesbats (Ifremer), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/):
+  https://commons.wikimedia.org/wiki/File:Lieu_jaune_(Pollachius_pollachius)_(Ifremer_00528-63951_-_6907).jpg
+- pouting: "Big pouting Holland on a white background" by Peter van der Sluijs, CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/):
+  https://commons.wikimedia.org/wiki/File:Big_pouting_Holland_on_a_white_background.jpg
+- flounder: "Platichthys flesus 1" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Platichthys_flesus_1.jpg
+- plaice: "Pleuronectes platessa" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Pleuronectes_platessa.jpg
+- dab: "Limanda limanda" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Limanda_limanda.jpg
+- sole: "Solea solea 1" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Solea_solea_1.jpg
+- ballan wrasse: "Labrus bergylta, North Sea, England, GB imported from iNaturalist photo 223571571" by rmjb (iNaturalist), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/):
+  https://commons.wikimedia.org/wiki/File:Labrus_bergylta,_North_Sea,_England,_GB_imported_from_iNaturalist_photo_223571571.jpg
+- black bream: "Chopa (Spondyliosoma cantharus), isla de Mouro, Santander, España, 2019-08-14, DD 20" by Diego Delso, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Chopa_(Spondyliosoma_cantharus),_isla_de_Mouro,_Santander,_Espa%C3%B1a,_2019-08-14,_DD_20.jpg
+- garfish: "Ecomare - geep (geep-4296-ogb)" by Ecomare/Oscar Bos, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Ecomare_-_geep_(geep-4296-ogb).jpg
+- starry smooth-hound: "Mustelus asterias" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Mustelus_asterias.jpg
+- thick-lipped grey mullet: "Chelon labrosus - dicklippige meeräsche - 0336" by Amada44, CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/):
+  https://commons.wikimedia.org/wiki/File:Chelon_labrosus_-_dicklippige_meer%C3%A4sche_-_0336.jpg
+- coalfish: "Pollachius virens, Tromsø 2007" by Arnstein Rønning, CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/):
+  https://commons.wikimedia.org/wiki/File:Pollachius_virens,_Troms%C3%B8_2007.jpg
+- thornback ray: "Raja clavata (juv)" by Hans Hillewaert, CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/):
+  https://commons.wikimedia.org/wiki/File:Raja_clavata_(juv).jpg
+The gurnard's, tope's, lesser-spotted dogfish's, conger's and eel's skins are made the same way from FishDock's own
+pictures of them alone, no photograph. The photographs, with their pages and file hashes, are listed in
+source-assets/ASSET-LICENCES.json, and in the app under Settings, 3D fish skin credits.
