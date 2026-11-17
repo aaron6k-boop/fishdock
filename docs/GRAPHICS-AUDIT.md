@@ -108,7 +108,14 @@ render targets come on top), 261 shader programs. After: 240 geometries, 125 tex
    BigSoundBank (CC0 1.0): three rods and sticks swept through the air, single clicks of a ratchet, a rope run through
    the hands, and shoes on concrete, cut into short pieces and each played a little differently every time
    (`source-assets/prepare_sounds2.py`). Checked in the game: the recordings are fetched, decoded and played on the
-   cast. Still drawn: the bell, the thunder, the fish flapping on the mat, the net going in and the drips.
+   cast. Later the same day (#152): the rod-tip bell (a small bell's strike), thunder (three claps, near to far),
+   the drop net going in and draining, a fish's tail on the mat and another angler's reel running, recorded too.
+   Still drawn: the fish laid on the mat, the line under strain, and the bite alarm by a river or lake (an electronic
+   beeper, which is what a real one is).
+13. **The rod rest's heads drew as black torn shapes** against the sea, seen on Aaron's PC (1920 by 1080, Ultra): each
+   was two half tori left open at their ends, so from most places you saw into the tube past its own back faces.
+   **Changed:** each U's ends rounded off, the tube smoother, and the rubber a real black rubber's dark grey with a
+   soft sheen rather than near-black, so its shape shows.
 
 Looked at and found sound: tone mapping and exposure (one Neutral curve, exposure eased with the light), colour
 management (sRGB textures marked as such, linear lighting), anisotropic filtering, instancing, shader precompiling,
@@ -119,5 +126,15 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
 1. Temporal anti-aliasing (motion vectors for the custom shaders), for the shimmer in motion.
 2. KTX2 textures, and with them the 2K texture sets the PC launcher could carry (`docs/PC-ARCHITECTURE.md` section 4).
 3. The town: it is shown by photographs, as Aaron chose (10 November); modelled buildings would need his say.
-4. Frame rates for every preset at 1080p, 1440p and 4K on Aaron's PC, before and after (the benchmark), to confirm
-   the near shadow map's cost.
+4. Frame rates at 4K on Aaron's PC. Done for 1080p and 1440p (17 November, the live game after #151, Microsoft Edge
+   with its 3D view full screen, RTX 3090, Direct3D 11; average frames a second and GPU milliseconds a frame):
+
+   | Preset | 1920 by 1080 | drawn at | 2560 by 1440 | drawn at |
+   |---|---|---|---|---|
+   | Low | 273 fps, 1.6 ms | 1920 by 1080 | 272 fps, 1.6 ms | 2560 by 1440 |
+   | Medium | 200 fps, 4.7 ms | 1920 by 1080 | 202 fps, 5.1 ms | 2560 by 1440 |
+   | High | 144 fps, 6.7 ms | 3360 by 1890 | 110 fps, 8.9 ms | 4480 by 2520 |
+   | Ultra | 117 fps, 8.5 ms | 3840 by 2160 | 74 fps, 13.5 ms | 5120 by 2880 |
+
+   High and Ultra draw at up to twice the window's size and scale it down (supersampling); the slowest 1% of frames
+   on Ultra at 1440p ran at 47 fps. Headless, so no monitor's refresh rate capped them.
