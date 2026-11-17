@@ -160,6 +160,12 @@ let DIM = 1, WET = 0; const liveMats = new Set();
 const tint = (m) => m.color.copy(m.userData.base).multiplyScalar(DIM * (1 - (m.userData.wetDark || 0) * WET));
 /** the arms in the dark: the colours scaled down at night unless a torch is on (world.js) */
 export function setHandsDim(k) { DIM = clamp(k, 0.2, 1); for (const m of liveMats) tint(m); }
+// (with the temporal antialiasing on, the coat's cut near your eye looking down may dissolve over a wider band: the
+// dither is smoothed into a fade there, where without it a wide band showed as a screen of dots (15 November). Looking
+// down at the drop net the cut's hard edge left the sleeve a torn blue ribbon, in the 17 November film on Aaron's PC)
+let SOFT = false;
+/** the temporal antialiasing on or off (world.js, with Settings → Graphics) */
+export function setSoftCut(on) { SOFT = !!on; }
 // ---- your arms in the rain ----
 // Wet skin and a wet nylon coat are glossier and a little darker: water fills the skin's fine grain and soaks the
 // coat's weave. They wet through in about a minute of rain and dry over a few once it stops, rather than with the
@@ -684,7 +690,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
       { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0, ct = o.castT, wind = ct == null ? 0 : clamp((ct - 0.12) / 0.15, 0, 1) * (1 - clamp((ct - 0.8) / 0.15, 0, 1));
-        nearCut.value += (Math.max(0.16 + 0.17 * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.012 + 0.06 * wind - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; }
+        nearCut.value += (Math.max(0.16 + 0.17 * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.012 + Math.max(0.06 * wind, SOFT ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)

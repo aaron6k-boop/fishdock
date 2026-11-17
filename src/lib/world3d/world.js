@@ -12,7 +12,7 @@ import { setShadowReach } from "./realPlace.js";
 import { createAngler, waveHeight } from "./angler.js";
 import { createRockSpray } from "./rockSpray.js";
 import { createTipLights, createHeadTorch } from "./nightKit.js";
-import { setHandsDim, setHandsWet, setRigView } from "./fpRig.js";
+import { setHandsDim, setHandsWet, setRigView, setSoftCut } from "./fpRig.js";
 import { wetSpotAt, dryWetSpots } from "./wetLook.js";
 import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
@@ -988,7 +988,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     if (post) {
       if (o.ao != null) { G.ao = Math.max(0, Math.min(2, o.ao | 0)); post.setAO(G.ao); }
       if (o.bloom != null) { G.bloom = o.bloom ? 1 : 0; post.setBloom(!!G.bloom); }
-      if (o.aa != null) { G.aa = o.aa >= 5 ? 5 : o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(Math.min(4, G.aa)); post.setTemporal(G.aa >= 5); } // (5: 4x and temporal, taa.js)
+      if (o.aa != null) { G.aa = o.aa >= 5 ? 5 : o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(Math.min(4, G.aa)); post.setTemporal(G.aa >= 5); setSoftCut(G.aa >= 5); } // (5: 4x and temporal, taa.js)
       if (o.sharp != null) { G.sharp = Math.max(0, Math.min(1, +o.sharp || 0)); post.setSharp(G.sharp); }
       if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer, { bigOnly: Q.q < 2 }); } // (Medium: the big things only, environment.js)
       if (o.sea != null) G.sea = env.setFftSea(!!o.sea, renderer) ? 1 : 0; // (the spectrum sea: Settings, or Ultra's default)

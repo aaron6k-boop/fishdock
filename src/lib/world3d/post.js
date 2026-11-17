@@ -57,6 +57,9 @@ export const GradeShader = {
     }`,
 };
 
+// the drawn picture's size (pixels) from which the ambient occlusion is worked out at half size
+export const AO_HALF_FROM = 4e6;
+
 /** level 0: none (draw straight to the screen); 1: MSAA, bloom and grade; 2: plus ambient occlusion; 3: finer AO. */
 export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   // (the buffer is half-float, for the light brighter than white that the bloom needs: a graphics chip that can't
@@ -93,6 +96,14 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
         if (o.isPoints || o.isLine || o.isSprite || see || o.userData.noAO) o.visible = false;
       });
     };
+    // (on a big picture the shade is worked out at half its size, a sample for every four pixels: drawing High or Ultra
+    // on a computer at up to twice the window's size, that is still a sample for every pixel of the window, and the
+    // shade is soft by nature. Measured on Aaron's PC (17 November, Ultra, Gorleston, 1920 by 1080): the full-size
+    // shade cost about 2.8 ms of a 10.5 ms frame, more than any other part, and the slowest frames came with it.
+    // The temporal antialiasing reads this pass's depth, at this size too)
+    const aoSet = ao.setSize.bind(ao);
+    ao.setSize = (w, h) => { const k = w * h >= AO_HALF_FROM ? 0.5 : 1; aoSet(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
+    ao.setSize(composer.renderTarget1.width, composer.renderTarget1.height);
     composer.insertPass(ao, 1); // (straight after the scene is drawn)
   }
   // contact shade at a person's or a bucket's scale (half a metre), fading with distance so the far town isn't dirty.
