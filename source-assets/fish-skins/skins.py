@@ -337,24 +337,48 @@ def compose(r, pec=None, fin_tint=None):
   # the photo's own highlights (a flash on wet skin) taken down: the game lights the fish itself
   lab = cv2.cvtColor(col, cv2.COLOR_BGR2LAB).astype(np.float32); Lm = cv2.medianBlur(lab[:, :, 0].astype(np.uint8), 31).astype(np.float32)
   ex_ = np.clip(lab[:, :, 0] - Lm - 10, 0, None); lab[:, :, 0] -= 0.7 * ex_ * (~use_synth); col = cv2.cvtColor(lab.clip(0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
-  # the pectoral fin: painted into the empty corner of the picture (FREE), where the game points the model's fin plates
-  # when it wears this skin (angler.js wearSkin), in the shape build_fish3.py gives the plate (a fan from its root just
-  # behind the gill cover, back to a rounded point), its rays fanning along it; the flank under the fin keeps its skin
+  # the pectoral fin: moved off the flank into the empty corner of the picture (FREE), where the game points the
+  # model's fin plates when it wears this skin (angler.js pecToCorner), in the shape build_fish3.py gives the plate (a
+  # fan from its root just behind the gill cover, back to a rounded point). A photograph's pectoral fin is seldom
+  # where the model's is, or spread (folded against the flank, or smaller): it is painted, in the colour of the
+  # photograph's own fins where they show spread (the drawn fins' colour where none do), with its rays. The flank
+  # where the photograph's fin lay is filled with the skin just behind it (the scales' pattern from there, the colour
+  # from round the hole), so the plate standing off the flank doesn't show a second fin under it
   if pec is not None:
     px0, py0, px1, py1 = pec; Hh = py1 - py0; yb = (py0 + py1) / 2 - 0.1 * Hh; hb = 0.18 * Hh
+    def fan_at(Xc, Yc, grow=0.0):
+      t = np.clip((Xc - px0) / max(1, px1 - px0), -0.3, 1.3)
+      half = (hb + (Hh / 2 - hb) * np.clip(t / 0.55, 0, 1) ** 2 * (3 - 2 * np.clip(t / 0.55, 0, 1))) * np.where(t > 0.55, np.sqrt(np.clip(1 - ((t - 0.55) / 0.45) ** 2, 0, 1)), 1.0)
+      yc = yb + ((py0 + py1) / 2 - yb) * t; sv = (Yc - yc) / np.maximum(0.4, half)
+      m = (t >= -0.02 - grow) & (t <= 1.02 + grow) & (np.abs(sv) <= 1.04 + grow * 4)
+      return t, sv, m
     Xo, Yo = X + (px0 - FREE[0]), Y + (py0 - FREE[1])
-    t = np.clip((Xo - px0) / max(1, px1 - px0), -0.2, 1.2)
-    half = (hb + (Hh / 2 - hb) * np.clip(t / 0.55, 0, 1) ** 2 * (3 - 2 * np.clip(t / 0.55, 0, 1))) * np.where(t > 0.55, np.sqrt(np.clip(1 - ((t - 0.55) / 0.45) ** 2, 0, 1)), 1.0)
-    yc = yb + ((py0 + py1) / 2 - yb) * t; sv = (Yo - yc) / np.maximum(0.4, half)
+    t, sv, m = fan_at(Xo, Yo)
     inbox = (X >= FREE[0] - 3) & (X <= FREE[0] + (px1 - px0) + 3) & (Y >= FREE[1] - 3) & (Y <= FREE[1] + (py1 - py0) + 3)
-    fan = ((t >= -0.02) & (t <= 1.02) & (np.abs(sv) <= 1.04) & inbox).astype(np.float32)
-    fr = (0.8 + 0.2 * np.abs(np.cos(np.pi * (np.clip(sv, -1, 1) * 7.5 + wob * 0.5))) ** 0.7) * (1.05 - 0.2 * np.clip(t, 0, 1)) * (1 - 0.15 * np.clip(np.abs(sv), 0, 1) ** 3)
-    tint = np.median(synth[fins], 0) if fins.any() else np.array([90.0, 110.0, 120.0])
-    # (its colour the fins', and a little of the flank's under it at the root: a pectoral fin is thin)
-    flank = cv2.remap(cv2.GaussianBlur(col.astype(np.float32), (0, 0), 3 * K / 4), ((Xo + 0.5) * K - 0.5).astype(np.float32), ((Yo + 0.5) * K - 0.5).astype(np.float32), cv2.INTER_LINEAR)
-    root = np.clip(1 - t / 0.35, 0, 1)[..., None]
-    fanc = (tint[None, None, :] * (1 - 0.35 * root) + flank * 0.35 * root) * fr[..., None]
+    fan = (m & inbox).astype(np.float32)
+    fr = (0.78 + 0.22 * np.abs(np.cos(np.pi * (np.clip(sv, -1, 1) * 7.5 + wob * 0.5))) ** 0.7) * (1.06 - 0.12 * np.clip(t, 0, 1))
+    # (its colour: the photograph's own fins where they show spread, else the drawn fins'; kept no darker than half
+    # the flank round it, a pectoral fin being thin and lit through. Paler at its root, where the flank shows through,
+    # a touch darker towards its edge)
+    colf = col.astype(np.float32)
+    _, _, mb = fan_at(X, Y); ring = cv2.dilate(mb.astype(np.uint8), np.ones((9 * K, 9 * K), np.uint8)).astype(bool) & ~mb & (alpha > 200)
+    flank = np.median(colf[ring], 0) if ring.any() else np.array([140.0, 140.0, 140.0])
+    spread = fins & (good[..., 0] > 0.6) & (alpha > 200)
+    tint = np.median(colf[spread], 0) if spread.sum() > 400 else (np.median(synth[fins], 0) if fins.any() else np.array([110.0, 120.0, 125.0]))
+    tint = tint * max(1.0, 0.5 * float(flank.mean()) / max(float(tint.mean()), 1.0))
+    root = np.clip(1 - t / 0.3, 0, 1)[..., None] * 0.4
+    fanc = (tint[None, None, :] * (1 - root) + flank[None, None, :] * root) * fr[..., None] * (1 - 0.2 * np.clip(t, 0, 1) ** 2)[..., None] * (1 - 0.15 * np.clip(np.abs(sv) - 0.8, 0, 1) / 0.2)[..., None]
     sel = fan > 0
+    # the flank where the fin lay: the scales' pattern from just behind it, the colour from round the hole
+    pecHole = cv2.dilate(mb.astype(np.uint8), np.ones((2 * K + 1, 2 * K + 1), np.uint8)) & (alpha > 128).astype(np.uint8)
+    if pecHole.any():
+      dxs = float((px1 - px0 + 6) * K)
+      clone = cv2.warpAffine(colf, np.float32([[1, 0, dxs], [0, 1, 0]]), (W, H), flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_REFLECT)
+      sig = 4.0 * K
+      low = cv2.GaussianBlur(cv2.inpaint(col, pecHole * 255, 5, cv2.INPAINT_TELEA).astype(np.float32), (0, 0), sig)
+      fill = low + (clone - cv2.GaussianBlur(clone, (0, 0), sig))
+      fm = cv2.GaussianBlur(pecHole.astype(np.float32), (0, 0), 1.5 * K)[..., None]
+      col = np.clip(colf * (1 - fm) + fill * fm, 0, 255).astype(np.uint8)
     col = col.copy(); col[sel] = np.clip(fanc[sel], 0, 255).astype(np.uint8)
     r["fan"] = cv2.GaussianBlur(fan, (0, 0), 0.6 * K / 4); r["fan_ph"] = np.clip(sv, -1, 1) * 7.5 + wob * 0.5
   # gaps in the body (where the photo's fish didn't reach): filled from round them

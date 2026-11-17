@@ -74,8 +74,11 @@ export function sheetPiling({ w = 128, h = 256, seed = 5, water = 0.5 } = {}) {
     } else {
       const streak = fbm(u * 24, v * 2, 24, seed, 2), rust = fbm(u * 6, v * 6, 6, seed + 1, 3);
       const wet = Math.max(0, 1 - Math.abs(v - water) / 0.12), weed = v < water + 0.04 ? Math.min(1, (water + 0.04 - v) / 0.08) : 0;
-      const shade = 0.72 + prof * 0.28;
-      r = (110 + rust * 60 - streak * 25) * shade; gg = (66 + rust * 28 - streak * 12) * shade; b = (44 + rust * 12) * shade;
+      // (dark: old piling's coating weathered to a deep brown, nearly black in the pans, with runs of orange rust down
+      // it here and there. It was a bright orange-brown all over, and from the water the wall read as a fence of new
+      // timber boards: Gorleston South Pier's piling is near black in every photograph, Geograph 1605191 and others)
+      const shade = 0.58 + prof * 0.42, run = Math.max(0, streak - 0.55) / 0.45;
+      r = (64 + rust * 34 + run * 70) * shade; gg = (46 + rust * 17 + run * 30) * shade; b = (38 + rust * 7 + run * 10) * shade;
       r = r * (1 - wet * 0.45) * (1 - weed) + 46 * weed; gg = gg * (1 - wet * 0.4) * (1 - weed) + 54 * weed; b = b * (1 - wet * 0.35) * (1 - weed) + 34 * weed;
       hh = prof; ro = 0.55 + rust * 0.3 - wet * 0.35;
     }

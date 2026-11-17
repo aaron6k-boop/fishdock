@@ -194,11 +194,91 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    His graphics card was 22 to 36% busy with other work all evening (the run waited 28 minutes for it to go idle), so
    these frame rates don't compare with item 20's.
 
+23. **The fish's skins were FishDock's 480 by 320 pictures stretched over the rebuilt bodies.** **Changed**
+   (`source-assets/fish-skins/skins.py`, `public/fish/skin/`): 17 species wear a skin made from one photograph each
+   (Wikimedia Commons, every one CC BY or CC BY-SA, chosen for a whole fish seen side on; credited in Settings, 3D
+   fish skin credits, in `public/models/CREDITS.txt` and in `source-assets/ASSET-LICENCES.json` with the hash of the
+   copy used, kept on Aaron's PC). Each photograph is cut out, turned level and warped onto the frame of FishDock's own
+   picture (which the models' uvs follow), along the body between marks matched in both (the snout, the eye, the gill
+   cover's edge, the peduncle) and across it between the body's edges, at four times the old size (1920 by 1280 on
+   High and Ultra, 960 by 640 below); fins the photograph shows folded or cut off are redrawn in its own fin colours
+   with rays; its highlights and colour cast are evened out, since the game lights the fish. A normal map goes with
+   each: the photograph's fine detail as relief, overlapping scales where the species has them (rows following the
+   body, none on the head or fins), the fins' rays and a shark's rasp. The gurnard, tope, lesser-spotted dogfish,
+   conger and eel (no photograph good enough: fins spread, or a museum mount) have skins drawn the same way from
+   FishDock's own pictures alone. The pectoral fin is a plate standing off the flank: its picture is now painted in
+   the skin's empty corner and the plates pointed there (`angler.js` `pecToCorner`), and the photograph's own fin
+   cleared from the flank under it, which showed through as a second fin. Filmed close up in the game on the mat and
+   in the net (cod, bass, mackerel, pouting, black bream). `tests/fishSkins.test.js`.
+24. **Spray off the rock armour was round soft puffs** (item 5 of the list below, until now): from the pier they read
+   as cotton wool on the stones, and the foam they left was more puffs lying on the water. **Changed**
+   (`rockSpray.js`): a break comes in stages as a wave's does on a breakwater. First sheets of water thrown up and
+   back over the stones, each drawn out along the way it goes and narrow across it, made of strands and torn at its
+   edges, see-through where thin, so a break is many overlapping; they slow, stall and burst into drops, which fall
+   back; a fine mist is left hanging where they broke and drifts off with the wind; and the water running back leaves
+   foam lying on the sea, flat on its surface, which spreads, drifts and opens out into a fine, irregular lace of
+   bubbles over several seconds. The same crest reaches each stone a moment apart, so a break runs along the armour.
+   How high and how hard follows the sea that is running (nothing on a flat calm, sheets about a metre in a light sea,
+   three or four in a big one). A crest against the wall's piling slaps up its face as sheets instead of throwing a
+   ring, and a rig, a fish or a net going in leaves a patch of foam. Spray and foam take the haze like everything else.
+   On the first footage from Aaron's PC the foam's lace drew as white star-shaped grids seen from the rail (too coarse
+   and regular): it is fine and broken now. `tests/rockSpray.test.js`.
+25. **The harbour wall's steel piling was a bright orange-brown, and its concrete capping beam a thin slab.** From the
+   water the piling read as new timber boards. Gorleston South Pier's piling is near black in every photograph
+   (Geograph 1605191, 2491438), under a deep, weathered capping beam. **Changed** (`textures3d.js` `sheetPiling`,
+   `realPlace.js`): the piling a deep weathered brown, near black in its pans, with runs of orange rust here and there;
+   the capping beam 0.85 m deep (was 0.45), its top falling a little to the water, rain running down its face in darker
+   streaks, a little rust from its fittings, its foot dark with spray and weed, longer rust runs below each railing
+   post and the mooring rings lower on its face; the ladders' rungs round bar. **Not done:** at Gorleston the railings
+   stand back a metre or more from the edge with a sloping concrete margin outside them (Geograph 2491438 and others);
+   here they stand 22 cm from it. Moving them moves every fishing spot, the cast over the rail and the drop net, so it
+   is left for a change of its own.
+26. **The first-person cast's wind-up** (item 18's "Still"): at its top the reel was 20 cm from your eye and your left
+   elbow at the middle of the picture's left side, 27 cm away, the forearm across the picture. **Changed**
+   (`tools/fp-cast-view.mjs`, `tools/fp-rig-data.mjs`): the wind-up's three moments were searched again with your view
+   as a condition, as the follow-through was: each arm kept out of the middle of the picture and away from your eye,
+   both hands on the rod, no arm stretched, every wrist inside its range (the gates' own measure, checked by
+   `tests/fpRig.test.js`), the rod still back past 130 degrees at the top. The left elbow now stays in the lower third
+   and the reel a third of a metre from your eye; filmed through a whole catch in first person.
+27. **The ambient occlusion's cost**, measured on Aaron's PC (Ultra, Gorleston, 3D view full screen; the four ways in
+   turn, three times each, at two window sizes; the graphics card's own milliseconds a frame, the mean of the last two
+   rounds, the first being just after loading):
+
+   | Shade | 1896 by 988 window (drawn 3792 by 1976) | 2536 by 1348 (drawn 3951 by 2100) |
+   |---|---|---|
+   | off | 9.6 ms, 90 fps | 9.5 ms, 94 fps |
+   | half size, nothing past 120 m (realism-8) | 11.2 ms, 84 fps | 11.3 ms, 84 fps |
+   | half size, everything (as live) | 11.7 ms, 83 fps | 10.7 ms, 86 fps |
+   | full size, everything | 11.3 ms, 87 fps | 11.6 ms, 83 fps |
+
+   So the shade costs about 1.5 ms of an 11 ms frame (about 10 fps at 90); since #153 worked it out at half size the
+   rest of its cost is drawing the scene a second time for its depth, not the shading, and nothing more is gained
+   from it on this card: the half-size and 120 m cut are within the runs' own spread (half a millisecond either way).
+   **Changed** all the same: the shade's own picture of the scene leaves out anything wholly further than 120 m (the
+   shade there is a few pixels across and less), for weaker graphics cards. The graphics card was 25 to 44% busy with
+   other work throughout (it never went idle in the 10 minutes the run waited), so the frame rates are coloured by it.
+28. **High against Ultra**, the in-game benchmark on the same run (average fps, slowest 1%, graphics card ms):
+   1896 by 988: High 87, 42, 9.7 ms; Ultra 72, 41, 13.0 ms (its measure caught only 55 frames). 2536 by 1348: High 87, 42, 10.3 ms; Ultra 80, 43, 11.2 ms.
+   3816 by 2068: High 127, 70, 6.9 ms; Ultra 99, 69, 9.5 ms. The 4K run happened to fall while the other work on the
+   PC eased (Low there ran 246 fps, its frames 3.6 ms apart, against about 105 at the other sizes), so it is the
+   nearest to a clean figure: on the RTX 3090 Ultra costs about a third more than High at the same window, both well
+   over 60 fps at 4K. Not clean figures: see item 27.
+29. **KTX2 texture compression.** Aaron's PC has no KTX2 or Basis encoder (no `toktx`, `ktx` or `basisu` on its path
+   or in its program folders; searched read-only, 17 November); the only Basis file on it is three.js's decoder inside
+   another project. three.js r170's KTX2 loader reads Basis textures only through that decoder, and of the raw
+   compressed formats only ASTC (phones), not the BC formats desktop cards use. Making KTX2 files needs KTX-Software
+   or Basis Universal installed; that is a new program on Aaron's PC and left for him to agree. Not done.
+30. **Seen in the footage on Aaron's PC** (a whole catch, walking, overcast, rain, dusk, night and morning, filmed
+   in real time on his graphics card at 1080p Ultra) and **fixed**: the foam's lace drawn as white grids (item 24);
+   after dark a light over the fishing stretch with no lamp to account for it lit 40 m of deck evenly orange, like a
+   stage (now faint, so the lamps' own pools show); and walking away from a landed fish, the drop net was drawn on the
+   deck beside you all the way, its rope trailing (now left out while you walk).
+
 ## What is left, in order of what it would add
 
 1. Temporal anti-aliasing: done on High and Ultra (item 15), from depth and the camera's own motion; motion vectors from
    the custom shaders would let it keep more of last frame on moving things (it holds them to this frame instead).
-2. KTX2 textures, and with them the 2K texture sets the PC launcher could carry (`docs/PC-ARCHITECTURE.md` section 4).
+2. The 2K texture sets the PC launcher could carry (`docs/PC-ARCHITECTURE.md` section 4): with KTX2 (item 29).
 3. The town: it is shown by photographs, as Aaron chose (10 November); modelled buildings would need his say.
 4. Clean frame rates on Aaron's PC. The live game after #153, measured with its own benchmark at three window sizes on
    17 November at 19:08 (Microsoft Edge, headless, its 3D view full screen; RTX 3090, Direct3D 11): average frames a
@@ -217,8 +297,6 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    on the same PC at 17:24 (item 20), Ultra ran 95 fps at 1080p and 83 at 1440p. The figures after
    #151 (117 fps on Ultra at 1080p, 74 at 1440p) came before #153's pixel budget, temporal antialiasing and half-size
    shade, so they don't compare directly either. A clean run waits for the graphics card to be idle
-   (`FishDock-assets/queue`, h005).
-5. Spray off the rock armour from closer than about 15 m: soft white puffs rather than broken water (seen filming the
-   armour's levels of detail from 10 m). From the fishing spots, 75 m and more away, it reads as white water.
-6. The fish's skins are FishDock's 480 by 320 pictures over the rebuilt bodies (item 14); no larger licensed
-   photographs of these species were found.
+   (`FishDock-assets/queue`, h005); it has not been idle on any evening run so far (items 27 and 28 have the latest).
+5. The sloping concrete margin outside Gorleston's railings, and the railings set back a metre from the edge (item 25).
+6. KTX2 textures, once Aaron agrees to KTX-Software or Basis Universal being installed (item 29).

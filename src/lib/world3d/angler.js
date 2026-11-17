@@ -1999,7 +1999,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (matOn) matOut = true;
     mat.visible = matOn || (matOut && !walking);
     if (mat.visible) { mat.position.copy(toWorld(matAtL())); mat.rotation.y = root.rotation.y; }
-    net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r, i) => (r.visible = i < 6 && net.visible && (netIdle ? i < 4 : tech === "dropnet" || ropesOn))); // (6 and 7, through the fists, only where they are placed, below)
+    // (and walking away from a landed fish, the net isn't carried along at your feet: it was drawn on the deck beside you
+    // as you walked, its rope trailing, in the footage on Aaron's PC, 17 November)
+    net.visible = netOn && !!netAt && !walking; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r, i) => (r.visible = i < 6 && net.visible && (netIdle ? i < 4 : tech === "dropnet" || ropesOn))); // (6 and 7, through the fists, only where they are placed, below)
     coilRope.visible = net.visible && venue === "pier" && !walking && (netIdle || tech === "dropnet" || ropesOn);
     if (coilRope.visible) { coilRope.position.copy(toWorld(COIL_AT)); coilRope.rotation.y = root.rotation.y; coilRope.updateMatrixWorld(); }
     if (net.visible) {

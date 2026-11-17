@@ -732,7 +732,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     // a lamp over the anglers after dark (piers, quays and promenades are lit), like the drawn pier's
     const sp = real.spots || [];
     if (sp.length) {
-      const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 48, 1.2); pl.position.set(c[0], c[1] + 8, c[2]); pl.userData.cd = 30; group.add(pl); pointLights.push(pl); // (a soft wash along the fishing stretch)
+      const c = sp.reduce((a, q) => [a[0] + q.at[0] / sp.length, a[1] + q.at[1] / sp.length, a[2] + q.at[2] / sp.length], [0, 0, 0]); const pl = new THREE.PointLight(0xffd9a0, 0, 40, 1.7); pl.position.set(c[0], c[1] + 8, c[2]); pl.userData.cd = 13; group.add(pl); pointLights.push(pl); // (a soft wash along the fishing stretch: faint, so the lamps' own pools show. At 30 cd falling off slowly it lit 40 m of deck evenly orange, like a stage, with no lamp to account for it: the footage on Aaron's PC, 17 November)
       // the lamp posts nearest the anglers cast warm pools on the deck round them: a light at each of the nearest few
       // (none on Performance, two on Balanced, three on High quality), and the nearest four shine on the water
       // (from the lamp's lens where the place knows it, just under it: a lighting column's lantern reaches 65 cm out
