@@ -1053,6 +1053,266 @@
      "url": "https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Adults/Female_Adult_15/Textures/f018_opacity_color.tga"
     }
    ]
+  },
+  {
+   "id": "bigsoundbank:0155",
+   "name": "Whistling of the Wind #2",
+   "source": "https://bigsoundbank.com/whistling-of-the-wind-2-s0155.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the wind whistling through the railings in a gale (public/sounds/wind_whistle.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_0155_wind_whistle.ogg",
+     "bytes": 1216871,
+     "sha256": "00f33c6e60f2190894af459788aabc4df3243011201cc4b16cdd583e9d3afc8f",
+     "url": "https://bigsoundbank.com/UPLOAD/ogg/0155.ogg"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0266",
+   "name": "Sea: Waves",
+   "source": "https://bigsoundbank.com/sea-waves-s0266.html",
+   "author": "Denis Chardonnet",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the sea against the pier and wall in a moderate breeze (public/sounds/sea_waves.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_0266_sea_waves_moderate.ogg",
+     "bytes": 1567417,
+     "sha256": "01e8de4f64650f53d9152ae3616bf03be6249eccbf7640ad3978e804bbaea337",
+     "url": "https://bigsoundbank.com/UPLOAD/ogg/0266.ogg"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0595",
+   "name": "Wind",
+   "source": "https://bigsoundbank.com/wind-s0595.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the wind (public/sounds/wind.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_0595_wind_foley.flac",
+     "bytes": 2408906,
+     "sha256": "cd84a94a3f3647d17cbcbd64eafbb6c2e76da40a5a896b9c9c28f6bb7994cc77",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/0595.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1289",
+   "name": "Rain on concrete",
+   "source": "https://bigsoundbank.com/rain-on-concrete-s1289.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "rain on the deck (public/sounds/rain_light.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1289_rain_concrete.flac",
+     "bytes": 10070455,
+     "sha256": "455818f109d4787e4a2ead91029a8ff33f9f11044c90d528b5d48c967c885182",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1289.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1290",
+   "name": "Rain on Puddle",
+   "source": "https://bigsoundbank.com/rain-on-puddle-s1290.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "heavier rain into puddles (public/sounds/rain_heavy.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1290_rain_puddle.flac",
+     "bytes": 10988884,
+     "sha256": "8fd772dd6b086889867e65717c59599fdce90d85b7b10b6a23764427c346b8bb",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1290.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1435",
+   "name": "Fishing reel, fast",
+   "source": "https://bigsoundbank.com/fishing-reel-fast-s1435.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the reel wound fast (public/sounds/reel_fast.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1435_reel_fast.flac",
+     "bytes": 1564356,
+     "sha256": "1f8c9ae3381619494428498a7f55d48ffebe6c8a034ae0f436063ebef3dc5e17",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1435.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1436",
+   "name": "Fishing reel, medium",
+   "source": "https://bigsoundbank.com/fishing-reel-medium-s1436.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the reel wound steadily (public/sounds/reel_medium.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1436_reel_medium.flac",
+     "bytes": 2076828,
+     "sha256": "1d991002c9cec55cde0574daa9e5dcc1ec582045ae5e656094ef892248a24fea",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1436.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1437",
+   "name": "Fishing reel, slow",
+   "source": "https://bigsoundbank.com/fishing-reel-slow-s1437.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the reel wound slowly (public/sounds/reel_slow.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1437_reel_slow.flac",
+     "bytes": 1889628,
+     "sha256": "cf6ca7b21fac3b75564b48983a6f5120526058ef60c296e8c6267248447df1cf",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1437.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1444",
+   "name": "Pontoon, marina",
+   "source": "https://bigsoundbank.com/pontoon-marina-s1444.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "water lapping in a calm (public/sounds/sea_lap.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1444_marina_ripples.flac",
+     "bytes": 27567224,
+     "sha256": "eff127a2b735da50ce42ac4ffd0f6496e454f4b6df2a4b2dd985eb0b835ca0e0",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1444.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1519",
+   "name": "Splash, Big #1",
+   "source": "https://bigsoundbank.com/splash-big-1-s1519.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "a big fish thrashing at the surface (public/sounds/splash_big.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1519_splash_big_1.flac",
+     "bytes": 350508,
+     "sha256": "cd0c9d6730ddd44ad2341a2b9e2f4eaf4c4cc2ed119b2ef05edee3f1b3ed1596",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1519.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1529",
+   "name": "Splash, Small #1",
+   "source": "https://bigsoundbank.com/splash-small-1-s1529.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "a fish breaking the surface, the lead going in (public/sounds/splash_small_1.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1529_splash_small_1.flac",
+     "bytes": 255987,
+     "sha256": "4a2958fc2d03cd13fa15062dda333bd89d12c26c52c29181692a0623ee350c8b",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1529.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1531",
+   "name": "Splash, small #3",
+   "source": "https://bigsoundbank.com/splash-small-3-s1531.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "a fish breaking the surface (public/sounds/splash_small_2.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_1531_splash_small_3.flac",
+     "bytes": 198347,
+     "sha256": "18055c0c94e28e561efa2ecd1e4cbebfd6059eb35fc207f5dd1ca0285001062d",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1531.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:2573",
+   "name": "Gulls on the Harbor",
+   "source": "https://bigsoundbank.com/gulls-on-the-harbor-s2573.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "a fishing port with its gulls, under everything at a pier or an estuary (public/sounds/harbour.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/bsb_2573_gulls_harbour.flac",
+     "bytes": 20105759,
+     "sha256": "3d622b5a0d52d37c7437520fa8679d99e7c7df9a197427505122f725c38a3ee0",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/2573.flac"
+    }
+   ]
   }
  ]
 }

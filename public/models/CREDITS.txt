@@ -69,3 +69,9 @@ and the near foreground made transparent, enlarged to twice its size, colours li
 sharpened, its cut end thinned to a stipple; the lamps
 file is its bright points only, on black, with a soft glow. Both offered under the same licence, CC BY-SA 2.0.
 The script that makes them is source-assets/night.py.
+
+The recorded sounds (public/sounds/: the sea against the pier, water lapping, the harbour and its gulls, wind, rain on the
+deck and in puddles, a fishing reel turned slow, steady and fast, and splashes) are from BigSoundBank
+(https://bigsoundbank.com), recorded by Joseph Sardin and Denis Chardonnet, CC0 1.0 (public domain): no attribution is
+required; credited here with thanks. Cut to loops and levelled by source-assets/prepare_sounds.py; the list of
+recordings, with their pages and file hashes, is in source-assets/ASSET-LICENCES.json.
