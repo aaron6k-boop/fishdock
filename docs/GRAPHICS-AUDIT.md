@@ -72,6 +72,22 @@ render targets come on top), 261 shader programs. After: 240 geometries, 125 tex
    reflections would add the pier wall's reflection close by. **Not done:** the planar reflection already covers what
    you see at Gorleston; SSR would cost a full-screen pass for little there.
 
+7. **Rain looked drawn on** (Aaron, 17 November: "it looks bad"). It was 1,800 one-pixel white lines in a 60 m box,
+   all the same length and brightness, falling straight down whatever the wind, unlit, so as bright at night as by
+   day, and moved one by one on the processor every frame. **Changed** (`src/lib/world3d/rain3d.js`): near drops are
+   ribbons along their paths, moved on the graphics card (nothing per drop on the processor), slanted by the wind,
+   each its own size and speed, bold close by and finer further off (a drop narrower than a pixel is drawn a pixel
+   wide and fainter by as much), showing the sky's light, glinting towards the sun, and after dark seen only in a
+   lamp's light (brightest with the lamp behind it) or your head torch; curtains of rain at 16 and 42 m (one on a
+   phone) falling in drifting sheets, faded out towards the deck and the water; splashes on the deck round you.
+   A drop streak was first invisible: drawn down its path from the drop it turned its back to the camera and was
+   culled, found by drawing markers at the drops' places and testing each part of the ribbon in turn. Cost when it
+   rains: three or four more draws, about 20,000 more triangles on a computer, and one or two passes of the curtains'
+   shading over the picture. `tests/rain3d.test.js`.
+8. **A fish swung up on the line was out of your own view** when standing: it hung about a metre above your eye and
+   the first-person view was held looking down at the rail (18 of 40 checks a quarter second apart). **Changed:** the
+   view may look up a little to it, and as it swings in it aims between the fish and your hand.
+
 Looked at and found sound: tone mapping and exposure (one Neutral curve, exposure eased with the light), colour
 management (sRGB textures marked as such, linear lighting), anisotropic filtering, instancing, shader precompiling,
 level of detail on trees, frame pacing, the sea's multiple wave scales and wind response.

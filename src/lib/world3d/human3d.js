@@ -714,7 +714,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       let wantYaw = 0, wantPitch = -0.06;
       if (o.look) {
         const d = o.look.clone().sub(wFig(wp(head))); const hy = Math.atan2(d.x, -d.z), hp = Math.atan2(d.y, Math.hypot(d.x, d.z));
-        wantYaw = clamp(hy - st.twist, -1.1, 1.1); wantPitch = clamp(hp, (o.kneel || 0) > 0.5 ? -1.1 : -0.8, 0.45); // (kneeling over a fish on the mat the head bows right down to it)
+        wantYaw = clamp(hy - st.twist, -1.1, 1.1); wantPitch = clamp(hp, (o.kneel || 0) > 0.5 ? -1.1 : -0.8, 0.3); // (up no more than 17 degrees: the eyes go the rest of the way) // (kneeling over a fish on the mat the head bows right down to it)
       }
       const kh = 1 - Math.exp(-dt * 5); st.yaw += (wantYaw - st.yaw) * kh; st.pitch += (wantPitch - st.pitch) * kh;
       const on = o.look ? 1 : 0; st.lookOn = (st.lookOn || 0) + (on - (st.lookOn || 0)) * kh;

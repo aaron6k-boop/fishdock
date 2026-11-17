@@ -10,7 +10,11 @@
 // pitch as it closes. The fishing sounds go through a short outdoor echo (the wall and the water, not a hall). Sound
 // that's on but can't start yet (browsers wait for a first tap, and a phone call stops it) starts at the next tap.
 
+import { loadRecordings, recordedBed, grain, recordedLevels } from "./sceneRecordings.js";
+
 let ac = null, master = null, reelTimer = null, wanderTimer = null, unlocking = false;
+// the recordings (sceneRecordings.js): fetched the first time sound goes on; their beds by name once playing
+let rec = null, recLoading = false; const recBeds = {};
 const timers = {}; // the sparse sounds' own timers: gull, slap, halyard, patter
 // three groups with their own levels (environment, equipment, fishing events), and a panner so another angler's
 // reel or splash comes from their side
@@ -151,6 +155,9 @@ function wander() {
   if (L.wind) { const gust = R() < 0.25 + w * 0.3; to(L.wind.swell.gain, gust ? 1.1 + R() * 0.9 : 0.25 + R() * 0.6, gust ? 0.5 + R() * 0.6 : 1.2 + R() * 1.5); to(L.wind.f.frequency, L.wind.base * (gust ? 1.15 + R() * 0.35 : 0.8 + R() * 0.2), 0.9); }
   if (L.whistle) { to(L.whistle.f.frequency, 820 + R() * 620, 0.7 + R()); to(L.whistle.swell.gain, R() < 0.4 ? 0.9 + R() * 0.6 : R() * 0.3, 0.8); }
   if (L.rain) to(L.rain.swell.gain, 0.75 + R() * 0.45, 2);
+  // (the recordings drift with them: the sea a little, the wind's gusts as the drawn wind's)
+  if (recBeds.sea_waves) to(recBeds.sea_waves.swell.gain, 0.75 + R() * (0.35 + w * 0.4), 1.2 + R() * 1.5);
+  if (recBeds.wind) { const gust = R() < 0.25 + w * 0.3; to(recBeds.wind.swell.gain, gust ? 1.15 + R() * 0.7 : 0.45 + R() * 0.45, gust ? 0.6 + R() * 0.6 : 1.4 + R() * 1.5); }
   wanderTimer = setTimeout(wander, 900 + R() * 2600);
 }
 // a sparse sound: plays now and then, each wait picked at random in its range
@@ -165,22 +172,26 @@ function every(name, range, fn) {
 function apply() {
   if (!ac) return;
   const sea = env.kind === "sea", w = clamp01(env.wind), r = clamp01(env.rain), plan = ambiencePlan(env);
+  // the recordings, where they've arrived, as the beds; the drawn beds kept a third as loud under them for their drift
+  const RL = rec && rec.size ? recordedLevels(plan, env) : null;
+  if (RL) for (const [name, g] of Object.entries(RL)) { if (!rec.has(name) || (!recBeds[name] && !(on && g > 0.001))) continue; const b = recBeds[name] || (recBeds[name] = recordedBed(ac, rec.get(name), envG)); to(b.gain.gain, on ? g : 0, 1.5); } // (a bed starts the first time it's wanted: no rain playing silently on a dry day)
+  const k = RL ? 0.33 : 1;
   const wash = layers.wash || bed("wash", { freq: 650, sec: 11.3 });
   wash.base = sea ? 520 + w * 500 : 380 + w * 120;
-  to(wash.gain.gain, on ? plan.wash : 0);
+  to(wash.gain.gain, on ? plan.wash * k : 0);
   const wind = layers.wind || bed("wind", { type: "bandpass", freq: 500, q: 0.6, sec: 8.7 });
   wind.base = 380 + w * 700;
-  to(wind.gain.gain, on ? plan.wind : 0, 1.5);
+  to(wind.gain.gain, on ? plan.wind * k : 0, 1.5);
   const whistle = layers.whistle || bed("whistle", { white: true, type: "bandpass", freq: 1000, q: 9, sec: 6.1 });
-  to(whistle.gain.gain, on ? plan.whistle : 0, 2);
+  to(whistle.gain.gain, on ? plan.whistle * k : 0, 2);
   const rain = layers.rain || bed("rain", { white: true, type: "highpass", freq: 2500, q: 0.5, sec: 7.9 });
   to(rain.f.frequency, 3200 - r * 1500);
-  to(rain.gain.gain, on ? plan.rain : 0, 1.2);
+  to(rain.gain.gain, on ? plan.rain * k : 0, 1.2);
   const rumble = layers.rumble || bed("rumble", { freq: 140, q: 0.5, sec: 13.7 });
   to(rumble.gain.gain, on ? plan.rumble : 0, 3);
   wander();
   every("slap", plan.slap, () => slap(w));
-  every("gull", plan.gull, gull);
+  every("gull", RL && RL.harbour > 0 ? null : plan.gull, gull); // (at a harbour the recording has its own gulls, real ones)
   every("halyard", plan.halyard, halyard);
   every("patter", plan.patter, () => drop(r));
   every("wave", plan.wave, () => wave(w));
@@ -195,7 +206,16 @@ export function soundOn(conditions = {}) {
   env = { ...env, ...conditions };
   to(master.gain, level, 0.3);
   apply();
+  fetchRecordings();
   return true;
+}
+// (the recordings are fetched once sound can actually be heard, after your first tap has started it, and a few
+// seconds after that, so their 5 MB never compete with the place's own models while it loads)
+function fetchRecordings() {
+  if (rec || recLoading || !ac) return;
+  if (ac.state !== "running") { ac.addEventListener?.("statechange", fetchRecordings, { once: true }); return; }
+  recLoading = true;
+  setTimeout(() => loadRecordings(ac).then((m) => { rec = m; if (on) apply(); }).catch(() => { /* the drawn sound alone */ }), 3000);
 }
 /** Follows a change in the scene's conditions while the sound is on. */
 export function soundEnv(conditions = {}) {
@@ -379,6 +399,13 @@ export function play(name, data = null) {
   const v = () => 0.85 + R() * 0.3;
   if (name === "bell") { if (env.venue === "river" || env.venue === "lake") alarm(3 + Math.floor(R() * 3)); else bell(); }
   // the lead going in: a deep "bloop" (one big bubble) over a soft thud, then a few small ones
+  // (recorded splashes, where they've arrived: a stone into water, pitched a little differently each time, with the
+  // drawn bubbles after it)
+  else if (rec && (name === "plop" || name === "splash" || name === "bigsplash") && rec.has("splash_small_1")) {
+    const pick = name === "bigsplash" ? rec.get("splash_big") || rec.get("splash_small_1") : rec.get(R() < 0.5 ? "splash_small_1" : "splash_small_2") || rec.get("splash_small_1");
+    grain(ac, pick, evG, { gain: (name === "plop" ? 0.32 : name === "splash" ? 0.5 : 0.75) * v(), rate: name === "plop" ? 1.15 + R() * 0.2 : name === "bigsplash" ? 0.8 + R() * 0.15 : 0.9 + R() * 0.25 });
+    bubbles(name === "bigsplash" ? 18 : 8, 500, 3200, name === "plop" ? 0.04 : 0.06, 0.6, 0.08);
+  }
   else if (name === "plop") { bubble(330 + R() * 120, 0.32 * v(), 0, 0.11); burst(0.16 + R() * 0.06, 700 + R() * 250, 0.22 * v(), 1.2); knock(160 + R() * 60, 0.06, 0.12); bubbles(5, 900, 2600, 0.06, 0.35, 0.05); }
   // a fish breaking the surface: the slap of water, spray, and a spray of bubbles
   else if (name === "splash") { burst(0.3 + R() * 0.12, 1000 + R() * 300, 0.3 * v(), 0.7); burst(0.22, 3600 + R() * 600, 0.07 * v(), 0.8, true); bubbles(12 + Math.floor(R() * 8), 500, 3200, 0.08, 0.45, 0.02); }
@@ -400,6 +427,10 @@ export function play(name, data = null) {
     // faster, the clicks run together into the whirr (quieter, one of them) rather than rattling, and each is a little
     // different
     const sp = Math.max(0, Math.min(1, data?.speed || 0));
+    // (a recorded reel, where it's arrived: a half turn's length of it, from the recording turned at about that speed,
+    // at a different point each time, over a quieter drawn click)
+    const rb = rec && rec.get(sp < 0.33 ? "reel_slow" : sp < 0.7 ? "reel_medium" : "reel_fast");
+    if (rb) { const d = 0.2 - 0.08 * sp; grain(ac, rb, gearG, { offset: R() * Math.max(0, rb.duration - d - 0.1), dur: d, gain: 0.1 * (0.85 + R() * 0.3), rate: 0.95 + R() * 0.1 }); click(0, 0.035); return; }
     click(0, 0.1 * (1 - 0.4 * sp)); if (R() < 0.75 - 0.5 * sp) click(0.035 + R() * 0.015, 0.06);
     burst(0.08 + 0.07 * sp, 470 + R() * 140 + 220 * sp, 0.02 + 0.016 * sp, 1.4, false, gearG);
     tone(150 + 170 * sp + R() * 15, 0.01 + 0.008 * sp, 0.1 + 0.05 * sp, "triangle", 0, gearG); // the gears' own hum

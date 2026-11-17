@@ -423,7 +423,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // fought and landed in first or third person, or another angler's catch you chose to watch
     const idle = performance.now() - look.touched > 2500;
     const watched = followId && anglers.get(followId)?.out;
-    let steerTo = null, fpDown = false;
+    let steerTo = null, fpDown = false, fpUp = false;
     if (watched && t < followUntil) {
       const wo = watched, busy = wo.phase === "hooked" || wo.phase === "landing" || wo.phase === "bite";
       steerTo = busy ? (wo.fishAt || wo.rig || wo.tip) : wo.at.clone().add(new THREE.Vector3(0, 1.2, 0));
@@ -434,10 +434,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       // going down, the fish led in, the net coming up), then to the fish on the deck; drag and you look where you like,
       // and after a moment it carries on with what's happening. (No cut to a camera beside you: that's Cinematic)
       const L = out.land, R2 = out.release;
-      steerTo = L ? (L.stage === "rod" ? out.at.clone().add(new THREE.Vector3(0, 1.0, 0)).lerp(out.tip, 0.5).lerp(L.fish || out.tip, L.fish ? 0.45 : 0) /* (and a little back towards the fish waiting at the surface, so it stays in the picture, low on the left: looking only at your hands, it was off the side of the picture in 6 of 7 checks, a tenth of a second apart) */ /* (watching your hands lay the rod on the rail, out in front: nearer your feet, the point was almost straight below your eye and the view spun round to wherever that put it) */ : L.stage === "lower" || L.stage === "lead" || L.stage === "haul" ? (L.net || L.fish) : L.stage === "pick" || L.stage === "in" || L.stage === "done" ? (L.net || L.fish) : (L.fish || out.fishAt || out.rig))
+      steerTo = L ? (L.stage === "rod" ? out.at.clone().add(new THREE.Vector3(0, 1.0, 0)).lerp(out.tip, 0.5).lerp(L.fish || out.tip, L.fish ? 0.45 : 0) /* (and a little back towards the fish waiting at the surface, so it stays in the picture, low on the left: looking only at your hands, it was off the side of the picture in 6 of 7 checks, a tenth of a second apart) */ /* (watching your hands lay the rod on the rail, out in front: nearer your feet, the point was almost straight below your eye and the view spun round to wherever that put it) */ : L.stage === "lower" || L.stage === "lead" || L.stage === "haul" ? (L.net || L.fish) : L.stage === "pick" || L.stage === "in" || L.stage === "done" ? (L.net || L.fish) : (L.to && L.fish ? L.fish.clone().lerp(L.to, 0.5) : L.fish || out.fishAt || out.rig))
         : R2 ? (R2.net || R2.fish || out.keptAt) : out.keptAt;
       if (steerTo) { steerTo = steerTo.clone(); if (L?.water != null && steerTo.y < L.water + 0.3) steerTo.y += 0.25; } // (a little above the net in the water, so the view isn't all dark sea)
       fpDown = true;
+      fpUp = !!L && out.tech === "lift" && !out.landed; // (a fish swung up on the line hangs under the tip, above your eye when you're standing: your eyes go up to it, not held down at the rail with the fish over the top of the picture, as 18 of 40 checks a quarter second apart found it. As it swings in, between it and your hand, so both are in the picture as it comes down: following the fish, or going ahead to the hand, lost it for over half a second either way)
     }
     else if (out && focus?.a.local && (mode === "first" || mode === "third") && (out.phase === "hooked" || out.phase === "landing") && !(out.phase === "landing" && out.landed)) {
       steerTo = out.phase === "landing" ? (out.fishAt || out.rig) : (out.rig ? out.tip.clone().lerp(out.rig, 0.55) : null);
@@ -680,7 +681,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     const settling = t - modeSince < 0.6;
     if (mode !== "cinematic") { camPos.lerp(pos, (mode === "first" || mode === "free") && !settling ? 1 : 1 - Math.exp(-dt * (mode === "spectator" ? 2.5 : settling ? 9 : 6))); cineShot = null; }
     // (never steered steeply down: a fish close in under the pier would tip the view down into the water)
-    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(fpDown ? -1.38 : -0.5, Math.min(fpDown ? -0.3 : 0.6, l.pitch)), fpDown ? (out?.kept === "inspect" ? 3 : 1.6) : 0); steering = fpDown ? "down" : true; } // (lifting the fish up to look at it, your eyes follow it up a little quicker: looking down at the net while it came up, it passed up through the view a hand's length away) // (landing it yourself, your head turns at a head's pace, about 90 degrees a second at most)
+    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(fpDown ? -1.38 : -0.5, Math.min(fpDown ? (fpUp ? 0.12 : -0.3) : 0.6, l.pitch)), fpDown ? (out?.kept === "inspect" ? 3 : 1.6) : 0); steering = fpDown ? "down" : true; } // (lifting the fish up to look at it, your eyes follow it up a little quicker: looking down at the net while it came up, it passed up through the view a hand's length away) // (landing it yourself, your head turns at a head's pace, about 90 degrees a second at most)
     else if (steering && idle && !steerTo) { const was = steering; steering = false; const h = look.home; if (mode === "first" || mode === "third") look.aim(h.yaw, h.pitch, was === "down" ? 1.6 : 0); } // (back up from the deck at the same head's pace: it snapped up in a tenth of a second)
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
     if (camOverride) camPos.copy(camOverride); // test hook only: a fixed viewpoint for visual checks
@@ -937,7 +938,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
-      tipLights.update(tipList, dark, t, tipMode); torch.update(dark, dt || 0.016, anglers.get(localId)?.out?.torchAt || null);
+      tipLights.update(tipList, dark, t, tipMode); torch.update(dark, dt || 0.016, anglers.get(localId)?.out?.torchAt || null); env.rainTorch?.(torch.light);
       // (a wet patch on the deck where your dripping net, and your fish, are put down: wetLook.js)
       { const me = anglers.get(localId)?.out, n = me?.land?.net, k = me?.keptAt;
         if (n && me.at && Math.abs(n.y - me.at.y) < 0.35) wetSpotAt(n.x, n.z, 0.55);
@@ -957,7 +958,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // drawing buffer away and makes a new one, and a step in resolution had already done that once)
     const pr = renderer.getPixelRatio(); if (canvas.width !== Math.floor(w * pr) || canvas.height !== Math.floor(h * pr)) renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    post?.setSize(w, h); env?.resizeReflections?.(renderer);
+    post?.setSize(w, h); env?.resizeReflections?.(renderer); env?.setScreen?.(renderer.domElement.height);
   }
   resize();
   raf = requestAnimationFrame(frame);

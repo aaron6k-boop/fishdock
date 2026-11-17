@@ -1495,7 +1495,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     else if (ph === "waiting" || ph === "missed") {
       // watching the tip (or the float) most of the time; standing about, hands in pockets or arms folded
       const watch = n1(t * 0.07 + id.length * 3.1) > -0.35;
-      if (watch) lookAtW = floatRig ? castAt.clone() : tipWorld();
+      // (the tip of a rod on its rest is two or three metres up: an angler watching it glances up at it, their head
+      // mostly level and their eyes doing the rest, not craning back at the sky as the figure did, 17 November)
+      if (watch) lookAtW = floatRig ? castAt.clone() : tipWorld().lerp(castAt, 0.3);
       const m = Math.floor(t / 23 + (hashSeed(id) % 7)) % 3; idleMode = ["pockets", "fold", "hang"][m];
       if (hands[1]) idleMode = "hang"; // (a hand on the rod: the other hangs, it can't fold its arms or pocket both)
       if (sitNow > 0.3 && !hands[0] && !hands[1]) idleMode = idleMode === "fold" ? "fold" : "lap"; // (sitting: arms folded or hands on the thighs, never in the pockets)
@@ -1959,7 +1961,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // your head torch, seen from outside you (third person): on your forehead, shining where your face points and
     // tipped down a little, as a head torch is worn. In first person the world uses the camera, which is your eye
     const torchAt = local && !fp ? headTorchAt() : null;
-    return { torchAt, phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
+    return { torchAt, phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater, to: tech === "lift" && age >= LT.swingIn - 0.3 ? toWorld(fp ? SWING_FP.clone() : SWING_TP.clone()) : null /* (where a fish swung in is coming to, as it swings down out of the air in under a second: world.js keeps it and the fish in the picture) */ } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
   // shoulders and your arms together, and your hands still reach the rod
