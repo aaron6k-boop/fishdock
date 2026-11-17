@@ -275,7 +275,11 @@ def build(sp, shared=False):
       off = aM2 * width * taper_at(cx) * out / L
       rot = Matrix.Rotation(math.radians(turn) * mirror, 4, "X")  # (the fin, hanging below its base, swings out to the side `mirror` is)
       pivot = Vector((0, 0, cyb))
-      for vv in pm.vertices: vv.co = rot @ (vv.co - pivot) + pivot + Vector((0, off * mirror, 0))
+      # (raised to where the belly is at that offset to the side, as the body's section is rounded there, and a shark's
+      # wing a little into the body: set out from the middle of the belly at its lowest, a shark's pectoral fins hung
+      # clear of it in the check render, a gap between the fin and the body)
+      lift = aM2 * (1 - math.sqrt(max(0.0, 1 - out * out))) / L + (0.05 * aM2 / L if turn > 45 else 0)
+      for vv in pm.vertices: vv.co = rot @ (vv.co - pivot) + pivot + Vector((0, off * mirror, lift))
     return o
   def grow(box):
     bx0, by0, bx1, by1 = box; g = 0.04 * L
