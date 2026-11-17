@@ -469,6 +469,22 @@ test("public places: everyone at a mark in the same room without joining anyone,
   assert.equal((await h.c("GET", `/${a.body.code}?via=code`)).status, 404);
 });
 
+test("public places: someone without a name yet is in as Angler and digits, and renamed in place when they choose", async (t) => {
+  const h = harness(t);
+  const pub = (name) => h.c("POST", "/public", { body: { mark: "gorleston-south-pier", venue: "pier", name } });
+  const a = await pub("Angler 4821"), b = await pub("Gary");
+  const sa = await h.sock(a.body.code, a.body.member.key), sb = await h.sock(b.body.code, b.body.member.key);
+  const names = (s) => s.last("members").members.map((m) => m.name).sort();
+  await sa.send({ t: "name", name: "  Aaron  " });
+  assert.deepEqual(names(sb), ["Aaron", "Gary"], "the others see the new name");
+  assert.ok(sb.last("members").members.find((m) => m.name === "Aaron").spot, "still fishing, at the same spot");
+  const n = sb.got.length;
+  await sa.send({ t: "name", name: "A" }); await sa.send({ t: "name", name: "<>" }); await sa.send({ t: "name", name: "Aaron" });
+  assert.equal(sb.got.length, n, "too short, nothing left once cleaned, or the same: nothing changes");
+  await sa.send({ t: "name", name: "x".repeat(60) });
+  assert.equal(sb.last("members").members.find((m) => m.id === a.body.member.id).name.length, 24, "cut to length");
+});
+
 test("public places keep nobody for long: gone two hours, dropped with their fishing; back, put in again", async (t) => {
   const room = new PartyRoom(null), now = Date.UTC(2026, 10, 13, 18);
   room.initPublic({ code: "ABCDEF", mark: "gorleston-south-pier", venue: "pier" }, now);

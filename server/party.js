@@ -19,7 +19,8 @@
 //   own room without joining anyone (POST /api/party/public), so whoever's fishing Gorleston South Pier sees the others
 //   there. Up to four anglers a room; a fifth goes in the mark's next room. Virtual only, no host, no typed chat and no
 //   voice (strangers): only the fixed phrases of src/lib/chatPhrases.js ("say", by id, 15 November); the names people
-//   chose, their looks, their fishing and their walking about. Nobody's kept for long:
+//   chose, their looks, their fishing and their walking about. Someone who hasn't chosen a name yet is in as "Angler"
+//   and four digits their phone picked, and is renamed in place when they choose ("name", 16 November). Nobody's kept for long:
 //   anyone gone two hours is dropped. Still never anyone's coordinates: the mark is a public place.
 //   The map shows how many are fishing each place now (GET /api/party/public): each public room tells one board its
 //   count of connected anglers when it changes, and the board adds them up by mark. Numbers by place only.
@@ -353,6 +354,14 @@ export class PartyRoom {
       case "presence": {
         if (S.mode === "real" && ["water", "remote"].includes(msg.presence)) { me.presence = msg.presence; bcastMembers(); return res({ save: true }); }
         return res();
+      }
+      case "name": {
+        // your own name, changed (16 November: at a public place you're in the room before you've chosen one, as
+        // "Angler" and four digits, and choosing renames you there). Cleaned as on joining; yours only
+        const n = cleanLine(msg.name, 24);
+        if (!n || n.length < 2 || n === me.name) return res();
+        me.name = n; bcastMembers();
+        return res({ save: true });
       }
       case "spot": {
         if (me.role === "spectator") return res();

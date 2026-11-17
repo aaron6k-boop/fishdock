@@ -25,7 +25,7 @@ import { landedCatches } from "../lib/landed.js";
 import { useParty, joinPublic, publicSeat, forgetPublic, momentText } from "../lib/party.js";
 import { matchAt, matchBoard, ukClock, countdown } from "../lib/pierMatch.js";
 import { lineText } from "../lib/chatPhrases.js";
-import { playerName, setPlayerName, cleanName, addCatch, setOutcome, diary as readDiary } from "../lib/diary.js";
+import { playerName, setPlayerName, guestName, cleanName, addCatch, setOutcome, diary as readDiary } from "../lib/diary.js";
 import { progress, afterCatch, medalFor, CHALLENGE_XP } from "../lib/progress.js";
 import { drawFish } from "../lib/fishDraw.js";
 import { gameBaits, gameBait, biteWeight, takesHere, DEFAULT_BAIT } from "../lib/gameBait.js";
@@ -103,7 +103,9 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   const [diaryOpen, setDiaryOpen] = useState(false), [diaryList, setDiaryList] = useState(readDiary);
   const saveName = () => { const n = setPlayerName(nameDraft); if (n) { setName(n); setNaming(false); } };
   // ---- the others fishing here: everyone playing this place is in its room (server/party.js public places), seen
-  // in the 3D view with the names they chose; you're in it as soon as you have a name ----
+  // in the 3D view with the names they chose. You're in it from the start: until you choose a name, as "Angler" and
+  // four random digits (diary.js guestName), and choosing one renames you there without leaving ----
+  const [guest] = useState(guestName), roomName = name || guest, roomNameRef = useRef(roomName); roomNameRef.current = roomName;
   const [seat, setSeat] = useState(null), [toasts, setToasts] = useState([]);
   const toast = (text, kind = "") => { const id = Math.random().toString(36).slice(2); setToasts((t) => [...t.slice(-3), { id, text, kind }]); setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), typeof text === "object" ? 5200 : 4200); };
   const poseBus = useMemo(() => new EventTarget(), []);
@@ -115,14 +117,15 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
   } });
   const Proom_ref = useRef(Proom); Proom_ref.current = Proom;
   useEffect(() => { // into this place's room (the one this phone had, or a new seat); out of the last place's
-    if (!name) return undefined;
     let gone = false; const had = publicSeat(placeId);
-    if (had) setSeat(had); else joinPublic(placeId, { venue: venueOf(place), name, outfit: look.outfit, look: lookOnly(look) }).then((s) => { if (!gone) setSeat(s); }).catch(() => { /* offline or no server: fishing alone */ });
+    if (had) setSeat(had); else joinPublic(placeId, { venue: venueOf(place), name: roomNameRef.current, outfit: look.outfit, look: lookOnly(look) }).then((s) => { if (!gone) setSeat(s); }).catch(() => { /* offline or no server: fishing alone */ });
     return () => { gone = true; Proom_ref.current?.send({ t: "leave" }); setSeat(null); };
-  }, [placeId, name]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [placeId]); // eslint-disable-line react-hooks/exhaustive-deps
   // (dropped from the room while away, or it's ended: a fresh seat)
-  useEffect(() => { if (Proom.status === "denied" || Proom.status === "ended") { forgetPublic(placeId); setSeat(null); joinPublic(placeId, { venue: venueOf(place), name, outfit: look.outfit, look: lookOnly(look) }).then(setSeat).catch(() => {}); } }, [Proom.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (Proom.status === "denied" || Proom.status === "ended") { forgetPublic(placeId); setSeat(null); joinPublic(placeId, { venue: venueOf(place), name: roomNameRef.current, outfit: look.outfit, look: lookOnly(look) }).then(setSeat).catch(() => {}); } }, [Proom.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const meRoom = Proom.members.find((m) => m.id === Proom.me?.id);
+  // (the room has you under another name: the random one from before you chose, or one changed from the menu)
+  useEffect(() => { if (Proom.status === "live" && meRoom && meRoom.name !== roomName) Proom.send({ t: "name", name: roomName }); }, [Proom.status, meRoom?.name, roomName]); // eslint-disable-line react-hooks/exhaustive-deps
   const others = Proom.status === "live" ? Proom.members.filter((m) => m.spot && m.online && m.id !== Proom.me?.id) : []; // (only who's here now)
   const poseSent = useRef({ at: 0, p: null });
   const sendPose = (p) => {
@@ -331,16 +334,17 @@ export default function TryLive({ initialPlace, initialSpecies, chosenFish = fal
           </aside>
         </> : null}
         {naming ? <>
-          <div className="sheet-scrim" onClick={() => { if (name) setNaming(false); }} />
+          <div className="sheet-scrim" onClick={() => setNaming(false)} />
           <aside className="watch-panel sheet open name-sheet" aria-label="Your fishing name">
-            <div className="sheet-head"><div className="try-head"><h1>{name ? "Your fishing name" : "Before you start: your name"}</h1><p className="small muted">What other anglers see you as when they're fishing the same place. 2 to 20 letters or numbers. Kept on this phone; you can change it from the menu.</p></div>
-              {name ? <button type="button" className="xbtn sheet-x" onClick={() => setNaming(false)} aria-label="Close"><Icon name="close" /></button> : null}</div>
+            <div className="sheet-head"><div className="try-head"><h1>{name ? "Your fishing name" : "Before you start: your name"}</h1><p className="small muted">What other anglers see you as when they're fishing the same place. 2 to 20 letters or numbers. Kept on this phone; you can change it from the menu.{name ? "" : ` Until you choose, they see you as ${guest}.`}</p></div>
+              <button type="button" className="xbtn sheet-x" onClick={() => setNaming(false)} aria-label={name ? "Close" : `Not now: fish as ${guest}`}><Icon name="close" /></button></div>
             <section className="watch-sec">
               <form className="name-form" onSubmit={(e) => { e.preventDefault(); saveName(); }}>
                 <input type="text" value={nameDraft} maxLength={24} autoFocus placeholder="Your name" aria-label="Your fishing name" onChange={(e) => setNameDraft(e.target.value)} />
                 <button type="submit" className="btn primary" disabled={!cleanName(nameDraft)}>{name ? "Save" : "Start fishing"}</button>
               </form>
               {nameDraft && !cleanName(nameDraft) ? <p className="tiny">2 to 20 letters, numbers, spaces, hyphens or apostrophes.</p> : null}
+              {name ? null : <button type="button" className="btn small" onClick={() => setNaming(false)}>Not now: fish as {guest}</button>}
             </section>
           </aside>
         </> : null}

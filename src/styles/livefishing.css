@@ -259,6 +259,8 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
 @media (min-width: 960px) and (orientation: landscape) {
   .immersive .fs-top .watch-more { display: none; }
   .immersive .watch-panel .sheet-head { display: none; }
+  /* (but the name box keeps its heading: on a PC it was a bare text box, nothing saying what it was for) */
+  .immersive .watch-panel.name-sheet .sheet-head { display: flex; }
   .immersive .watch-panel.sheet .watch-activity { display: block; }
 }
 .vol-row { display: flex; align-items: center; gap: 10px; }

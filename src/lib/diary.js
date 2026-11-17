@@ -5,7 +5,7 @@
 // newest 5,000 (your level and badges are worked out from it: src/lib/progress.js). A game catch: never a real record,
 // and never shared as one.
 
-const NAME_KEY = "fishdock.playerName", DIARY_KEY = "fishdock.diary", MAX = 5000;
+const NAME_KEY = "fishdock.playerName", GUEST_KEY = "fishdock.guestName", DIARY_KEY = "fishdock.diary", MAX = 5000;
 
 const store = () => { try { return typeof localStorage !== "undefined" ? localStorage : null; } catch { return null; } };
 
@@ -16,6 +16,15 @@ export function cleanName(s) {
   return t.length >= 2 && t.length <= 20 ? t : null;
 }
 export const playerName = () => cleanName(store()?.getItem(NAME_KEY) || "");
+/** What the others at a place see you as until you choose a name: "Angler" and four random digits, the same on this
+ * phone every visit (kept beside the name; never shown as your name in your own logbook). */
+export function guestName(rnd = Math.random) {
+  const had = cleanName(store()?.getItem(GUEST_KEY) || "");
+  if (had && /^Angler \d{4}$/.test(had)) return had;
+  const n = `Angler ${1000 + Math.floor(rnd() * 9000)}`;
+  try { store()?.setItem(GUEST_KEY, n); } catch { /* full or blocked: a new one next visit */ }
+  return n;
+}
 export function setPlayerName(s) { const n = cleanName(s); if (!n) return null; try { store()?.setItem(NAME_KEY, n); } catch { /* full or blocked: lasts this visit */ } return n; }
 
 /** The diary, newest first. */
