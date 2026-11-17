@@ -566,7 +566,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         if (uWind > .55 && sea > .5)
           // old foam lying in streaks along the wind, broken into short lengths and thin patches (unbroken, they read as
           // long pale lines drawn across the sea)
-          streak = smoothstep(.74, .92, noise(pf*vec2(.07, 1.1) + vec2(-uTime*.15, 0.)))*smoothstep(.45, .75, noise(p*.45 + 5.)*.6 + noise(p*1.7 - uTime*.1)*.4)*smoothstep(.55, 1., uWind)*sea*.22*(1. - smoothstep(40., 200., dist));
+          streak = smoothstep(.74, .92, noise(pf*vec2(.07, 1.1) + vec2(-uTime*.15, 0.)))*smoothstep(.45, .75, noise(p*.45 + 5.)*.6 + noise(p*1.7 - uTime*.1)*.4)*smoothstep(.55, 1., uWind)*sea*.22*(1. - smoothstep(40., 200., dist))*(uFft > .5 ? .55 : 1.); // (the spectrum sea's own foam lies in streaks already: the drawn ones over it smeared it)
         #endif
         float shore = uShoreZ > -1e3 ? smoothstep(-26., 0., p.y - uShoreZ) : 0.;
         float band = smoothstep(.5, .9, sin((p.y - uShoreZ)*.45 + uTime*1.3 + noise(vec2(p.x*.05, uTime*.1))*3.))*shore;
@@ -973,7 +973,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       if (!fft || wU.uFft.value < 0.5) return;
       // (JONSWAP over a long fetch gives a light air more sea than a sheltered pier sees: the energy is eased in
       // with the wind. Choppiness 1.4: crests drawn together enough to fold in a fresh breeze, not before)
-      const gain = (0.08 + 0.22 * THREE.MathUtils.smoothstep(wind, 0.05, 0.45)) * (kind === 1 ? 0.5 : 1);
+      // (and more again from a fresh breeze to a near gale: at the old ceiling the spectrum sea in a force 7 was no
+      // rougher than in a force 5, flatter than the High sea's own trains, 17 November)
+      const gain = (0.1 + 0.28 * THREE.MathUtils.smoothstep(wind, 0.05, 0.45) + 0.27 * THREE.MathUtils.smoothstep(wind, 0.45, 0.9)) * (kind === 1 ? 0.5 : 1);
       fft.update(t, { windKph: wind * 45, windDir, fetchKm: 80, gain, lambda: 1.4 });
       wU.uFoam0.value = fft.foam;
     },
