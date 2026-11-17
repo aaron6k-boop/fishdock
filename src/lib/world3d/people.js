@@ -51,10 +51,15 @@ export const PEOPLE = [
   { file: "m20", sex: "m", name: "Man, brown hoodie", skin: 1, hair: 1, beard: 0, hem: 0.5 },
   { file: "f08", sex: "f", name: "Woman, long dark hair", skin: 1, hair: 0, beard: 0, hem: 0.53 },
   { file: "f15", sex: "f", name: "Woman, auburn hair", skin: 1, hair: 4, beard: 0, hem: 0.52 },
+  // (17 November, the new people: modelled in Blender for FishDock on a Rocketbox body, docs/CHARACTER-SYSTEM.md. The
+  // main angler: a short beard, a black waterproof jacket with its hood rolled at the collar, a storm flap and
+  // pockets, waterproof trousers and green wellies, each with its own colour, normal and roughness maps, and lighter
+  // versions of everything for further off. Coloured as your kit like the others; "as they come" is his own black)
+  { file: "angler2", sex: "m", name: "Angler, waterproofs and beard", skin: 0, hair: 1, beard: 2, hem: 0.475, clothes: true, v2: true, own: { coat: 0x26292c, legs: 0x2a2b2c, boots: 0x2c4a28 } },
 ];
 // who your own angler is until you choose: the angler in their fishing clothes, so the jacket you see on your arms in
 // first person is the one you see them wearing from behind
-export const OWN_DEFAULT = PEOPLE.findIndex((p) => p.file === "m05");
+export const OWN_DEFAULT = PEOPLE.findIndex((p) => p.file === "angler2");
 // clothing colours: the first keeps the jacket or trousers as they come (the model's own fabric, unrecoloured)
 export const COATS = [
   { hex: null, name: "As they come" }, { hex: 0x1d3150, name: "Navy" }, { hex: 0x3d4a2c, name: "Olive" }, { hex: 0x2e5e4e, name: "Bottle green" },
@@ -69,7 +74,10 @@ export const FOOTWEAR = [
 ];
 export const LIFE = ["No life jacket", "Life jacket"];
 export const GLOVES = ["No gloves", "Gloves"];
-export const KIT_KEYS = { person: PEOPLE.length, coat: COATS.length, legs: LEGS.length, boots: FOOTWEAR.length, life: LIFE.length, gloves: GLOVES.length };
+// (17 November 2026: glasses and a head torch, worn by any of the people)
+export const GLASSES = ["No glasses", "Glasses", "Sunglasses"];
+export const TORCH = ["No head torch", "Head torch"];
+export const KIT_KEYS = { person: PEOPLE.length, coat: COATS.length, legs: LEGS.length, boots: FOOTWEAR.length, life: LIFE.length, gloves: GLOVES.length, glasses: GLASSES.length, torch: TORCH.length };
 
 const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 
@@ -96,9 +104,11 @@ export function lookFor(id = "", chosen = null) {
   const kit = {
     person: c?.person ?? pk(PEOPLE.length, 0), coat: c?.coat ?? 1 + pk(COATS.length - 1, 5), legs: c?.legs ?? pk(LEGS.length, 10),
     boots: c?.boots ?? pk(FOOTWEAR.length, 15), life: c?.life ?? 0, gloves: c?.gloves ?? 0,
+    // (about one in five who haven't chosen wear glasses, a few of them sunglasses; no head torch unless chosen)
+    glasses: c?.glasses ?? (pk(10, 20) < 2 ? 1 + pk(3, 24) % 2 : 0), torch: c?.torch ?? 0,
   };
   const P = PEOPLE[kit.person];
-  return { ...base, ...kit, chosen: !!c, height, seed: h, skinHex: SKINS[base.skin].hex, hairHex: HAIRS[base.hair].hex, file: P.file, sex: P.sex, hem: P.hem, clothes: !!P.clothes };
+  return { ...base, ...kit, chosen: !!c, height, seed: h, skinHex: SKINS[base.skin].hex, hairHex: HAIRS[base.hair].hex, file: P.file, sex: P.sex, hem: P.hem, clothes: !!P.clothes, v2: !!P.v2, own: P.own || null };
 }
 
 /** A person's own look for the simple stand-in figure (their skin, hair and beard), keeping everything else. */

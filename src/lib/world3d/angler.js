@@ -293,7 +293,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // then, loading and building them stopped the game for over a second, the 13 November recording at 11 s. Counted as
   // an asset once loaded, so the world builds their shaders while the place is still loading)
   let fpvCounted = false;
-  function makeFpv() { if (fpv) return; const L = fig.look || {}; fpv = createFpRig({ gloves: !!L.gloves || !!(FILM && typeof window !== "undefined" && window.__fdGloves), skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48 }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
+  function makeFpv() { if (fpv) return; const L = fig.look || {}; fpv = createFpRig({ gloves: !!L.gloves || !!(FILM && typeof window !== "undefined" && window.__fdGloves), skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? L.own?.coat ?? O?.jacket ?? 0x2f3a48 }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
   const part = (geo, mat, x, y, z, parent = root) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
   const tagY = fig.look.height + 0.3;
   let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, tagY, 0); root.add(tag);

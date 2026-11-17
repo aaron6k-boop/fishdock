@@ -157,6 +157,62 @@ function prepGeometry(geo, bones) {
   };
   return info;
 }
+// ---- body types: slim, medium or broad, one morph on every part of a person, the body and the clothes alike ----
+// Each point moves out from (or in towards) the bones that carry it: the torso from the spine's line (wider at the
+// sides, fuller in front at the belly, a little at the back), the arms, legs and neck from their bones' lines, and the
+// whole arm and leg a little out with the wider chest and hips; the head, hands and feet keep their size. A garment's
+// points carry the same bones as the body under them (they were made from it), so the cloth moves with the body and
+// the two never cross. Worked out once per mesh from its own bind pose, so it fits every person, old or new.
+export const BUILD_AT = [-0.75, 0, 1]; // (BUILDS: Slim, Medium, Broad)
+const BULK = { UpperArm: 0.12, Forearm: 0.08, Thigh: 0.1, Calf: 0.06, Neck: 0.1 };
+const LIMB_END = { UpperArm: "Forearm", Forearm: "Hand", Thigh: "Calf", Calf: "Foot", Neck: "Head" };
+const morphed = new WeakMap();
+export function buildMorph(geo, bones, boneInverses, bindMatrixInverse) {
+  if (morphed.has(geo)) return morphed.get(geo);
+  const at = {}, mt = new THREE.Matrix4();
+  bones.forEach((b, i) => { if (b && boneInverses[i]) at[b.name.replace(/^Bip01_/, "")] = new THREE.Vector3().setFromMatrixPosition(mt.copy(boneInverses[i]).invert().premultiply(bindMatrixInverse)); });
+  const need = ["Pelvis", "Neck", "Head", "L_UpperArm", "R_UpperArm", "L_Thigh", "R_Thigh", "L_Foot", "R_Foot", "L_Toe0"];
+  if (need.some((n) => !at[n])) { morphed.set(geo, null); return null; }
+  const feet = at.L_Foot.clone().add(at.R_Foot).multiplyScalar(0.5);
+  const up = at.Head.clone().sub(feet).normalize();
+  const lat = at.L_UpperArm.clone().sub(at.R_UpperArm); lat.addScaledVector(up, -lat.dot(up)).normalize();
+  const fwd = new THREE.Vector3().crossVectors(up, lat); if (at.L_Toe0.clone().sub(at.L_Foot).dot(fwd) < 0) fwd.negate();
+  const pel = at.Pelvis, spine = at.Neck.clone().sub(pel), sp2 = spine.lengthSq();
+  const half = (n) => Math.abs(at["L_" + n].clone().sub(at["R_" + n]).dot(lat)) / 2;
+  const armOut = half("UpperArm") * 0.06, legOut = half("Thigh") * 0.05;
+  const K = bones.map((b) => {
+    const nm = (b?.name || "").replace(/^Bip01_/, "");
+    if (/^(Pelvis|Spine\d?)$/.test(nm)) return { torso: 0.07 };
+    if (/Clavicle$/.test(nm)) return { torso: 0.05 };
+    const sd = /^([LR])_/.exec(nm), sg = sd ? (sd[1] === "L" ? 1 : -1) : 0;
+    const shift = sd && /UpperArm|Forearm|Hand|Finger/.test(nm) ? lat.clone().multiplyScalar(sg * armOut) : sd && /Thigh|Calf|Foot|Toe/.test(nm) ? lat.clone().multiplyScalar(sg * legOut) : null;
+    const mm = /^(?:[LR]_)?(UpperArm|Forearm|Thigh|Calf|Neck)$/.exec(nm);
+    const a = mm ? at[nm] : null, e = mm ? at[(mm[1] === "Neck" ? "" : nm.slice(0, 2)) + LIMB_END[mm[1]]] : null;
+    return a && e ? { a, ax: e.clone().sub(a), k: BULK[mm[1]], shift } : shift ? { shift } : null;
+  });
+  const pos = geo.attributes.position, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight;
+  if (!pos || !si || !sw) { morphed.set(geo, null); return null; }
+  const n = pos.count, out = new Float32Array(n * 3), p = V(), d = V(), r = V(), q = V();
+  for (let i = 0; i < n; i++) {
+    p.fromBufferAttribute(pos, i); d.set(0, 0, 0);
+    for (let j = 0; j < 4; j++) {
+      const w = sw.getComponent(i, j); if (w < 1e-3) continue;
+      const k = K[si.getComponent(i, j)]; if (!k) continue;
+      if (k.shift) d.addScaledVector(k.shift, w);
+      if (k.ax) {
+        const t = clamp(r.copy(p).sub(k.a).dot(k.ax) / k.ax.lengthSq(), 0, 1);
+        r.copy(p).sub(q.copy(k.a).addScaledVector(k.ax, t)); d.addScaledVector(r, k.k * w);
+      } else if (k.torso) {
+        const t = clamp(r.copy(p).sub(pel).dot(spine) / sp2, -0.3, 1.2);
+        r.copy(p).sub(q.copy(pel).addScaledVector(spine, t));
+        const x = r.dot(lat), f = r.dot(fwd), hb = t - 0.28, belly = Math.exp(-(hb * hb) / 0.0968);
+        d.addScaledVector(lat, x * k.torso * w).addScaledVector(fwd, f * (f > 0 ? 0.05 + 0.16 * belly : 0.06) * w);
+      }
+    }
+    out[i * 3] = d.x; out[i * 3 + 1] = d.y; out[i * 3 + 2] = d.z;
+  }
+  const attr = new THREE.BufferAttribute(out, 3); morphed.set(geo, attr); return attr;
+}
 // the average brightness of each region's fabric (linear), so a new colour keeps the fabric's own light and shade
 function regionMeans(map, uv, reg) {
   const out = [0.2, 0.2, 0.2, 0.2];
@@ -283,6 +339,24 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // (body, head, hair), the joined geometry made once per model and shared by everyone who chose that person
   skinned = mergeByMaterial(skinned, gltf);
   const B = (n) => bone["Bip01_" + n];
+  // ---- levels of detail (the new people: every part also as <part>_lod1 and <part>_lod2, about 25,000 and 8,000
+  // triangles against 60,000): the set drawn picked by how far the camera is, a frame behind (found when one of them
+  // is drawn for the view itself, not for a shadow or the water's mirror), with a margin so it doesn't flicker ----
+  const lodOf = (o) => { for (let p = o; p && p !== model; p = p.parent) { const mm = /_lod([12])(?:_\d+)?$/.exec(p.name || ""); if (mm) return +mm[1]; } return 0; };
+  const lodSets = [[], [], []]; for (const m of skinned) lodSets[lodOf(m)].push(m);
+  let lodNow = -1; const camAt = V(), meAt = V();
+  const setLod = (n) => { if (n === lodNow) return; lodNow = n; lodSets.forEach((set, i) => set.forEach((m) => { m.visible = i === n && !m.userData.off; })); };
+  if (lodSets[1].length) {
+    setLod(0);
+    const pick = (_r, _s, cam) => {
+      if (!cam || cam.isOrthographicCamera || cam.userData?.fdMirror) return;
+      const d = camAt.setFromMatrixPosition(cam.matrixWorld).distanceTo(root.getWorldPosition(meAt));
+      let want = d < (lodNow === 1 ? 11 : 13) ? 0 : d < (lodNow === 2 ? 32 : 36) ? 1 : 2;
+      while (want > 0 && !lodSets[want].length) want--; // (the light file has two levels)
+      setLod(want);
+    };
+    for (const set of lodSets) for (const m of set) m.onBeforeRender = pick;
+  }
 
   // ---- materials: the clothes recolourable, the hair soft-edged ----
   // (your own angler, coat "as they come": the model's top is coloured as your outfit's jacket, the same jacket as the
@@ -292,14 +366,33 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // ---- the modelled clothes (people with clothes: their own jacket, trousers and wellies, made in Blender) ----
   // coloured as the kit, and the body's own clothes underneath the same colours, so anywhere the body shows through a
   // seam it's the same cloth
-  const worn = skinned.some((m) => /^fd_(jacket|trousers|boots)/.test(m.material?.name || ""));
-  const wornHex = worn ? { jacket: COATS[L.coat]?.hex ?? outfit?.jacket ?? 0x1d3150, trousers: LEGS[L.legs]?.hex ?? 0x3b3e42, boots: FOOTWEAR[L.boots]?.hex ?? 0x2f4a2c } : null;
+  const worn = skinned.some((m) => /^fd2?_(jacket|trousers|boots)/.test(m.material?.name || ""));
+  // ("as they come" for the new people (people.js own): their own colours, the main angler's black jacket and green wellies)
+  const own = L.own || null;
+  const wornHex = worn ? { jacket: COATS[L.coat]?.hex ?? own?.coat ?? outfit?.jacket ?? 0x1d3150, trousers: LEGS[L.legs]?.hex ?? own?.legs ?? 0x3b3e42, boots: FOOTWEAR[L.boots]?.hex ?? own?.boots ?? 0x2f4a2c } : null;
   if (worn) { U.uTop.value = tint(wornHex.jacket); U.uLegs.value = tint(wornHex.trousers); U.uFeet.value = tint(wornHex.boots); }
   const mats = [];
   let unit = 1, clothMesh = null; const clothInv = new THREE.Matrix4(); // metres per unit of the meshes' own geometry
   for (const m of skinned) {
     m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false;
     const mat = m.material;
+    // the new people's clothes (source-assets/blender/people2): their own colour, normal and roughness maps, the
+    // colour map the cloth's detail in grey, coloured as the kit; the beard's strands cut out by their alpha; the studs,
+    // toggles and buckles as they come
+    { const w2 = /^fd2_(jacket|trousers|boots|beard|trim)/.exec(mat.name || "");
+      if (w2) {
+        const c = mat.clone();
+        if (w2[1] === "beard") {
+          // (the beard in the colour chosen for the hair; stubble is the same beard thinned to its densest strands,
+          // none hides it)
+          c.transparent = false; c.alphaTest = L.beard === 1 ? 0.78 : 0.4; c.depthWrite = true; c.side = THREE.DoubleSide; c.roughness = 0.65; c.metalness = 0;
+          if (L.hairHex != null) c.color = new THREE.Color(L.hairHex).multiplyScalar(1.6);
+          if (L.beard === 0) m.userData.off = true;
+        }
+        else if (w2[1] !== "trim") { c.color = new THREE.Color(wornHex[w2[1]]); c.metalness = 0; c.roughness = 1; if (c.normalMap) c.normalScale = new THREE.Vector2(1, 1); }
+        m.material = c; mats.push(c); continue;
+      }
+    }
     { const w = /^fd_(jacket|trousers|boots)/.exec(mat.name || "");
       if (w) { const c = mat.clone(); c.map = null; c.color = new THREE.Color(wornHex[w[1]]); if (w[1] === "boots") { c.roughness = 0.38; c.metalness = 0; } else if (weave()) { c.normalMap = weave(); c.normalScale = new THREE.Vector2(0.5, 0.5); } m.castShadow = true; m.frustumCulled = false; m.material = c; mats.push(c); continue; } }
     if (/opacity/.test(mat.name)) { const h = mat.clone(); h.transparent = true; h.alphaTest = 0.04; h.depthWrite = false; m.material = h; mats.push(h); m.renderOrder = 1; continue; }
@@ -311,6 +404,17 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       const c = clothMaterial(mat, U); m.material = c; mats.push(c); clothMesh = m; continue;
     }
     const c = mat.clone(); m.material = c; mats.push(c);
+  }
+
+  for (const m of skinned) if (m.userData.off) m.visible = false;
+  // ---- the body type (people.js BUILDS): the same morph on the body and everything worn, every level of detail ----
+  // (every mesh gets the morph, a medium build at nought, as the geometry is shared by everyone who chose this person)
+  const build = BUILD_AT[L.build] ?? 0;
+  for (const m of skinned) {
+    const g = m.geometry, D = g.morphAttributes.position?.[0] || buildMorph(g, m.skeleton.bones, m.skeleton.boneInverses, m.bindMatrixInverse);
+    if (!D) continue;
+    if (!g.morphAttributes.position) { g.morphAttributes.position = [D]; g.morphTargetsRelative = true; }
+    m.updateMorphTargets(); m.morphTargetInfluences[0] = build;
   }
 
   // ---- motion: the clips on one mixer ----
@@ -373,6 +477,49 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     brim.scale.set(hd.rx + 0.016, 1, hd.rz + 0.016); brim.position.set(hd.cx, cy - 0.016, hd.cz); hats.add(brim);
   }
   if (hats.children.length) attach("Head", hats);
+  // glasses: a thin frame (dark tortoiseshell) with clear lenses, or black sunglasses with dark lenses; the lenses in
+  // front of the eyes, the arms along the sides of the head to behind the ears
+  if (L.glasses) {
+    const f = hd.face || { front: hd.cz - hd.rz, side: hd.rx }, sun = L.glasses === 2;
+    const eyes = ["LEye", "REye"].map((n) => (B(n) ? restAt(n).x : null));
+    const ex = eyes.every((x) => x != null) && Math.abs(eyes[0] - eyes[1]) > 0.04 ? eyes : [hd.cx - 0.032, hd.cx + 0.032];
+    const y = hd.eye + 0.003, z = f.front - 0.009, w = sun ? 0.029 : 0.025, h = sun ? 0.021 : 0.017, tr = sun ? 0.0021 : 0.0015;
+    const rimMat = new THREE.MeshStandardMaterial({ color: sun ? 0x121315 : 0x3a2a20, roughness: 0.32, metalness: sun ? 0.1 : 0.05 });
+    const lensMat = new THREE.MeshStandardMaterial({ color: sun ? 0x0d1114 : 0xdfe8ee, transparent: true, opacity: sun ? 0.86 : 0.1, roughness: 0.04, metalness: 0.3, depthWrite: false, side: THREE.DoubleSide });
+    extraMats.push(rimMat, lensMat);
+    const gl = new THREE.Group(); gl.name = "glasses";
+    const outline = (cx, sg) => { const pts = []; for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2, c = Math.cos(a), s2 = Math.sin(a); pts.push(new THREE.Vector2(cx + Math.sign(c) * Math.abs(c) ** 0.55 * w * (c * sg > 0 ? 1.04 : 0.96), y + Math.sign(s2) * Math.abs(s2) ** 0.7 * h * (s2 < 0 ? 0.9 : 1))); } return pts; };
+    for (const cx of ex) {
+      const sg = Math.sign(cx - hd.cx) || 1, o2 = outline(cx, sg);
+      // (the frame wraps back a little towards the temples)
+      const z3 = (p) => z + Math.max(0, (p.x - cx) * sg) / w * 0.004;
+      gl.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(o2.map((p) => V(p.x, p.y, z3(p))), true), 56, tr, 5, true), rimMat));
+      const lens = new THREE.ShapeGeometry(new THREE.Shape(o2), 1), lp = lens.attributes.position;
+      for (let i = 0; i < lp.count; i++) lp.setZ(i, z3({ x: lp.getX(i) }) + 0.0005);
+      lens.computeVertexNormals(); const lm = new THREE.Mesh(lens, lensMat); lm.renderOrder = 2; lm.castShadow = false; gl.add(lm);
+      // the arm: from the frame's outer edge back along the side of the head, over the ear and a little down behind it
+      const ox = cx + sg * w * 1.02, sx = hd.cx + sg * (f.side + 0.004);
+      gl.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(ox, y + h * 0.45, z + 0.004), V(sx, y + h * 0.4, z + 0.03), V(sx + sg * 0.002, y + 0.004, hd.cz + 0.01), V(sx - sg * 0.004, y - 0.022, hd.cz + 0.03)]), 24, tr * 0.9, 5, false), rimMat));
+    }
+    // the bridge over the nose
+    const ins = ex.map((cx) => cx - (Math.sign(cx - hd.cx) || 1) * w * 0.96);
+    gl.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(ins[0], y + h * 0.35, z), V(hd.cx, y + h * 0.55, z - 0.002), V(ins[1], y + h * 0.35, z)]), 10, tr, 5, false), rimMat));
+    attach("Head", gl);
+  }
+  // a head torch: an elastic band round the head (over the hat or hood if one's worn), the lamp at the front of it
+  if (L.torch) {
+    const over = L.hat === 0 ? 0.013 : L.hat === 1 ? 0.012 : L.hat === 2 ? 0.018 : L.hat === 4 ? 0.036 : 0.005;
+    const by = brow + 0.026, rx = hd.rx + over, rz = hd.rz + over, pts = [];
+    for (let i = 0; i < 40; i++) { const a = (i / 40) * Math.PI * 2; pts.push(V(hd.cx + Math.sin(a) * rx, by + 0.02 * (1 + Math.cos(a)) * 0.5, hd.cz - Math.cos(a) * rz)); } // (a = 0 at the front; the band rides higher at the back)
+    const bandMat = new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.9 }), lampMat = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.45, metalness: 0.2 });
+    const lensMat = new THREE.MeshStandardMaterial({ color: 0xf2f0e8, emissive: 0xfff1d0, emissiveIntensity: 0.35, roughness: 0.1 });
+    extraMats.push(bandMat, lampMat, lensMat);
+    const ht = new THREE.Group(); ht.name = "headTorch";
+    ht.add(new THREE.Mesh(strap(new THREE.CatmullRomCurve3(pts, true), (q) => V(q.x - hd.cx, 0, q.z - hd.cz), 0.024, 0.003), bandMat));
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.034, 0.026), lampMat); lamp.position.set(hd.cx, by, hd.cz - rz - 0.012); lamp.rotation.x = -0.12; ht.add(lamp);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.012, 0.004, 18), lensMat); lens.rotation.x = Math.PI / 2 - 0.12; lens.position.set(hd.cx, by - 0.001, hd.cz - rz - 0.026); ht.add(lens);
+    attach("Head", ht);
+  }
   // the hood (chosen as "Hood up"): cut to the head like a real jacket's hood rather than a shell over it: close round
   // the back and top of the head with a centre seam, wider below where it meets the collar, open at the face with the
   // edge rolled; lined a shade darker inside
@@ -422,7 +569,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     const wg = new THREE.Group(); wg.add(ring, buckle); attach("Spine", wg);
   }
   // wellies: a shaft round each calf up to just below the knee, a moulded boot over the foot
-  if (L.boots > 0) {
+  if (L.boots > 0 && !worn) { // (people with modelled boots have them coloured instead)
     const wm = new THREE.MeshStandardMaterial({ color: FOOTWEAR[L.boots].hex, roughness: 0.42, side: THREE.DoubleSide }); extraMats.push(wm); // (both sides: looking down into the top, the boot's inside, not through it)
     const sole = new THREE.MeshStandardMaterial({ color: 0x16181a, roughness: 0.9 }); extraMats.push(sole);
     for (const s of ["L", "R"]) {
@@ -942,6 +1089,11 @@ function measure(skinned, root, k) {
   const hb = box(pts.head), eyesY = eye || hb.min.y + (hb.max.y - hb.min.y) * 0.55;
   const hb2 = box(pts.head.filter((p) => p.y > eyesY));
   const head = { cx: (hb2.min.x + hb2.max.x) / 2, cz: (hb2.min.z + hb2.max.z) / 2, rx: (hb2.max.x - hb2.min.x) / 2, rz: (hb2.max.z - hb2.min.z) / 2, eye: eyesY, top: hb.max.y };
+  // the face at the eyes (for glasses): how far forward it comes there (the brow and the bridge of the nose) and how wide
+  // the head is
+  { let front = Infinity, side = 0;
+    for (const p of pts.head) if (Math.abs(p.y - eyesY) < 0.015) { if (Math.abs(p.x - head.cx) < 0.045) front = Math.min(front, p.z); side = Math.max(side, Math.abs(p.x - head.cx)); }
+    head.face = { front: Number.isFinite(front) ? front : head.cz - head.rz, side: side || head.rx }; }
   // the chest: shoulder height, width and front/back at the chest
   const neck = at(bi.neck), sh = neck.y - 0.02;
   const cs = pts.chest.filter((p) => p.y > sh - 0.3 && p.y < sh - 0.05), cb = box(cs.length ? cs : pts.chest);

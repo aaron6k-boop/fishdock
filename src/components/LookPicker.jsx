@@ -5,12 +5,12 @@
 // character in the simulation, not anything about you).
 import { useEffect, useRef } from "react";
 import { OUTFITS } from "../lib/world3d/angler.js";
-import { PEOPLE, COATS, LEGS, FOOTWEAR, HATS, KIT_KEYS, LOOK_KEYS, lookFor, savedLook, withPerson, OWN_DEFAULT } from "../lib/world3d/people.js";
+import { PEOPLE, COATS, LEGS, FOOTWEAR, HATS, BUILDS, BEARDS, HAIRS, GLASSES, KIT_KEYS, LOOK_KEYS, lookFor, savedLook, withPerson, OWN_DEFAULT } from "../lib/world3d/people.js";
 
 const hex = (n) => `#${n.toString(16).padStart(6, "0")}`;
 /** Your look: the saved one, or a starting point (a man in a navy jacket, green wellies and a beanie). */
 // (until you choose: the angler in their fishing clothes, navy jacket, dark trousers and green wellies)
-export const myLook = () => savedLook() || withPerson({ outfit: 0, skin: 1, hair: 1, hat: 0, beard: 0, build: 1, coat: 1, legs: 0, boots: 1, life: 0, gloves: 0 }, OWN_DEFAULT);
+export const myLook = () => savedLook() || withPerson({ outfit: 0, skin: 1, hair: 1, hat: 0, beard: 0, build: 1, coat: 0, legs: 0, boots: 0, life: 0, gloves: 0, glasses: 0, torch: 0 }, OWN_DEFAULT); // (the main angler as he comes: black jacket, dark trousers, green wellies, a beanie)
 /** The parts the server keeps (no jacket colour of the old kind: parties already share that as `outfit`). */
 export const lookOnly = (v) => {
   if (!v) return null;
@@ -105,11 +105,18 @@ export default function LookPicker({ value, onChange }) {
         <Swatches label="Trousers" list={LEGS} value={value.legs ?? 0} onPick={set("legs")} />
         <Chips label="Boots" list={FOOTWEAR} value={value.boots ?? 0} onPick={set("boots")} />
         <Chips label="Headwear" list={HATS} value={value.hat} onPick={set("hat")} />
+        <Chips label="Build" list={BUILDS} value={value.build ?? 1} onPick={set("build")} />
+        {PEOPLE[person]?.v2 && PEOPLE[person]?.sex === "m" ? <Chips label="Beard" list={BEARDS} value={value.beard ?? 2} onPick={set("beard")} /> : null}
+        {PEOPLE[person]?.v2 && PEOPLE[person]?.sex === "m" && (value.beard ?? 2) > 0 ? <Swatches label="Beard colour" list={HAIRS} value={value.hair ?? 1} onPick={set("hair")} /> : null}
         <div className="look-row look-pair">
           <Chips label="Life jacket" list={["No", "Yes"]} value={value.life ?? 0} onPick={set("life")} />
           <Chips label="Gloves" list={["No", "Yes"]} value={value.gloves ?? 0} onPick={set("gloves")} />
         </div>
-        <p className="tiny muted">People: Microsoft Rocketbox (MIT licence).</p>
+        <div className="look-row look-pair">
+          <Chips label="Glasses" list={["No", ...GLASSES.slice(1)]} value={value.glasses ?? 0} onPick={set("glasses")} />
+          <Chips label="Head torch" list={["No", "Yes"]} value={value.torch ?? 0} onPick={set("torch")} />
+        </div>
+        <p className="tiny muted">People: Microsoft Rocketbox (MIT licence); the anglers’ clothes, beards and body types made for FishDock.</p>
       </div>
     </div>
   );
