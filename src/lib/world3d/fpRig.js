@@ -412,6 +412,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     // from your eye, and nothing of it is inside the reel or the handle)
     for (const n of ["DEF-f_middle02R", "DEF-f_middle03R"]) grips.hold?.R.get(n)?.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -0.15));
     grips.hold?.R.get("DEF-f_middle01R")?.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), -0.37));
+    // (and the thumb moved at its root, out from where the index finger wraps the handle and bent back down onto the
+    // handle beside it: as Blender left it, it lay across that place, and the index finger went 8 mm into it, its tip
+    // coming out through the ball of the thumb. Aaron, 17 November: "the finger's still going through the thumb".
+    // Measured on the skin as drawn, each point of the index, middle and ring fingers against the thumb's surface: none
+    // inside it now; and the thumb still rests on the handle, its pad within 2 mm of it, not held off it)
+    grips.hold?.R.get("DEF-thumb01R")?.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), 0.32)).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0, -0.16)));
     // the hold, as Blender left it: each arm's bones' lengths, which way its elbow bends and the forearm's twist at rest
     clips.hold.apply(1 / RIG.fps); scene.updateMatrixWorld(true);
     const wp = (b) => b.getWorldPosition(V()), wq = (b) => b.getWorldQuaternion(new THREE.Quaternion());
