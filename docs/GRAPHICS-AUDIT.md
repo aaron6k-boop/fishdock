@@ -152,9 +152,11 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
 18. **In your own view the cast's follow-through held your hands at the foot of the picture or below it** while the
    lead flew, the rod standing straight up the middle (Aaron's PC, 17 November). **Changed:** the follow-through is
    held out in front at chest height, the rod pointing up the lead's line a little right of your eye's, both hands in
-   view. **Still:** through the wind-up your left arm, holding the butt, comes up across the lower left of the
-   picture; moving the cast's moments or forcing the elbow down put the wrist past its range (`tests/fpRig.test.js`),
-   so it needs the cast solved again in Blender with the view as one of its conditions.
+   view. Through the wind-up your left arm, holding the butt, came up across the lower left of the picture, its sleeve
+   17 to 23 cm from your eye: the sleeve within about 24 cm of your eye now dissolves (dithered over 6 cm, smoothed by
+   the temporal antialiasing). **Still:** the left forearm crosses the lower part of the picture in the wind-up and the
+   right hand passes close; moving the cast's moments or forcing the elbow down put the wrist past its range
+   (`tests/fpRig.test.js`), so a cleaner wind-up needs the cast solved again in Blender with the view as a condition.
 19. **The wellies were straight tubes.** **Changed:** each leg a moulded shape: a little flare at the top, full over
    the calf, narrowing to the ankle, a raised band near the top.
 
