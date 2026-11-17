@@ -13,7 +13,9 @@
 #   a shark's five gill slits;
 # - the eyes: domes with a cornea's bulge;
 # - the fins: the dorsal, anal and tail fins on the middle plane, their rays standing out as ridges that fade to the
-#   edge; the pelvic fins as a pair, each turned out from the belly;
+#   edge; the pelvic fins as a pair, each turned out from the belly (a shark's pectoral fins likewise, turned out
+#   nearly flat as its wings are); the pectoral fins of the bony fish, painted on the picture's flank, stood off it as a
+#   pair of rayed fans from just behind the gill cover, lying back along the side and lifting a little from it;
 # - two shape keys the game plays (glTF morph targets): "gape" (the lower jaw drops about its hinge at the mouth's
 #   corner) and "gills" (the gill covers lift out from the body at their edge);
 # - a colour on each vertex the game darkens the skin by: the grooves, the mouth's slit and the eye's socket (a
@@ -31,18 +33,19 @@ os.makedirs(OUTD, exist_ok=True); os.makedirs(REND, exist_ok=True)
 P = lambda x, y, z: Vector((x, -z, y))  # (fish frame to Blender's: exported y-up it is the fish frame again)
 
 # ---- each species: its kind, thickness (of its depth), eyes (picture x, y, radius), and the head's marks: the mouth's
-# corner (picture x, y), the gill cover's edge (picture x at the middle of the head), how far the jaw drops ----
+# corner (picture x, y), the gill cover's edge (picture x at the middle of the head), how far the jaw drops; pec: where
+# the pectoral fin is painted on the flank (picture x0, y0, x1, y1), placed by eye from each picture ----
 ANAT = {
-  "cod":       dict(kind="round", width=0.6,  eyes=[(88, 150, 9)],  mouth=(72, 172), op=150, gape=26),
-  "bass":      dict(kind="round", width=0.42, eyes=[(72, 157, 9)],  mouth=(66, 172), op=146, gape=30),
-  "whiting":   dict(kind="round", width=0.45, eyes=[(68, 158, 8)],  mouth=(62, 170), op=128, gape=24),
-  "mackerel":  dict(kind="round", width=0.6,  eyes=[(73, 150, 9)],  mouth=(58, 166), op=126, gape=26),
-  "pollack":   dict(kind="round", width=0.5,  eyes=[(80, 155, 9)],  mouth=(68, 168), op=140, gape=26),
-  "coalfish":  dict(kind="round", width=0.5,  eyes=[(69, 164, 9)],  mouth=(58, 172), op=128, gape=24),
-  "pouting":   dict(kind="deep",  width=0.45, eyes=[(76, 148, 14)], mouth=(52, 174), op=128, gape=22),
-  "black-bream": dict(kind="deep", width=0.34, eyes=[(79, 157, 13)], mouth=(52, 184), op=140, gape=20),
-  "ballan-wrasse": dict(kind="deep", width=0.5, eyes=[(82, 140, 7)], mouth=(60, 166), op=150, gape=18),
-  "thick-lipped-mullet": dict(kind="round", width=0.6, eyes=[(68, 146, 8)], mouth=(52, 160), op=122, gape=16),
+  "cod":       dict(kind="round", width=0.6,  eyes=[(88, 150, 9)],  mouth=(72, 172), op=150, gape=26, pec=(170, 160, 242, 192)),
+  "bass":      dict(kind="round", width=0.42, eyes=[(72, 157, 9)],  mouth=(66, 172), op=146, gape=30, pec=(160, 163, 222, 196)),
+  "whiting":   dict(kind="round", width=0.45, eyes=[(68, 158, 8)],  mouth=(62, 170), op=128, gape=24, pec=(135, 168, 200, 190)),
+  "mackerel":  dict(kind="round", width=0.6,  eyes=[(73, 150, 9)],  mouth=(58, 166), op=126, gape=26, pec=(143, 150, 190, 176)),
+  "pollack":   dict(kind="round", width=0.5,  eyes=[(80, 155, 9)],  mouth=(68, 168), op=140, gape=26, pec=(158, 160, 228, 200)),
+  "coalfish":  dict(kind="round", width=0.5,  eyes=[(69, 164, 9)],  mouth=(58, 172), op=128, gape=24, pec=(140, 155, 200, 190)),
+  "pouting":   dict(kind="deep",  width=0.45, eyes=[(76, 148, 14)], mouth=(52, 174), op=128, gape=22, pec=(150, 170, 230, 210)),
+  "black-bream": dict(kind="deep", width=0.34, eyes=[(79, 157, 13)], mouth=(52, 184), op=140, gape=20, pec=(155, 172, 245, 205)),
+  "ballan-wrasse": dict(kind="deep", width=0.5, eyes=[(82, 140, 7)], mouth=(60, 166), op=150, gape=18, pec=(135, 168, 200, 205)),
+  "thick-lipped-mullet": dict(kind="round", width=0.6, eyes=[(68, 146, 8)], mouth=(52, 160), op=122, gape=16, pec=(143, 150, 185, 172)),
   "garfish":   dict(kind="round", width=0.85, eyes=[(111, 151, 5)], mouth=(100, 158), op=140, gape=10),
   "gurnard":   dict(kind="gurnard", width=0.75, eyes=[(88, 150, 9)], mouth=(66, 168), op=150, gape=22),
   "lesser-spotted-dogfish": dict(kind="shark", width=0.8, eyes=[(72, 164, 8)], mouth=(70, 180), op=None, gills=0.17, gape=10),
@@ -239,7 +242,7 @@ def build(sp, shared=False):
   parts = [body]
 
   # ---- the fins: plates on the middle plane, their rays standing out; the pelvic fins a pair ----
-  def plate(name, box, kindf, mirror=0):
+  def plate(name, box, kindf, mirror=0, turn=32, out=0.35):
     bx0, by0, bx1, by1 = box; nx = max(8, int((bx1 - bx0) / 3)); ny = max(6, int((by1 - by0) / 3))
     nx, ny = min(nx, 40), min(ny, 30)
     pm = bpy.data.meshes.new(name); bmp = bmesh.new(); ul = bmp.loops.layers.uv.new("UVMap"); grid = []
@@ -269,8 +272,8 @@ def build(sp, shared=False):
     if mirror:
       # a pelvic fin: turned out from the belly about its base (the plate's top edge), and set off to the side
       cx, cyb = toU((bx0 + bx1) / 2), toY(by0); cM2, aM2 = ring_at((bx0 + bx1) / 2)
-      off = aM2 * width * taper_at(cx) * 0.35 / L
-      rot = Matrix.Rotation(math.radians(32) * mirror, 4, "X")  # (the fin, hanging below its base, swings out to the side `mirror` is)
+      off = aM2 * width * taper_at(cx) * out / L
+      rot = Matrix.Rotation(math.radians(turn) * mirror, 4, "X")  # (the fin, hanging below its base, swings out to the side `mirror` is)
       pivot = Vector((0, 0, cyb))
       for vv in pm.vertices: vv.co = rot @ (vv.co - pivot) + pivot + Vector((0, off * mirror, 0))
     return o
@@ -280,12 +283,52 @@ def build(sp, shared=False):
   for k, f in enumerate(S["fins"]):
     bx0, by0, bx1, by1 = f["box"]; cxu = toU((bx0 + bx1) / 2); narrow = (bx1 - bx0) < 0.035 * L
     pelvic = f["side"] == "bottom" and cxu < 0.42 and not flat and kind != "shark" and not narrow and f["area"] > 120
-    if pelvic:
+    if kind == "shark" and f["side"] == "bottom" and cxu < 0.42 and f["area"] > 120:
+      # (a shark's pectoral fins: the front pair below it, turned out almost flat, as its wings are, not hanging under
+      # the middle of its belly as one)
+      bb = [bx0, by0 - 1, bx1, by1]
+      parts.append(plate(f"fish_{sp}_pectoralL{k}", bb, "bottom", 1, turn=64, out=0.7)); parts.append(plate(f"fish_{sp}_pectoralR{k}", bb, "bottom", -1, turn=64, out=0.7))
+    elif pelvic:
       # (not grown into the body: turned out, the grown part, the picture's body above the fin, stood out with it)
       bb = [bx0, by0 - 1, bx1, by1]
       parts.append(plate(f"fish_{sp}_pelvicL{k}", bb, "bottom", 1)); parts.append(plate(f"fish_{sp}_pelvicR{k}", bb, "bottom", -1))
     else: parts.append(plate(f"fish_{sp}_fin{k}", grow(f["box"]), f["side"]))
   if S["tail"]: parts.append(plate(f"fish_{sp}_tail", S["tail"], "tail"))
+  # ---- the pectoral fins of a bony fish: painted on the picture's flank, stood off it ----
+  # A fan from its base just behind the gill cover, back along the side to a rounded edge, lying on the flank at its
+  # base and lifting from it by 18 degrees towards its edge (as a landed fish's fins lie), its rays ridged; its colours
+  # the picture's own where it is painted, so it is the painted fin, raised. Never into the body: kept just off the
+  # flank wherever the flank is further out than the lift.
+  def flank_z(x, y):
+    c, a = ring_at(x); cs = max(-1.0, min(1.0, (c - y) / a)); b = a * width * taper_at(toU(x))
+    zf = (1 - 0.32 * max(0.0, cs) ** 2) * 0.86 * max(0.3, (1 - cs * cs) ** 0.5) ** -0.25 if kind == "deep" else (1 - 0.24 * max(0.0, cs) ** 2)
+    return b * math.sqrt(max(0.0, 1 - cs * cs)) * zf / L
+  if N.get("pec") and not flat and kind != "shark":
+    px0, py0, px1, py1 = N["pec"]; Hh = py1 - py0; yb = (py0 + py1) / 2 - 0.1 * Hh; hb = 0.18 * Hh; NT, NS = 12, 8
+    zb = flank_z(px0, yb) + 0.0012; lift = math.tan(math.radians(18))
+    for side in (1, -1):
+      pm = bpy.data.meshes.new(f"pec{side}"); bmp = bmesh.new(); ul = bmp.loops.layers.uv.new("UVMap"); grid = []; shade = []
+      for it in range(NT + 1):
+        t = it / NT; row = []
+        half = (hb + (Hh / 2 - hb) * smooth(0, 0.55, t)) * (math.sqrt(max(0.0, 1 - ((t - 0.55) / 0.45) ** 2)) if t > 0.55 else 1.0)
+        for js in range(NS + 1):
+          sv = -1 + 2 * js / NS; x = px0 + t * (px1 - px0); y = yb + ((py0 + py1) / 2 - yb) * t + sv * max(0.4, half)
+          ridge = 0.0009 * math.cos(sv * math.pi * 4.5) * (1 - 0.6 * t) * smooth(0, 0.2, t)
+          z = max(flank_z(x, y) + 0.0012, zb + (x - px0) / L * lift) + ridge
+          v = bmp.verts.new(P(toU(x), toY(y), side * z)); row.append((v, (x / w, 1 - y / h))); shade.append(0.8 + 0.2 * smooth(0, 0.3, t))
+        grid.append(row)
+      for it in range(NT):
+        for js in range(NS):
+          q = (grid[it][js], grid[it][js + 1], grid[it + 1][js + 1], grid[it + 1][js])
+          if side < 0: q = q[::-1]
+          f = bmp.faces.new([e[0] for e in q])
+          for lp, e in zip(f.loops, q): lp[ul].uv = e[1]
+      bmp.to_mesh(pm); bmp.free()
+      o = bpy.data.objects.new(f"fish_{sp}_pectoral{'L' if side > 0 else 'R'}", pm); col.objects.link(o); pm.materials.append(M_FIN)
+      for pp in pm.polygons: pp.use_smooth = True
+      c2 = pm.color_attributes.new("fdShade", "BYTE_COLOR", "POINT")
+      for k2 in range(len(pm.vertices)): c2.data[k2].color = (shade[k2], shade[k2], shade[k2], 1)
+      parts.append(o)
 
   # ---- the eyes: a dome with a cornea's bulge, set in its socket ----
   for k, (ex, ey, er) in enumerate(N["eyes"]):

@@ -66,7 +66,14 @@ for (const name of ["rope", "hoop", "pole", "butt", "tail"]) { cyl[name] = { r: 
 const body = ([x, y, z, eDeg, sw]) => ({ x: r6(x), y: r6(y), z: r6(z), e: r6((eDeg * Math.PI) / 180), sw: r6(sw) });
 const holdBody = body(g3.K0), reelBelow = Math.round((Math.atan2(-g3.K0[1], g3.K0[2]) * 180 / Math.PI) * 100) / 100;
 const order = ["K0", "KM1", "KB", "KM2", "KF", "KH", "KH", "K0"];
-const cast = { path: g3.path_t.map((t, i) => ({ t, ...(order[i] === "K0" ? holdBody : body(g3.keys[order[i]].key)) })), still: g3.still };
+// ---- the follow-through as you see it ----
+// Gate 3 chose the follow-through for the arms alone, and held the reel 40 cm below your eye and only 30 cm out: in your
+// own view the hands sat at the very foot of the picture or below it while the lead flew, and the rod stood straight
+// up the middle (the 17 November film on Aaron's PC). A caster's arms follow through out in front, the reel at chest
+// height, the rod pointing up the lead's line a little to the right of your eye's. Gate 3's angle of the rod, nudged;
+// tests/fpRig.test.js checks every frame still has both hands on the rod, no arm stretched, the wrists in range.
+const VIEW = { KH: [0.04, -0.32, 0.33, 40, 0.04] };
+const cast = { path: g3.path_t.map((t, i) => ({ t, ...(order[i] === "K0" ? holdBody : body(VIEW[order[i]] || g3.keys[order[i]].key)) })), still: g3.still };
 const RIG = { fps: meta.fps, grips: meta.grips_order, eye: { bone: meta.head, hold: R6(C(g1.eye)) }, seat, knob, reelTh, reel, loc, cyl, flat, holdBody, reelBelow, cast };
 const out = `// ---- fpRigData: made by tools/fp-rig-data.mjs from the Blender rig's output (source-assets/blender/rig/data/); not edited by hand ----
 // eye: the eye in the model's frame at the hold; seat: the right hand
