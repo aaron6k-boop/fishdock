@@ -1495,7 +1495,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     else if (ph === "waiting" || ph === "missed") {
       // watching the tip (or the float) most of the time; standing about, hands in pockets or arms folded
       const watch = n1(t * 0.07 + id.length * 3.1) > -0.35;
-      if (watch) lookAtW = floatRig ? castAt.clone() : tipWorld();
+      // (the tip of a rod on its rest is two or three metres up: an angler watching it glances up at it, their head
+      // mostly level and their eyes doing the rest, not craning back at the sky as the figure did, 17 November)
+      if (watch) lookAtW = floatRig ? castAt.clone() : tipWorld().lerp(castAt, 0.3);
       const m = Math.floor(t / 23 + (hashSeed(id) % 7)) % 3; idleMode = ["pockets", "fold", "hang"][m];
       if (hands[1]) idleMode = "hang"; // (a hand on the rod: the other hangs, it can't fold its arms or pocket both)
       if (sitNow > 0.3 && !hands[0] && !hands[1]) idleMode = idleMode === "fold" ? "fold" : "lap"; // (sitting: arms folded or hands on the thighs, never in the pockets)
