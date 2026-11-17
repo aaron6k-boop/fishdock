@@ -65,13 +65,13 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   if (!level || !renderer.capabilities.isWebGL2 || !(ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float"))) return null;
   const size = renderer.getSize(new THREE.Vector2()), pr = renderer.getPixelRatio();
   const rt = new THREE.WebGLRenderTarget(size.x * pr, size.y * pr, { type: THREE.HalfFloatType, samples: 4 });
-  // (the scene's depth kept with it, for the temporal antialiasing to find where each pixel was last frame)
-  rt.depthTexture = new THREE.DepthTexture(size.x * pr, size.y * pr); rt.depthTexture.type = THREE.UnsignedIntType;
   const composer = new EffectComposer(renderer, rt);
   composer.setPixelRatio(pr); composer.setSize(size.x, size.y);
   composer.addPass(new RenderPass(scene, camera));
-  // temporal antialiasing (taa.js): straight after the scene, before the shade and the glow (off until set on)
+  // temporal antialiasing (taa.js): after the scene and its shade (the ambient occlusion goes in before it, and its
+  // depth is what this uses), before the glow. Off until set on
   const taa = new TAAPass(camera, size.x * pr, size.y * pr); taa.on = false; composer.addPass(taa);
+  taa.depthSource = () => (ao && ao.enabled ? ao.depthTexture : null);
   let ao = null, aoLevel = 0;
   // (made when first needed: at level 2 or 3 from the start, or later when Settings → Graphics turns it on)
   function makeAO() {

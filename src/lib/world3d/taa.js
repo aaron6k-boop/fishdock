@@ -10,6 +10,10 @@
 // in YCoCg): last frame's colour is only kept where it is one this pixel could have now. That is what stops ghosts
 // and smears. Blending is weighted by brightness (on tone-mapped values), so a single bright glint doesn't flare.
 // A jump of the camera (a cut in the landing shot, a teleport) starts the history again.
+// The depth is the ambient occlusion pass's own (drawn without multisampling, this frame, with this frame's jitter):
+// the multisampled picture's depth, resolved into a texture after every pass, halved the frame rate on Aaron's PC
+// (ANGLE on Direct3D resolves multisampled depth by drawing it). So it runs after the ambient occlusion, and only with
+// it on (High and Ultra): without, the picture goes through as it is.
 import * as THREE from "three";
 import { Pass, FullScreenQuad } from "./vendor/three-post/postprocessing/Pass.js";
 
@@ -93,9 +97,10 @@ export class TAAPass extends Pass {
   }
   render(renderer, writeBuffer, readBuffer) {
     const U = this.mat.uniforms, c = this.camera;
-    if (!this.on || !readBuffer.depthTexture) { this.copy.uniforms.t.value = readBuffer.texture; this.quad.material = this.copy; renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer); this.quad.render(renderer); this.reset = true; return; }
+    const depth = this.depthSource ? this.depthSource() : readBuffer.depthTexture;
+    if (!this.on || !depth) { this.copy.uniforms.t.value = readBuffer.texture; this.quad.material = this.copy; renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer); this.quad.render(renderer); this.reset = true; return; }
     const src = this.hist[this.frame % 2], dst = this.hist[(this.frame + 1) % 2];
-    U.tDiffuse.value = readBuffer.texture; U.tDepth.value = readBuffer.depthTexture; U.tHistory.value = src.texture;
+    U.tDiffuse.value = readBuffer.texture; U.tDepth.value = depth; U.tHistory.value = src.texture;
     // (the depth was drawn with the jittered camera: undone with the same)
     U.uCurInv.value.multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse).invert();
     U.uPrevVP.value.copy(this.prevVP); U.uReset.value = this.reset ? 1 : 0;

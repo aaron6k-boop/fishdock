@@ -1236,6 +1236,7 @@ function buildRocks(group, cls, xs, n, area, quality) {
   };
   mat.customProgramCacheKey = () => "fdrock1";
   const per = [[], [], [], []]; spots.forEach((sp) => per[Math.floor(rnd() * 4)].push(sp));
+  const meshes = []; // ([near, far] for each shape: the photographed stones go into them when they arrive)
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
   per.forEach((list, v) => {
     if (!list.length) return;
@@ -1263,8 +1264,23 @@ function buildRocks(group, cls, xs, n, area, quality) {
     mats.forEach((m, i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, cols[i]); away.setMatrixAt(i, m); away.setColorAt(i, cols[i]); });
     share(null);
     mesh.castShadow = true; away.castShadow = false; away.userData.noAO = true; mesh.receiveShadow = away.receiveShadow = true; away.frustumCulled = false; group.add(mesh, away);
+    meshes[v] = [mesh, away];
     away.onBeforeRender = (_r, _s, cam) => { if (cam.isPerspectiveCamera && !cam.userData.fdMirror) share(cam); };
   });
+  // ---- the photographed stones (public/models/armour.glb, source-assets/blender/build_armour.py): four scanned
+  // boulders (Poly Haven, CC0), turned down to about 2,000 triangles near and 300 far, sized as these, their
+  // photographs in one atlas turned to a grey granite's colour. They take the drawn stones' places (the same spots,
+  // turns and sizes) once loaded, the wet band and weed kept; until then, or if they can't load, the drawn ones stay ----
+  loadPart("armour").then((sc) => {
+    let atlas = null;
+    for (let v = 0; v < 4; v++) {
+      const near = sc.getObjectByName("armour_" + v), far = sc.getObjectByName("armour_far_" + v); if (!near || !far || !meshes[v]) continue;
+      const geo = (o) => { let g = null; o.updateWorldMatrix(true, true); o.traverse((m) => { if (!g && m.isMesh) { g = m.geometry.clone().applyMatrix4(m.matrixWorld); atlas = atlas || m.material; } }); return g; };
+      const gn = geo(near), gf = geo(far); if (!gn || !gf) continue;
+      const [mesh, away] = meshes[v]; mesh.geometry.dispose(); away.geometry.dispose(); mesh.geometry = gn; away.geometry = gf; mesh.computeBoundingSphere();
+    }
+    if (atlas?.map) { mat.map = atlas.map; mat.normalMap = atlas.normalMap || null; mat.roughnessMap = atlas.roughnessMap || null; mat.normalScale.set(1, 1); mat.needsUpdate = true; }
+  }).catch(() => {});
   return edge;
 }
 
