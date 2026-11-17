@@ -4,6 +4,7 @@
 // landings) and free look. Looking round never pauses the fishing. Quality: Performance, Balanced or High Quality,
 // chosen by Auto from the phone, and stepped down if frames run slow. Nothing is drawn while hidden.
 import * as THREE from "three";
+import { setThinPixel } from "./thinAA.js";
 import { checkScene } from "./sceneCheck.js";
 import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor } from "./walker.js";
 import { createEnvironment } from "./environment.js";
@@ -945,7 +946,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         if (k && me.kept === "deck" && me.at && Math.abs(k.y - me.at.y) < 0.35) wetSpotAt(k.x, k.z, 0.32);
         dryWetSpots(dt || 0.016); } setHandsWet(c.rain ?? 0, dt || 0.016); setHandsDim(1 - 0.5 * (c.night ?? 0) * (torch.colour === "off" ? 1 : 0.4)); }
     env.setRipples(stepRipples(ripples, dt));
-    env.update(t, dt, camera); simT = t;
+    env.update(t, dt, camera); simT = t; setThinPixel(camera, renderer.domElement.height); // (thinAA.js: the railings never drawn thinner than a pixel and a half)
     adapt();
     if (draw) drawFrame();
     const spent = performance.now() - t0;

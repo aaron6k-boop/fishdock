@@ -383,6 +383,10 @@ function drop(r = 0.5) { burst(0.012 + R() * 0.01, 3000 + R() * 3500, (0.008 + r
 // a footstep (stepSound above): the thump, the grit, a crunch of stones on shingle, a hollow knock on boards
 function step(d = {}) {
   const s = stepSound(d.surface, d.land ? 1 : d.hard ?? 0.6, !!d.wet), k = d.land ? 1.3 : 1;
+  // (on concrete, a recorded shoe's step, one of 24, a little different in pitch and level each time, over the drawn
+  // grit; sand, shingle, grass and boards keep the drawn steps, as no recording here is of them)
+  const sb = rec && rec.get("steps");
+  if (sb && (d.surface || "concrete") === "concrete") { grain(ac, sb, evG, { offset: Math.floor(R() * 24) * 0.35, dur: 0.3, gain: (0.16 + 0.12 * (d.land ? 1 : d.hard ?? 0.6)) * k * (0.85 + R() * 0.3), rate: 0.92 + R() * 0.16, fade: 0.003 }); burst(s.grit.d, s.grit.f, s.grit.g * k * 0.4, 1.6, true); if (s.splash) burst(0.08, s.splash.f, s.splash.g, 1.2, true, evG, 0.01); return; }
   burst(s.thump.d, s.thump.f, s.thump.g * k, 1.1);
   burst(s.grit.d, s.grit.f, s.grit.g * k, 1.6, true);
   for (let i = 0; i < s.crunch; i++) burst(0.012 + R() * 0.02, 2400 + R() * 3200, s.grit.g * 0.7, 2.2, true, evG, 0.008 + R() * 0.07);
@@ -410,14 +414,17 @@ export function play(name, data = null) {
   // a fish breaking the surface: the slap of water, spray, and a spray of bubbles
   else if (name === "splash") { burst(0.3 + R() * 0.12, 1000 + R() * 300, 0.3 * v(), 0.7); burst(0.22, 3600 + R() * 600, 0.07 * v(), 0.8, true); bubbles(12 + Math.floor(R() * 8), 500, 3200, 0.08, 0.45, 0.02); }
   else if (name === "bigsplash") { burst(0.8, 800 + R() * 150, 0.6 * v(), 0.5); burst(0.5, 1800, 0.22 * v(), 0.7, false, evG, 0.1); burst(0.45, 4200, 0.08, 0.8, true, evG, 0.1); bubbles(26, 380, 3000, 0.1, 0.9, 0.05); bubbles(10, 1500, 4500, 0.04, 1.2, 0.5); }
-  else if (name === "whoosh") cast();
+  // the cast: a rod swept through the air (a recorded stick, tube or rope whoosh, each a little different), over the
+  // drawn line's hiss off the spool; drawn alone until the recordings arrive
+  else if (name === "whoosh") { const w = rec && rec.get(["whoosh_a", "whoosh_b", "whoosh_c"][Math.floor(R() * 3)]); if (w) { grain(ac, w, gearG, { gain: 0.42 * v(), rate: 0.9 + R() * 0.25 }); burst(0.45, 5200, 0.012, 2, true, gearG, 0.15); } else cast(); }
   else if (name === "thunder") thunder(data?.delay, data?.far);
   // water pouring out of the net as it comes up: a run of drips into the sea below, each a little plink, thinning out
   else if (name === "drip") { for (let i = 0; i < 22; i++) { const at = (i * 80 + R() * 70) / 1000 + (i > 12 ? (i - 12) * 0.06 : 0); bubble(1100 + R() * 2400, 0.06 * (1 - i / 26) * (0.6 + R() * 0.6), at); if (R() < 0.35) burst(0.03, 3000 + R() * 2000, 0.012, 2, true, evG, at); } }
   else if (name === "net") { burst(0.35, 650 + R() * 150, 0.24 * v(), 0.6); burst(0.25, 1500, 0.1, 0.8, true, evG, 0.12); burst(0.12, 900, 0.05, 1.5, true, gearG, 0.05); bubbles(14, 600, 3400, 0.07, 0.6, 0.06); }
   else if (name === "reelOn") { clearInterval(reelTimer); reelTimer = setInterval(() => click(0, 0.08), 62 + R() * 20); setTimeout(() => { clearInterval(reelTimer); reelTimer = null; }, 2500); } // (a friend's reel: the first run, not a loop for the whole fight)
-  else if (name === "swish") burst(0.2 + R() * 0.05, 1600 + R() * 300, 0.15 * v(), 0.5, false, gearG); // the rod swept up on the strike
+  else if (name === "swish") { const w = rec && rec.get(R() < 0.5 ? "whoosh_a" : "whoosh_b"); if (w) grain(ac, w, gearG, { gain: 0.26 * v(), rate: 1.1 + R() * 0.2 }); else burst(0.2 + R() * 0.05, 1600 + R() * 300, 0.15 * v(), 0.5, false, gearG); } // the rod swept up on the strike
   else if (name === "step" || name === "stepRun") step({ hard: name === "stepRun" ? 0.9 : 0.6, ...(data || {}) });
+  else if (name === "rope" && rec && rec.has("rope_run")) { const rr = rec.get("rope_run"), d = 0.3 + R() * 0.2; grain(ac, rr, gearG, { offset: R() * (rr.duration - d - 0.05), dur: d, gain: 0.3 * v(), rate: 0.9 + R() * 0.2, fade: 0.03 }); } // (a recorded rope run through the hands, a different stretch of it each pull)
   else if (name === "rope") { const d = 0.26 + R() * 0.14; burst(d, 1300 + R() * 500, 0.05, 0.9, true, gearG); burst(0.06, 600, 0.05, 1.2, false, evG, d * 0.9); } // the rope drawn through the hands, then gripped
   else if (name === "mat") { burst(0.12, 240 + R() * 50, 0.26 * v(), 0.9); burst(0.08, 1800, 0.05, 1, true); } // the fish laid on the wet mat
   else if (name === "flap") { const n = 1 + Math.floor(R() * 3); for (let i = 0; i < n; i++) { const at = i * (0.08 + R() * 0.07), g = 0.11 * (1 - i * 0.25) * v(); burst(0.06, 850 + R() * 400, g, 1.3, false, evG, at); burst(0.03, 2600, g * 0.25, 1.5, true, evG, at); } } // a flick or two of its tail on the wet mat
@@ -440,5 +447,8 @@ export function play(name, data = null) {
     const k = Math.max(0, Math.min(1.4, data?.tension || 0.5));
     burst(0.35 + 0.25 * k, 190 + R() * 60 + 90 * k, 0.03 + 0.05 * k, 6, false, gearG); burst(0.2, 2400 + R() * 600, 0.008 * k, 3, true, gearG, 0.05);
   }
+  // the drag giving line: the clutch's clicks (single clicks from a recorded ratchet, a different one each time, faster
+  // and closer together than any hand could turn it) over the line hissing off the spool
+  else if (name === "drag" && rec && rec.has("clicks")) { const cb = rec.get("clicks"), n = 6 + Math.floor(R() * 5), gap = 0.022 + R() * 0.008; for (let i = 0; i < n; i++) grain(ac, cb, gearG, { at: i * gap + R() * 0.004, offset: Math.floor(R() * 16) * 0.1, dur: 0.045, gain: 0.16 * v(), rate: 1.25 + R() * 0.25, fade: 0.002 }); burst(0.22, 6500, 0.012, 2, true, gearG); }
   else if (name === "drag") { const n = 5 + Math.floor(R() * 4); for (let i = 0; i < n; i++) burst(0.016, 4000 + R() * 800, 0.085 * v(), 5, false, gearG, (i * (24 + R() * 8)) / 1000); burst(0.22, 6500, 0.012, 2, true, gearG); } // the drag giving line: a fast ratchet, and the line hissing off the spool
 }

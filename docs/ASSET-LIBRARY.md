@@ -16,7 +16,7 @@ it goes in (an asset site's other assets may be under other terms).
 | nets.glb | Drop net and landing net | close to mid | 491 KB | 6,692 | 512x512, 512x512, 512x512, 512x512 | none |
 | pierprops.glb | Lamps, lifebuoy stations, bollards, benches | all distances, instanced along the pier | 692 KB | 5,786 | 512x512, 512x512, 512x512, 512x512, 512x512, 512x512, 512x512 | none |
 | reel.glb | The reel, older single model | close | 175 KB | 7,384 | none | none |
-| rodkit.glb | The rod (handle, seat, guides, blank) and the spinning reel | close; the 3D view hides it past a few metres | 401 KB | 17,456 | none | none |
+| rodkit.glb | The rod (handle, seat, guides, blank) and the spinning reel | close; the 3D view hides it past a few metres | 609 KB | 27,248 | none | none |
 | fish2/*.glb (14 files) | The other species with a cut-out picture, one file each (ballan-wrasse, black-bream, coalfish, dab, flounder, garfish, gurnard, lesser-spotted-dogfish, pouting, smoothhound, sole, thick-lipped-mullet, thornback-ray, tope) | close (in the hand) to mid (in the water); only the one hooked is fetched | 1.7 MB in all | 78,112 in all | none | none |
 
 ## Game-ready textures (`public/textures/`)
@@ -29,6 +29,12 @@ it goes in (an asset site's other assets may be under other terms).
 | cap_concrete_diff.jpg | 17 KB | 512x512 | jpeg |
 | cap_concrete_nor.jpg | 33 KB | 512x512 | jpeg |
 | cap_concrete_rough.jpg | 1 KB | 256x256 | jpeg |
+| deck_broom_diff.jpg | 315 KB | 1024x1024 | jpeg |
+| deck_broom_diff_2k.jpg | 1.2 MB | 2048x2048 | jpeg |
+| deck_broom_nor.jpg | 325 KB | 1024x1024 | jpeg |
+| deck_broom_nor_2k.jpg | 1.3 MB | 2048x2048 | jpeg |
+| deck_broom_rough.jpg | 58 KB | 512x512 | jpeg |
+| deck_broom_rough_2k.jpg | 263 KB | 1024x1024 | jpeg |
 | deck_worn_diff.jpg | 20 KB | 512x512 | jpeg |
 | gorleston_northbank.webp | 41 KB | 2260x228 | webp |
 | gorleston_northbank_lights.webp | 3 KB | 2260x228 | webp |
@@ -75,7 +81,7 @@ it goes in (an asset site's other assets may be under other terms).
 | Human Base Meshes bundle, version 1.1.0 (the realistic male body) | Blender Studio | https://download.blender.org/demo/asset-bundles/human-base-meshes/human-base-meshes-bundle-v1.1.0.zip (listed at https://www.blender.org/download/demo-files/) | CC0 1.0, as announced at its release (reported by CG Channel, 28 June 2023); the bundle itself carries no licence file | Not required; credited in public/models/CREDITS.txt | your arms, hands and jacket in first person (public/models/fp_rig.glb): the body rigged with Rigify, its hands and forearms and a jacket made from it (source-assets/blender/rig/). Before 13 November 2026, the hands and wrists of fp_body.glb |  |
 | MPFB (MakeHuman plugin for Blender), installed from extensions.blender.org | MakeHuman team | https://extensions.blender.org/add-ons/mpfb/ | GPL-3.0 (the tool); the humans it makes are CC0 1.0 | Not required for the models it produces | makes and rigs the anglers |  |
 | Concrete Floor Worn 001 | Dimitrios Savva, Rico Cilliers | https://polyhaven.com/a/concrete_floor_worn_001 | CC0 1.0 | Not required (credited anyway in CREDITS) | worn patches on the pier deck (public/textures/deck_worn_diff.jpg, 512 px) | `concrete_floor_worn_001_1k.gltf` (3 KB), `concrete_floor_worn_001_diff_1k.jpg` (116 KB), `concrete_floor_worn_001.bin` (2.3 MB), `concrete_floor_worn_001_rough_1k.jpg` (178 KB), `concrete_floor_worn_001_nor_gl_1k.jpg` (108 KB) |
-| Concrete Floor 02 | Rob Tuytel | https://polyhaven.com/a/concrete_floor_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | the pier deck (public/textures/pier_concrete_*.jpg) | `concrete_floor_02_1k.gltf` (4 KB), `concrete_floor_02_rough_1k.jpg` (311 KB), `concrete_floor_02_diff_1k.jpg` (758 KB), `concrete_floor_02.bin` (2.3 MB), `concrete_floor_02_nor_gl_1k.jpg` (188 KB) |
+| Concrete Floor 02 | Rob Tuytel | https://polyhaven.com/a/concrete_floor_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | the pier deck (public/textures/pier_concrete_*.jpg) (until 17 November 2026; replaced by concrete_floor_03) | `concrete_floor_02_1k.gltf` (4 KB), `concrete_floor_02_rough_1k.jpg` (311 KB), `concrete_floor_02_diff_1k.jpg` (758 KB), `concrete_floor_02.bin` (2.3 MB), `concrete_floor_02_nor_gl_1k.jpg` (188 KB) |
 | Concrete Wall 004 | Dario Barresi, Charlotte Baglioni | https://polyhaven.com/a/concrete_wall_004 | CC0 1.0 | Not required (credited anyway in CREDITS) | the harbour wall's concrete cap (public/textures/cap_concrete_*.jpg, 512 px colour and normal, 256 px roughness) | `concrete_wall_004_1k.gltf` (3 KB), `concrete_wall_004_rough_1k.jpg` (228 KB), `concrete_wall_004_nor_gl_1k.jpg` (970 KB), `concrete_wall_004_diff_1k.jpg` (520 KB), `concrete_wall_004.bin` (2.3 MB) |
 | Water normals | three.js authors | https://github.com/mrdoob/three.js/blob/dev/examples/textures/waternormals.jpg | MIT (the three.js repository's licence) | Copyright 2010-2025 three.js authors, MIT licence | the sea's fine ripples (public/textures/water_normal.jpg) | `water_normal.jpg` (NaN KB) |
 | Red Brick 03 | Poly Haven | https://polyhaven.com/a/red_brick_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness) | `red_brick_03_diff_1k.jpg` (678 KB), `red_brick_03_nor_gl_1k.jpg` (933 KB), `red_brick_03_rough_1k.jpg` (280 KB) |
@@ -106,6 +112,14 @@ it goes in (an asset site's other assets may be under other terms).
 | Splash, Small #1 | Joseph Sardin | https://bigsoundbank.com/splash-small-1-s1529.html | CC0 1.0 | Not required (credited anyway in CREDITS) | a fish breaking the surface, the lead going in (public/sounds/splash_small_1.mp3) | `bsb_1529_splash_small_1.flac` (250 KB) |
 | Splash, small #3 | Joseph Sardin | https://bigsoundbank.com/splash-small-3-s1531.html | CC0 1.0 | Not required (credited anyway in CREDITS) | a fish breaking the surface (public/sounds/splash_small_2.mp3) | `bsb_1531_splash_small_3.flac` (194 KB) |
 | Gulls on the Harbor | Joseph Sardin | https://bigsoundbank.com/gulls-on-the-harbor-s2573.html | CC0 1.0 | Not required (credited anyway in CREDITS) | a fishing port with its gulls, under everything at a pier or an estuary (public/sounds/harbour.mp3) | `bsb_2573_gulls_harbour.flac` (19.2 MB) |
+| Whoosh #5 | Joseph Sardin | https://bigsoundbank.com/whoosh-5-s1797.html | CC0 1.0 | Not required (credited anyway in CREDITS) | the cast's whoosh, a long stick through the air (public/sounds/whoosh_a.mp3) | `1797.flac` (84 KB) |
+| Whoosh #8 | Joseph Sardin | https://bigsoundbank.com/whoosh-8-s1801.html | CC0 1.0 | Not required (credited anyway in CREDITS) | the cast's whoosh, a metal tube through the air (public/sounds/whoosh_b.mp3) | `1801.flac` (131 KB) |
+| Whoosh #4 | Joseph Sardin | https://bigsoundbank.com/whoosh-4-s1796.html | CC0 1.0 | Not required (credited anyway in CREDITS) | the cast's whoosh, a long rope swung through the air (public/sounds/whoosh_c.mp3) | `1796.flac` (169 KB) |
+| Small ratchet | Joseph Sardin | https://bigsoundbank.com/small-ratchet-s0794.html | CC0 1.0 | Not required (credited anyway in CREDITS) | single clicks of a small ratchet for the reel's drag (public/sounds/clicks.mp3) | `0794.ogg` (673 KB) |
+| Large ratchet | Joseph Sardin | https://bigsoundbank.com/large-ratchet-s0795.html | CC0 1.0 | Not required (credited anyway in CREDITS) | single clicks of a large ratchet for the reel's drag (public/sounds/clicks.mp3) | `0795.ogg` (845 KB) |
+| Sliding rope #4 | Joseph Sardin | https://bigsoundbank.com/sliding-rope-4-s1821.html | CC0 1.0 | Not required (credited anyway in CREDITS) | the drop net's rope run through the hands (public/sounds/rope_run.mp3) | `1821.flac` (639 KB) |
+| Footsteps, Shoe on Concrete | Joseph Sardin | https://bigsoundbank.com/footsteps-shoe-on-concrete-s0514.html | CC0 1.0 | Not required (credited anyway in CREDITS) | footsteps on the pier's concrete (public/sounds/steps.mp3) | `0514.flac` (411 KB) |
+| Concrete Floor 03 | Rob Tuytel (processing), Matterfield (photography) | https://polyhaven.com/a/concrete_floor_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | the pier deck and paved ground, broom-finished concrete (public/textures/deck_broom_*.jpg: 1024 px colour and normal, 512 px roughness; *_2k: 2048 px colour and normal, 1024 px roughness on High and Ultra) | `concrete_floor_03_diff_1k.jpg` (1.1 MB), `concrete_floor_03_diff_2k.jpg` (4.6 MB), `concrete_floor_03_nor_gl_1k.jpg` (1.1 MB), `concrete_floor_03_nor_gl_2k.jpg` (4.5 MB), `concrete_floor_03_rough_1k.jpg` (893 KB), `concrete_floor_03_rough_2k.jpg` (3.5 MB) |
 
 Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench,
 bollard and lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA

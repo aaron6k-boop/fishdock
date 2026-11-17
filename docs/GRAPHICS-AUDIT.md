@@ -88,6 +88,28 @@ render targets come on top), 261 shader programs. After: 240 geometries, 125 tex
    the first-person view was held looking down at the rail (18 of 40 checks a quarter second apart). **Changed:** the
    view may look up a little to it, and as it swings in it aims between the fish and your hand.
 
+9. **The reel was built from simple shapes** (Aaron, 17 November: "replace simplistic fishing rods and reels with detailed,
+   accurately proportioned models"). **Changed** (`source-assets/blender/build_rodkit.py`, `public/models/rodkit.glb`):
+   a front-drag spinning reel modelled part by part in Blender: a lofted gearbox body with its side
+   covers and trim rings, a swept stem down to the foot, the rotor's cup and arms with their bosses, a bail wire that
+   runs round in one curve to the line roller and its cover, a spool with a grooved skirt and blue braid on it, a
+   knurled drag knob with its cap, and a handle whose arm is one lofted piece out to a shaped knob. 27,000 triangles,
+   623 kB (the old file's points where the hand, the line and the game hold it are kept exactly, checked by
+   `tests/rodkitModel.test.js`). Filmed in first person through a cast and a fight.
+10. **The deck's concrete was a smooth, plain grey.** **Changed:** Poly Haven's broom-finished "Concrete Floor 03"
+   (photographed, 2.5 m a tile; 1K, and 2K on High and Ultra), its colour, roughness and relief laid along the pier so
+   the brush lines run across it as they do on a slab, under the drawn bays, joints, wear and stains.
+11. **Railings and the rod's tip crawled and flickered as you looked about** (item 4 above). **Changed**
+   (`src/lib/world3d/thinAA.js`): a tube that would be drawn thinner than a pixel and a half is widened to that on the
+   screen and made fainter by as much, through the multisampled picture's own samples (alpha to coverage), so a
+   distant rail is a steady faint line rather than broken dashes. On the railings, their joints and the rod's blank.
+   No extra draws. Temporal anti-aliasing is still not done (see item 4).
+12. **The cast, the drag, the drop net's rope and footsteps were drawn sounds.** **Changed:** real recordings from
+   BigSoundBank (CC0 1.0): three rods and sticks swept through the air, single clicks of a ratchet, a rope run through
+   the hands, and shoes on concrete, cut into short pieces and each played a little differently every time
+   (`source-assets/prepare_sounds2.py`). Checked in the game: the recordings are fetched, decoded and played on the
+   cast. Still drawn: the bell, the thunder, the fish flapping on the mat, the net going in and the drips.
+
 Looked at and found sound: tone mapping and exposure (one Neutral curve, exposure eased with the light), colour
 management (sRGB textures marked as such, linear lighting), anisotropic filtering, instancing, shader precompiling,
 level of detail on trees, frame pacing, the sea's multiple wave scales and wind response.

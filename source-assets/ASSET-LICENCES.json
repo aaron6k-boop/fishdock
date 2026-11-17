@@ -506,7 +506,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "1k",
-   "use": "the pier deck (public/textures/pier_concrete_*.jpg)",
+   "use": "the pier deck (public/textures/pier_concrete_*.jpg) (until 17 November 2026; replaced by concrete_floor_03)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -1311,6 +1311,196 @@
      "bytes": 20105759,
      "sha256": "3d622b5a0d52d37c7437520fa8679d99e7c7df9a197427505122f725c38a3ee0",
      "url": "https://bigsoundbank.com/UPLOAD/flac/2573.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1797",
+   "name": "Whoosh #5",
+   "source": "https://bigsoundbank.com/whoosh-5-s1797.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the cast's whoosh, a long stick through the air (public/sounds/whoosh_a.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/1797.flac",
+     "bytes": 86179,
+     "sha256": "c7eec6353b7a50c41c4ca664ed07140a84d4aea4ad02eb92930946443e612d87",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1797.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1801",
+   "name": "Whoosh #8",
+   "source": "https://bigsoundbank.com/whoosh-8-s1801.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the cast's whoosh, a metal tube through the air (public/sounds/whoosh_b.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/1801.flac",
+     "bytes": 133790,
+     "sha256": "353e8662a31493403835312d2cbfc229ee4e8af0269fbdb28fad9258f501b4e0",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1801.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1796",
+   "name": "Whoosh #4",
+   "source": "https://bigsoundbank.com/whoosh-4-s1796.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the cast's whoosh, a long rope swung through the air (public/sounds/whoosh_c.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/1796.flac",
+     "bytes": 173016,
+     "sha256": "17942950627b87b34eec2cc62dc7eddd1b9b2ff34742f87a781cb918ea6b9c92",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1796.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0794",
+   "name": "Small ratchet",
+   "source": "https://bigsoundbank.com/small-ratchet-s0794.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "single clicks of a small ratchet for the reel's drag (public/sounds/clicks.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/0794.ogg",
+     "bytes": 688992,
+     "sha256": "97ec48a4f2d69b580ddae67b2e5d24faef248ee76f93308d77edc48a88685b46",
+     "url": "https://bigsoundbank.com/UPLOAD/ogg/0794.ogg"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0795",
+   "name": "Large ratchet",
+   "source": "https://bigsoundbank.com/large-ratchet-s0795.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "single clicks of a large ratchet for the reel's drag (public/sounds/clicks.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/0795.ogg",
+     "bytes": 865397,
+     "sha256": "d4c4265d724936ee0baa747efd5c4488f5bfd7ebfd4a7110eb14cc27169bcea2",
+     "url": "https://bigsoundbank.com/UPLOAD/ogg/0795.ogg"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1821",
+   "name": "Sliding rope #4",
+   "source": "https://bigsoundbank.com/sliding-rope-4-s1821.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the drop net's rope run through the hands (public/sounds/rope_run.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/1821.flac",
+     "bytes": 653832,
+     "sha256": "0e71359df01af900776d2ba1b8b5e4c173b1c22db937046a99e498c91f15e1fb",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1821.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0514",
+   "name": "Footsteps, Shoe on Concrete",
+   "source": "https://bigsoundbank.com/footsteps-shoe-on-concrete-s0514.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "footsteps on the pier's concrete (public/sounds/steps.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/0514.flac",
+     "bytes": 420460,
+     "sha256": "8052e6c892b129b6ce526ebafed5ab816c2f99ed4596a1edd5c4d3f19da40635",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/0514.flac"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:concrete_floor_03",
+   "name": "Concrete Floor 03",
+   "source": "https://polyhaven.com/a/concrete_floor_03",
+   "author": "Rob Tuytel (processing), Matterfield (photography)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k and 2k JPG (colour, GL normal, roughness)",
+   "use": "the pier deck and paved ground, broom-finished concrete (public/textures/deck_broom_*.jpg: 1024 px colour and normal, 512 px roughness; *_2k: 2048 px colour and normal, 1024 px roughness on High and Ultra)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/polyhaven/concrete_floor_03/concrete_floor_03_diff_1k.jpg",
+     "bytes": 1184196,
+     "sha256": "6403524d194100d80e3040435b953ddf44e90069bd404cfb116204dec3c35df7",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_03/concrete_floor_03_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_03/concrete_floor_03_diff_2k.jpg",
+     "bytes": 4840388,
+     "sha256": "43b304e9dc3a0426b9501c2d6f4971c186e3a98ffe6b40ac91fe418074f8f73e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_03/concrete_floor_03_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_03/concrete_floor_03_nor_gl_1k.jpg",
+     "bytes": 1105067,
+     "sha256": "f9f18d02c1e4e655aa321ddeaf2c696a87a9c4782fea7119c65310c510367f5a",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_03/concrete_floor_03_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_03/concrete_floor_03_nor_gl_2k.jpg",
+     "bytes": 4760863,
+     "sha256": "249205d41d5b768833a7e43f8fe07d6b6e43f6b0f8f6e63b48338ed5071f9cbf",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_03/concrete_floor_03_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_03/concrete_floor_03_rough_1k.jpg",
+     "bytes": 914332,
+     "sha256": "13bf9548e801ada85c2445782544ad6ffba17c9ec08e39aa35c6f6ad2bc83961",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete_floor_03/concrete_floor_03_rough_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/concrete_floor_03/concrete_floor_03_rough_2k.jpg",
+     "bytes": 3711467,
+     "sha256": "9a09b6ed3f5b8ed674d58c6191140f71d3c87fd162386d642daf92b5162a4916",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_03/concrete_floor_03_rough_2k.jpg"
     }
    ]
   }

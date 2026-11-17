@@ -5,6 +5,7 @@
 // steel sheet piling under a concrete cap; galvanised railings along them near the anglers; jetties on piles; the
 // buildings from the architecture library (buildings3d.js). Materials are drawn on the phone (textures3d.js).
 import * as THREE from "three";
+import { thinTubes } from "./thinAA.js";
 import { setTownStyle } from "./architecture.js";
 import { unrle, GROUND, PLACE3D, inside } from "./osmPlace.js";
 import { concrete, sheetPiling, detail, noise2, photoTex, weather, weatherTex, decalTex, grateTex, asphalt, bricks, woodTex, turf, DECAL } from "./textures3d.js";
@@ -57,34 +58,40 @@ function segIndex(segs, cell = 8) {
 // and along the walls a ragged band of damp (darker, a little greener, less rough) with dried salt just inside it.
 // Wet (rain) darkens it and makes it shine. Until the photographs have loaded (or if they can't) the drawn one shows.
 export const PIER_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/pier_concrete_"; // (__fdAssetBase: only a self-contained preview page sets it, its files beside it; the app leaves it unset)
-const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
+// (17 November: the deck's photograph is now broom-finished concrete, Poly Haven's concrete_floor_03, as a pier deck and
+// a promenade are laid: the brush lines run across the deck, square to the pier, its grit and wear underneath; at 2048
+// px on High and Ultra, 1024 elsewhere)
+export const DECK_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/deck_broom_";
+const DECK_M = 2.5; // metres the photograph covers (Poly Haven: 2.5 m square)
+const PHOTO_TILE = 8 / DECK_M; // the deck's uv runs one unit per 8 m
 function pierConcrete(mat, quality = 1, axis = 0, shade = null) {
   const wet = { value: 0, clock: { value: 0 }, rain: { value: 0 } }; // (clock: seconds, and rain: how hard it is raining, for the rain's rings in the puddles; environment.js keeps them)
   if (typeof document === "undefined") return wet;
-  const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
+  const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(DECK_TEX + n + (quality >= 2 ? "_2k" : "") + ".jpg").then((t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; return t;
   });
   const worn = photoTex("deck_worn_diff"), noise = weatherTex();
   Promise.all([get("diff", true), get("nor", false), get("rough", false)]).then(([diff, nor, rough]) => {
-    nor.repeat.set(PHOTO_TILE, PHOTO_TILE); rough.repeat.set(PHOTO_TILE, PHOTO_TILE);
-    mat.normalMap = nor; mat.roughnessMap = rough; mat.normalScale.set(0.9, 0.9);
+    mat.normalMap = nor; mat.roughnessMap = rough; mat.normalScale.set(1.0, 1.0); // (sampled on the turned coordinates, fdPU, in the shader)
     mat.onBeforeCompile = (sh) => {
       sh.uniforms.pDiff = { value: diff }; sh.uniforms.uWetSpots = WET_SPOTS; sh.uniforms.uWet = wet; sh.uniforms.uWetT = wet.clock; sh.uniforms.uWetRain = wet.rain; sh.uniforms.pWorn = { value: worn }; sh.uniforms.pNoise = { value: noise };
       sh.uniforms.uAxis = { value: new THREE.Vector2(Math.cos(axis), Math.sin(axis)) };
       sh.vertexShader = "attribute float aDamp;\nvarying float vDamp;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvDamp = aDamp;");
-      sh.fragmentShader = (quality < 1 ? "" : "#define FD_WET_RINGS\n") + "#define FD_WET_SPOTS\nuniform vec4 uWetSpots[4];\nuniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform float uWetT;\nuniform float uWetRain;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
+      sh.fragmentShader = (quality < 1 ? "" : "#define FD_WET_RINGS\n") + "#define FD_WET_SPOTS\nvec2 fdPU;\nuniform vec4 uWetSpots[4];\nuniform sampler2D pDiff;\nuniform sampler2D pWorn;\nuniform sampler2D pNoise;\nuniform float uWet;\nuniform float uWetT;\nuniform float uWetRain;\nuniform vec2 uAxis;\nvarying float vDamp;\nfloat fdDamp = 0.0, fdWorn = 0.0, fdJoint = 0.0;\n" + sh.fragmentShader
         .replace("#include <map_fragment>", `#include <map_fragment>
+        fdPU = vec2(dot(vMapUv, uAxis), dot(vMapUv, vec2(-uAxis.y, uAxis.x))) * ${PHOTO_TILE.toFixed(3)}; // (along the pier, across it: the brush lines run across)
         ${WET_PREP}
         {
-          vec2 pu = vMapUv * ${PHOTO_TILE.toFixed(3)};
+          vec2 pu = fdPU;
           vec3 a = texture2D(pDiff, pu).rgb, b = ${quality < 2 ? "a" : "texture2D(pDiff, mat2(0.8, -0.6, 0.6, 0.8) * pu * 0.43 + vec2(0.37, 0.61)).rgb"};
           float m = ${quality < 2 ? "0.0" : "smoothstep(0.42, 0.62, texture2D(map, vMapUv * 0.31 + 0.2).g * 1.6)"}; // (the second, turned sample that breaks up the tiling only on High: the deck fills the view while you land a fish, and on a phone those samples halved the frame rate)
           vec3 avg = texture2D(pDiff, vec2(0.5), 12.0).rgb; // its smallest mip: the photograph's own average colour
           vec3 p = mix(a, b, m) / max(avg, vec3(0.02)); // over its average: the drawn colour stays the colour
           p = mix(vec3(dot(p, vec3(0.3, 0.59, 0.11))), p, 0.35);
-          // (the photograph's pale flecks, at full strength, read as a speckled, blotchy floor: kept for its patches, softer)
-          p = mix(vec3(1.0), p, 0.7);
-          diffuseColor.rgb *= mix(vec3(1.0), p, 0.5);
+          // (the broom-finished photograph more strongly than the old one: its brush lines, grit and wear are what make the
+          // deck read as a weathered sea pier's rather than a clean floor)
+          p = mix(vec3(1.0), p, 0.85);
+          diffuseColor.rgb *= mix(vec3(1.0), p, 0.8);
           // ---- the deck as cast: bays about 4.5 m long, square across the pier, with sawn joints between them ----
           // (each joint a dark, sharp line a centimetre or so wide, grime settled a hand's width either side; each bay a
           // shade different from the next, as concrete poured on different days is)
@@ -118,9 +125,10 @@ function pierConcrete(mat, quality = 1, axis = 0, shade = null) {
           diffuseColor.rgb *= mix(vec3(1.0), vec3(0.74, 0.77, 0.72), fdDamp);
           diffuseColor.rgb *= ${WET_DARKEN};
         }`)
-        .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`)
-        .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+        .replace("#include <roughnessmap_fragment>", `float roughnessFactor = roughness * texture2D(roughnessMap, fdPU).g; // (the photograph's own roughness, on the same turned coordinates as its colour)
+        roughnessFactor = ${wetRough("mix(0.62, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`)
+        .replace("#include <normal_fragment_begin>", THREE.ShaderChunk.normal_fragment_begin.replaceAll("vNormalMapUv", "fdPU"))
+        .replace("#include <normal_fragment_maps>", `${THREE.ShaderChunk.normal_fragment_maps.replaceAll("vNormalMapUv", "fdPU")}
         ${WET_NORMAL}`);
       // the contact shade baked round what stands on the deck (contactShade below): the sky's light and its reflection
       // taken down where a building, a bench, a lamp or a post meets the concrete, the sun's a little
@@ -134,7 +142,7 @@ function pierConcrete(mat, quality = 1, axis = 0, shade = null) {
           } }`);
       }
     };
-    mat.customProgramCacheKey = () => "fdpier8" + (quality < 1 ? "p" : quality < 2 ? "b" : "") + (shade ? "s" : "");
+    mat.customProgramCacheKey = () => "fdpier9" + (quality < 1 ? "p" : quality < 2 ? "b" : "") + (shade ? "s" : "");
     mat.needsUpdate = true;
   }).catch(() => {});
   return wet;
@@ -778,10 +786,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // galvanised steel: dull, mottled zinc gone grey with weather, darker towards the deck where the spray and the dirt
   // reach, not polished chrome. The fittings (caps, ball joints, base plates, the sleeves where rails join, the bolts)
   // are where the zinc wears through first: rust in their crevices and a run of it down from each joint
-  const railMat = weather(new THREE.MeshStandardMaterial({ color: 0xaeb2b1, metalness: 0.6, roughness: 0.62 }), { scale: 0.7, mottle: 0.35, bump: 0.6, rust: [0.32, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.5, 0.26], rough: [0.8, 1.25], wet: place.deckWet }); // (rustier: a North Sea pier's railings are brown along their joints and streaked below them)
+  const railMat = thinTubes(weather(new THREE.MeshStandardMaterial({ color: 0xaeb2b1, metalness: 0.6, roughness: 0.62 }), { scale: 0.7, mottle: 0.35, bump: 0.6, rust: [0.32, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.5, 0.26], rough: [0.8, 1.25], wet: place.deckWet })); // (rustier: a North Sea pier's railings are brown along their joints and streaked below them)
   // (the jetties' handrails: thin tubes of dull galvanising)
-  const jRailMat = new THREE.MeshStandardMaterial({ color: 0x8a8e8c, metalness: 0.3, roughness: 0.8 }); // (no weathering: on tubes this thin it shaded them past white, a row of glowing bars)
-  const jointMat = weather(new THREE.MeshStandardMaterial({ color: 0xa2a6a5, metalness: 0.55, roughness: 0.66 }), { scale: 0.35, mottle: 0.4, bump: 0.8, rust: [0.85, 0.15, 0.06, 0.025], grime: [LAND, LAND + 0.4, 0.25], rough: [0.8, 1.2], wet: place.deckWet });
+  const jRailMat = thinTubes(new THREE.MeshStandardMaterial({ color: 0x8a8e8c, metalness: 0.3, roughness: 0.8 })); // (no weathering: on tubes this thin it shaded them past white, a row of glowing bars)
+  const jointMat = thinTubes(weather(new THREE.MeshStandardMaterial({ color: 0xa2a6a5, metalness: 0.55, roughness: 0.66 }), { scale: 0.35, mottle: 0.4, bump: 0.8, rust: [0.85, 0.15, 0.06, 0.025], grime: [LAND, LAND + 0.4, 0.25], rough: [0.8, 1.2], wet: place.deckWet }));
   const posts = [], rails = [], timberRuns = [], barRuns = [];
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
