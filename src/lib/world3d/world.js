@@ -807,6 +807,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       gfx(o = {}) { setGfx(o); return { ...G, dpr: renderer.getPixelRatio(), q: Q.q, shadowsOn: renderer.shadowMap.enabled, shed: shedN }; },
       /** (checks) the frame pacing told every recent frame was late, so its next look steps down */
       lateNow() { late = 1; paceAt = 0; pacing = true; },
+      /** (checks) everything sized again for the picture as it is now (as a change of the window's size does) */
+      resized() { post?.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1); },
       get warms() { return { late: warmCount, calls: warmCalls, ms: Math.round(warmMs) }; },
       freeze() { film = { t: (performance.now() - clock0) / 1000, now: nowFn() }; },
       // for visual checks: your angler driven by a scripted event log (its times in seconds from now on the film clock),

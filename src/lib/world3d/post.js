@@ -57,8 +57,10 @@ export const GradeShader = {
     }`,
 };
 
-// the drawn picture's size (pixels) from which the ambient occlusion is worked out at half size
-export const AO_HALF_FROM = 4e6;
+// the drawn picture's size (pixels) from which the ambient occlusion is worked out at half size (the film build can
+// change it, for measuring both on one run)
+export const AO_SIZE = { halfFrom: 4e6 };
+if (typeof window !== "undefined" && window.__fdFilm) window.__fdAoSize = AO_SIZE;
 
 /** level 0: none (draw straight to the screen); 1: MSAA, bloom and grade; 2: plus ambient occlusion; 3: finer AO. */
 export function createPost(renderer, scene, camera, { level = 1 } = {}) {
@@ -102,7 +104,7 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
     // shade cost about 2.8 ms of a 10.5 ms frame, more than any other part, and the slowest frames came with it.
     // The temporal antialiasing reads this pass's depth, at this size too)
     const aoSet = ao.setSize.bind(ao);
-    ao.setSize = (w, h) => { const k = w * h >= AO_HALF_FROM ? 0.5 : 1; aoSet(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
+    ao.setSize = (w, h) => { const k = w * h >= AO_SIZE.halfFrom ? 0.5 : 1; aoSet(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
     ao.setSize(composer.renderTarget1.width, composer.renderTarget1.height);
     composer.insertPass(ao, 1); // (straight after the scene is drawn)
   }
