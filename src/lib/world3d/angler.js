@@ -12,7 +12,7 @@ import { biteTaps, fightProfile, fightStyle, fishLoad, landingTimes, landingTech
 import { fishShape, buildFishMesh, bodyWidth } from "../fish3d.js";
 import { hasArt, artUrl } from "../../data/fishart.js";
 import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway, bodyWaveSlope, breathing, flapping, swimKind } from "../fishMotion.js";
-import { fishMaterials, donorOf, paintSkin } from "./fishLook.js";
+import { fishMaterials, donorOf, paintSkin, skinLook } from "./fishLook.js";
 import { castPoint, dirOf } from "./spots.js";
 import { tripodPlan, buildTripod, TRIPOD, restHead } from "./tripod.js";
 import { buildChair, CHAIR, SEAT, SIT_EYE, wantsSit, sitStep, sitEase } from "./chair.js";
@@ -25,6 +25,7 @@ import { fitRodReel, buildRod, rodWet, handleProfile, KNOB_PROFILE } from "./rod
 import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
 import { contactShadow } from "./contactShadow.js";
 import { FILM } from "./film.js";
+import { SKIN_PHOTOS, PROCEDURAL } from "../../data/fishSkins.js";
 const SWING_TP = new THREE.Vector3(0.05, 1.25, -0.42), SWING_FP = new THREE.Vector3(0.08, 1.0, -0.52); // (where a fish swung up by hand arrives: seen from outside, and in your own view)
 const OVER_BAG = 0.3, OVER_FLAT = 0.7; // (the drop net crossing the rail: how much of the bag hangs below the hoop, and how slumped it is drawn)
 
@@ -159,6 +160,63 @@ const STRAIGHT_PIC = new Set(["conger", "eel"]);
 const fishPart = (pic) => (STRAIGHT_PIC.has(pic) ? "eels" : "fish2/" + pic); // (one file each, about 350 kB: only the fish you've hooked is fetched)
 const EARLY_FISH = new Set(["cast", "waiting", "bite"]); // (the phases in which the coming fish is got ready)
 const modelledCache = new Map();
+// ---- the species' skins from photographs (source-assets/fish-skins/skins.py): colour with the outline in its alpha,
+// and a normal map; 1920 by 1280 where the hands are drawn finely (a computer on High or Ultra), else 960 by 640 ----
+// (from the photographs credited in src/data/fishSkins.js, or from FishDock's own pictures alone)
+export const FISH_SKINS = new Set([...Object.keys(SKIN_PHOTOS), ...PROCEDURAL]);
+const skinCache = new Map();
+function loadSkin(pic, big) {
+  const k = pic + (big ? "" : "-m");
+  if (!skinCache.has(k)) {
+    const base = `${(typeof window !== "undefined" && window.__fdAssetBase) || ""}/fish/skin/${pic}`, loader = new THREE.TextureLoader();
+    const one = (url, srgb) => loader.loadAsync(url).then((t) => { t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; return t; });
+    const p = Promise.all([one(`${base}${big ? "" : "-m"}.webp`, true), one(`${base}_n${big ? "" : "-m"}.webp`, false)]).then(([map, normal]) => ({ map, normal }));
+    p.catch(() => skinCache.delete(k)); skinCache.set(k, p);
+  }
+  return skinCache.get(k);
+}
+// ---- the pectoral fins in a photographed skin: painted in the picture's empty top left corner (skins.py FREE, 6
+// pixels in), so the flank under each fin keeps its own skin; where build_fish3.py takes the fin plates' picture from
+// (its ANAT pec, picture x0, y0, x1, y1), so the plates can be pointed there. In the cut-out the fin is painted on the
+// flank, and the plate and the flank under it showed the same fin twice ----
+export const PEC_BOX = { cod: [170, 160, 242, 192], bass: [160, 163, 222, 196], whiting: [135, 168, 200, 190], mackerel: [143, 150, 190, 176],
+  pollack: [158, 160, 228, 200], coalfish: [140, 155, 200, 190], pouting: [150, 170, 230, 210], "black-bream": [155, 172, 245, 205],
+  "ballan-wrasse": [135, 168, 200, 205], "thick-lipped-mullet": [143, 150, 185, 172] };
+export const PEC_AT = 6;
+/** Move a modelled fish's pectoral plates' uvs into the skin's corner: each piece of the fins (connected triangles)
+ *  that lies wholly in the fin's box is a plate (a pelvic fin or the anal fin reaches outside it). Returns how many
+ *  vertices moved. */
+export function pecToCorner(geo, pic) {
+  const box = PEC_BOX[pic], grp = geo?.groups?.find((q) => q.materialIndex === 1);
+  if (!box || !grp || !geo.index || geo.userData.pecMoved) return 0;
+  const ix = geo.index.array, uv = geo.attributes.uv, n = uv.count, up = new Int32Array(n).map((_, i) => i);
+  const root = (a) => { while (up[a] !== a) { up[a] = up[up[a]]; a = up[a]; } return a; };
+  const used = new Uint8Array(n);
+  for (let i = grp.start; i < grp.start + grp.count; i += 3) {
+    const a = ix[i], b = ix[i + 1], c = ix[i + 2]; used[a] = used[b] = used[c] = 1;
+    up[root(b)] = root(a); up[root(c)] = root(a);
+  }
+  const [x0, y0, x1, y1] = box, out = new Set();
+  for (let i = 0; i < n; i++) {
+    if (!used[i]) continue;
+    const x = uv.getX(i) * 480, y = (1 - uv.getY(i)) * 320;
+    if (x < x0 - 4 || x > x1 + 4 || y < y0 - 4 || y > y1 + 4) out.add(root(i));
+  }
+  let moved = 0;
+  for (let i = 0; i < n; i++) {
+    if (!used[i] || out.has(root(i))) continue;
+    uv.setXY(i, uv.getX(i) - (x0 - PEC_AT) / 480, uv.getY(i) + (y0 - PEC_AT) / 320); moved++;
+  }
+  if (moved) { uv.needsUpdate = true; geo.userData.pecMoved = true; }
+  return moved;
+}
+/** Put a fish's materials into its photographed skin (fishLook.js fishMaterials made them for the cut-out). */
+function wearSkin(mats, { map, normal }) {
+  const old = mats.body.map;
+  for (const m of [mats.body, mats.fin, mats.eye]) { m.map = map; m.needsUpdate = true; }
+  skinLook(mats, normal);
+  if (old && old !== map && old.isCanvasTexture) old.dispose();
+}
 /** One geometry for a modelled species: its body, fins and eyes as three groups (materials 0, 1 and 2), its uvs the
  *  picture's (turned the way a canvas texture reads them). A fresh copy each time (the fish is bent in place). */
 function modelledFish(scene, species) {
@@ -607,6 +665,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           // (a ray: its back raised along the spine and its tail round, and a thornback's thorns: fishRay.js)
           if (pic === "thornback-ray") geoBlend = shapeRay(geoBlend, { thorns: species === "thornback-ray" });
           useGeometry(geoBlend, geoBlend.groups.some((q) => q.materialIndex === 3) ? [mats.body, mats.fin, mats.eye, rayThornMaterial()] : [mats.body, mats.fin, mats.eye]);
+          // its skin from photographs (public/fish/skin, source-assets/fish-skins): four times the cut-out's pixels in
+          // the same frame, so the same uvs, with its own normal map (scales, fin rays, a shark's rasp). Got ready while
+          // the rig is in the water, as the fish is
+          if (own && FISH_SKINS.has(pic)) loadSkin(pic, fineHands).then((sk) => {
+            if (fishFor !== key || !sk || fish.geometry !== geoBlend) return;
+            pecToCorner(geoBlend, pic); wearSkin(mats, sk);
+          }).catch(() => {});
         }).catch(() => {});
       } catch { /* keep the generic fish */ }
     };
@@ -1934,7 +1999,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (matOn) matOut = true;
     mat.visible = matOn || (matOut && !walking);
     if (mat.visible) { mat.position.copy(toWorld(matAtL())); mat.rotation.y = root.rotation.y; }
-    net.visible = netOn && !!netAt; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r, i) => (r.visible = i < 6 && net.visible && (netIdle ? i < 4 : tech === "dropnet" || ropesOn))); // (6 and 7, through the fists, only where they are placed, below)
+    // (and walking away from a landed fish, the net isn't carried along at your feet: it was drawn on the deck beside you
+    // as you walked, its rope trailing, in the footage on Aaron's PC, 17 November)
+    net.visible = netOn && !!netAt && !walking; pole.visible = net.visible && (tech === "net" || releasePole); ropes.forEach((r, i) => (r.visible = i < 6 && net.visible && (netIdle ? i < 4 : tech === "dropnet" || ropesOn))); // (6 and 7, through the fists, only where they are placed, below)
     coilRope.visible = net.visible && venue === "pier" && !walking && (netIdle || tech === "dropnet" || ropesOn);
     if (coilRope.visible) { coilRope.position.copy(toWorld(COIL_AT)); coilRope.rotation.y = root.rotation.y; coilRope.updateMatrixWorld(); }
     if (net.visible) {

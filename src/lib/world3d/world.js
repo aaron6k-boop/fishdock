@@ -288,12 +288,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   let tipMode = "auto";
   const tipLights = createTipLights(scene), torch = createHeadTorch(scene, camera), tipList = [];
   const spray = createRockSpray(scene, []), sprayLight = new THREE.Color(1, 1, 1), tmpSprayC = new THREE.Color(); let sprayEdge = false;
-  /** at: world point; size: how big (a rig .6, a landed fish .9); mult: how many more drops (spray off a wall, seen from further off); up: a direction to throw them (spray goes up and back over the wall, not out in a ring) */
-  function splash(at, size = 0.6, mult = 1, up = null) {
-    spray.splash(at.x, at.y, at.z, size, mult, up);
-    // (spray off a wall: the white of it as well as the drops)
-    if (up) spray.burst(at.x + up.x * 0.3, Math.max(at.y, 0), at.z + up.z * 0.3, Math.min(1, size * 0.45), up.x, up.z, 0.7);
-  }
+  /** at: world point; size: how big (a rig .6, a landed fish .9); mult: how many more drops; up: the way back over a
+   *  wall, for a crest slapping against one (rockSpray.js slap: a sheet up its face, not a ring) */
+  function splash(at, size = 0.6, mult = 1, up = null) { spray.splash(at.x, at.y, at.z, size, mult, up); }
   const ripples = [];
   // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
   // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)

@@ -11,6 +11,7 @@ import { areaSize } from "../lib/geo.js";
 import { SPECIES } from "../data/species.js";
 import { PHOTOS, PHOTO_SOURCE, filePage, licenceUrl } from "../data/photos.js";
 import { BAIT_PHOTOS } from "../data/baitphotos.js";
+import { SKIN_PHOTOS } from "../data/fishSkins.js";
 import { BAITS } from "../data/baits.js";
 import { Icon, Seg, Sheet, Notice, Beta } from "../components/ui.jsx";
 
@@ -99,6 +100,7 @@ export default function Settings() {
           <div key={what}><b>{what}</b><span>{url ? <a href={url} target="_blank" rel="noopener noreferrer">{who}</a> : who}</span>{note ? <span className="tiny">{note}</span> : null}</div>
         ))}</div>
         <PhotoCredits />
+        <SkinCredits />
         <BaitCredits />
         <p className="tiny">Being on a FishDock map never means a place is legal or safe to fish. Always check access, permits, byelaws and conditions.</p>
       </section>
@@ -136,6 +138,23 @@ function PhotoCredits() {
         })}
       </ul>
       <p className="tiny">All via <a href={PHOTO_SOURCE.url} target="_blank" rel="noopener noreferrer">{PHOTO_SOURCE.name}</a>, checked {new Date(PHOTO_SOURCE.checked).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}. Photos are shown smaller and cropped; follow a name to see the original.</p>
+    </details>
+  );
+}
+
+// ---- the photographs the 3D fish's skins are made from (src/data/fishSkins.js) ----
+function SkinCredits() {
+  const rows = SPECIES.filter((sp) => SKIN_PHOTOS[sp.id]).map((sp) => ({ sp, p: SKIN_PHOTOS[sp.id] }));
+  return (
+    <details className="credits">
+      <summary>3D fish skin credits ({rows.length})</summary>
+      <ul className="credit-list">
+        {rows.map(({ sp, p }) => {
+          const lic = licenceUrl(p);
+          return <li key={sp.id}><b>{sp.name}</b>: <a href={filePage(p)} target="_blank" rel="noopener noreferrer">{p.author}</a>, {lic ? <a href={lic} target="_blank" rel="noopener noreferrer">{p.licence}</a> : p.licence}</li>;
+        })}
+      </ul>
+      <p className="tiny">The fish you catch in the 3D view wear skins made from these photographs, via Wikimedia Commons: each fish cut out, fitted to its 3D model, the fins partly redrawn and the lighting evened out. Each adapted skin is offered under its photograph's licence. The gurnard, tope, lesser-spotted dogfish, conger and eel are drawn from FishDock's own pictures.</p>
     </details>
   );
 }

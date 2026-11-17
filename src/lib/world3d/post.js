@@ -59,7 +59,8 @@ export const GradeShader = {
 
 // the drawn picture's size (pixels) from which the ambient occlusion is worked out at half size (the film build can
 // change it, for measuring both on one run)
-export const AO_SIZE = { halfFrom: 4e6 };
+// far: nothing whose nearest point is further than this (m) is drawn into the shade's own picture of the scene (see makeAO)
+export const AO_SIZE = { halfFrom: 4e6, far: 120 };
 if (typeof window !== "undefined" && window.__fdFilm) window.__fdAoSize = AO_SIZE;
 
 /** level 0: none (draw straight to the screen); 1: MSAA, bloom and grade; 2: plus ambient occlusion; 3: finer AO. */
@@ -86,10 +87,22 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
     ao.blendIntensity = 0.85;
     // only solid surfaces shade each other: not name labels and other sprites, lines, spray or anything see-through
     // (three's own pass leaves out just points and lines, so a label's square cast a dark box round it)
-    const cache = ao._visibilityCache;
+    const cache = ao._visibilityCache, eye = new THREE.Vector3(), c = new THREE.Vector3();
     ao.overrideVisibility = function () {
+      eye.setFromMatrixPosition(camera.matrixWorld); const far = AO_SIZE.far;
       this.scene.traverse((o) => {
         cache.set(o, o.visible);
+        // (nor anything whose nearest point is more than 120 m away: the shade is half a metre across, a few pixels
+        // there and less, and the pass drew the whole town, the far stones and the boats again every frame for it.
+        // The temporal antialiasing reads this depth too: what is left out reads as far away, which for things that
+        // far makes no difference to where they were last frame)
+        if (far && o.visible && (o.isMesh || o.isInstancedMesh) && o.geometry) {
+          const bs = o.isInstancedMesh ? o.boundingSphere : (o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere)); // (an instanced mesh: all its copies' sphere)
+          if (bs && Number.isFinite(bs.radius)) {
+            c.copy(bs.center).applyMatrix4(o.matrixWorld); const r = bs.radius * o.matrixWorld.getMaxScaleOnAxis();
+            if (c.distanceTo(eye) - r > far) { o.visible = false; return; }
+          }
+        }
         // (nor anything cut out by alpha test: leaves and the far trees' cards. The pass draws depth without the cut, so
         // each card shaded the sky behind it as a dark square)
         const cut = (x) => x.transparent || !x.depthWrite || x.alphaTest > 0;

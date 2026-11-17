@@ -184,3 +184,18 @@ export function fishMaterials(species, { map = null, aspect = 320 / 480, len = 0
   const eye = new THREE.MeshPhysicalMaterial({ map, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, vertexColors: true });
   return { body, fin, eye };
 }
+
+/**
+ * A fish's materials turned to its photographed skin's own normal map (source-assets/fish-skins: each scale where the
+ * species has them, rows following the body, the fin rays, a shark's rasp), in place of the tiled scales: the map
+ * once over the whole picture, the wet coat taking a little of it, and no drawn darkening of the scale edges (the
+ * photograph has its own).
+ */
+export function skinLook(mats, normal) {
+  const { body, fin } = mats;
+  if (body.normalMap && body.normalMap !== normal) body.normalMap.dispose();
+  body.normalMap = normal; body.normalScale = new THREE.Vector2(0.85, 0.85);
+  body.clearcoatNormalMap = normal; body.clearcoatNormalScale = new THREE.Vector2(0.3, 0.3);
+  body.onBeforeCompile = () => {}; body.customProgramCacheKey = () => "fdskin1"; body.needsUpdate = true;
+  fin.normalMap = normal; fin.normalScale = new THREE.Vector2(0.6, 0.6); fin.needsUpdate = true;
+}

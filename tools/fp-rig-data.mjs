@@ -72,7 +72,13 @@ const order = ["K0", "KM1", "KB", "KM2", "KF", "KH", "KH", "K0"];
 // up the middle (the 17 November film on Aaron's PC). A caster's arms follow through out in front, the reel at chest
 // height, the rod pointing up the lead's line a little to the right of your eye's. Gate 3's angle of the rod, nudged;
 // tests/fpRig.test.js checks every frame still has both hands on the rod, no arm stretched, the wrists in range.
-const VIEW = { KH: [0.04, -0.32, 0.33, 40, 0.04] };
+// The wind-up likewise (17 November, realism-8): at its top Gate 3 had the reel 20 cm from your eye and your left
+// elbow at the middle of the picture's left side, 27 cm from your eye, the left forearm across the picture. Its three
+// moments (the rod coming up, the top of the wind-up, the drive forward) were searched again with the view as a
+// condition (tools/fp-cast-view.mjs): each arm kept out of the middle of the picture and
+// away from the eye, both hands on the rod, no arm stretched, every wrist inside its range, the rod still back past
+// 130 degrees at the top. The left elbow now stays in the lower third and the reel a third of a metre from your eye.
+const VIEW = { KH: [0.04, -0.32, 0.33, 40, 0.04], KM1: [0.078, -0.193, 0.229, 89.0, -0.222], KB: [0.132, -0.127, 0.224, 133.4, -0.65], KM2: [-0.033, -0.096, 0.235, 118.3, -0.019] };
 const cast = { path: g3.path_t.map((t, i) => ({ t, ...(order[i] === "K0" ? holdBody : body(VIEW[order[i]] || g3.keys[order[i]].key)) })), still: g3.still };
 const RIG = { fps: meta.fps, grips: meta.grips_order, eye: { bone: meta.head, hold: R6(C(g1.eye)) }, seat, knob, reelTh, reel, loc, cyl, flat, holdBody, reelBelow, cast };
 const out = `// ---- fpRigData: made by tools/fp-rig-data.mjs from the Blender rig's output (source-assets/blender/rig/data/); not edited by hand ----

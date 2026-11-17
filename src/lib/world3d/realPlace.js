@@ -29,6 +29,7 @@ const WALL_BOTTOM = GROUND.water - 0.8;
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
 const RAIL = { within: 260, inset: 0.22, h: 1.1, post: 2.0 };
+export const CAP_DEPTH = 0.85; // (the capping beam's face, from the deck's top down: see the harbour walls below)
 // ---- the steel piling's pans: a trapezoid every 0.6 m (out, along its face, back, along the back), 9 cm deep, as the
 // drawn pans in textures3d.js sheetPiling (their bends at 0, 0.12, 0.5 and 0.62 of the pitch); shaped within 300 m ----
 const PAN = { pitch: 0.6, depth: 0.09, bends: [0, 0.12, 0.5, 0.62], within: 300 };
@@ -199,7 +200,7 @@ function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRu
     const r = 0.16 + rnd() * 0.12, t = rnd() * 6.28, ca = Math.cos(t) * r, sa = Math.sin(t) * r;
     quad([x, y, z], [ca, 0, sa], [-sa, 0, ca], DECAL.rustRing, true);
     // the run down the cap's face, in front of the post (not every post: some have been painted over)
-    if (i % 3 !== 1) { const fx = x + nx * (0.22 + 0.12 + 0.004), fz = z + nz * (0.22 + 0.12 + 0.004), w = 0.05 + rnd() * 0.05, h = 0.2 + rnd() * 0.12; quad([fx, LAND + 0.01 - h, fz], [-nz * w, 0, nx * w], [0, h, 0], DECAL.rustRun, true); }
+    if (i % 3 !== 1) { const fx = x + nx * (0.22 + 0.12 + 0.004), fz = z + nz * (0.22 + 0.12 + 0.004), w = 0.05 + rnd() * 0.05, h = 0.25 + rnd() * 0.35; quad([fx, LAND + 0.01 - h, fz], [-nz * w, 0, nx * w], [0, h, 0], DECAL.rustRun, true); }
   });
   for (const sp of spots) for (let k = 0; k < 5; k++) {
     const t = rnd() * 6.28, d = 0.8 + rnd() * 2.5, x = sp.at[0] + Math.cos(t) * d, z = sp.at[2] + Math.sin(t) * d, r = 0.2 + rnd() * 0.35, a = rnd() * 6.28;
@@ -233,7 +234,7 @@ function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRu
     m.castShadow = true; m.computeBoundingSphere(); group.add(m);
   };
   // a mooring ring hanging from its staple on the cap's face (local +z faces the water)
-  if (rings.length) place(mergeGeometries([new THREE.TorusGeometry(0.09, 0.012, 5, 14).translate(0, LAND - 0.24, 0.012), new THREE.BoxGeometry(0.07, 0.035, 0.03).translate(0, LAND - 0.14, 0.0)].map((g2) => { g2.deleteAttribute("uv"); return g2.toNonIndexed(); })), rings);
+  if (rings.length) place(mergeGeometries([new THREE.TorusGeometry(0.09, 0.012, 5, 14).translate(0, LAND - 0.42, 0.012), new THREE.BoxGeometry(0.07, 0.035, 0.03).translate(0, LAND - 0.32, 0.0)].map((g2) => { g2.deleteAttribute("uv"); return g2.toNonIndexed(); })), rings);
   // a steel ladder from below the water up over the cap: two stiles, rungs every 30 cm, brackets back to the wall and
   // the stiles' tops bent over onto the deck as hand holds
   if (ladders.length) {
@@ -243,7 +244,7 @@ function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRu
       parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.42).translate(sx, top, -0.2));
       for (const by of [WALL_BOTTOM + 0.4, 0.9, LAND - 0.6]) parts.push(new THREE.BoxGeometry(0.03, 0.03, 0.2).translate(sx, by, -0.1));
     }
-    for (let ry2 = WALL_BOTTOM + 0.2; ry2 < LAND - 0.1; ry2 += 0.3) parts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.4, 6, 1, true).rotateZ(Math.PI / 2).translate(0, ry2, 0));
+    for (let ry2 = WALL_BOTTOM + 0.2; ry2 < LAND - 0.1; ry2 += 0.3) parts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.4, 10, 1, true).rotateZ(Math.PI / 2).translate(0, ry2, 0)); // (round bar: six-sided, up close each rung read as a flat strip)
     place(mergeGeometries(parts.map((g2) => { g2.deleteAttribute("uv"); return g2.toNonIndexed(); })), ladders);
   }
   void railH;
@@ -785,15 +786,17 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (cols[j][0] === cols[j + 1][0]) continue; // (the doubled corner: no face between its two)
       const a = o + r * nc + j, b2 = a + nc; wi.push(a, a + 1, b2 + 1, a, b2 + 1, b2);
     }
-    // the cap: a concrete lip standing 12 cm proud of the piling, with its top, a worn chamfer along the arris and its
-    // underside. uv in metres over 2.4 (the photographed concrete's tile), so nothing stretches; the vertex colours
-    // carry the wear: the arris paler where it's knocked and scrubbed, the face darker towards its stained foot
-    const ox = nx * 0.12, oz = nz * 0.12, c0 = cp.length / 3, yT = LAND + 0.03, yB = LAND - 0.45, ch = 0.025, T = 2.4;
-    const cx = nx * ch, cz = nz * ch;
-    cp.push(x1 + ox, yB, z1 + oz, x2 + ox, yB, z2 + oz, x2 + ox, yT - ch, z2 + oz, x1 + ox, yT - ch, z1 + oz); // front
-    cp.push(x1 + ox - cx, yT, z1 + oz - cz, x2 + ox - cx, yT, z2 + oz - cz, x2 - ox, yT, z2 - oz, x1 - ox, yT, z1 - oz); // top
+    // the cap: a concrete capping beam standing 12 cm proud of the piling, its face 0.85 m deep (Gorleston's is a
+    // deep beam over the piling, near a metre, in Geograph 1605191 and 2491438; it was 0.45 m), its top falling a
+    // little to the water (so the rain runs off), a worn chamfer along the arris and its underside. uv in metres over
+    // 2.4 (the photographed concrete's tile), so nothing stretches; the vertex colours carry the wear: the arris paler
+    // where it's knocked and scrubbed, the face darker towards its stained foot
+    const ox = nx * 0.12, oz = nz * 0.12, c0 = cp.length / 3, yT = LAND + 0.03, yB = LAND - CAP_DEPTH, ch = 0.03, fall = 0.035, T = 2.4;
+    const cx = nx * ch, cz = nz * ch, yO = yT - fall;
+    cp.push(x1 + ox, yB, z1 + oz, x2 + ox, yB, z2 + oz, x2 + ox, yO - ch, z2 + oz, x1 + ox, yO - ch, z1 + oz); // front
+    cp.push(x1 + ox - cx, yO, z1 + oz - cz, x2 + ox - cx, yO, z2 + oz - cz, x2 - ox, yT, z2 - oz, x1 - ox, yT, z1 - oz); // top
     cp.push(x1, yB, z1, x2, yB, z2, x2 + ox, yB, z2 + oz, x1 + ox, yB, z1 + oz); // underside
-    cp.push(x1 + ox, yT - ch, z1 + oz, x2 + ox, yT - ch, z2 + oz, x2 + ox - cx, yT, z2 + oz - cz, x1 + ox - cx, yT, z1 + oz - cz); // chamfer
+    cp.push(x1 + ox, yO - ch, z1 + oz, x2 + ox, yO - ch, z2 + oz, x2 + ox - cx, yO, z2 + oz - cz, x1 + ox - cx, yO, z1 + oz - cz); // chamfer
     const U0 = u0 * 2.4 / T, U1 = u1 * 2.4 / T, fv = (yT - yB) / T, tv = 0.24 / T;
     cuv.push(U0, 0, U1, 0, U1, fv, U0, fv, U0, 0.3, U1, 0.3, U1, 0.3 + tv, U0, 0.3 + tv, U0, 0.6, U1, 0.6, U1, 0.65, U0, 0.65, U0, fv, U1, fv, U1, fv + 0.01, U0, fv + 0.01);
     const wear = (0.96 + noise2(x1 / 3, z1 / 3, 1e6, 21) * 0.1), wear2 = (0.96 + noise2(x2 / 3, z2 / 3, 1e6, 21) * 0.1);
@@ -812,7 +815,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const capPhoto = photoTex("cap_concrete_diff");
     const capMat = capPhoto ? new THREE.MeshStandardMaterial({ map: capPhoto, normalMap: photoTex("cap_concrete_nor", { srgb: false }), roughnessMap: photoTex("cap_concrete_rough", { srgb: false }), normalScale: new THREE.Vector2(0.8, 0.8), roughness: 1, color: 0xf4efe6, vertexColors: true, side: THREE.DoubleSide })
       : new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.9, color: 0xe6e2da, vertexColors: true, side: THREE.DoubleSide });
-    weather(capMat, { scale: 3, mottle: 0.22, grime: [LAND - 0.45, LAND - 0.15, 0.25], rough: [0.9, 1.1], wet: place.deckWet });
+    // (rain runs down its face from the top, darker streaks; a little rust from the fittings; the foot dark with spray and weed)
+    weather(capMat, { scale: 3, mottle: 0.26, grime: [LAND - CAP_DEPTH, LAND - 0.3, 0.32], streaks: [LAND - 0.03, 0.75, 0.35], rust: [0.08, 0.42, 0.24, 0.12], rough: [0.9, 1.1], wet: place.deckWet });
     const cm = new THREE.Mesh(cg, capMat); cm.receiveShadow = true; cm.castShadow = true; group.add(cm);
   }
   if (cwp.length) solids.push(collider(cwp, cwi));
