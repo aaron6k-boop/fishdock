@@ -406,12 +406,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     // (the right middle finger on the reel seat opened 0.15 radians at its two outer joints: as Blender left it, the pad
     // of its tip was a millimetre into the side of the reel's foot, under the seat, and the tip seemed to come out
     // through the reel. Aaron's screenshot, 16 November. Measured in the game: no point of it inside the reel after.
-    // And turned in a quarter radian at its knuckle, towards the index finger: wrapped under the foot, its tip still
-    // showed past the rod on the reel's side, a fingertip on its own by the reel's stem that read as poking through it
-    // (his second screenshot, 17 November). Turned in, it lies behind the rod from your eye, and nothing of it is inside
-    // the reel or the handle)
+    // And turned in 0.37 radians at its knuckle, towards the index finger: wrapped under the foot, its tip still showed
+    // past the rod on the reel's side, a fingertip on its own by the reel's stem that read as poking through it (his
+    // second screenshot, 17 November; a quarter radian still left a sliver showing). Turned in, it lies behind the rod
+    // from your eye, and nothing of it is inside the reel or the handle)
     for (const n of ["DEF-f_middle02R", "DEF-f_middle03R"]) grips.hold?.R.get(n)?.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -0.15));
-    grips.hold?.R.get("DEF-f_middle01R")?.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), -0.25));
+    grips.hold?.R.get("DEF-f_middle01R")?.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), -0.37));
     // the hold, as Blender left it: each arm's bones' lengths, which way its elbow bends and the forearm's twist at rest
     clips.hold.apply(1 / RIG.fps); scene.updateMatrixWorld(true);
     const wp = (b) => b.getWorldPosition(V()), wq = (b) => b.getWorldQuaternion(new THREE.Quaternion());
