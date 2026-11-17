@@ -218,3 +218,7 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    #151 (117 fps on Ultra at 1080p, 74 at 1440p) came before #153's pixel budget, temporal antialiasing and half-size
    shade, so they don't compare directly either. A clean run waits for the graphics card to be idle
    (`FishDock-assets/queue`, h005).
+5. Spray off the rock armour from closer than about 15 m: soft white puffs rather than broken water (seen filming the
+   armour's levels of detail from 10 m). From the fishing spots, 75 m and more away, it reads as white water.
+6. The fish's skins are FishDock's 480 by 320 pictures over the rebuilt bodies (item 14); no larger licensed
+   photographs of these species were found.
