@@ -29,6 +29,10 @@ const WALL_BOTTOM = GROUND.water - 0.8;
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
 const RAIL = { within: 260, inset: 0.22, h: 1.1, post: 2.0 };
+// ---- the steel piling's pans: a trapezoid every 0.6 m (out, along its face, back, along the back), 9 cm deep, as the
+// drawn pans in textures3d.js sheetPiling (their bends at 0, 0.12, 0.5 and 0.62 of the pitch); shaped within 300 m ----
+const PAN = { pitch: 0.6, depth: 0.09, bends: [0, 0.12, 0.5, 0.62], within: 300 };
+const panOut = (r) => { const f = ((r / PAN.pitch) % 1 + 1) % 1; return PAN.depth * (f < 0.12 ? f / 0.12 : f < 0.5 ? 1 : f < 0.62 ? 1 - (f - 0.5) / 0.12 : 0); };
 
 // nearest wall segment to a point, through a grid of 8 m cells
 function segIndex(segs, cell = 8) {
@@ -747,9 +751,29 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       continue;
     }
     // in rows up the wall, so the tide line shows: dark weed and wet piling up to about a metre above the water, then
-    // the dry, paler steel
-    WALL_ROWS.forEach(([y, c]) => { const v = (y - WALL_BOTTOM) / (LAND - WALL_BOTTOM); wp.push(x1, y, z1, x2, y, z2); wuv.push(u0, v, u1, v); wcol.push(...c, ...c); });
-    for (let r = 0; r < WALL_ROWS.length - 1; r++) { const a = o + r * 2; wi.push(a, a + 1, a + 3, a, a + 3, a + 2); }
+    // the dry, paler steel. Near the marks on a computer, the piling's pans are shaped, not only drawn: each 0.6 m a
+    // trapezoid 9 cm deep (out, along, back, along; the drawn pans' own places, so the paint and the rust lie on them),
+    // with a corner at every bend, so the sun and the shadows find the corrugations and the wall's end shows them
+    // edge on. (A flat sheet with corrugations drawn on read as a painted board from out on the water, seen on
+    // Aaron's PC, 17 November.) Further off, and on a phone, it stays flat.
+    const ax = (x2 - x1) / len, az = (z2 - z1) / len, run0 = u0 * 2.4;
+    const shaped = quality >= 2 && Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) < PAN.within;
+    const cols = [[0, panOut(run0)]];
+    if (shaped) {
+      // (the bends inside this stretch: each twice, once for the face before it and once for the one after, so each
+      // face of the pan keeps its own flat light)
+      for (let k = Math.ceil(run0 / PAN.pitch); k * PAN.pitch < run0 + len; k++) for (const f of PAN.bends) {
+        const t = k * PAN.pitch + f * PAN.pitch - run0; if (t <= 0.001 || t >= len - 0.001) continue; const d = panOut(run0 + t); cols.push([t, d], [t, d]);
+      }
+      cols.sort((a, b) => a[0] - b[0]);
+    }
+    cols.push([len, shaped ? panOut(run0 + len) : 0]); if (!shaped) cols[0][1] = 0;
+    const nc = cols.length;
+    WALL_ROWS.forEach(([y, c]) => { const v = (y - WALL_BOTTOM) / (LAND - WALL_BOTTOM); for (const [t, d] of cols) { wp.push(x1 + ax * t + nx * d, y, z1 + az * t + nz * d); wuv.push((run0 + t) / 2.4, v); wcol.push(...c); } });
+    for (let r = 0; r < WALL_ROWS.length - 1; r++) for (let j = 0; j < nc - 1; j++) {
+      if (cols[j][0] === cols[j + 1][0]) continue; // (the doubled corner: no face between its two)
+      const a = o + r * nc + j, b2 = a + nc; wi.push(a, a + 1, b2 + 1, a, b2 + 1, b2);
+    }
     // the cap: a concrete lip standing 12 cm proud of the piling, with its top, a worn chamfer along the arris and its
     // underside. uv in metres over 2.4 (the photographed concrete's tile), so nothing stretches; the vertex colours
     // carry the wear: the arris paler where it's knocked and scrubbed, the face darker towards its stained foot
