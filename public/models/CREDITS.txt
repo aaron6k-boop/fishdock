@@ -19,6 +19,12 @@ modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and 
 is Poly Haven's "Concrete Floor 03" (broom-finished, by Rob Tuytel and Matterfield), CC0 1.0; before it, "Concrete Floor
 02" (public/textures/pier_concrete_*.jpg). Credited with thanks to Poly Haven and its artists.
 
+armour.glb (the rock armour's stones, from 17 November 2026): four scanned boulders from Poly Haven
+(https://polyhaven.com), CC0 1.0: "Boulder 01" by Rico Cilliers, "Namaqualand Boulder 03" and "Namaqualand Boulder 05"
+by Jenelle van Heerden and Dario Barresi, and "Namaqualand Boulder 04" by Jenelle van Heerden. Turned down to fewer
+triangles and their photographs tinted towards a grey granite by source-assets/blender/build_armour.py. Credited with
+thanks to Poly Haven and its artists.
+
 The pier's other photographed surfaces (public/textures/, cut down to 512 or 1024 px by
 source-assets/prepare_textures.py) are also from Poly Haven (https://polyhaven.com), CC0 1.0:
   deck_worn_diff.jpg: "Concrete Floor Worn 001" by Dimitrios Savva and Rico Cilliers (worn patches on the deck);
