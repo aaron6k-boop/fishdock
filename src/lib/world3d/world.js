@@ -938,7 +938,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
-      tipLights.update(tipList, dark, t, tipMode); torch.update(dark, dt || 0.016, anglers.get(localId)?.out?.torchAt || null);
+      tipLights.update(tipList, dark, t, tipMode); torch.update(dark, dt || 0.016, anglers.get(localId)?.out?.torchAt || null); env.rainTorch?.(torch.light);
       // (a wet patch on the deck where your dripping net, and your fish, are put down: wetLook.js)
       { const me = anglers.get(localId)?.out, n = me?.land?.net, k = me?.keptAt;
         if (n && me.at && Math.abs(n.y - me.at.y) < 0.35) wetSpotAt(n.x, n.z, 0.55);
@@ -958,7 +958,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // drawing buffer away and makes a new one, and a step in resolution had already done that once)
     const pr = renderer.getPixelRatio(); if (canvas.width !== Math.floor(w * pr) || canvas.height !== Math.floor(h * pr)) renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    post?.setSize(w, h); env?.resizeReflections?.(renderer);
+    post?.setSize(w, h); env?.resizeReflections?.(renderer); env?.setScreen?.(renderer.domElement.height);
   }
   resize();
   raf = requestAnimationFrame(frame);

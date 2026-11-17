@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { createFftSea } from "./fftSea.js";
 import { installFogScatter, SCATTER } from "./fogScatter.js";
 import { installSunShade, updateClouds, CLOUDS, CLOUD_GLSL, nearShadowLight, placeNear } from "./sunShade.js";
+import { createRain } from "./rain3d.js";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
@@ -817,13 +818,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     }
   }
 
-  // ---- rain: streaks falling round the camera ----
-  const RAIN_N = Math.round(1800 * Math.max(0.4, quality));
-  const rainGeo = new THREE.BufferGeometry(); const rp = new Float32Array(RAIN_N * 6);
-  for (let i = 0; i < RAIN_N; i++) { const x = (Math.random() - 0.5) * 60, y = Math.random() * 30, z = (Math.random() - 0.5) * 60; rp.set([x, y, z, x, y - 0.5, z], i * 6); }
-  rainGeo.setAttribute("position", new THREE.BufferAttribute(rp, 3));
-  const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xc8d4e0, transparent: true, opacity: 0.35, depthWrite: false }));
-  rain.frustumCulled = false; rain.visible = false; group.add(rain);
+  // ---- rain: streaks round you, curtains further off, splashes on the deck (rain3d.js) ----
+  const rain3 = createRain(group, { quality, floorAt: (x, z) => floorAt(x, z) }), rain = rain3.group, rainLight = new THREE.Color(), rainSun = { d: new THREE.Vector3(), c: new THREE.Color() };
+  let screenH = 900;
 
   let rainAmt = 0, wind = 0.3, windDir = [0.3, -1], fft = null;
   // gulls and a few boats at the coast (wildlife.js): where the anglers are, the water to put boats on, lamps to perch on
@@ -875,7 +872,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     const wetNow = Math.max(Math.min(1, st.rain * 1.4), st.wet || 0);
     sandWet.value = wetNow;
     if (real?.deckWet) { real.deckWet.value = wetNow; if (real.deckWet.rain) real.deckWet.rain.value = Math.min(1, st.rain * 1.4); }
-    rainAmt = st.rain; rain.visible = st.rain > 0.02; rain.material.opacity = 0.18 + st.rain * 0.3;
+    rainAmt = st.rain; rain3.set(st.rain, st.wind, windDir);
+    // (a drop shows the sky's light, a little of the sun's, the sun's glint looking towards it, and the lamps' after dark)
+    rainLight.copy(hemi.color).multiplyScalar(hemi.intensity * 0.75 * (1 - 0.65 * st.night)).add(rainSun.c.copy(sun.color).multiplyScalar(sun.intensity * 0.05));
+    rainSun.d.copy(lightDir); rainSun.c.copy(sun.color).multiplyScalar(sun.intensity * 0.12 * (st.night > 0.6 ? 0.2 : 1));
+    rain3.light(rainLight, rainSun, lampSpots.slice(0, 4).map((q) => [q[0], q[1], q[2], lampOn]));
   }
   // ---- reflections of the scene in the water: the scene drawn again from a camera mirrored in the water's surface,
   // at a fraction of the screen's size, with the sky, the water and anything passed in (your own hands) left out ----
@@ -952,6 +953,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     /** where the sea breaks on the rock armour: [x, z, ox, oz] (rockSpray.js) */
     get rockEdge() { return real?.rockEdge || null; },
     floorAt: (x, z) => floorAt(x, z),
+    /** the screen's height in drawn pixels (how fine a far raindrop is: rain3d.js) */
+    setScreen(h) { screenH = h || screenH; },
+    /** your head torch's light (nightKit.js), for the rain in its beam */
+    rainTorch(spot) { rain3.torch(spot); },
     ground,
     /** The waves as the water shows them right now (eased), so floats and fish ride the same sea. */
     waveState: () => ({ swell: wU.uSwell.value, wind: wU.uWind.value, windDir: [wU.uWindDir.value.x, wU.uWindDir.value.y], chop: wU.uChop.value }),
@@ -1035,13 +1040,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       } else bolt.next = null;
       { let f = 0; for (const [at, k] of bolt.pulses) { const a = t - at; if (a >= 0 && a < 0.6) f += k * Math.exp(-a * 14); } bolt.flash = Math.min(1.4, f);
         if (Math.abs(bolt.flash - U.uFlash.value) > 1e-3 || bolt.flash > 0) { U.uFlash.value = bolt.flash; hemi.intensity = look.skyIntensity * (1 + bolt.flash * 3); } }
-      if (rainAmt > 0.02) {
-        const p = rainGeo.attributes.position, sp = (14 + rainAmt * 10) * dt, sx = -windDir[0] * wind * 6 * dt, sz = -windDir[1] * wind * 6 * dt;
-        for (let i = 0; i < RAIN_N; i++) { let y = p.getY(i * 2) - sp; let x = p.getX(i * 2) + sx, z = p.getZ(i * 2) + sz; if (y < -1) { y = 25 + Math.random() * 5; x = (Math.random() - 0.5) * 60; z = (Math.random() - 0.5) * 60; } p.setXYZ(i * 2, x, y, z); p.setXYZ(i * 2 + 1, x + windDir[0] * wind * 0.3, y - 0.45 - rainAmt * 0.3, z + windDir[1] * wind * 0.3); }
-        p.needsUpdate = true; rain.position.set(cam.position.x, cam.position.y - 8, cam.position.z);
-      }
+      if (rainAmt > 0.02) { rain3.flash(bolt.flash); rain3.update(t, dt, cam, screenH); }
     },
-    dispose() { fft?.dispose(); envSky.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
+    dispose() { fft?.dispose(); envSky.dispose(); rain3.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
   };
   return api;
 }
