@@ -302,6 +302,17 @@ function pilingMaterial(sp, quality) {
 /** How far (m) from your eye a stone can be and still cast a shadow that lands in the sun's shadow map (world.js sets it from the shadow distance). */
 export const SHADOW_REACH = { m: 55 };
 export const setShadowReach = (shadowDist) => { SHADOW_REACH.m = Math.max(40, shadowDist * 1.42 + 12); };
+/** The rock armour's levels of detail by distance from the eye (m): the fine stone within `near`, a middling one to
+ * `mid`, the coarse one beyond (realPlace's armour). */
+export const ARMOUR_LOD = { near: 20, mid: 60 };
+if (typeof window !== "undefined" && window.__fdFilm) window.__fdArmour = { lod: ARMOUR_LOD, reach: SHADOW_REACH }; // (film checks: the bands set by hand)
+/** Which band each stone at xz [[x, z], ...] goes in, seen from (ex, ez) with the sun's shadows reaching `reach` m:
+ * [near, middling, coarse with shadows, coarse without], each a list of indices into xz. */
+export function armourBands(xz, ex, ez, reach) {
+  const out = [[], [], [], []], n2 = ARMOUR_LOD.near ** 2, m2 = ARMOUR_LOD.mid ** 2, r2 = reach * reach;
+  xz.forEach(([x, z], i) => { const d2 = (x - ex) ** 2 + (z - ez) ** 2; out[d2 < n2 ? 0 : d2 < m2 ? 1 : d2 < r2 ? 2 : 3].push(i); });
+  return out;
+}
 /** How near (m) a railing post has to be to get its full fittings (realPlace's rails). */
 export const POST_DETAIL_M = 9;
 /** Indices of `points` ([x, z, ...]) within sqrt(near2) of (x, z), and the rest: [near, far]. */
@@ -1260,48 +1271,57 @@ function buildRocks(group, cls, xs, n, area, quality) {
   };
   mat.customProgramCacheKey = () => "fdrock1";
   const per = [[], [], [], []]; spots.forEach((sp) => per[Math.floor(rnd() * 4)].push(sp));
-  const meshes = []; // ([near, far] for each shape: the photographed stones go into them when they arrive)
+  const meshes = []; // (the bands of each shape, nearest first: the photographed stones go into them when they arrive)
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e = new THREE.Euler(), c = new THREE.Color();
   per.forEach((list, v) => {
     if (!list.length) return;
-    // (two meshes of the same stones: those near enough for their shadows to fall inside the sun's shadow map cast
-    // them; the rest, most of a long breakwater, are drawn without being drawn a second time into that map)
-    const mesh = new THREE.InstancedMesh(shapes[v], mat, list.length), away = new THREE.InstancedMesh(farShapes[v], mat, list.length);
+    // (four meshes of the same stones, by how far they are from you: the fine stone within ARMOUR_LOD.near, a middling
+    // one to ARMOUR_LOD.mid, the coarse one beyond. All three cast shadows while inside the reach of the sun's shadow
+    // maps; past it, most of a long breakwater, the coarse ones are drawn without being drawn again into those maps.
+    // With two bands the photographed stones' 2,000 triangles went to every stone within the shadows' reach, 125 m on
+    // Ultra: 6.6 million triangles a frame at Gorleston across the passes, most of them about a pixel each)
+    const band = (geo) => new THREE.InstancedMesh(geo, mat, list.length);
+    const near = band(shapes[v]), mid = band(shapes[v]), lit = band(farShapes[v]), away = band(farShapes[v]);
+    const bands = [near, mid, lit, away];
     const mats = [], cols = [];
     list.forEach(([x, y, z, s]) => {
       e.set((rnd() - 0.5) * 1.2, rnd() * 6.28, (rnd() - 0.5) * 1.2); q4.setFromEuler(e); // (lying roughly flat, as placed stone settles)
       mats.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q4, new THREE.Vector3(s * (0.9 + rnd() * 0.4), s * (0.7 + rnd() * 0.35), s)));
       const t = 0.82 + rnd() * 0.3; cols.push(new THREE.Color().setRGB(t * (0.98 + rnd() * 0.06), t, t * (0.97 + rnd() * 0.06)));
     });
+    const xz = list.map(([x, , z]) => [x, z]);
     const at = new THREE.Vector3(Infinity, 0, 0), eye = new THREE.Vector3(); let reachWas = 0;
     const share = (cam) => {
       if (cam) eye.setFromMatrixPosition(cam.matrixWorld);
       if (cam && eye.distanceToSquared(at) < 9 && reachWas === SHADOW_REACH.m) return; at.copy(eye); reachWas = SHADOW_REACH.m;
-      const [near, far] = cam ? splitByDistance(list.map(([x, , z]) => [x, z]), eye.x, eye.z, SHADOW_REACH.m * SHADOW_REACH.m) : [[], list.map((_, i) => i)];
-      near.forEach((i, k) => { mesh.setMatrixAt(k, mats[i]); mesh.setColorAt(k, cols[i]); });
-      far.forEach((i, k) => { away.setMatrixAt(k, mats[i]); away.setColorAt(k, cols[i]); });
-      mesh.count = near.length; away.count = far.length;
-      mesh.instanceMatrix.needsUpdate = away.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; if (away.instanceColor) away.instanceColor.needsUpdate = true;
-      mesh.computeBoundingSphere();
+      const into = cam ? armourBands(xz, eye.x, eye.z, SHADOW_REACH.m) : [[], [], [], xz.map((_, i) => i)];
+      into.forEach((idx, b) => { const m = bands[b]; idx.forEach((i, k) => { m.setMatrixAt(k, mats[i]); m.setColorAt(k, cols[i]); }); m.count = idx.length; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; });
+      for (const m of [near, mid, lit]) m.computeBoundingSphere();
     };
-    // (both get every stone once, so each has its colours set up before the first share by distance)
-    mats.forEach((m, i) => { mesh.setMatrixAt(i, m); mesh.setColorAt(i, cols[i]); away.setMatrixAt(i, m); away.setColorAt(i, cols[i]); });
+    // (each gets every stone once, so each has its colours set up before the first share by distance)
+    mats.forEach((m, i) => { for (const b of bands) { b.setMatrixAt(i, m); b.setColorAt(i, cols[i]); } });
     share(null);
-    mesh.castShadow = true; away.castShadow = false; away.userData.noAO = true; mesh.receiveShadow = away.receiveShadow = true; away.frustumCulled = false; group.add(mesh, away);
-    meshes[v] = [mesh, away];
+    for (const b of bands) { b.castShadow = b !== away; b.receiveShadow = true; group.add(b); }
+    away.userData.noAO = true; away.frustumCulled = false;
+    meshes[v] = bands;
     away.onBeforeRender = (_r, _s, cam) => { if (cam.isPerspectiveCamera && !cam.userData.fdMirror) share(cam); };
   });
   // ---- the photographed stones (public/models/armour.glb, source-assets/blender/build_armour.py): four scanned
-  // boulders (Poly Haven, CC0), turned down to about 2,000 triangles near and 300 far, sized as these, their
-  // photographs in one atlas turned to a grey granite's colour. They take the drawn stones' places (the same spots,
-  // turns and sizes) once loaded, the wet band and weed kept; until then, or if they can't load, the drawn ones stay ----
+  // boulders (Poly Haven, CC0), turned down to about 2,000 triangles near, 600 middling and 300 far, sized as these,
+  // their photographs in one atlas turned to a grey granite's colour. They take the drawn stones' places (the same
+  // spots, turns and sizes) once loaded, the wet band and weed kept; until then, or if they can't load, the drawn ones
+  // stay ----
   loadPart("armour").then((sc) => {
     let atlas = null;
+    const geo = (o) => { let g = null; if (!o) return null; o.updateWorldMatrix(true, true); o.traverse((m) => { if (!g && m.isMesh) { g = m.geometry.clone().applyMatrix4(m.matrixWorld); atlas = atlas || m.material; } }); return g; };
     for (let v = 0; v < 4; v++) {
-      const near = sc.getObjectByName("armour_" + v), far = sc.getObjectByName("armour_far_" + v); if (!near || !far || !meshes[v]) continue;
-      const geo = (o) => { let g = null; o.updateWorldMatrix(true, true); o.traverse((m) => { if (!g && m.isMesh) { g = m.geometry.clone().applyMatrix4(m.matrixWorld); atlas = atlas || m.material; } }); return g; };
-      const gn = geo(near), gf = geo(far); if (!gn || !gf) continue;
-      const [mesh, away] = meshes[v]; mesh.geometry.dispose(); away.geometry.dispose(); mesh.geometry = gn; away.geometry = gf; mesh.computeBoundingSphere();
+      if (!meshes[v]) continue;
+      const gn = geo(sc.getObjectByName("armour_" + v)), gf = geo(sc.getObjectByName("armour_far_" + v)); if (!gn || !gf) continue;
+      const gm = geo(sc.getObjectByName("armour_mid_" + v)) || gf.clone(); // (a file from before the middling stone: the far one)
+      const [near, mid, lit, away] = meshes[v];
+      for (const m of meshes[v]) m.geometry.dispose();
+      near.geometry = gn; mid.geometry = gm; lit.geometry = gf; away.geometry = gf.clone();
+      for (const m of [near, mid, lit]) m.computeBoundingSphere();
     }
     if (atlas?.map) { mat.map = atlas.map; mat.normalMap = atlas.normalMap || null; mat.roughnessMap = atlas.roughnessMap || null; mat.normalScale.set(1, 1); mat.needsUpdate = true; }
   }).catch(() => {});

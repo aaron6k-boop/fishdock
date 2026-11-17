@@ -847,6 +847,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       ripple(x, z, s) { ripple({ x, z }, s); },
       get stats() { const r = renderer.info.render, m = renderer.info.memory; return { dpr: dprNow, post: post ? post.level : 0, ao: !!post?.ao, late: +late.toFixed(2), calls: r.calls, triangles: r.triangles, geometries: m.geometries, textures: m.textures, programs: renderer.info.programs?.length }; },
       get yaw() { return look.yaw; },
+      /** (checks) the graphics card's mean milliseconds a frame over the last 60 answers, and how many there were */
+      get gpuMs() { const m = Math.min(gpuN, 60); if (!m) return null; let t = 0; for (let i = 0; i < m; i++) t += gpuT[i]; return { ms: +(t / m).toFixed(2), n: gpuN }; },
       get lag() { return film ? nowFn() - film.now : 0; },
       get scene() { return scene; },
       floor(x, z) { return env.floorAt ? env.floorAt(x, z) : null; },
