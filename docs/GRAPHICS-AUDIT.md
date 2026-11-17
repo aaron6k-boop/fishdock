@@ -154,8 +154,8 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    held out in front at chest height, the rod pointing up the lead's line a little right of your eye's, both hands in
    view. Through the wind-up your left arm, holding the butt, came up across the lower left of the picture, its sleeve
    17 to 23 cm from your eye: the sleeve within about 24 cm of your eye now dissolves (dithered over 6 cm, smoothed by
-   the temporal antialiasing). **Still:** the left forearm crosses the lower part of the picture in the wind-up and the
-   right hand passes close; moving the cast's moments or forcing the elbow down put the wrist past its range
+   the temporal antialiasing). **Still:** the left forearm crosses the lower part of the picture in the wind-up (as a
+   real angler's does, the butt hand coming up in front of the chest) and the right hand passes close; moving the cast's moments or forcing the elbow down put the wrist past its range
    (`tests/fpRig.test.js`), so a cleaner wind-up needs the cast solved again in Blender with the view as a condition.
 19. **The wellies were straight tubes.** **Changed:** each leg a moulded shape: a little flare at the top, full over
    the calf, narrowing to the ankle, a raised band near the top.
@@ -179,6 +179,14 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    below.
 21. **A hooked or landed shark's jaw tip vanished** as it gaped: its swimming wave was not a number a little ahead of
    the snout, where a dropped jaw reaches. **Fixed**, with a check for every kind of swimming.
+22. **The photographed rock armour cost far more than it showed.** On Aaron's PC the live game after #153 drew 6.6
+   million triangles a frame on Ultra at Gorleston, against 2.4 million after #151: every stone within the sun's
+   shadows' reach (125 m on Ultra) was the fine 2,000-triangle scan, drawn again in each pass (the picture, the ambient
+   occlusion's depth, two shadow maps, the reflection), though from the fishing spots the nearest stones are 75 m away
+   and a few tens of pixels across. **Changed** (`realPlace.js` `ARMOUR_LOD`, `source-assets/blender/build_armour.py`):
+   a middling 600-triangle version of each stone, made in Blender like the others; the fine stone only within 20 m of
+   you, the middling to 60 m, the 300-triangle one beyond, each casting shadows while inside their reach. Filmed from
+   10, 28, 45 and 90 m. RESULTS_22
 
 ## What is left, in order of what it would add
 
