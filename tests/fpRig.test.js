@@ -322,9 +322,15 @@ test("the coat's cut near your eye is softened over a narrow band only", () => {
   let coat = null; R.scene.traverse((o) => { if (o.isMesh && o.material?.type === "MeshPhysicalMaterial") coat = o.material; });
   const lib = THREE.ShaderLib.physical, sh = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} };
   coat.onBeforeCompile(sh, {});
-  const m = /fpNearCut \+ \(fpB4\(gl_FragCoord\.xy\) - 0\.5\) \* ([0-9.]+)/.exec(sh.fragmentShader);
-  assert.ok(m, "the cut is there, with its dither");
-  assert.ok(+m[1] <= 0.015, `the dither's band ${(+m[1] * 100).toFixed(1)} cm wide`);
+  assert.ok(/fpNearCut \+ \(fpB4\(gl_FragCoord\.xy\) - 0\.5\) \* fpCutSoft/.test(sh.fragmentShader), "the cut is there, with its dither");
+  // (held, or winding: the band narrow; through a cast's wind-up (17 November: the left sleeve over the lower left of
+  // the picture) the cut reaches further and dissolves over 6 cm, and goes back after)
+  const P = place(rigP0()), hold = () => pose(P, [crankSpec(P, TURN[0]), seatSpec(P)], 40);
+  hold(); assert.ok(sh.uniforms.fpCutSoft.value <= 0.015, `the dither's band ${(sh.uniforms.fpCutSoft.value * 100).toFixed(1)} cm wide`);
+  const k = castAt(0.5), Pc = place(rigP0(), k), butt = Pc.reel.clone().addScaledVector(Pc.dir, -META.seat + 0.065);
+  pose(Pc, [{ at: butt, axis: Pc.dir.clone(), palm: V(1, 0.2, 0), kind: "butt", sock: { pos: butt.clone(), quat: rodFrame(Pc.dir, Pc.rest, bodyUp(Pc.vf, Pc.vu)) } }, seatSpec(Pc)], 40, 0.5);
+  assert.ok(sh.uniforms.fpCutSoft.value > 0.05 && sh.uniforms.fpNearCut.value > 0.22, `winding up: the cut ${sh.uniforms.fpNearCut.value.toFixed(2)} m, its band ${sh.uniforms.fpCutSoft.value.toFixed(3)}`);
+  hold(); assert.ok(sh.uniforms.fpCutSoft.value <= 0.015 && sh.uniforms.fpNearCut.value < 0.18, "and back after");
 });
 
 // ---- the jacket's lining (14 November: a dark ring round the forearm looking down a sleeve cut near the eye) ----
