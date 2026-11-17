@@ -78,4 +78,7 @@ required; credited here with thanks. Cut to loops and levelled by source-assets/
 recordings, with their pages and file hashes, is in source-assets/ASSET-LICENCES.json.
 Added 17 November 2026, from the same library and under the same licence: the cast's whoosh (a long stick, a metal
 tube and a rope swung through the air), single clicks of a small and a large ratchet for the reel's drag, and a rope
-run through the hands for the drop net (cut by source-assets/prepare_sounds2.py).
+run through the hands for the drop net, and a shoe's steps on concrete (cut by source-assets/prepare_sounds2.py).
+And later the same day, from the same library and licence, all by Joseph Sardin: three claps of thunder, near to far,
+one strike of a small bell for the rod-tip bell, drops of water and water swirling for the net draining and going in,
+and slaps (made duller) for a fish's tail on the mat (cut by source-assets/prepare_sounds3.py).
