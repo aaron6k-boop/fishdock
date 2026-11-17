@@ -15,17 +15,77 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
  * much the species bends (an eel a lot, a flatfish little); beat: how hard it's swimming (0 still, 1 cruising, more
  * when it's fighting).
  */
-export function bodyWave(u, t, { tempo = 1, flex = 1, beat = 1, curl = 0 } = {}) {
-  const env = 0.18 + 0.82 * u * u; // (a little at the head, which counters the tail; most at the tail)
-  const wave = Math.sin(t * 9 * tempo - u * 5.2) * 0.11 * beat * flex * env;
-  return wave + curl * u * u;
+export function bodyWave(u, t, { tempo = 1, flex = 1, beat = 1, curl = 0, kind = "", shake = 0 } = {}) {
+  const K = WAVES[kind] || WAVES.carangiform;
+  const wave = Math.sin(t * 9 * tempo - u * K.lam) * 0.11 * beat * flex * K.env(u);
+  return wave + curl * u * u + shake * HEAD_SHAKE * Math.sin(t * 16) * (1 - u) * (1 - u);
 }
 
 /** The slope of bodyWave along the body (d/du), for turning the fish's normals with its bend without working them
  *  out again from the triangles every frame. */
-export function bodyWaveSlope(u, t, { tempo = 1, flex = 1, beat = 1, curl = 0 } = {}) {
-  const th = t * 9 * tempo - u * 5.2, k = 0.11 * beat * flex;
-  return k * (Math.cos(th) * -5.2 * (0.18 + 0.82 * u * u) + Math.sin(th) * 1.64 * u) + 2 * curl * u;
+export function bodyWaveSlope(u, t, { tempo = 1, flex = 1, beat = 1, curl = 0, kind = "", shake = 0 } = {}) {
+  const K = WAVES[kind] || WAVES.carangiform, th = t * 9 * tempo - u * K.lam, k = 0.11 * beat * flex;
+  return k * (Math.cos(th) * -K.lam * K.env(u) + Math.sin(th) * K.envD(u)) + 2 * curl * u - 2 * shake * HEAD_SHAKE * Math.sin(t * 16) * (1 - u);
+}
+
+// how each kind of fish swims: the wave's length along the body (lam: radians over a body length; the longer the
+// fish's wave the fewer of them on its body at once) and how the bend grows from head to tail. Most fish (a bass, a
+// cod) swing mostly the back half (carangiform); an eel or a conger the whole body in more than one wave
+// (anguilliform); a dogfish, a smoothhound or a tope between the two; a mackerel or a garfish keeps its body stiff and
+// drives with the tail alone (towards thunniform)
+const WAVES = {
+  carangiform: { lam: 5.2, env: (u) => 0.18 + 0.82 * u * u, envD: (u) => 1.64 * u },
+  eel: { lam: 9.5, env: (u) => 0.35 + 0.65 * u, envD: () => 0.65 },
+  shark: { lam: 7.5, env: (u) => 0.25 + 0.75 * u ** 1.5, envD: (u) => 1.125 * Math.sqrt(Math.max(0, u)) },
+  tuna: { lam: 4.6, env: (u) => 0.12 + 0.88 * u ** 3, envD: (u) => 2.64 * u * u },
+};
+const HEAD_SHAKE = 0.06; // (a hooked fish shaking its head: the head swings most, the tail barely)
+
+/** Which way of swimming a species has (bodyWave's kind). */
+export function swimKind(species, { eel = false } = {}) {
+  if (eel) return "eel";
+  if (["lesser-spotted-dogfish", "smoothhound", "tope", "bull-huss", "spurdog"].includes(species)) return "shark";
+  if (["mackerel", "garfish", "bonito"].includes(species)) return "tuna";
+  return "carangiform";
+}
+
+// ---- out of the water ----
+/**
+ * A fish lying on the mat or held: now and then a burst of two to four quick flips of the tail, side to side, then
+ * still for a few seconds with a twitch or two between (curl, as bodyWave's, and how hard it beats). seed (0..1) sets
+ * one fish's own timing; tired (0..1) makes the bursts rarer and weaker as it's been out longer.
+ */
+export function flapping(t, { seed = 0, tired = 0 } = {}) {
+  const per = (4.2 + 2.4 * ((seed * 9.7) % 1)) * (1 + 1.2 * tired), cyc = t / per + seed, n = Math.floor(cyc), ph = (cyc - n) * per;
+  const flips = 2 + ((n * 7 + Math.floor(seed * 5)) % 3), flipS = 0.22, burst = flips * flipS, k = 1 - 0.6 * tired;
+  if (ph < burst) {
+    const f = ph / flipS, side = Math.floor(f) % 2 ? -1 : 1, e = Math.sin(Math.PI * (f % 1));
+    return { curl: side * 0.55 * e * k * (1 - 0.15 * Math.floor(f)), beat: 0.6 * k };
+  }
+  const tw = Math.max(0, Math.sin((ph - burst) * 3.1 + seed * 11)) ** 16;
+  return { curl: 0.08 * tw * k, beat: 0.06 };
+}
+
+// ---- breathing ----
+/**
+ * How far the mouth is open and the gill covers lifted (each 0 to 1, as the modelled fish's shape keys, build_fish3.py)
+ * at time t. In the water ("water") slow and slight, the gill covers opening as the mouth closes, as a fish pumps water
+ * over its gills; hooked ("hooked") the mouth held half open by the hook and working faster; out of the water ("air")
+ * gasping: every two to three seconds the mouth opens wide and shuts, the covers flaring as it shuts, every third gasp
+ * a weaker one. seed (0..1) sets one fish's own rhythm. A flatfish's mouth opens less.
+ */
+export function breathing(t, { mode = "water", flat = false, seed = 0 } = {}) {
+  const frac = (x) => x - Math.floor(x);
+  if (mode === "air") {
+    const per = 2.3 + 0.6 * frac(seed * 7.13), cyc = t / per + seed, ph = frac(cyc);
+    const open = ph < 0.18 ? ease(ph / 0.18) : ph < 0.42 ? 1 - ease((ph - 0.18) / 0.24) : 0;
+    const flare = ph > 0.3 && ph < 0.75 ? Math.sin((Math.PI * (ph - 0.3)) / 0.45) : 0;
+    const weak = Math.floor(cyc) % 3 === 2 ? 0.45 : 1;
+    return { gape: 0.06 + (flat ? 0.6 : 0.85) * open * weak, gills: 0.9 * flare * weak };
+  }
+  if (mode === "hooked") { const w = (t * 2 * Math.PI) / 0.85 + seed * 6; return { gape: 0.38 + 0.12 * Math.sin(w), gills: 0.35 + 0.25 * Math.sin(w - 1.6) }; }
+  const w = (t * 2 * Math.PI) / 1.5 + seed * 6;
+  return { gape: 0.1 + 0.08 * Math.sin(w), gills: 0.12 + 0.12 * Math.sin(w - 1.8) };
 }
 
 // ---- turning ----

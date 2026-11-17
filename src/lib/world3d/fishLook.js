@@ -159,21 +159,28 @@ export function fishMaterials(species, { map = null, aspect = 320 / 480, len = 0
     map, color: map ? 0xffffff : plain, roughness: K.rough, metalness: 0.05 + K.silver * 0.3, side: THREE.DoubleSide, alphaTest: 0.5,
     clearcoat: 0.35 + 0.6 * K.slime, clearcoatRoughness: 0.08 + 0.1 * (1 - K.slime), // (the wet sheen, brightest at a glancing angle)
     iridescence: K.silver * 0.8, iridescenceIOR: 1.35, iridescenceThicknessRange: [180, 420],
-    specularIntensity: 0.6 + 0.4 * K.silver, envMapIntensity: 1,
+    specularIntensity: 0.6 + 0.4 * K.silver, envMapIntensity: 1, vertexColors: true,
   });
+  // (vertexColors: the modelled fish's shade, darkest in the gill cover's groove, the mouth's slit and the eye's socket,
+  // so a gasping mouth and a lifted gill cover open onto dark. Every other fish carries white: angler.js useGeometry)
   const nm = K.scales > 0 && len > 0.12 ? scaleNormalMap() : null;
   if (nm) {
     // (one tile has 8 scales across: the picture's width is a little more than the fish's length)
     const t = nm.clone(); t.needsUpdate = true; const across = K.scales * 1.1 / 8;
     t.repeat.set(across, across * aspect * 1.25); body.normalMap = t; body.normalScale.set(0.32, 0.32);
     body.clearcoatNormalMap = t; body.clearcoatNormalScale = new THREE.Vector2(0.12, 0.12);
+    // each scale's edge a little darker where it tucks under the next (the relief's slope, from the same map): close
+    // to, where the picture is softer than the screen, the scales still read one by one
+    body.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
+      { vec3 fdS = texture2D(normalMap, vNormalMapUv).xyz * 2.0 - 1.0; diffuseColor.rgb *= 1.0 - 0.3 * clamp(1.0 - fdS.z * 1.15, 0.0, 1.0) - 0.06 * fdS.y; }`); };
+    body.customProgramCacheKey = () => "fdscale1";
   }
   const fin = new THREE.MeshPhysicalMaterial({
     map, color: map ? 0xffffff : plain, roughness: 0.35, metalness: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.86, alphaTest: 0.22,
-    depthWrite: false, clearcoat: 0.5, clearcoatRoughness: 0.15, emissive: 0x000000,
+    depthWrite: false, clearcoat: 0.5, clearcoatRoughness: 0.15, emissive: 0x000000, vertexColors: true,
   });
   // light through a thin fin: lit a little from either side, so a fin held against the sky glows rather than going black
   fin.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "outgoingLight += diffuseColor.rgb * 0.18 * (totalEmissiveRadiance + vec3(0.6));\n#include <opaque_fragment>"); };
-  const eye = new THREE.MeshPhysicalMaterial({ map, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02 });
+  const eye = new THREE.MeshPhysicalMaterial({ map, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, vertexColors: true });
   return { body, fin, eye };
 }

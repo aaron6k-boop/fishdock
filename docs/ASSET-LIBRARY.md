@@ -11,13 +11,12 @@ it goes in (an asset site's other assets may be under other terms).
 | File | What | Drawn | Size | Triangles | Textures inside | Animations |
 |---|---|---|---|---|---|---|
 | eels.glb | The conger and the eel (from their straightened pictures) | close (in the hand) to mid (in the water) | 206 KB | 10,432 | none | none |
-| fish.glb | Fish bodies, fins and eyes | close (in the hand) to mid (in the water) | 628 KB | 33,896 | none | none |
 | fp_rig.glb | Your arms, hands and jacket in first person, skeleton and clips | close (first person), one level | 1.5 MB | 37,414 | none | 4 |
 | nets.glb | Drop net and landing net | close to mid | 491 KB | 6,692 | 512x512, 512x512, 512x512, 512x512 | none |
 | pierprops.glb | Lamps, lifebuoy stations, bollards, benches | all distances, instanced along the pier | 692 KB | 5,786 | 512x512, 512x512, 512x512, 512x512, 512x512, 512x512, 512x512 | none |
 | reel.glb | The reel, older single model | close | 175 KB | 7,384 | none | none |
 | rodkit.glb | The rod (handle, seat, guides, blank) and the spinning reel | close; the 3D view hides it past a few metres | 609 KB | 27,248 | none | none |
-| fish2/*.glb (14 files) | The other species with a cut-out picture, one file each (ballan-wrasse, black-bream, coalfish, dab, flounder, garfish, gurnard, lesser-spotted-dogfish, pouting, smoothhound, sole, thick-lipped-mullet, thornback-ray, tope) | close (in the hand) to mid (in the water); only the one hooked is fetched | 1.7 MB in all | 78,112 in all | none | none |
+| fish2/*.glb (20 files) | Every sea fish with a cut-out picture, one file each, with its gill covers, mouth, sockets, rayed fins and the jaw and gill shape keys (build_fish3.py) (ballan-wrasse, bass, black-bream, coalfish, cod, dab, flounder, garfish, gurnard, lesser-spotted-dogfish, mackerel, plaice, pollack, pouting, smoothhound, sole, thick-lipped-mullet, thornback-ray, tope, whiting) | close (in the hand) to mid (in the water); only the one hooked is fetched | 6.6 MB in all | 247,702 in all | none | none |
 
 ## Game-ready textures (`public/textures/`)
 
