@@ -1503,6 +1503,146 @@
      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/concrete_floor_03/concrete_floor_03_rough_2k.jpg"
     }
    ]
+  },
+  {
+   "id": "bigsoundbank:3113",
+   "name": "Thunder #2",
+   "source": "https://bigsoundbank.com/thunder-2-s3113.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "near thunder, a short clap and roll (public/sounds/thunder_a.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/3113.flac",
+     "bytes": 333950,
+     "sha256": "aece3d410a95b09dec470372576cfe5160cf99e208d8526cea5538fd12e32ddb",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/3113.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:3114",
+   "name": "Thunder #3",
+   "source": "https://bigsoundbank.com/thunder-3-s3114.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "thunder, a longer clap (public/sounds/thunder_b.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/3114.flac",
+     "bytes": 842752,
+     "sha256": "90458dc8ee2337b81449cae726076e8d72f519d5e146ae8ec2da4a2ef7ac0e98",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/3114.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:3116",
+   "name": "Thunder #5",
+   "source": "https://bigsoundbank.com/thunder-5-s3116.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "thunder far off, a long roll (public/sounds/thunder_c.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/3116.flac",
+     "bytes": 1355296,
+     "sha256": "3fc479a53b553d7b63c0049d0382604f8dfcf764cb9c8eac66f57376a6414515",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/3116.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0292",
+   "name": "Small Bell #1",
+   "source": "https://bigsoundbank.com/small-bell-1-s0292.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the rod-tip bell, one strike (public/sounds/bell_tip.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/0292.ogg",
+     "bytes": 99249,
+     "sha256": "a88ea726694fafb628be96a33e80366218336fa1859a605c09aecc09f9b3f9be",
+     "url": "https://bigsoundbank.com/UPLOAD/ogg/0292.ogg"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:1384",
+   "name": "Drops of water #1",
+   "source": "https://bigsoundbank.com/drops-of-water-1-s1384.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "water running out of a lifted net (public/sounds/drops.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/1384.flac",
+     "bytes": 1894100,
+     "sha256": "1feae2fe40458f2c0644dd1aa973e5c36bd4b7e66f74935081a5e65c448433c9",
+     "url": "https://bigsoundbank.com/UPLOAD/flac/1384.flac"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0245",
+   "name": "Water: swirls and flow",
+   "source": "https://bigsoundbank.com/water-swirls-and-flow-s0245.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "the net going into the water (public/sounds/swirl.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/0245.ogg",
+     "bytes": 175303,
+     "sha256": "a6d09627224d8b021470df115aff4921e8029aa12a6191d10f44812f7cd47e56",
+     "url": "https://bigsoundbank.com/UPLOAD/ogg/0245.ogg"
+    }
+   ]
+  },
+  {
+   "id": "bigsoundbank:0597",
+   "name": "Slaps",
+   "source": "https://bigsoundbank.com/slaps-s0597.html",
+   "author": "Joseph Sardin",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "sounds",
+   "resolution": "original recording",
+   "use": "a fish's tail on the mat, made duller (public/sounds/slaps.mp3)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/bigsoundbank/0597.ogg",
+     "bytes": 146693,
+     "sha256": "b2e48234a5d2bb4ff2354b4685d63eb4d6da7a9266e89c6a278404df484bbfda",
+     "url": "https://bigsoundbank.com/UPLOAD/ogg/0597.ogg"
+    }
+   ]
   }
  ]
 }

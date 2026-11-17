@@ -9,7 +9,8 @@
 // padding at either end of a file never leaves a gap or a click.
 
 export const RECORDINGS = ["sea_waves", "sea_lap", "harbour", "rain_light", "rain_heavy", "wind", "wind_whistle", "reel_slow", "reel_medium", "reel_fast", "splash_small_1", "splash_small_2", "splash_big",
-  "whoosh_a", "whoosh_b", "whoosh_c", "clicks", "rope_run", "steps"]; // (and, 17 November: the cast's whoosh, the drag's clicks, the drop net's rope, footsteps on concrete)
+  "whoosh_a", "whoosh_b", "whoosh_c", "clicks", "rope_run", "steps", // (and, 17 November: the cast's whoosh, the drag's clicks, the drop net's rope, footsteps on concrete)
+  "bell_tip", "thunder_a", "thunder_b", "thunder_c", "drops", "swirl", "slaps"]; // (and the rod-tip bell, thunder, a net draining and going in, a fish's tail on the mat)
 export const SOUND_BASE = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/sounds/";
 const XF = 1.5; // seconds two voices of a bed overlap where it comes round
 

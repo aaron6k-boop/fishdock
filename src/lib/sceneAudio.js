@@ -262,6 +262,10 @@ function knock(f, g, d, out = evG, at = 0) {
 // a rod-tip bell: a little brass bell nodding two to four times as the tip pulls down, its partials not quite in tune
 // with each other (as a bell's aren't) and a twin a few hertz off giving it a shimmer
 function bell() {
+  // (a recorded small bell's strike, where it's arrived: struck two to four times as the tip nods, each a hair higher or
+  // lower and quieter, ringing on under the next)
+  const rb = rec && rec.get("bell_tip");
+  if (rb) { const n = 2 + Math.floor(R() * 3), r0 = 0.92 + R() * 0.14; let at = 0; for (let i = 0; i < n; i++) { grain(ac, rb, evG, { at, gain: 0.3 * (1 - i * 0.18) * (0.8 + R() * 0.4), rate: r0 * (1 + (R() - 0.5) * 0.01), fade: 0.001 }); at += 0.1 + R() * 0.12; } return; }
   const n = 2 + Math.floor(R() * 3), f0 = 2300 + R() * 450;
   let at = 0;
   for (let i = 0; i < n; i++) {
@@ -370,6 +374,10 @@ function horn() {
 // further away it's later, lower and softer, with no crack at all
 function thunder(delay = 3, far = 3) {
   const t = ac.currentTime + Math.min(20, delay), near = 1 - Math.min(1, far / 8), out = placed(envG, R() * 1.4 - 0.7), g = 0.05 + 0.12 * near;
+  // (recorded thunder, where it's arrived: a short sharp clap close by, a longer one, a long roll far off; the further
+  // it is the later, quieter and duller, the air taking the top off it)
+  const rt = rec && rec.get(far < 2 ? (R() < 0.5 ? "thunder_a" : "thunder_b") : far < 5 ? (R() < 0.5 ? "thunder_b" : "thunder_c") : "thunder_c");
+  if (rt) { const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 500 + 5500 * near * near; lp.Q.value = 0.5; lp.connect(out); grain(ac, rt, lp, { at: Math.min(20, delay), gain: (0.15 + 0.35 * near) * (0.85 + R() * 0.3), rate: 0.9 + R() * 0.15, fade: 0.05 }); return; }
   if (far < 2) burst(0.25, 1800, g * 1.4, 0.6, true, out, Math.min(20, delay));
   const len = 3 + R() * 3 + far * 0.3, src = ac.createBufferSource(); src.buffer = noiseBuffer(len + 0.5);
   const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 160 + 240 * near; lp.Q.value = 0.7;
@@ -419,14 +427,18 @@ export function play(name, data = null) {
   else if (name === "whoosh") { const w = rec && rec.get(["whoosh_a", "whoosh_b", "whoosh_c"][Math.floor(R() * 3)]); if (w) { grain(ac, w, gearG, { gain: 0.42 * v(), rate: 0.9 + R() * 0.25 }); burst(0.45, 5200, 0.012, 2, true, gearG, 0.15); } else cast(); }
   else if (name === "thunder") thunder(data?.delay, data?.far);
   // water pouring out of the net as it comes up: a run of drips into the sea below, each a little plink, thinning out
+  // the net lifted out, the water running out of its mesh: bursts of many drops, fewer and quieter as it drains
+  else if (name === "drip" && rec && rec.has("drops")) { const db = rec.get("drops"), n = 3 + Math.floor(R() * 3); let at = 0; for (let i = 0; i < n; i++) { grain(ac, db, evG, { at, offset: Math.floor(R() * 4) * 0.7, dur: 0.6, gain: 0.22 * (1 - i / (n + 1)) * v(), rate: 0.9 + R() * 0.25, fade: 0.02 }); at += 0.28 + R() * 0.18 + i * 0.05; } }
   else if (name === "drip") { for (let i = 0; i < 22; i++) { const at = (i * 80 + R() * 70) / 1000 + (i > 12 ? (i - 12) * 0.06 : 0); bubble(1100 + R() * 2400, 0.06 * (1 - i / 26) * (0.6 + R() * 0.6), at); if (R() < 0.35) burst(0.03, 3000 + R() * 2000, 0.012, 2, true, evG, at); } }
+  else if (name === "net" && rec && rec.has("swirl")) { grain(ac, rec.get("swirl"), evG, { gain: 0.38 * v(), rate: 0.85 + R() * 0.2, fade: 0.01 }); burst(0.3, 650 + R() * 150, 0.12 * v(), 0.6); } // the net into the water: a recorded swirl as it fills, over a soft slap
   else if (name === "net") { burst(0.35, 650 + R() * 150, 0.24 * v(), 0.6); burst(0.25, 1500, 0.1, 0.8, true, evG, 0.12); burst(0.12, 900, 0.05, 1.5, true, gearG, 0.05); bubbles(14, 600, 3400, 0.07, 0.6, 0.06); }
-  else if (name === "reelOn") { clearInterval(reelTimer); reelTimer = setInterval(() => click(0, 0.08), 62 + R() * 20); setTimeout(() => { clearInterval(reelTimer); reelTimer = null; }, 2500); } // (a friend's reel: the first run, not a loop for the whole fight)
+  else if (name === "reelOn") { clearInterval(reelTimer); reelTimer = setInterval(() => { const cb = rec && rec.get("clicks"); if (cb) grain(ac, cb, gearG, { offset: Math.floor(R() * 16) * 0.1, dur: 0.045, gain: 0.1, rate: 1.3 + R() * 0.2, fade: 0.002 }); else click(0, 0.08); }, 62 + R() * 20); setTimeout(() => { clearInterval(reelTimer); reelTimer = null; }, 2500); } // (a friend's reel: the first run, not a loop for the whole fight)
   else if (name === "swish") { const w = rec && rec.get(R() < 0.5 ? "whoosh_a" : "whoosh_b"); if (w) grain(ac, w, gearG, { gain: 0.26 * v(), rate: 1.1 + R() * 0.2 }); else burst(0.2 + R() * 0.05, 1600 + R() * 300, 0.15 * v(), 0.5, false, gearG); } // the rod swept up on the strike
   else if (name === "step" || name === "stepRun") step({ hard: name === "stepRun" ? 0.9 : 0.6, ...(data || {}) });
   else if (name === "rope" && rec && rec.has("rope_run")) { const rr = rec.get("rope_run"), d = 0.3 + R() * 0.2; grain(ac, rr, gearG, { offset: R() * (rr.duration - d - 0.05), dur: d, gain: 0.3 * v(), rate: 0.9 + R() * 0.2, fade: 0.03 }); } // (a recorded rope run through the hands, a different stretch of it each pull)
   else if (name === "rope") { const d = 0.26 + R() * 0.14; burst(d, 1300 + R() * 500, 0.05, 0.9, true, gearG); burst(0.06, 600, 0.05, 1.2, false, evG, d * 0.9); } // the rope drawn through the hands, then gripped
   else if (name === "mat") { burst(0.12, 240 + R() * 50, 0.26 * v(), 0.9); burst(0.08, 1800, 0.05, 1, true); } // the fish laid on the wet mat
+  else if (name === "flap" && rec && rec.has("slaps")) { const sb = rec.get("slaps"), n = 1 + Math.floor(R() * 3); for (let i = 0; i < n; i++) grain(ac, sb, evG, { at: i * (0.08 + R() * 0.07), offset: Math.floor(R() * 12) * 0.3, dur: 0.25, gain: 0.2 * (1 - i * 0.25) * v(), rate: 0.75 + R() * 0.2, fade: 0.002 }); } // (recorded slaps, made duller: its tail on the wet mat)
   else if (name === "flap") { const n = 1 + Math.floor(R() * 3); for (let i = 0; i < n; i++) { const at = i * (0.08 + R() * 0.07), g = 0.11 * (1 - i * 0.25) * v(); burst(0.06, 850 + R() * 400, g, 1.3, false, evG, at); burst(0.03, 2600, g * 0.25, 1.5, true, evG, at); } } // a flick or two of its tail on the wet mat
   else if (name === "reelOff") { clearInterval(reelTimer); reelTimer = null; }
   else if (name === "reelTap") {

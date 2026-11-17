@@ -52,9 +52,17 @@ function tube(a, b, r0, r1 = r0, seg = 10, open = false) {
   const q = new THREE.Quaternion().setFromUnitVectors(Y, d.multiplyScalar(1 / len));
   return g.applyMatrix4(new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), q, V(1, 1, 1)));
 }
+// half a torus, the U, with its two ends rounded off. (Until 17 November the ends were left open: from most places you
+// saw into the tube past its own back faces, and the two Us of each rest head, one inside the other, showed against the
+// sea as black torn shapes with ragged points rather than a rubber U)
+function roundedU(R, r) {
+  const g = new THREE.TorusGeometry(R, r, 12, 28, Math.PI); g.rotateZ(Math.PI);
+  const ends = [-1, 1].map((s) => new THREE.SphereGeometry(r, 14, 10).translate(s * R, 0, 0));
+  return mergeGeometries([g, ...ends]);
+}
 function cradle(at, P) {
   // a U of rubber the rod lies in, square to the rod, its inside resting on the rod's underside
-  const { cradleR: R, cradleT: r } = TRIPOD, g = new THREE.TorusGeometry(R, r, 8, 20, Math.PI); g.rotateZ(Math.PI);
+  const { cradleR: R, cradleT: r } = TRIPOD, g = roundedU(R, r);
   // (the torus lies in its own x-y plane, the half drawn below its middle: x across the rod, y the open side, z along it)
   const x = new THREE.Vector3().crossVectors(P.open, P.dir).normalize();
   const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, P.open, P.dir));
@@ -69,7 +77,7 @@ function cup(at, dir) {
 // a rest head's rubber is thicker than the U the rod lies in: a rim round its outside, the same shape, wider and further
 // out (never nearer the rod than the U itself)
 function outerU(at, P) {
-  const { cradleR: R, cradleT: r } = TRIPOD, g = new THREE.TorusGeometry(R + 0.006, r + 0.004, 8, 20, Math.PI); g.rotateZ(Math.PI);
+  const { cradleR: R, cradleT: r } = TRIPOD, g = roundedU(R + 0.006, r + 0.004);
   const x = new THREE.Vector3().crossVectors(P.open, P.dir).normalize();
   const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, P.open, P.dir));
   return g.applyMatrix4(new THREE.Matrix4().compose(at.clone().addScaledVector(P.open, R - r - P.rodR), q, V(1, 1, 1)));
@@ -91,7 +99,7 @@ const materials = () => (mats ||= {
   // legs hinge from, rubber feet, a chunky rubber rest head on each post and flared butt cups)
   metal: new THREE.MeshStandardMaterial({ color: 0xc9cdd2, metalness: 0.9, roughness: 0.3 }), // (anodised aluminium, satin)
   black: new THREE.MeshStandardMaterial({ color: 0x17191c, metalness: 0.05, roughness: 0.5 }), // (moulded plastic: the clamps, caps and cups)
-  rubber: new THREE.MeshStandardMaterial({ color: 0x0d0e0f, metalness: 0, roughness: 0.9 }), // (the rest heads and the feet)
+  rubber: new THREE.MeshStandardMaterial({ color: 0x2a2b2d, metalness: 0, roughness: 0.78 }), // (the rest heads and the feet: black rubber, which is a dark grey with a soft sheen, not the near-black 0x0d0e0f it was, which drew the heads as flat silhouettes)
   cast: new THREE.MeshStandardMaterial({ color: 0x3a3d42, metalness: 0.65, roughness: 0.45 }), // (the head's cast body)
   trim: new THREE.MeshStandardMaterial({ color: 0xb3202a, metalness: 0.6, roughness: 0.35 }), // (a red anodised ring at each clamp)
 });
