@@ -22,6 +22,7 @@ import { TEX_BASE } from "./textures3d.js";
 import { RIG } from "./fpRigData.js";
 import { clothe } from "./fabric.js";
 import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "./fpIk.js";
+import { FILM } from "./film.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const A3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
@@ -404,8 +405,13 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     RIG.grips.forEach((name, k) => { grips[name] = { L: new Map(), R: new Map() }; for (const S of "LR") for (const n of fingerBones[S]) { const v = clips.grips?.value((k + 1) / RIG.fps, n); if (v) grips[name][S].set(n, new THREE.Quaternion().fromArray(v)); } });
     // (the right middle finger on the reel seat opened 0.15 radians at its two outer joints: as Blender left it, the pad
     // of its tip was a millimetre into the side of the reel's foot, under the seat, and the tip seemed to come out
-    // through the reel. Aaron's screenshot, 16 November. Measured in the game: no point of it inside the reel after)
+    // through the reel. Aaron's screenshot, 16 November. Measured in the game: no point of it inside the reel after.
+    // And turned in a quarter radian at its knuckle, towards the index finger: wrapped under the foot, its tip still
+    // showed past the rod on the reel's side, a fingertip on its own by the reel's stem that read as poking through it
+    // (his second screenshot, 17 November). Turned in, it lies behind the rod from your eye, and nothing of it is inside
+    // the reel or the handle)
     for (const n of ["DEF-f_middle02R", "DEF-f_middle03R"]) grips.hold?.R.get(n)?.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -0.15));
+    grips.hold?.R.get("DEF-f_middle01R")?.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), -0.25));
     // the hold, as Blender left it: each arm's bones' lengths, which way its elbow bends and the forearm's twist at rest
     clips.hold.apply(1 / RIG.fps); scene.updateMatrixWorld(true);
     const wp = (b) => b.getWorldPosition(V()), wq = (b) => b.getWorldQuaternion(new THREE.Quaternion());
@@ -737,6 +743,9 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         // the fingers, curled for the grip
         const G = R.grips[want.grip]?.[S] || R.grips.relax?.[S]; h.fing ||= new Map();
         if (G) for (const [n, q] of G) { const b = R.bones.get(n); if (!b) continue; const f = h.fingFrom?.get(n); const qq = f && e < 1 ? f.clone().slerp(q, e) : q; b.quaternion.copy(qq); h.fing.set(n, qq.clone()); }
+        // (film only: a finger's joints turned further, about each bone's own x, y, z, for trying a grip by eye)
+        const tweak = FILM && typeof window !== "undefined" ? window.__fdFingerTweak : null;
+        if (tweak) for (const [n, a] of Object.entries(tweak)) { const b = R.bones.get(n); if (b && n.endsWith(S)) b.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(a[0], a[1], a[2]))); }
         A.H.updateMatrixWorld(true);
         // (and kept out of what they're round: the reel seat's lock nut, its trims and the grips; the reel's knob. Worked
         // out again only when the hand moves on it: held still, as it is on the seat while you wait, last frame's answer
@@ -746,7 +755,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
           const crank = spec.kind === "crank", key = crank ? `k${Math.round((want.th || 0) / 4)}` : "seat";
           if (h.clears?.prof !== spec.prof) { h.clears = new Map(); h.clears.prof = spec.prof; }
           const c = h.clears.get(key);
-          if (c && h.u >= 1 && c.p.distanceTo(rp) < (crank ? 0.0015 : 2e-4) && c.q.angleTo(rq) < (crank ? 0.04 : 0.005)) { for (const [b, q] of c.qs) b.quaternion.copy(q); A.H.updateMatrixWorld(true); h.lift = c.lift; }
+          if (c && !tweak && h.u >= 1 && c.p.distanceTo(rp) < (crank ? 0.0015 : 2e-4) && c.q.angleTo(rq) < (crank ? 0.04 : 0.005)) { for (const [b, q] of c.qs) b.quaternion.copy(q); A.H.updateMatrixWorld(true); h.lift = c.lift; }
           else { h.lift = clearFingers(R.fingers[S], spec, Mg, qg); if (h.u >= 1) h.clears.set(key, { p: rp, q: rq, lift: h.lift, qs: R.fingers[S].flatMap((segs) => segs.map(({ b }) => [b, b.quaternion.clone()])) }); }
         } else h.lift = 0;
         h.wrist = group.worldToLocal(A.H.getWorldPosition(V()));
