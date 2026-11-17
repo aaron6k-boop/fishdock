@@ -186,7 +186,13 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    and a few tens of pixels across. **Changed** (`realPlace.js` `ARMOUR_LOD`, `source-assets/blender/build_armour.py`):
    a middling 600-triangle version of each stone, made in Blender like the others; the fine stone only within 20 m of
    you, the middling to 60 m, the 300-triangle one beyond, each casting shadows while inside their reach. Filmed from
-   10, 28, 45 and 90 m. RESULTS_22
+   10, 28, 45 and 90 m: no visible change. Measured on Aaron's PC (the two ways in turn on one run, three and two
+   times, Ultra, 3D view full screen): triangles a frame 6.65 million down to 2.5 million; the frame rate within the
+   run's own spread either way (1080p 67 to 77 fps with the bands, 80 to 82 without; 1440p 66 to 81 and 78 to 79; the
+   graphics card 10.9 to 12.9 ms a frame either way, the first run at each size the slowest). The RTX 3090 had
+   triangles to spare, so this is for weaker graphics cards (laptops, High on a modest card), not a faster frame on his.
+   His graphics card was 22 to 36% busy with other work all evening (the run waited 28 minutes for it to go idle), so
+   these frame rates don't compare with item 20's.
 
 ## What is left, in order of what it would add
 
@@ -194,15 +200,21 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    the custom shaders would let it keep more of last frame on moving things (it holds them to this frame instead).
 2. KTX2 textures, and with them the 2K texture sets the PC launcher could carry (`docs/PC-ARCHITECTURE.md` section 4).
 3. The town: it is shown by photographs, as Aaron chose (10 November); modelled buildings would need his say.
-4. Frame rates at 4K on Aaron's PC. Done for 1080p and 1440p (17 November, the live game after #151, Microsoft Edge
-   with its 3D view full screen, RTX 3090, Direct3D 11; average frames a second and GPU milliseconds a frame):
+4. Clean frame rates on Aaron's PC. The live game after #153, measured with its own benchmark at three window sizes on
+   17 November at 19:08 (Microsoft Edge, headless, its 3D view full screen; RTX 3090, Direct3D 11): average frames a
+   second, the slowest 1% of frames, and the graphics card's milliseconds a frame:
 
-   | Preset | 1920 by 1080 | drawn at | 2560 by 1440 | drawn at |
-   |---|---|---|---|---|
-   | Low | 273 fps, 1.6 ms | 1920 by 1080 | 272 fps, 1.6 ms | 2560 by 1440 |
-   | Medium | 200 fps, 4.7 ms | 1920 by 1080 | 202 fps, 5.1 ms | 2560 by 1440 |
-   | High | 144 fps, 6.7 ms | 3360 by 1890 | 110 fps, 8.9 ms | 4480 by 2520 |
-   | Ultra | 117 fps, 8.5 ms | 3840 by 2160 | 74 fps, 13.5 ms | 5120 by 2880 |
+   | Preset | 1896 by 988 | 2536 by 1348 | 3816 by 2068 |
+   |---|---|---|---|
+   | Low | 108 fps, 1% 51, 3.8 ms | 94, 50, 3.7 ms | 105, 51, 4.0 ms |
+   | Medium | 111, 52, 6.0 ms | 111, 50, 7.3 ms | 99, 49, 8.9 ms |
+   | High | 79, 47, 8.6 ms | 96, 47, 8.7 ms | 73, 41, 10.0 ms |
+   | Ultra | 82, 43, 10.6 ms | 74, 38, 12.2 ms | 84, 49, 11.4 ms |
 
-   High and Ultra draw at up to twice the window's size and scale it down (supersampling); the slowest 1% of frames
-   on Ultra at 1440p ran at 47 fps. Headless, so no monitor's refresh rate capped them.
+   Ultra draws at most 3840 by 2160 at every size (the pixel budget), so its rows are much alike. The graphics card was
+   already 22 to 32% busy with other work before each size, and Low and Medium sat at about 118 frames a second
+   whatever their load (frames 8.5 ms apart), so these are what the game managed beside that work, not clean figures:
+   on the same PC at 17:24 (item 20), Ultra ran 95 fps at 1080p and 83 at 1440p. The figures after
+   #151 (117 fps on Ultra at 1080p, 74 at 1440p) came before #153's pixel budget, temporal antialiasing and half-size
+   shade, so they don't compare directly either. A clean run waits for the graphics card to be idle
+   (`FishDock-assets/queue`, h005).
