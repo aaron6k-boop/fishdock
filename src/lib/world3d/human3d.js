@@ -423,15 +423,15 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   }
   // wellies: a shaft round each calf up to just below the knee, a moulded boot over the foot
   if (L.boots > 0) {
-    const wm = new THREE.MeshStandardMaterial({ color: FOOTWEAR[L.boots].hex, roughness: 0.4 }); extraMats.push(wm);
+    const wm = new THREE.MeshStandardMaterial({ color: FOOTWEAR[L.boots].hex, roughness: 0.42, side: THREE.DoubleSide }); extraMats.push(wm); // (both sides: looking down into the top, the boot's inside, not through it)
     const sole = new THREE.MeshStandardMaterial({ color: 0x16181a, roughness: 0.9 }); extraMats.push(sole);
     for (const s of ["L", "R"]) {
       const kn = restAt(s + "_Calf"), an = restAt(s + "_Foot"), toe = restAt(s + "_Toe0");
       const dir = an.clone().sub(kn), len = dir.length(); dir.normalize();
       const top = kn.clone().addScaledVector(dir, len * 0.2), r = bounds.calf[s] + 0.014, shaftLen = an.y < top.y ? (top.y - 0.06) / Math.max(0.5, -dir.y) : len * 0.7;
-      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 0.84, shaftLen, 18, 1, true), wm);
+      const shaft = new THREE.Mesh(wellyShaft(r, shaftLen), wm);
       shaft.position.copy(top).addScaledVector(dir, shaftLen / 2); shaft.quaternion.setFromUnitVectors(V(0, 1, 0), dir.clone().negate());
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 1.04, 0.006, 6, 20), wm); rim.position.copy(top); rim.quaternion.copy(shaft.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI / 2));
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(r * 1.06, 0.0075, 8, 28), wm); rim.position.copy(top); rim.quaternion.copy(shaft.quaternion).multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI / 2));
       const sg = new THREE.Group(); sg.add(shaft, rim); attach(s + "_Calf", sg);
       // the foot: from behind the heel to past the toes, on the ground
       const heelZ = an.z + 0.078, tipZ = toe.z - 0.072, cx = (an.x + toe.x) / 2 + (s === "L" ? 0 : 0); // (long enough to cover the shoe underneath: its toe showed through)
@@ -981,6 +981,22 @@ function strap(curve, outward, w, d) {
 // a box with well-rounded edges (a superellipsoid), 2 units across
 // ---- a welly's foot: lofted along the foot from heel to toe, in the figure's own space (x across, y up, -z forwards) ----
 // (sole: the thin dark sole under it, the same outline a touch larger, flat on the ground)
+// a welly's leg (17 November): shaped down the calf as a moulded boot is, a little flared at its top, full over the calf
+// and narrowing to the ankle, with a raised band near its top and its inside showing (it was a straight cone, wider at
+// the top than the calf, an open bucket on each leg). Its own y from +len/2 (the top) to -len/2
+function wellyShaft(r, len) {
+  const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const pts = [];
+  for (let i = 0; i <= 24; i++) {
+    const t = 1 - i / 24; // (from the foot up: the lathe's faces then face out)
+    const k = 1.06 - 0.06 * sm(0, 0.1, t) + 0.025 * Math.sin(Math.PI * Math.min(1, Math.max(0, (t - 0.08) / 0.45))) - 0.19 * sm(0.42, 0.97, t) + 0.012 * Math.exp(-(((t - 0.12) / 0.012) ** 2));
+    pts.push(new THREE.Vector2(r * k, len / 2 - t * len));
+  }
+  const g = new THREE.LatheGeometry(pts, 28);
+  // (a calf is deeper front to back than across: the boot follows it a little)
+  const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, p.getZ(i) * 1.06);
+  g.computeVertexNormals(); return g;
+}
 function wellyFoot(cx, heelZ, tipZ, W, H, sole = false) {
   const K = 18, M = 16, pos = [], idx = [], len = heelZ - tipZ;
   const sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };

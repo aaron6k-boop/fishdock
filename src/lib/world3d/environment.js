@@ -30,6 +30,9 @@ float hash(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p + 45.32); r
 float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3. - 2.*f);
   return mix(mix(hash(i), hash(i + vec2(1., 0.)), u.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), u.x), u.y); }
 float fbm(vec2 p){ float s = 0., a = .5; for (int i = 0; i < 5; i++){ s += a*noise(p); p = p*2.03 + 17.1; a *= .5; } return s; }
+// a highlight pow(c, n) widened to at least sv, the spread of directions across one pixel, and dimmed as it widens so
+// it sends the same light (a lobe of exponent n is about sqrt(2 / n) wide)
+float fdSpec(float c, float n, float sv){ float m = 1./(1./n + .9*sv*sv); return pow(c, m)*(m/n); }
 float fbm3(vec2 p){ float s = 0., a = .5; for (int i = 0; i < 3; i++){ s += a*noise(p); p = p*2.03 + 17.1; a *= .5; } return s*1.14; }
 // value noise and its slope (x: value, yz: d/dx, d/dy), for the water's fine ripples without extra samples
 vec3 noised(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3. - 2.*f), du = 6.*f*(1. - f);
@@ -447,6 +450,12 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         n = normalize(n);
         // ---- colour: the sky mirrored, the water's own colour seen through it ----
         vec3 rd = reflect(-v, n); rd.y = abs(rd.y);
+        // (specular antialiasing, 17 November: how far the reflected ray turns across this one pixel. A sun's glint as
+        // sharp as pow(.., 1400) is narrower than the turn of the ray across a pixel of rippled water, so it lit some
+        // pixels and missed their neighbours, and as the waves and your view moved the sea crawled with flickering
+        // points. Each sharp highlight is widened to at least the pixel's spread of directions and dimmed as much, so
+        // the light it sends stays the same: steady glitter, nothing smeared, nothing carried over from earlier frames)
+        float fdSV = length(fwidth(rd));
         float F = .02 + .98*pow(1. - max(dot(n, v), 0.), 5.);
         vec3 refl = skyReflect(normalize(rd));
         // ---- the scene mirrored (a second, half-size picture from below the water, world.js): the dune, the rocks, the
@@ -516,7 +525,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // there are almost no glints: the spectrum's small facets lit the water under you with white confetti)
         float lean = degrees(acos(clamp(normalize(v + uSunDir).y, 0., 1.))), leanMax = 15. + 10.*clamp(uWind, 0., 1.);
         float canLean = 1. - smoothstep(leanMax, leanMax + 9., lean);
-        col += uFft > .5 ? sunC*(pow(sp, 700.)*1.6*(1. - farR*.6) + pow(sp, mix(150., 28., farR))*mix(.05, .4, farR)*(.4 + .6*uWind))*sunVis*canLean : sunC*(pow(sp, 1400.)*4.*brk + pow(sp, 60.)*.07)*sunVis*canLean;
+        col += uFft > .5 ? sunC*(fdSpec(sp, 700., fdSV)*1.6*(1. - farR*.6) + pow(sp, mix(150., 28., farR))*mix(.05, .4, farR)*(.4 + .6*uWind))*sunVis*canLean : sunC*(fdSpec(sp, 1400., fdSV)*4.*brk + pow(sp, 60.)*.07)*sunVis*canLean;
         // the glitter path: tiny facets of the chop catching the sun, scattered in a broad band towards it, twinkling as
         // the waves move (faded out with distance, where they would be smaller than a pixel and shimmer)
         #if WQ > 0
@@ -531,13 +540,13 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
             // was a round patch a quarter of the sea wide under a low sun)
             float az = max(dot(normalize(rd.xz + vec2(1e-5)), normalize(uSunDir.xz + vec2(1e-5))), 0.);
             float path = pow(az, 90./(.6 + 1.4*uWind + .6*uSwell))*pow(sp, 5.);
-            col += mix(sunC, vec3(1., .95, .85), .3)*glit*(path*1.3 + pow(sp, 120.)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell)*canLean;
+            col += mix(sunC, vec3(1., .95, .85), .3)*glit*(path*1.3 + fdSpec(sp, 120., fdSV)*4.)*sunVis*(.4 + .6*uWind + .3*uSwell)*canLean;
           }
         #endif
-        float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*pow(mp, 200.)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
+        float mp = max(dot(rd, uMoonDir), 0.); col += vec3(.8, .85, 1.)*fdSpec(mp, 200., fdSV)*1.4*uNight*uMoonLight*(1. - smoothstep(.6, 1., uCloud));
         // lamps on piers and promenades after dark: warm streaks broken up by the waves
         for (int i = 0; i < 4; i++) { vec4 L = uLamps[i]; if (L.w <= 0.) continue; vec3 ld = normalize(L.xyz - vW); float s2 = max(dot(rd, ld), 0.); vec2 o = L.xz - vW.xz; float fall = 1./(1. + dot(o, o)*.003);
-          col += vec3(1., .78, .45)*(pow(s2, 90.)*2.4 + pow(s2, 14.)*.08)*L.w*fall; }
+          col += vec3(1., .78, .45)*(fdSpec(s2, 90., fdSV)*2.4 + pow(s2, 14.)*.08)*L.w*fall; }
         // ---- foam ----
         float sea = uKind < .5 ? 1. : 0.;
         // whitecaps once the wind is up (about force 4): on the higher crests, in patches that come and go, drawn
