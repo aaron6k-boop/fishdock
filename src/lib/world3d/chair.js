@@ -70,8 +70,19 @@ function roundBox(w, h, d, r) {
   }
   g.computeVertexNormals(); return g;
 }
+/** a padded cushion: a rounded box whose face (+y, or -z for a back) is crowned, fullest in the middle, as a stuffed
+ * cushion is (a flat slab with rounded edges read as a moulded board) */
+function pillow(w, h, d, r, bulge, face = "y") {
+  const g = roundBox(w, h, d, r), q = g.attributes.position;
+  for (let i = 0; i < q.count; i++) {
+    const x = q.getX(i) / (w / 2), y = q.getY(i) / (h / 2), z = q.getZ(i) / (d / 2);
+    if (face === "y" && y > 0) q.setY(i, q.getY(i) + bulge * y * Math.max(0, 1 - x * x) * Math.max(0, 1 - z * z));
+    if (face === "-z" && z < 0) q.setZ(i, q.getZ(i) + bulge * z * Math.max(0, 1 - x * x) * Math.max(0, 1 - y * y));
+  }
+  g.computeVertexNormals(); return g;
+}
 /** a tube between two points (radius r) */
-function tube(a, b, r, mat, seg = 10) {
+function tube(a, b, r, mat, seg = 16) {
   const d = b.clone().sub(a), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, d.length(), seg, 1), mat);
   m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); return m;
 }
@@ -93,9 +104,10 @@ export function buildChair() {
   const M = MATS, g = new THREE.Group(); g.name = "chair";
   const { w, d, seat, back, recline } = CHAIR, fy = seat - 0.06; // (the frame under the cushion)
   // the seat: a padded cushion on a rectangle of tube
-  const cush = new THREE.Mesh(roundBox(w, 0.06, d, 0.024), M.cloth); cush.position.set(0, seat - 0.03, 0); g.add(cush);
+  // (16 November: thicker and crowned, a stuffed cushion; its top still at the seat's height)
+  const cush = new THREE.Mesh(pillow(w, 0.075, d, 0.03, 0.012), M.cloth); cush.position.set(0, seat - 0.0495, 0); g.add(cush);
   { const uv = cush.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 1.6); }
-  const pipe = new THREE.Mesh(roundBox(w + 0.006, 0.012, d + 0.006, 0.006), M.edge); pipe.position.set(0, seat - 0.032, 0); g.add(pipe);
+  const pipe = new THREE.Mesh(roundBox(w + 0.008, 0.014, d + 0.008, 0.007), M.edge); pipe.position.set(0, seat - 0.05, 0); g.add(pipe);
   const hx = w / 2 - 0.01, hz = d / 2 - 0.01;
   for (const sx of [-1, 1]) g.add(tube(V(sx * hx, fy, -hz), V(sx * hx, fy, hz), 0.011, M.frame));
   for (const sz of [-1, 1]) g.add(tube(V(-hx, fy, sz * hz), V(hx, fy, sz * hz), 0.011, M.frame));
@@ -116,9 +128,15 @@ export function buildChair() {
     const knuckle = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 12), M.rubber); knuckle.rotation.z = Math.PI / 2; knuckle.position.copy(base(sx)).addScaledVector(up, 0.03); g.add(knuckle); // (the hinge it folds on)
   }
   g.add(tube(base(-1).addScaledVector(up, back + 0.04), base(1).addScaledVector(up, back + 0.04), 0.011, M.frame));
-  const bc = new THREE.Mesh(roundBox(w - 0.02, back - 0.04, 0.055, 0.022), M.cloth);
+  const bc = new THREE.Mesh(pillow(w - 0.02, back - 0.04, 0.07, 0.028, 0.014, "-z"), M.cloth);
   bc.position.copy(V(0, fy, hz - 0.012)).addScaledVector(up, 0.04 + (back - 0.04) / 2); bc.rotation.x = recline; g.add(bc);
   { const uv = bc.geometry.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 2.2); }
+  // padded arms either side, on two short posts from the seat's frame, as a levelling chair's are
+  for (const sx of [-1, 1]) {
+    const ax = sx * (hx + 0.035), ay = seat + 0.16;
+    for (const z of [-hz + 0.06, hz - 0.1]) { g.add(tube(V(sx * hx, fy, z), V(ax, ay - 0.012, z), 0.0095, M.frame)); }
+    const arm = new THREE.Mesh(pillow(0.06, 0.035, d * 0.78, 0.016, 0.006), M.edge); arm.position.set(ax, ay, -0.02); g.add(arm);
+  }
   // (drawn as one mesh per finish, five in all: built from 32 parts, it cost 32 draws a chair, 40 more a frame with
   // its shadows)
   g.updateMatrixWorld(true);

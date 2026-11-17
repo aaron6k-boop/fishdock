@@ -980,7 +980,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       if (o.bloom != null) { G.bloom = o.bloom ? 1 : 0; post.setBloom(!!G.bloom); }
       if (o.aa != null) { G.aa = o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(G.aa); }
       if (o.sharp != null) { G.sharp = Math.max(0, Math.min(1, +o.sharp || 0)); post.setSharp(G.sharp); }
-      if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer); }
+      if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer, { bigOnly: Q.q < 2 }); } // (Medium: the big things only, environment.js)
       if (o.sea != null) G.sea = env.setFftSea(!!o.sea, renderer) ? 1 : 0; // (the spectrum sea: Settings, or Ultra's default)
     }
     const sun = env.sun;
@@ -996,6 +996,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       const c = sun.shadow.camera, d = G.shadowDist; if (c.right !== d) { Object.assign(c, { left: -d, right: d, top: d, bottom: -d, far: Math.max(160, d * 3) }); c.updateProjectionMatrix(); }
       // (the map's texels grow with the box: the biases grow with them, or the wider boxes show acne on the deck)
       sun.shadow.normalBias = 0.02 * Math.max(1, d / 30) * (G.shadows === 2 ? 0.6 : 1); sun.shadow.bias = -0.0005 * Math.max(1, d / 45);
+      // the near shadow map (sunShade.js): a computer's screen, the High shadow detail, and shadows reaching 45 m or more,
+      // where one map's pixels are 2 cm and more across: a second, 1.3 cm map over the 26 m round you. (three makes every
+      // lit material again for the extra light, once)
+      env.setNearShadow?.(G.shadows === 2 && G.shadowDist >= 45 && !phoneScreen());
       if (!!was !== !!G.shadows) {
         renderer.shadowMap.enabled = !!G.shadows; sun.castShadow = !!G.shadows;
         if (G.shadows) Object.assign(sun.shadow, { bias: -0.0005, normalBias: 0.02 });

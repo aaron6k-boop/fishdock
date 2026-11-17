@@ -58,7 +58,7 @@ function segIndex(segs, cell = 8) {
 // Wet (rain) darkens it and makes it shine. Until the photographs have loaded (or if they can't) the drawn one shows.
 export const PIER_TEX = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/pier_concrete_"; // (__fdAssetBase: only a self-contained preview page sets it, its files beside it; the app leaves it unset)
 const PHOTO_TILE = 8 / 2.5; // the deck's uv runs one unit per 8 m
-function pierConcrete(mat, quality = 1, axis = 0) {
+function pierConcrete(mat, quality = 1, axis = 0, shade = null) {
   const wet = { value: 0, clock: { value: 0 }, rain: { value: 0 } }; // (clock: seconds, and rain: how hard it is raining, for the rain's rings in the puddles; environment.js keeps them)
   if (typeof document === "undefined") return wet;
   const tl = new THREE.TextureLoader(), get = (n, srgb) => tl.loadAsync(PIER_TEX + n + ".jpg").then((t) => {
@@ -122,8 +122,19 @@ function pierConcrete(mat, quality = 1, axis = 0) {
         roughnessFactor = ${wetRough("mix(0.7, 1.0, roughnessFactor) * (1.0 - fdWorn * 0.18) * (1.0 - fdDamp * 0.35)")}; // (wetLook.js)`)
         .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
         ${WET_NORMAL}`);
+      // the contact shade baked round what stands on the deck (contactShade below): the sky's light and its reflection
+      // taken down where a building, a bench, a lamp or a post meets the concrete, the sun's a little
+      if (shade) {
+        sh.uniforms.fdAO = shade.tex; sh.uniforms.fdAOBox = shade.box; sh.uniforms.fdAOK = shade.k;
+        sh.fragmentShader = "uniform sampler2D fdAO;\nuniform vec4 fdAOBox;\nuniform float fdAOK;\n" + sh.fragmentShader.replace("#include <aomap_fragment>", `#include <aomap_fragment>
+        { vec2 aq = (vMapUv * 8.0 - fdAOBox.xy) / fdAOBox.zw;
+          if (fdAOK > 0.0 && aq.x > 0.0 && aq.y > 0.0 && aq.x < 1.0 && aq.y < 1.0) {
+            float ao = 1.0 - fdAOK * texture2D(fdAO, aq).r;
+            reflectedLight.indirectDiffuse *= ao; reflectedLight.indirectSpecular *= ao; reflectedLight.directDiffuse *= mix(1.0, ao, 0.4);
+          } }`);
+      }
     };
-    mat.customProgramCacheKey = () => "fdpier7" + (quality < 1 ? "p" : quality < 2 ? "b" : "");
+    mat.customProgramCacheKey = () => "fdpier8" + (quality < 1 ? "p" : quality < 2 ? "b" : "") + (shade ? "s" : "");
     mat.needsUpdate = true;
   }).catch(() => {});
   return wet;
@@ -292,6 +303,46 @@ export function splitByDistance(points, x, z, near2) {
 export const PLACED_APART = 3;
 export function farFromAll(list, x, z, iz = 1, min = PLACED_APART) { return list.every((p) => Math.hypot(p[0] - x, p[iz] - z) >= min); }
 
+/**
+ * The contact shade round what stands on a deck, as a map: 1 where something meets the ground, fading over about 40 cm.
+ * rings: footprints ([[x, z]...]); discs: [x, z, radius, weight]; rects: [x, z, turn, half-length, half-width, weight]
+ * (turn as a bench's: atan2 of the way it faces). A square `size` metres across round (cx, cz), `mpp` metres a pixel.
+ * Returns { tex (a one-channel texture, or null with no three.js canvas), data, n, x0, z0, size } or null.
+ */
+export function contactShade({ cx, cz, size = 140, mpp = 0.1, rings = [], discs = [], rects = [] }) {
+  const n = Math.round(size / mpp), x0 = cx - size / 2, z0 = cz - size / 2, occ = new Float32Array(n * n);
+  const px = (x) => (x - x0) / mpp - 0.5, pz = (z) => (z - z0) / mpp - 0.5;
+  const put = (i, j, w) => { if (i >= 0 && j >= 0 && i < n && j < n) { const k = j * n + i; if (occ[k] < w) occ[k] = w; } };
+  for (const ring of rings) {
+    if (!ring || ring.length < 3) continue;
+    let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity; for (const [x, z] of ring) { i0 = Math.min(i0, px(x)); i1 = Math.max(i1, px(x)); j0 = Math.min(j0, pz(z)); j1 = Math.max(j1, pz(z)); }
+    for (let j = Math.max(0, Math.floor(j0)); j <= Math.min(n - 1, Math.ceil(j1)); j++) for (let i = Math.max(0, Math.floor(i0)); i <= Math.min(n - 1, Math.ceil(i1)); i++) {
+      const x = x0 + (i + 0.5) * mpp, z = z0 + (j + 0.5) * mpp; let c = false;
+      for (let a = 0, b = ring.length - 1; a < ring.length; b = a++) { const [xa, za] = ring[a], [xb, zb] = ring[b]; if ((za > z) !== (zb > z) && x < ((xb - xa) * (z - za)) / (zb - za) + xa) c = !c; }
+      if (c) put(i, j, 1);
+    }
+  }
+  for (const [x, z, r, w] of discs) { const R = r / mpp + 0.5; for (let j = Math.floor(pz(z) - R); j <= Math.ceil(pz(z) + R); j++) for (let i = Math.floor(px(x) - R); i <= Math.ceil(px(x) + R); i++) if (Math.hypot(i - px(x), j - pz(z)) <= R) put(i, j, w); }
+  for (const [x, z, ry, hl, hw, w] of rects) {
+    const tx = Math.cos(ry), tz = -Math.sin(ry), nx = Math.sin(ry), nz = Math.cos(ry), R = Math.hypot(hl, hw) / mpp + 1;
+    for (let j = Math.floor(pz(z) - R); j <= Math.ceil(pz(z) + R); j++) for (let i = Math.floor(px(x) - R); i <= Math.ceil(px(x) + R); i++) {
+      const dx = x0 + (i + 0.5) * mpp - x, dz = z0 + (j + 0.5) * mpp - z;
+      if (Math.abs(dx * tx + dz * tz) <= hl && Math.abs(dx * nx + dz * nz) <= hw) put(i, j, w);
+    }
+  }
+  // spread: three box blurs of 3 pixels each way (about a gaussian of 30 cm), then shaped so the shade is deepest at
+  // the foot and fades smoothly
+  const tmp = new Float32Array(n * n), R = 3;
+  const pass = (src, dst, horiz) => { for (let a = 0; a < n; a++) { let s = 0; const at = (b) => (horiz ? a * n + Math.min(n - 1, Math.max(0, b)) : Math.min(n - 1, Math.max(0, b)) * n + a);
+    for (let b = -R; b <= R; b++) s += src[at(b)];
+    for (let b = 0; b < n; b++) { dst[horiz ? a * n + b : b * n + a] = s / (2 * R + 1); s += src[at(b + R + 1)] - src[at(b - R)]; } } };
+  for (let k = 0; k < 3; k++) { pass(occ, tmp, true); pass(tmp, occ, false); }
+  const data = new Uint8Array(n * n); for (let k = 0; k < n * n; k++) { const v = Math.min(1, occ[k] / 0.55); data[k] = Math.round(255 * v * v * (3 - 2 * v)); }
+  let tex = null;
+  if (typeof document !== "undefined") { tex = new THREE.DataTexture(data, n, n, THREE.RedFormat, THREE.UnsignedByteType); tex.flipY = false; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true; tex.needsUpdate = true; }
+  return { tex, data, n, x0, z0, size };
+}
+
 export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const local = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
   const fenceKind = (x, z, nx, nz) => (local?.fence ? local.fence(x, z, nx, nz) : "rail");
@@ -450,7 +501,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // the pier's own direction (its longest run of wall near the fishing spots), for the deck's slab joints: square across
   // it, not across the map's north and south
   let axis = 0; { let best = 0; for (const e of walls) { const L = Math.hypot(e[2] - e[0], e[3] - e[1]), mx = (e[0] + e[2]) / 2, mz = (e[1] + e[3]) / 2; const near = spots.length ? Math.min(...spots.map((sp) => Math.hypot(mx - sp.at[0], mz - sp.at[2]))) : 0; const w = L / (1 + near / 60); if (w > best) { best = w; axis = Math.atan2(e[3] - e[1], e[2] - e[0]); } } }
-  place.deckWet = pierConcrete(deckMat, quality, axis);
+  const deckShade = { tex: { value: null }, box: { value: new THREE.Vector4(0, 0, 1, 1) }, k: { value: 0 } }; // (filled in once everything on the deck is placed: contactShade)
+  place.deckWet = pierConcrete(deckMat, quality, axis, deckShade);
   const softMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: dTex.map, normalMap: dTex.normalMap, roughness: 1 });
   // the cliff's face and the dune: a photographed patch of rough coastal ground (Poly Haven coast_sand_rocks_02, CC0:
   // scrub, bare earth and stones) at about 6 m a tile, coloured by the ground's own tint (green on the cliff, sandy
@@ -924,6 +976,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
 
   // ---- buildings ----
 
+  const aoRings = []; // (every building's footprint, for the contact shade on the deck)
   const backs = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null /* (__fdNoBackdrop: a measuring switch, for comparing the scene with and without it) */, mid = (b) => { let x = 0, z = 0; for (const [px, pz] of b.ring) { x += px; z += pz; } return [x / b.ring.length, z / b.ring.length]; };
   const behindBackdrop = (b) => { if (!backs) return false; const [x, z] = mid(b); return backdropCovers(backs, x, z); };
   // a mark's own landmark buildings, built from photographs (localDetail.js), in place of the generic style
@@ -933,7 +986,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (const m of lm.meshes) { m.userData.kind = "a building"; targets.push(m); }
     place.buildingGlow = [...(place.buildingGlow || []), ...lm.glow];
     if (lm.flash) beacons.push(lm.flash);
-    const c = lm.collider, cbp = [], cbi = [];
+    const c = lm.collider, cbp = [], cbi = []; aoRings.push(c.ring);
     for (let k = 0; k < c.ring.length; k++) { const [x1, z1] = c.ring[k], [x2, z2] = c.ring[(k + 1) % c.ring.length], o = cbp.length / 3; cbp.push(x1, c.base, z1, x2, c.base, z2, x2, c.top, z2, x1, c.top, z1); cbi.push(o, o + 2, o + 1, o, o + 3, o + 2); }
     solids.push(collider(cbp, cbi));
   }
@@ -953,6 +1006,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   setTownStyle(null);
   place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; for (const m of res.meshes) m.userData.kind = "a building"; targets.push(...res.meshes);
   for (const c of res.colliders) {
+    aoRings.push(c.ring);
     const cbp = [], cbi = [];
     for (let k = 0; k < c.ring.length; k++) { const [x1, z1] = c.ring[k], [x2, z2] = c.ring[(k + 1) % c.ring.length], o = cbp.length / 3; cbp.push(x1, c.base, z1, x2, c.base, z2, x2, c.top, z2, x1, c.top, z1); cbi.push(o, o + 2, o + 1, o, o + 3, o + 2); }
     solids.push(collider(cbp, cbi));
@@ -1064,6 +1118,25 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       return { at: [x, y, z], face: Math.atan2(nx, -nz), edge: Math.max(0.3, e.d), cast: 26 };
     },
   };
+  // ---- the contact shade on the deck: where a building, a bench, a lamp or a post meets the concrete ----
+  // (16 November, from "like PS2 graphics": on Medium there was no shade where things meet the ground, so the lookout,
+  // the benches and the lamp posts stood on the deck as if pasted on. High's ambient occlusion pass does this every
+  // frame; here it is worked out once, as the place is built, into a map 10 cm a pixel over the 140 m round the spots,
+  // and the deck's shader reads it: one look-up a pixel)
+  if (spots.length) {
+    const cx = spots.reduce((a, q) => a + q.at[0], 0) / spots.length, cz = spots.reduce((a, q) => a + q.at[2], 0) / spots.length;
+    const discs = [];
+    // (a thin post's shade is its base plate's and a little round it: drawn as its own few pixels it all but vanished in
+    // the spread)
+    for (const [x, , z] of props.lamp) discs.push([x, z, 0.2, 0.9]);
+    for (const [x, , z] of props.station) discs.push([x, z, 0.18, 0.8]);
+    for (const [x, , z] of props.bollard) discs.push([x, z, 0.26, 0.9]);
+    for (const [x, z] of columns) discs.push([x, z, 0.2, 0.9]);
+    for (const [x, z] of posts) discs.push([x, z, 0.13, 0.85]);
+    const rects = props.bench.map(([x, , z, ry]) => [x, z, ry, 0.85, 0.24, 0.5]);
+    const sh = contactShade({ cx, cz, size: 140, mpp: 0.1, rings: aoRings, discs, rects });
+    if (sh) { deckShade.tex.value = sh.tex; deckShade.box.value.set(sh.x0, sh.z0, sh.size, sh.size); deckShade.k.value = quality >= 2 ? 0.38 : 0.65; place.deckShade = sh; }
+  }
   // ---- trees and scrub on the grass and the cliff's bank (trees3d.js): not on a road, a building or near a spot ----
   {
     const roads = place.roads || [];

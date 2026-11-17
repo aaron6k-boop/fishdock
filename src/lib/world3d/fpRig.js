@@ -22,6 +22,7 @@ import { TEX_BASE } from "./textures3d.js";
 import { RIG } from "./fpRigData.js";
 import { clothe } from "./fabric.js";
 import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "./fpIk.js";
+import { FILM } from "./film.js";
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const A3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
@@ -196,14 +197,35 @@ function sampler(clip, bones) {
 // worked out from where each point is on the hand itself, so they move with the fingers and never swim.
 const SKIN_BLEED = "reflectedLight.directDiffuse += irradiance * BRDF_Lambert( material.diffuseColor );";
 const SKIN_NOISE = `varying vec3 vSkinP;
+varying vec3 vHair;
 float fpSkinHash( vec3 p ) { p = fract( p * 0.3183099 + 0.1 ); p *= 17.0; return fract( p.x * p.y * p.z * ( p.x + p.y + p.z ) ); }
 float fpSkinNoise( vec3 x ) { vec3 i = floor( x ), f = fract( x ); f = f * f * ( 3.0 - 2.0 * f );
   return mix( mix( mix( fpSkinHash( i ), fpSkinHash( i + vec3( 1, 0, 0 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 0 ) ), fpSkinHash( i + vec3( 1, 1, 0 ) ), f.x ), f.y ),
     mix( mix( fpSkinHash( i + vec3( 0, 0, 1 ) ), fpSkinHash( i + vec3( 1, 0, 1 ) ), f.x ), mix( fpSkinHash( i + vec3( 0, 1, 1 ) ), fpSkinHash( i + vec3( 1, 1, 1 ) ), f.x ), f.y ), f.z ); }`;
+// ---- a soft key light on your own arms ----
+// A close shot is lit: your arms are the nearest thing in the picture, and under a flat light (a grey day, dusk, the
+// "Dusk" the game shows after dark) the sky lit them from all round alike and they had no form, a smooth tan shape
+// (Aaron, 16 November: "like PS2 graphics"). Some of the sky's own light (never more: at night there is little, so
+// little is added) is brought round from above and to the left of your view, wrapped softly over the skin or the
+// cloth, with a faint sheen, and the even all-round part of it a little less; the total stays about the same.
+/** GLSL put after the lights: k how much of the sky's light comes from the side, s and p the sheen, fill what's left all round. */
+export const fpKeyLight = (k, s, p, fill) => `
+{ vec3 fpL = normalize( vec3( -0.45, 0.75, 0.5 ) ), fpH = normalize( fpL + geometryViewDir );
+  float fpWrap = saturate( ( dot( geometryNormal, fpL ) + 0.35 ) / 1.35 );
+  reflectedLight.directDiffuse += BRDF_Lambert( material.diffuseColor ) * irradiance * fpWrap * ${k.toFixed(2)};
+  reflectedLight.directSpecular += irradiance * pow( saturate( dot( geometryNormal, fpH ) ), ${p.toFixed(1)} ) * ${s.toFixed(3)};
+  reflectedLight.indirectDiffuse *= ${fill.toFixed(2)}; }`;
+// (x: how much hair grows there, 0 to 1; y: along the arm, metres; z: round it, metres)
+const FP_HAIR = `{ vec2 hc = vec2( vHair.y * 95.0, vHair.z * 520.0 ), ci = floor( hc ), cf = fract( hc );
+  float aa = clamp( fwidth( hc.y ), 0.0, 4.0 ), pick = fpSkinHash( vec3( ci, 3.1 ) ), slant = ( fpSkinHash( vec3( ci, 7.3 ) ) - 0.5 ) * 0.9;
+  float x = cf.y - 0.5 - ( cf.x - 0.5 ) * slant, w = 0.14 + 0.35 * aa, len = 0.45 + 0.5 * fpSkinHash( vec3( ci, 5.7 ) );
+  float strand = ( 1.0 - smoothstep( w * 0.3, w, abs( x ) ) ) * step( 0.3, pick ) * smoothstep( 0.0, 0.12, cf.x ) * ( 1.0 - smoothstep( len - 0.2, len, cf.x ) );
+  float k = mix( strand * min( 1.0, 0.24 / w ), 0.12, smoothstep( 0.45, 1.2, aa ) );
+  diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 0.6, 0.52, 0.47 ), k * vHair.x ); }`;
 export function skinShade(sh) {
   // (the point as the model was made, before the bones move it: taken after skinning, as it was until 15 November, the
   // patches stayed where they were while the arm moved through them, sliding over the skin as you cast or wound)
-  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSkinP;").replace("#include <skinning_vertex>", "vSkinP = transformed;\n#include <skinning_vertex>");
+  sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vSkinP;\nattribute vec3 fpHair;\nvarying vec3 vHair;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvHair = fpHair;").replace("#include <skinning_vertex>", "vSkinP = transformed;\n#include <skinning_vertex>");
   const chunk = THREE.ShaderChunk.lights_physical_pars_fragment;
   if (!chunk.includes(SKIN_BLEED)) return; // (a three.js whose lighting is written differently: plain skin, as before)
   sh.fragmentShader = sh.fragmentShader
@@ -211,8 +233,20 @@ export function skinShade(sh) {
     // (the light that wraps round past the shadow's edge, a third of the way into the dark side, warm)
     .replace("#include <lights_physical_pars_fragment>", chunk.replace(SKIN_BLEED, `${SKIN_BLEED}\n\t{ float fpW = saturate( ( dot( geometryNormal, directLight.direction ) + 0.5 ) / 1.5 ); reflectedLight.directDiffuse += max( fpW - dotNL, 0.0 ) * directLight.color * vec3( 0.9, 0.26, 0.15 ) * BRDF_Lambert( material.diffuseColor ); }`))
     // (patches 3 to 10 cm across, a few per cent redder or paler; the knuckles' and palms' sheen varies with them)
-    .replace("#include <color_fragment>", "#include <color_fragment>\n{ float fpN = fpSkinNoise( vSkinP * 11.0 ) * 0.6 + fpSkinNoise( vSkinP * 34.0 ) * 0.4; diffuseColor.rgb *= mix( vec3( 1.04, 0.96, 0.95 ), vec3( 0.97, 1.02, 1.03 ), fpN ); }")
-    .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, 0.3, 1.0 );");
+    // (the baked creases, knuckles, nails and veins at twice their strength: drawn true to life they were too faint to
+    // see at the size a phone shows your hands, which read as smooth and even as a mannequin's, 16 November)
+    .replace("#include <map_fragment>", "#ifdef USE_MAP\n{ vec4 fpMap = texture2D( map, vMapUv ); diffuseColor.rgb *= max( vec3( 0.0 ), 0.85 + ( fpMap.rgb - 0.85 ) * 2.0 ); }\n#endif")
+    // (and the hair on your forearms and the backs of your hands: short fine strands lying along the arm, each a couple
+    // of millimetres apart and a centimetre or so long, more on the outside of the arm than the inside, drawn darker
+    // than the skin. Where a strand would be finer than a pixel they even out into the slight darkening hair gives
+    // skin seen from further off, so they never shimmer. The coordinates come with the rig: hairCoords)
+    .replace("#include <color_fragment>", "#include <color_fragment>\n" + FP_HAIR)
+    .replace("#include <color_fragment>", "#include <color_fragment>\n{ float fpN = fpSkinNoise( vSkinP * 11.0 ) * 0.6 + fpSkinNoise( vSkinP * 34.0 ) * 0.4; diffuseColor.rgb *= mix( vec3( 1.07, 0.94, 0.92 ), vec3( 0.95, 1.02, 1.04 ), fpN ); }")
+    .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = clamp( roughnessFactor + ( fpSkinNoise( vSkinP * 34.0 + 7.0 ) - 0.5 ) * 0.14, roughnessFactor < 0.32 ? 0.15 : 0.3, 1.0 );")
+    // (and towards its outline skin is lighter, not darker: the fine hairs catch the light and light scattered inside
+    // comes back out near the edge. Without it a finger's outline went dark like a painted model's, the plastic look
+    // Aaron called "PS2 graphics", 16 November)
+    .replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(1.1, 0.07, 28, 0.75) + "\n{ float fpRim = pow( 1.0 - saturate( dot( geometryNormal, geometryViewDir ) ), 2.5 ); reflectedLight.indirectDiffuse *= 1.0 + 0.8 * fpRim; reflectedLight.directDiffuse *= 1.0 + 0.3 * fpRim; }");
 }
 
 // ---- the jacket's lining left out ----
@@ -329,6 +363,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nvarying float vTorso;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * 0.012 || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
   };
   clothe(coatMat);
+  { const prev = coatMat.onBeforeCompile; coatMat.onBeforeCompile = (sh, r) => { prev.call(coatMat, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(0.9, 0.025, 10, 0.75)); }; }
   // (and a hand or forearm right against the lens isn't drawn either: seen from inside, it showed as a flat pale shape)
   skinMat.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace("#include <opaque_fragment>", "if (length(vViewPosition) < .07) discard;\n#include <opaque_fragment>");
@@ -340,7 +375,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // skin keeps the player's own colour; nothing waits on it: the plain skin until it's in)
   if (!gloves && typeof document !== "undefined") {
     const tl = new THREE.TextureLoader(), got = {};
-    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 1; skinMat.roughness = 1 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(1, 1); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
+    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 0.86; skinMat.roughness = 0.86 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(2.2, 2.2); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
     for (const [k, f] of [["map", "hand_colour"], ["normalMap", "hand_normal"], ["roughnessMap", "hand_rough"]]) tl.load(TEX_BASE + f + ".webp", (t) => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; got[k] = t; done(); }, undefined, () => {});
   }
   // (wet: the skin's roughness down by 40% and its colour 4% darker; the coat's roughness down by half and 12% darker,
@@ -368,6 +403,21 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     for (const [n] of bones) { const m = /^DEF-(f_\w+|thumb|palm)\d*(L|R)$/.exec(n); if (m) fingerBones[m[2]].push(n); }
     const grips = {};
     RIG.grips.forEach((name, k) => { grips[name] = { L: new Map(), R: new Map() }; for (const S of "LR") for (const n of fingerBones[S]) { const v = clips.grips?.value((k + 1) / RIG.fps, n); if (v) grips[name][S].set(n, new THREE.Quaternion().fromArray(v)); } });
+    // (the right middle finger on the reel seat opened 0.15 radians at its two outer joints: as Blender left it, the pad
+    // of its tip was a millimetre into the side of the reel's foot, under the seat, and the tip seemed to come out
+    // through the reel. Aaron's screenshot, 16 November. Measured in the game: no point of it inside the reel after.
+    // And turned in 0.37 radians at its knuckle, towards the index finger: wrapped under the foot, its tip still showed
+    // past the rod on the reel's side, a fingertip on its own by the reel's stem that read as poking through it (his
+    // second screenshot, 17 November; a quarter radian still left a sliver showing). Turned in, it lies behind the rod
+    // from your eye, and nothing of it is inside the reel or the handle)
+    for (const n of ["DEF-f_middle02R", "DEF-f_middle03R"]) grips.hold?.R.get(n)?.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -0.15));
+    grips.hold?.R.get("DEF-f_middle01R")?.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), -0.37));
+    // (and the thumb moved at its root, out from where the index finger wraps the handle and bent back down onto the
+    // handle beside it: as Blender left it, it lay across that place, and the index finger went 8 mm into it, its tip
+    // coming out through the ball of the thumb. Aaron, 17 November: "the finger's still going through the thumb".
+    // Measured on the skin as drawn, each point of the index, middle and ring fingers against the thumb's surface: none
+    // inside it now; and the thumb still rests on the handle, its pad within 2 mm of it, not held off it)
+    grips.hold?.R.get("DEF-thumb01R")?.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), 0.32)).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0, -0.16)));
     // the hold, as Blender left it: each arm's bones' lengths, which way its elbow bends and the forearm's twist at rest
     clips.hold.apply(1 / RIG.fps); scene.updateMatrixWorld(true);
     const wp = (b) => b.getWorldPosition(V()), wq = (b) => b.getWorldQuaternion(new THREE.Quaternion());
@@ -386,7 +436,43 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     }
     // (the eye: where it is at the hold, carried in the head bone's own frame so it moves with the head)
     const head = B(RIG.eye.bone), eyeLocal = A3(RIG.eye.hold).applyMatrix4(head.matrixWorld.clone().invert());
+    hairCoords(scene, B);
     return { scene, bones, B, clips, rest, grips, arm, head, eyeLocal, fingerBones, fingers: fingerSkin(scene, grips) };
+  }
+
+  // ---- where hair grows on your arms, and its lie ----
+  // For each point of the skin: how much hair (the forearm, more on its outside, thinning towards the elbow under the
+  // sleeve; the back of the hand, a little, as far as the knuckles; none on the palm or the fingers), how far along the
+  // arm it is and how far round it, both in metres, from the rig as it was made. The skin's shader draws the strands.
+  function hairCoords(scene, B) {
+    let skin = null; scene.traverse((o) => { if (o.isSkinnedMesh && o.material === skinMat && !skin) skin = o; });
+    if (!skin || skin.geometry.attributes.fpHair) return;
+    const g = skin.geometry, pos = g.attributes.position, nor = g.attributes.normal, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, sk = skin.skeleton;
+    const out = new Float32Array(pos.count * 3), at = (b) => new THREE.Matrix4().copy(sk.boneInverses[sk.bones.indexOf(b)]).invert();
+    const sides = {};
+    for (const S of "LR") {
+      const F = B(`DEF-forearm.${S}`), F1 = B(`DEF-forearm.${S}.001`), H = B(`DEF-hand.${S}`); if (!F || !F1 || !H) return;
+      const mF = at(F), mH = at(H), elbow = V().setFromMatrixPosition(mF), wrist = V().setFromMatrixPosition(mH), ax = wrist.clone().sub(elbow).normalize();
+      // (the back of the hand and the outside of the forearm: the hand bone's -z, as the hand maps are baked)
+      const back = V(0, 0, -1).transformDirection(mH); back.addScaledVector(ax, -back.dot(ax)).normalize();
+      const side = new THREE.Vector3().crossVectors(ax, back).normalize();
+      sides[S] = { idx: new Set([F, F1, H].map((b) => sk.bones.indexOf(b))), hand: sk.bones.indexOf(H), elbow, wrist, ax, back, side, len: wrist.distanceTo(elbow) };
+    }
+    const p = V(), n = V(), r = V();
+    for (let i = 0; i < pos.count; i++) {
+      let S = null, wArm = 0, wHand = 0;
+      for (let k = 0; k < 4; k++) { const b = si.getComponent(i, k), w = sw.getComponent(i, k); for (const s of "LR") if (sides[s].idx.has(b)) { S = s; wArm += w; if (b === sides[s].hand) wHand += w; } }
+      if (!S || wArm < 0.05) continue;
+      const D = sides[S]; p.fromBufferAttribute(pos, i); n.fromBufferAttribute(nor, i);
+      r.copy(p).sub(D.wrist); const along = r.dot(D.ax), out1 = r.dot(D.back), out2 = r.dot(D.side);
+      const facing = n.dot(D.back); // (1 on the outside of the arm and the back of the hand, -1 on the inside and the palm)
+      let dens = wArm * (0.35 + 0.65 * Math.max(0, Math.min(1, (facing + 0.4) / 1.2)));
+      dens *= Math.min(1, Math.max(0, (along + D.len) / (0.5 * D.len))); // (thinning towards the elbow)
+      if (along > 0) dens *= (1 - Math.min(1, along / 0.075)) * Math.max(0, Math.min(1, (facing - 0.2) / 0.5)) * 0.7; // (the back of the hand: as far as the knuckles, sparser)
+      dens *= 1 - 0.85 * (wHand > 0.5 && facing < 0 ? 1 : 0);
+      out[i * 3] = Math.max(0, Math.min(1, dens)); out[i * 3 + 1] = along; out[i * 3 + 2] = Math.atan2(out2, out1) * 0.032;
+    }
+    g.setAttribute("fpHair", new THREE.BufferAttribute(out, 3));
   }
 
   // ---- the fingers' own skin, for keeping them out of what they hold ----
@@ -663,6 +749,9 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
         // the fingers, curled for the grip
         const G = R.grips[want.grip]?.[S] || R.grips.relax?.[S]; h.fing ||= new Map();
         if (G) for (const [n, q] of G) { const b = R.bones.get(n); if (!b) continue; const f = h.fingFrom?.get(n); const qq = f && e < 1 ? f.clone().slerp(q, e) : q; b.quaternion.copy(qq); h.fing.set(n, qq.clone()); }
+        // (film only: a finger's joints turned further, about each bone's own x, y, z, for trying a grip by eye)
+        const tweak = FILM && typeof window !== "undefined" ? window.__fdFingerTweak : null;
+        if (tweak) for (const [n, a] of Object.entries(tweak)) { const b = R.bones.get(n); if (b && n.endsWith(S)) b.quaternion.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(a[0], a[1], a[2]))); }
         A.H.updateMatrixWorld(true);
         // (and kept out of what they're round: the reel seat's lock nut, its trims and the grips; the reel's knob. Worked
         // out again only when the hand moves on it: held still, as it is on the seat while you wait, last frame's answer
@@ -672,7 +761,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
           const crank = spec.kind === "crank", key = crank ? `k${Math.round((want.th || 0) / 4)}` : "seat";
           if (h.clears?.prof !== spec.prof) { h.clears = new Map(); h.clears.prof = spec.prof; }
           const c = h.clears.get(key);
-          if (c && h.u >= 1 && c.p.distanceTo(rp) < (crank ? 0.0015 : 2e-4) && c.q.angleTo(rq) < (crank ? 0.04 : 0.005)) { for (const [b, q] of c.qs) b.quaternion.copy(q); A.H.updateMatrixWorld(true); h.lift = c.lift; }
+          if (c && !tweak && h.u >= 1 && c.p.distanceTo(rp) < (crank ? 0.0015 : 2e-4) && c.q.angleTo(rq) < (crank ? 0.04 : 0.005)) { for (const [b, q] of c.qs) b.quaternion.copy(q); A.H.updateMatrixWorld(true); h.lift = c.lift; }
           else { h.lift = clearFingers(R.fingers[S], spec, Mg, qg); if (h.u >= 1) h.clears.set(key, { p: rp, q: rq, lift: h.lift, qs: R.fingers[S].flatMap((segs) => segs.map(({ b }) => [b, b.quaternion.clone()])) }); }
         } else h.lift = 0;
         h.wrist = group.worldToLocal(A.H.getWorldPosition(V()));

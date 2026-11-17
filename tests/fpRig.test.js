@@ -157,8 +157,10 @@ test("your fingers on the reel seat stay outside it: none in the metal, the foam
     const P = place(pitch, holdView(), yaw), row = TURN[0];
     pose(P, [crankSpec(P, row), seatSpec(P)], 20);
     const before = intoHandle(P, prof), A = R.arm.R, hand = at(A.H), handQ = A.H.getWorldQuaternion(new THREE.Quaternion());
-    // (as it was: the index finger 4.2 mm and the thumb 2.4 mm inside the lock nut, the far trim through the index finger)
-    if (pitch === rigP0()) assert.ok(before["DEF-f_index02R"] > 3 && before["DEF-thumb03R"] > 2, JSON.stringify(before));
+    // (as it was: the index finger 4.2 mm and the thumb 2.4 mm inside the lock nut, the far trim through the index finger;
+    // with the fingers slimmed, 16 November, source-assets/hands/slim_fingers.py, 2.7 and 1.8. The thumb, turned out to
+    // lie along the handle's side so the index finger no longer goes through it, 17 November, is clear of it before)
+    if (pitch === rigP0()) assert.ok(before["DEF-f_index02R"] > 2, JSON.stringify(before));
     pose(P, [crankSpec(P, row), { ...seatSpec(P), prof }], 20);
     const after = intoHandle(P, prof), worst = Math.max(...Object.values(after));
     assert.ok(worst < 0.25, `pitch ${pitch}: a finger ${worst.toFixed(2)} mm inside the handle (${JSON.stringify(after)})`);
@@ -166,6 +168,31 @@ test("your fingers on the reel seat stay outside it: none in the metal, the foam
     assert.ok(at(A.H).distanceTo(hand) < 1e-6 && deg(A.H.getWorldQuaternion(new THREE.Quaternion()), handQ) < 0.1, `the hand moved ${(at(A.H).distanceTo(hand) * 1000).toFixed(3)} mm, ${deg(A.H.getWorldQuaternion(new THREE.Quaternion()), handQ).toFixed(3)} degrees`);
     // (and lifted the way fingers lift, a few degrees at the knuckles, not flung open)
     for (const segs of R.fingers.R) for (const { b } of segs) assert.ok(b.quaternion.angleTo(R.grips.hold.R.get(b.name)) < 0.35, `${b.name} turned ${(b.quaternion.angleTo(R.grips.hold.R.get(b.name)) * 57.3).toFixed(1)} degrees off the hold`);
+  }
+});
+
+/** how far the right hand's fingers (middle and outer bones of the index, middle and ring) go into its own thumb (the
+ * thumb's last two bones), at worst (mm), on the skin as drawn: each finger point against the nearest thumb point within
+ * 12 mm, by how far it is behind that point's surface (the normals worked out from the drawn faces) */
+function intoThumb() {
+  let skin = null; R.scene.traverse((o) => { if (o.isSkinnedMesh && !skin && !/jacket/i.test(o.name)) skin = o; });
+  const pos = skin.geometry.attributes.position, si = skin.geometry.attributes.skinIndex, sw = skin.geometry.attributes.skinWeight, n = pos.count, P = new Float32Array(n * 3), dom = [], v = V();
+  for (let i = 0; i < n; i++) { skin.getVertexPosition(i, v); v.applyMatrix4(skin.matrixWorld); P[3 * i] = v.x; P[3 * i + 1] = v.y; P[3 * i + 2] = v.z; let bi = 0, bw = -1; for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; bi = si.getComponent(i, k); } } dom[i] = skin.skeleton.bones[bi].name; }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(P, 3)); g.setIndex(skin.geometry.index); g.computeVertexNormals(); const N = g.attributes.normal.array;
+  const thumb = [], fing = []; for (let i = 0; i < n; i++) { if (/^DEF-thumb0[23]R$/.test(dom[i])) thumb.push(i); else if (/^DEF-f_(index|middle|ring)0[23]R$/.test(dom[i])) fing.push(i); }
+  let worst = 0;
+  for (const i of fing) { let bj = -1, bd = 0.012 ** 2; for (const j of thumb) { const d = (P[3 * i] - P[3 * j]) ** 2 + (P[3 * i + 1] - P[3 * j + 1]) ** 2 + (P[3 * i + 2] - P[3 * j + 2]) ** 2; if (d < bd) { bd = d; bj = j; } }
+    if (bj >= 0) worst = Math.max(worst, -((P[3 * i] - P[3 * bj]) * N[3 * bj] + (P[3 * i + 1] - P[3 * bj + 1]) * N[3 * bj + 1] + (P[3 * i + 2] - P[3 * bj + 2]) * N[3 * bj + 2]) * 1000); }
+  return worst;
+}
+test("your fingers on the reel seat stay out of your own thumb (Aaron, 17 November: the index finger went 8 mm into it)", () => {
+  const prof = handleProfile(PIER, true);
+  for (const [pitch, yaw] of [[rigP0(), 0], [-0.75, 0.4], [0.35, -0.5]]) {
+    const P = place(pitch, holdView(), yaw);
+    pose(P, [crankSpec(P, TURN[0]), { ...seatSpec(P), prof }], 20);
+    const w = intoThumb(); assert.ok(w < 1, `pitch ${pitch}: a finger ${w.toFixed(1)} mm into the thumb`);
+    // (and the thumb moved out of the way still rests on the handle, not held off it)
+    const t = intoHandle(P, prof); assert.ok(t["DEF-thumb03R"] > -3 && t["DEF-thumb02R"] > -3, `the thumb ${(-t["DEF-thumb03R"]).toFixed(1)} mm off the handle`);
   }
 });
 

@@ -5,6 +5,7 @@
 import * as THREE from "three";
 import { createFftSea } from "./fftSea.js";
 import { installFogScatter, SCATTER } from "./fogScatter.js";
+import { installSunShade, updateClouds, CLOUDS, CLOUD_GLSL, nearShadowLight, placeNear } from "./sunShade.js";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
@@ -53,8 +54,11 @@ vec3 skyBase(vec3 d){
   // dusk: blue overhead, a pale gold glow low towards the sun, lilac-grey away from it (not an orange wash)
   vec3 dusk = mix(mix(vec3(.50, .50, .62), vec3(.96, .70, .48), ts*ts), vec3(.15, .20, .40), pow(hp, .38));
   dusk += vec3(.55, .32, .16)*pow(sd, 8.)*(1. - hp);
-  // night: near black overhead, the glow of the town and the moon low down
-  vec3 night = mix(vec3(.050, .060, .088), vec3(.010, .016, .036), t) + vec3(.05, .06, .08)*pow(max(dot(normalize(d), uMoonDir), 0.), 6.)*uMoonLight;
+  // night: a deep navy overhead, never black (a town's sky never is), and low all round the sodium-and-LED glow of the
+  // town and the port on the haze, warmest at the horizon; the moon's glow round it
+  // (16 November: it was near black overhead and the picture after dark read as one dark mud, "like PS2 graphics")
+  vec3 night = mix(vec3(.070, .078, .108), vec3(.016, .027, .062), t) + vec3(.05, .06, .08)*pow(max(dot(normalize(d), uMoonDir), 0.), 6.)*uMoonLight;
+  night += vec3(.062, .040, .022)*(1. - smoothstep(0., .22, hp));
   vec3 c = day*uDay + dusk*uDusk + night*uNight;
   // overcast: a soft grey, a little brighter overhead; darker and cooler in rain
   // (a coastal overcast is bright: a pale silvery grey, whitest high up and over the sun's side, a little darker and
@@ -94,7 +98,7 @@ vec4 cloudAt(vec3 d, float q){
   float cover = max(smoothstep(thr, thr + .1 + .12*(1. - q), n1), smoothstep(.78, 1., uCloud));
   float thick = smoothstep(thr, thr + .42, n1);
   vec3 lit = vec3(1., .98, .95)*uDay + vec3(1., .80, .64)*uDusk*.9 + vec3(.11, .12, .15)*uNight*(.3 + uMoonLight);
-  vec3 dark = vec3(.50, .55, .64)*uDay + vec3(.34, .31, .40)*uDusk + vec3(.025, .028, .04)*uNight;
+  vec3 dark = vec3(.50, .55, .64)*uDay + vec3(.34, .31, .40)*uDusk + vec3(.052, .046, .050)*uNight; // (at night their undersides lit dimly by the town, a warm grey, so they stand out against the sky)
   vec3 cc = mix(dark, lit, clamp(shade, 0., 1.)*(1. - thick*.35));
   // the bright rim where thin cloud passes in front of the sun
   float sd = max(dot(d, uSunDir), 0.);
@@ -201,6 +205,7 @@ function speckle(g, w, h, base, spread, n = 2600, size = 2) {
 
 export function createEnvironment(scene, { venue = "pier", quality = 1, real = null, pano = null, post = false } = {}) {
   installFogScatter(); // (before any material is made: the haze glows towards the sun)
+  installSunShade(); // (and the clouds' shadows, and the near shadow map's place in the light loop: sunShade.js)
   const L = layoutFor(venue);
   const group = new THREE.Group(); scene.add(group);
   const U = {
@@ -251,6 +256,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // (the shadows' box follows the camera, a 2 m step at a time so their edges don't crawl)
   if (quality >= 1) { sun.castShadow = true; sun.shadow.mapSize.set(LQ.shadowMap, LQ.shadowMap); Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 240 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02; }
   group.add(hemi, sun, sun.target);
+  // the near shadow map's light (sunShade.js): after the sun, so it is the second directional light; off until switched on
+  const nearSun = nearShadowLight(); group.add(nearSun, nearSun.target);
   scene.fog = new THREE.FogExp2(0xb8c8d4, 0.0006);
 
   // ---- water ----
@@ -263,6 +270,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
     uNrm: { value: null }, uNrmOn: { value: 0 },
     uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() }, uFdSun: { value: new THREE.Vector3() },
+    fdCloudA: { value: CLOUDS.a }, fdCloudB: { value: CLOUDS.b }, fdCamX: { value: CLOUDS.camX }, fdCamY: { value: CLOUDS.camY }, // (the clouds' shadows, sunShade.js)
     // the spectrum sea (fftSea.js, Ultra): its displacement and slope maps, the size of each cascade's tile, and how
     // much of the sine-train chop stays under it (the trains carry the swell; the CPU rides the same trains)
     uDbg: { value: 0 }, uFft: { value: 0 }, uFoam0: { value: null }, uDisp0: { value: null }, uDer0: { value: null }, uDer1: { value: null }, uL0: { value: 180 }, uL1: { value: 22 }, uChop: { value: 1 },
@@ -335,6 +343,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       uniform float uShoreZ, uFogD, uShoreOn, uShoreHalf; uniform vec3 uWater, uCam, uFogC; uniform vec4 uRip[8]; uniform vec4 uLamps[4];
       uniform sampler2D uShore, uShoreF, uNrm, uRefl; uniform float uShoreFHalf, uNrmOn, uReflOn; uniform mat4 uReflMat; uniform vec3 uFdSun;
       uniform float uFft, uL0, uL1, uDbg; uniform sampler2D uDer0, uDer1, uFoam0;
+      uniform vec3 fdCamX, fdCamY;
+` + CLOUD_GLSL + /* glsl */`
       // the scene's own light (linear, before the tone curve) to the display colours the water works in: the same
       // neutral curve and sRGB the rest of the picture gets at the end (post.js OutputPass), so the mirrored dune and
       // town match the real ones
@@ -450,6 +460,8 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         // (at dusk the water keeps more of its light: it went near-black under a sky still bright, as on the 6 November
         // recording, where the real sea at that hour mirrors the sky's glow)
         float lit = uDay + uDusk*.75 + uNight*.12, dim = 1. - .25*smoothstep(.5, 1., uCloud) - .15*uRain;
+        // (under a cloud's shadow, drifting over the sea: no glitter, and the water's own sunlit colour darker. sunShade.js)
+        float fdCl = fdCloudA.w > 0. ? fdCloudAt(vec2(dot(fdCamX, vW) - fdCloudB.y, dot(fdCamY, vW) - fdCloudB.z)) : 1.;
         float sd = shoreDist(p), shallow = 1. - smoothstep(0., 16., sd);
         // looking down into it you see the deep colour; at a low angle more of the light scattered back out; the
         // shallows by the land are lighter and greener
@@ -473,11 +485,16 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         body += vec3(.004, .008, .014)*uNight;
         // the dark of a wall or bank mirrored close to it
         refl = mix(refl, vec3(.16, .15, .13)*lit, (1. - smoothstep(0., 7., sd))*.45*(1. - rd.y));
-        vec3 col = mix(body, refl, clamp(F*1.05, 0., .9));
+        // (a sea with a chop mirrors more of the sky than one flat facet's Fresnel says: many of its facets lean towards
+        // you at a glancing angle. At dusk most of all the water should carry the sky's colour, not a flat dark teal; it
+        // read as green mud on a phone, 16 November)
+        float Fr = F + (1. - F)*(.05 + .11*uDusk + .03*uNight)*(.4 + .6*clamp(uWind*1.5, 0., 1.));
+        body *= mix(1., fdCl, .55);
+        vec3 col = mix(body, refl, clamp(Fr*1.05, 0., .9));
         // after dark the water still catches the glow of the sky and the town, enough to see the swell move
         col += vec3(.016, .020, .034)*uNight*(.4 + F*1.6)*(.8 + .4*smoothstep(-.3, .4, h));
         // the sun's glitter (a gold path at dusk, never a red one) and the moon's
-        float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud));
+        float sunVis = (uDay + uDusk)*(1. - smoothstep(.55, .95, uCloud))*fdCl;
         float sp = max(dot(rd, uSunDir), 0.);
         // (the sharp reflection broken up close by into sparkles on the small facets of the chop: whole, it lay in big
         // white blotches the shape of each wave's face, like paper cut-outs on the water)
@@ -505,7 +522,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           // (only where the sun's path is: everywhere else it added nothing but cost four noises a pixel)
           if (sunVis > .01 && sp > .85 && dist < 160. && uFft < .5) {
             float tw = noise(p*vec2(23., 19.) + vec2(uTime*1.9, -uTime*1.4))*noise(p*vec2(41., 37.) - vec2(uTime*2.6, uTime*1.1));
-            float glit = smoothstep(.42, .62, tw)*(1. - smoothstep(25., 160., dist));
+            // (and not close under you: there each twinkle was a flat pale fleck several centimetres across, and looking down
+            // over the rail at the net the water read as scattered confetti, 16 November. Close by the sun's own highlight,
+            // broken by the facets above, is the glitter)
+            float glit = smoothstep(.45, .68, tw)*(1. - smoothstep(25., 160., dist))*smoothstep(5., 22., dist);
             // (the path is long towards the sun and narrow across it, wider in more wind, as a real glitter path is: it
             // was a round patch a quarter of the sea wide under a low sun)
             float az = max(dot(normalize(rd.xz + vec2(1e-5)), normalize(uSunDir.xz + vec2(1e-5))), 0.);
@@ -561,11 +581,14 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         if (uShoreOn > .5 && sd < 3. && dist < 90.) { // (only near a wall: three noises a pixel over the whole sea for a band a metre or two wide)
           float en1 = noise(p*vec2(4.3, 3.7) - uTime*.3), en2 = noise(p*9.1 + vec2(uTime*.25, -uTime*.35));
           float clump = smoothstep(.45 + .1*sd, .72 + .1*sd, en1*.6 + en2*.4)*smoothstep(.2, .5, noise(p*1.1 + uTime*.06));
+          // (and broken into lace by the bubbles' own fine pattern: whole, each clump was a hard-edged white fleck, and
+          // looking down over the rail the water by the wall read as scattered paper, 16 November)
+          clump *= .45 + .55*smoothstep(.3, .75, noise(p*23. + vec2(uTime*.5, -uTime*.4)));
           float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
           edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
         }
         if (uDbg > .5) { gl_FragColor = vec4(uDbg < 1.5 ? vec3(fftJ) : uDbg < 2.5 ? vec3(cap) : vec3(n.xz*4. + .5, 0.), 1.); return; }
-        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.8*uShoreOn + churn*.7;
+        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.62*uShoreOn + churn*.6;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
         // (a fresh whitecap is the exception: a dense head of bubbles, near white in the day's light)
         foam = max(clamp(foam, 0., .8), capJ*.95);
@@ -811,7 +834,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   // comes in over a few seconds instead of jumping (the first one, as the view opens, is applied at once) ----
   let target = null, cur = null;
   const EASE = 0.7; // per second
-  const lightDir = new THREE.Vector3(0.3, 0.5, -0.8), shadowAt = new THREE.Vector3();
+  const lightDir = new THREE.Vector3(0.3, 0.5, -0.8), shadowAt = new THREE.Vector3(), _fw = new THREE.Vector3();
   let look = lightingFor({ day: 1, dusk: 0, night: 0, cloud: 0.3, rain: 0, moonLight: 0 });
   const bolt = { next: null, pulses: [], flash: 0 }; // (the storm's lightning, update below)
   function apply(st) {
@@ -877,6 +900,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     if (rough && (R.n & 1)) return;
     c.fov = camera.fov; c.aspect = camera.aspect; c.zoom = camera.zoom; c.near = camera.near; c.far = Math.min(camera.far, rough ? 220 : R.far);
     c.updateMatrixWorld(); c.updateProjectionMatrix(); // (its own projection, so the shorter far plane culls what it can't see)
+    // (Medium: only the big things are mirrored, the dune and the walls, the far piers, the buildings and the photographs
+    // of the shore, a few draws; the kit, the rails, the lamps and the people, each its own draw, are left to the
+    // waves. Marked once, the first time: layer 2, beside the usual layer 0)
+    if (R.big) { if (!R.tagged) { R.tagged = true; const sph = new THREE.Sphere(); scene.traverse((o) => { if (o.isLight) { o.layers.enable(2); return; } if (!o.isMesh || !o.geometry) return; if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); sph.copy(o.geometry.boundingSphere).applyMatrix4(o.matrixWorld); if (sph.radius > 4 || o.userData.backdrop) o.layers.enable(2); }); } c.layers.set(2); } else c.layers.set(0);
     const tm = wU.uReflMat.value; tm.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1); tm.multiply(c.projectionMatrix).multiply(c.matrixWorldInverse);
     // (an oblique near plane on the water's surface, so nothing under the water shows in the mirror)
     R.plane.setFromNormalAndCoplanarPoint(N, P).applyMatrix4(c.matrixWorldInverse);
@@ -893,10 +920,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     [sky.visible, water.visible, rain.visible] = was; hide.forEach((o, i) => { if (o) o.visible = was[3 + i]; });
   }
   /** Settings → Graphics → Reflections: 0 the sky only, 1 the scene at half size every other frame, 2 every frame */
-  function setReflections(level, renderer) {
-    level = Math.max(0, Math.min(2, level | 0));
+  function setReflections(level, renderer, { bigOnly = false } = {}) {
+    level = Math.max(0, Math.min(2, level | 0)); R.bigOnly = bigOnly;
     if (!level) { R.rt?.dispose(); R.rt = null; wU.uRefl.value = null; wU.uReflOn.value = 0; return; }
     R.every = level >= 2 ? 1 : 2; R.scale = level >= 2 ? 0.5 : 0.4; R.far = level >= 2 ? 500 : 300; // (how far the mirror sees)
+    R.big = level === 1 && !!R.bigOnly; // (Medium's mirror: the big things only, above)
     sizeReflections(renderer);
   }
   function sizeReflections(renderer) {
@@ -913,6 +941,9 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     reflect, setReflections, resizeReflections: (renderer) => { if (R.rt) sizeReflections(renderer); },
     get reflections() { return R.rt ? (R.every === 1 ? 2 : 1) : 0; },
     group, water, uniforms: U, waterUniforms: wU, layout: L, materials: M, solids, sun, // (sun: its shadows, set by Settings → Graphics)
+    /** the near shadow map on or off (sunShade.js; world.js, from Settings → Graphics). Every lit material is made again once */
+    setNearShadow(on) { on = !!on; if (nearSun.visible === on) return; nearSun.visible = on; nearSun.castShadow = on; if (!on) { nearSun.shadow.map?.dispose(); nearSun.shadow.map = null; } },
+    get nearShadow() { return nearSun.visible; },
     /** The sky (no stars, the sea below the horizon) for world.js's environment map. */
     envSky,
     /** The conditions as shown right now (eased) and their light (skyLook.js lightingFor). */
@@ -973,9 +1004,14 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       real?.treesUpdate?.(t, cam, wind, windDir); // (the trees' level of detail by distance, and their wind)
       if (real?.beacons) { const nt = cur ? Math.min(1, cur.night + cur.dusk * 0.6) : 0; for (const b of real.beacons) b(t, nt); }
       U.uTime.value = t; wU.uCam.value.set(Math.round(cam.position.x / 4) * 4, 0, Math.round(cam.position.z / 4) * 4);
-      // the shadows' box round the camera, moved a 2 m step at a time
-      const sx = Math.round(cam.position.x / 2) * 2, sz = Math.round(cam.position.z / 2) * 2;
+      // the shadows' box round the camera, moved a 2 m step at a time (with the near map on, which covers your feet, a
+      // third of its width ahead of you: behind you it was half spent on what you can't see)
+      let ax = cam.position.x, az = cam.position.z;
+      if (nearSun.visible) { cam.getWorldDirection(_fw); const h = Math.hypot(_fw.x, _fw.z) || 1, k = (sun.shadow.camera.right * 0.33) / h; ax += _fw.x * k; az += _fw.z * k; }
+      const sx = Math.round(ax / 2) * 2, sz = Math.round(az / 2) * 2;
       if (sx !== shadowAt.x || sz !== shadowAt.z) { shadowAt.set(sx, 0, sz); sun.position.copy(shadowAt).addScaledVector(lightDir, 120); sun.target.position.copy(shadowAt); }
+      if (nearSun.visible) placeNear(nearSun, cam, lightDir);
+      if (cur) { updateClouds({ sun, t, cloud: cur.cloud, day: cur.day, sunY: U.uSunDir.value.y }); if (FILM && typeof window !== "undefined" && window.__fdNoCloudShade) CLOUDS.a.w = 0; } // (film only: a before-and-after check without the clouds' shade, which moves)
       if (target && cur) {
         const k = 1 - Math.exp(-dt * EASE);
         let moved = false;
