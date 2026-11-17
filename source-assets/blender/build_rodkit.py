@@ -112,62 +112,127 @@ Tr = lambda x, y, z: Matrix.Translation(Vector((x, y, z)))
 ALONG_X = Ry(math.pi / 2) # (a lathe about z laid along x)
 
 # =========================================================================================== the reel
+# (17 November: rebuilt as a sea-spinning reel's real shapes rather than boxes and cylinders: a swept leg, a gearbox
+# housing lofted from rounded sections and smoothed, a rotor whose arms sweep forward from the cup to the bail's pivots,
+# a machined spool with a tapered lip and grooved skirt, a knurled drag knob and a one-piece tapered handle arm. Every
+# point the game and the hands rely on is where it was: the foot in the seat, the gearbox's centre (BY, BZ), the rotor's
+# and spool's faces (RZ, SZ), the roller, the crank's axle and the knob, which is the same shape, so the grips hold.)
+def ring_se(cx, cy, cz, w, h, n=2.6, seg=28, plane="xy", rot=0.0):
+    """A superellipse ring (w by h, exponent n) round (cx, cy, cz), in the xy plane (along z) or the xz plane (along y)."""
+    pts = []
+    for j in range(seg):
+        a = 2 * math.pi * j / seg + rot; c, s_ = math.cos(a), math.sin(a)
+        u = w / 2 * math.copysign(abs(c) ** (2 / n), c); v = h / 2 * math.copysign(abs(s_) ** (2 / n), s_)
+        pts.append((cx + u, cy + v, cz) if plane == "xy" else (cx + u, cy, cz + v))
+    return pts
+
+def loft(name, rings, m, parent=None, cap0=True, cap1=True, subd=0, sharp=1.2):
+    """A surface through rings of points (each the same count), capped at either end, smoothed by subdivision if asked."""
+    n = len(rings[0]); verts = [p for r in rings for p in r]; faces = []
+    for i in range(len(rings) - 1):
+        for j in range(n): a, b = i * n + j, i * n + (j + 1) % n; faces.append((a, b, b + n, a + n))
+    if cap0:
+        c = len(verts); verts.append(tuple(sum(p[k] for p in rings[0]) / n for k in range(3)))
+        for j in range(n): faces.append((c, (j + 1) % n, j))
+    if cap1:
+        c = len(verts); verts.append(tuple(sum(p[k] for p in rings[-1]) / n for k in range(3))); o = (len(rings) - 1) * n
+        for j in range(n): faces.append((c, o + j, o + (j + 1) % n))
+    ob = mesh_obj(name, verts, faces, m, parent, sharp)
+    bm = bmesh.new(); bm.from_mesh(ob.data); bmesh.ops.recalc_face_normals(bm, faces=bm.faces); bm.to_mesh(ob.data); bm.free()
+    if subd: sd = ob.modifiers.new("subd", "SUBSURF"); sd.levels = subd; sd.render_levels = subd
+    return ob
+
+def knurled(name, prof, m, T=Matrix.Identity(4), seg=64, ribs=18, depth=0.035, parent=None, rib_from=1, rib_to=-1):
+    """A lathe whose outer rings (rib_from..rib_to) are fluted with ribs, as a drag knob or a screw cap is."""
+    verts, faces = [], []; rt = len(prof) + rib_to if rib_to < 0 else rib_to
+    for i, (r, z) in enumerate(prof):
+        for j in range(seg):
+            a = 2 * math.pi * j / seg; k = 1.0 - (depth * (0.5 - 0.5 * math.cos(ribs * a)) if rib_from <= i <= rt else 0.0)
+            verts.append(xf((r * k * math.cos(a), r * k * math.sin(a), z), T))
+    for i in range(len(prof) - 1):
+        for j in range(seg): a, b = i * seg + j, i * seg + (j + 1) % seg; faces.append((a, b, b + seg, a + seg))
+    return mesh_obj(name, verts, faces, m, parent, 0.5)
+
+M["gloss"] = mat("reel_gloss", (0.012, 0.013, 0.016), 0.3, 0.22, 0.9)
 reel = pivot("reel", (0, 0, 0))
 BY, BZ = -0.076, -0.012 # the gearbox's centre (below the rod, a little behind the seat's middle)
-# the foot (it slides into the reel seat) and the stem, swept forward, down to the body
-boxm("reel_foot", 0.011, 0.005, 0.052, (0, -0.0165, 0), M["body"], reel)
-for k in range(6):
-    t = k / 5; y = -0.019 - t * 0.034; z = -0.002 - t * 0.008; w = 0.009 + t * 0.006
-    boxm(f"reel_stem{k}", w, 0.009, 0.016 - t * 0.002, (0, y, z), M["body"], reel)
-# the body: a rounded gearbox lying across the rod (its axis along x), its domed back, the side covers
-lathe("reel_body", [(0.0, -0.025), (0.022, -0.025), (0.029, -0.022), (0.031, -0.016), (0.031, 0.016), (0.029, 0.022), (0.022, 0.025), (0.0, 0.025)], M["body"], Tr(0, BY, BZ) @ ALONG_X, 36, reel)
-lathe("reel_back", [(0.0, -0.034), (0.012, -0.033), (0.022, -0.028), (0.028, -0.018), (0.03, -0.005), (0.026, 0.004)], M["body"], Tr(0, BY, BZ - 0.004), 32, reel)
-for s in (-1, 1): # a blue anodised ring and a gunmetal cover each side (the handle goes in on the left, x +)
-    lathe(f"reel_cover{'L' if s > 0 else 'R'}", [(0.0, 0.0), (0.024, 0.0), (0.025, 0.002), (0.023, 0.004), (0.012, 0.0055), (0.0, 0.0055)], M["gun"], Tr(s * 0.0255, BY, BZ) @ (ALONG_X if s > 0 else Ry(-math.pi / 2)), 36, reel)
-    torus(f"reel_trim{'L' if s > 0 else 'R'}", 0.0285, 0.0012, M["blue"], Tr(s * 0.0245, BY, BZ) @ ALONG_X, 40, 6, parent=reel)
-# the shaft's housing in front of the gearbox, carrying the rotor
-lathe("reel_nose", [(0.0, -0.004), (0.016, -0.004), (0.017, 0.006), (0.012, 0.012), (0.0, 0.012)], M["body"], Tr(0, BY, BZ + 0.024), 32, reel)
+# the foot: a flat bar with tapered ends that slides into the seat, and the leg swept down and back to the gearbox
+foot = []
+for z, w, t in ((-0.026, 0.006, 0.002), (-0.022, 0.0105, 0.0032), (-0.012, 0.011, 0.0036), (0.0, 0.011, 0.0038), (0.012, 0.011, 0.0036), (0.022, 0.0105, 0.0032), (0.026, 0.006, 0.002)):
+    foot.append(ring_se(0.0, -0.0165, z, w, t, 4.0, 16))
+loft("reel_foot", foot, M["body"], reel)
+stem = []
+for y, z, w, d in ((-0.0168, -0.001, 0.0092, 0.0155), (-0.0195, -0.0015, 0.0092, 0.016), (-0.026, -0.0035, 0.0098, 0.0158), (-0.033, -0.006, 0.0112, 0.0166), (-0.04, -0.0085, 0.0138, 0.019), (-0.046, -0.0105, 0.018, 0.024), (-0.05, -0.0115, 0.024, 0.03)):
+    stem.append(ring_se(0.0, y, z, w, d, 3.0, 20, "xz"))
+loft("reel_stem", stem, M["body"], reel, cap0=True, cap1=False, subd=1)
+# the gearbox housing, lofted along the spool's axis from the rear cap to the nose under the rotor
+body = []
+for z, dy, w, h, n in ((-0.054, 0.004, 0.012, 0.014, 2.2), (-0.05, 0.0035, 0.024, 0.027, 2.3), (-0.042, 0.002, 0.04, 0.047, 2.5), (-0.03, 0.001, 0.051, 0.06, 2.7),
+                       (-0.016, 0.0, 0.056, 0.066, 2.8), (-0.004, 0.0, 0.056, 0.066, 2.8), (0.006, 0.0005, 0.05, 0.057, 2.6), (0.012, 0.001, 0.038, 0.042, 2.3), (0.015, 0.0005, 0.031, 0.031, 2.0)):
+    body.append(ring_se(0.0, BY + dy, z, w, h, n, 32))
+loft("reel_body", body, M["gloss"], reel, subd=1)
+# the side plates: a polished cover on the handle's side (x +) and a knurled screw cap on the other
+lathe("reel_coverL", [(0.0, 0.0), (0.0175, 0.0), (0.019, 0.0012), (0.0188, 0.0026), (0.017, 0.0034), (0.011, 0.0038), (0.0, 0.0038)], M["gun"], Tr(0.0268, BY, BZ) @ ALONG_X, 40, reel)
+torus("reel_trimL", 0.0186, 0.0009, M["chrome"], Tr(0.0272, BY, BZ) @ ALONG_X, 40, 6, parent=reel)
+knurled("reel_coverR", [(0.0, 0.0), (0.0115, 0.0), (0.0122, 0.001), (0.0122, 0.0042), (0.0112, 0.0052), (0.0, 0.0054)], M["gun"], Tr(-0.0268, BY, BZ) @ Ry(-math.pi / 2), 48, 20, 0.05, reel, 1, 3)
+torus("reel_trimR", 0.0128, 0.0008, M["chrome"], Tr(-0.0272, BY, BZ) @ ALONG_X, 36, 6, parent=reel)
+# the anti-reverse switch under the back, and a cap on the rear
+boxm("reel_back_switch", 0.004, 0.006, 0.009, (0.0, BY - 0.0225, BZ - 0.027), M["gun"], reel)
+lathe("reel_back", [(0.0, -0.0565), (0.005, -0.0563), (0.0068, -0.0548), (0.0072, -0.052), (0.006, -0.05)], M["body"], Tr(0, BY + 0.004, 0), 24, reel)
+# the shaft's housing in front of the gearbox, carrying the rotor (mostly inside the rotor's cup)
+lathe("reel_nose", [(0.0, -0.004), (0.016, -0.004), (0.0165, 0.004), (0.0125, 0.011), (0.0, 0.011)], M["body"], Tr(0, BY, BZ + 0.024), 32, reel)
 
-# ---- the rotor: turns about the spool's axis (z) as you wind; its cup, two arms, the bail on its pivot ----
+# ---- the rotor: turns about the spool's axis (z) as you wind; its cup, two arms sweeping forward, the bail ----
 RZ = 0.016 # the rotor's back face
 rotor = pivot("rotor", (0, BY, RZ), reel)
-lathe("rotor_cup", [(0.0, 0.0), (0.017, 0.0), (0.027, 0.006), (0.031, 0.016), (0.031, 0.026), (0.0285, 0.0265), (0.025, 0.012), (0.012, 0.004), (0.0, 0.004)], M["body"], Matrix.Identity(4), 40, rotor)
-torus("rotor_trim", 0.0305, 0.0011, M["blue"], Tr(0, 0, 0.0255), 40, 6, parent=rotor)
-for s in (-1, 1): # the arms reaching forward to the bail's pivots
-    boxm(f"rotor_arm{'L' if s > 0 else 'R'}", 0.006, 0.012, 0.022, (s * 0.032, 0, 0.032), M["gun"], rotor)
+lathe("rotor_cup", [(0.0, 0.0), (0.0165, 0.0), (0.0178, 0.0008), (0.0235, 0.0035), (0.0285, 0.0085), (0.0308, 0.0145), (0.0314, 0.0205), (0.031, 0.0245), (0.0298, 0.0262), (0.0262, 0.026), (0.0248, 0.018), (0.019, 0.009), (0.011, 0.005), (0.0, 0.005)], M["gloss"], Matrix.Identity(4), 56, rotor)
+torus("rotor_trim", 0.0306, 0.001, M["chrome"], Tr(0, 0, 0.0254), 48, 6, parent=rotor)
+for s in (-1, 1): # each arm: from the cup's rim, flaring out and forward to the bail's pivot boss
+    arm = []
+    for t in (0.0, 0.2, 0.45, 0.7, 0.88, 1.0):
+        x = s * (0.0285 + 0.0062 * math.sin(t * math.pi * 0.9) + 0.003 * t); z = 0.017 + t * 0.024
+        arm.append(ring_se(x, 0.0, z, 0.0062 - 0.0018 * t, 0.0135 - 0.0055 * t, 2.6, 16))
+    loft(f"rotor_cup_arm{'L' if s > 0 else 'R'}", arm, M["gloss"], rotor, subd=1)
+    lathe(f"rotor_arm_boss{'L' if s > 0 else 'R'}", [(0.0, -0.0026), (0.0042, -0.0026), (0.0046, 0.0), (0.0042, 0.0026), (0.0, 0.0026)], M["gun"], Tr(s * 0.0345, 0.0, 0.041) @ ALONG_X, 20, rotor)
 bail = pivot("bail", (0, 0, 0.041), rotor) # the pivot axis runs across (x) through both arms' ends
-# the wire: a half hoop over the spool's front from the roller's arm (x +) round to the other (x -)
+# the wire: a full half hoop over the spool's front, a little forward of the arms, from the roller round to the far arm
 pts = []
-for i in range(25):
-    a = math.pi * i / 24; pts.append((0.0335 * math.cos(a), 0.0335 * math.sin(a) * 1.02, 0.014 * math.sin(a)))
-cu = bpy.data.curves.new("bail_wire", "CURVE"); cu.dimensions = "3D"; cu.bevel_depth = 0.0014; cu.bevel_resolution = 2
+for i in range(41):
+    a = math.pi * i / 40; pts.append((0.0335 * math.cos(a), 0.0338 * math.sin(a), 0.0115 * math.sin(a) ** 0.8 + 0.001))
+cu = bpy.data.curves.new("bail_wire", "CURVE"); cu.dimensions = "3D"; cu.bevel_depth = 0.00135; cu.bevel_resolution = 3
 sp = cu.splines.new("POLY"); sp.points.add(len(pts) - 1)
 for i, p in enumerate(pts): sp.points[i].co = (*P(*p), 1)
 bw = bpy.data.objects.new("bail_wire", cu); col.objects.link(bw); bw.parent = bail; bw.data.materials.append(M["chrome"])
-boxm("bail_armL", 0.004, 0.006, 0.012, (0.0335, 0.0, -0.004), M["chrome"], bail)
-boxm("bail_armR", 0.004, 0.006, 0.012, (-0.0335, 0.0, -0.004), M["chrome"], bail)
-lathe("line_roller", [(0.0, -0.0035), (0.0028, -0.0035), (0.0033, -0.002), (0.0024, 0.0), (0.0033, 0.002), (0.0028, 0.0035), (0.0, 0.0035)], M["chrome"], Tr(0.0335, 0.0015, 0.0), 16, bail)
+for s, nm in ((1, "bail_armL"), (-1, "bail_armR")): # shaped plates from the pivot to the wire
+    pl = [ring_se(s * 0.0335, 0.0, z, 0.0032, h, 2.4, 12) for z, h in ((-0.006, 0.006), (-0.002, 0.0075), (0.002, 0.0062), (0.005, 0.0045))]
+    loft(nm, pl, M["chrome"], bail)
+lathe("line_roller", [(0.0, -0.0036), (0.003, -0.0036), (0.0034, -0.0022), (0.0025, 0.0), (0.0034, 0.0022), (0.003, 0.0036), (0.0, 0.0036)], M["chrome"], Tr(0.0335, 0.0015, 0.0), 20, bail)
+lathe("bail_roller_cover", [(0.0, -0.0044), (0.0042, -0.0044), (0.0046, -0.0038), (0.0046, -0.0036), (0.0, -0.0036)], M["gun"], Tr(0.0335, 0.0015, 0.0) @ Rx(0.0), 20, bail)
 pivot("att_roller", (0.0335, 0.0015, 0.0), bail)
 
-# ---- the spool: in and out along z as you wind (the game moves it), the blue braid, the front drag knob ----
+# ---- the spool: in and out along z as you wind (the game moves it), the blue braid, the knurled drag knob ----
 SZ = 0.05
 spool = pivot("spool", (0, BY, SZ), reel)
-lathe("spool_body", [(0.0, -0.016), (0.0205, -0.016), (0.0215, -0.013), (0.024, -0.012), (0.024, 0.012), (0.0285, 0.014), (0.0295, 0.0165), (0.028, 0.018), (0.0, 0.018)], M["brushed"], Matrix.Identity(4), 48, spool)
-lathe("spool_skirt", [(0.0295, -0.03), (0.031, -0.026), (0.031, -0.017), (0.025, -0.0135)], M["brushed"], Matrix.Identity(4), 48, spool)
-lathe("spool_braid", [(0.0, -0.0128), (0.0262, -0.0128), (0.0268, -0.0115), (0.0268, 0.0115), (0.0262, 0.0128), (0.0, 0.0128)], M["line"], Matrix.Identity(4), 48, spool)
-torus("spool_trim", 0.0292, 0.001, M["blue"], Tr(0, 0, 0.0165), 40, 6, parent=spool)
-lathe("drag_knob", [(0.0, 0.018), (0.0135, 0.018), (0.0145, 0.021), (0.014, 0.028), (0.011, 0.031), (0.0, 0.031)], M["gun"], Matrix.Identity(4), 18, spool, 0.4)
-torus("drag_trim", 0.0138, 0.0009, M["blue"], Tr(0, 0, 0.0205), 30, 6, parent=spool)
+lathe("spool_body", [(0.0, -0.016), (0.0205, -0.016), (0.0212, -0.0145), (0.0236, -0.0128), (0.0236, 0.0118), (0.0262, 0.0128), (0.0288, 0.0142), (0.0298, 0.0158), (0.0296, 0.0172), (0.0284, 0.0182), (0.0, 0.0182)], M["brushed"], Matrix.Identity(4), 64, spool)
+lathe("spool_skirt", [(0.0272, -0.0315), (0.0296, -0.0305), (0.0312, -0.0285), (0.0313, -0.0262), (0.0306, -0.0258), (0.0313, -0.0252), (0.0313, -0.0222), (0.0306, -0.0218), (0.0313, -0.0212), (0.0312, -0.0182), (0.0292, -0.0158), (0.025, -0.0135)], M["brushed"], Matrix.Identity(4), 64, spool)
+lathe("spool_braid", [(0.0, -0.0126), (0.0258, -0.0126), (0.0266, -0.0114), (0.0268, 0.0), (0.0266, 0.0114), (0.0258, 0.0126), (0.0, 0.0126)], M["line"], Matrix.Identity(4), 64, spool)
+torus("spool_trim", 0.0294, 0.0008, M["chrome"], Tr(0, 0, 0.0166), 48, 6, parent=spool)
+knurled("drag_knob", [(0.0, 0.0182), (0.0128, 0.0182), (0.0142, 0.0205), (0.0146, 0.0225), (0.0144, 0.0275), (0.0132, 0.0302), (0.009, 0.0318), (0.0, 0.032)], M["body"], Matrix.Identity(4), 72, 18, 0.06, spool, 2, 4)
+lathe("drag_cap", [(0.0, 0.0316), (0.0075, 0.0316), (0.0078, 0.0322), (0.0, 0.0326)], M["gun"], Matrix.Identity(4), 32, spool)
+torus("drag_trim", 0.0139, 0.0007, M["chrome"], Tr(0, 0, 0.0204), 40, 6, parent=spool)
 
-# ---- the handle, on the reel's left (x +): its axle out of the side cover, a folding arm and a round knob ----
+# ---- the handle, on the reel's left (x +): its axle out of the side cover, a one-piece tapered arm and a round knob ----
 crank = pivot("crank", (0.031, BY, BZ), reel)
-lathe("crank_hub", [(0.0, 0.0), (0.0075, 0.0), (0.0075, 0.007), (0.006, 0.009), (0.0, 0.009)], M["gun"], ALONG_X, 20, crank)
+lathe("crank_hub", [(0.0, 0.0), (0.0078, 0.0), (0.0082, 0.0015), (0.0078, 0.0065), (0.0062, 0.0092), (0.0, 0.0094)], M["gun"], ALONG_X, 28, crank)
 ARM = 0.058
-for k in range(5): # the arm: tapering, a little cranked outwards
-    t = (k + 0.5) / 5; boxm(f"crank_arm{k}", 0.0045, ARM / 5 + 0.001, 0.0085 - t * 0.002, (0.008 + t * 0.006, -ARM * t, 0), M["gun"], crank)
-lathe("crank_stud", [(0.0, 0.0), (0.0025, 0.0), (0.0025, 0.006), (0.0, 0.006)], M["chrome"], Tr(0.014, -ARM, 0) @ ALONG_X, 12, crank)
-lathe("crank_knob", [(0.0, 0.0), (0.006, 0.0), (0.0092, 0.004), (0.0098, 0.012), (0.0092, 0.02), (0.007, 0.025), (0.0, 0.026)], M["rubber"], Tr(0.019, -ARM, 0) @ ALONG_X, 24, crank)
-torus("crank_cap", 0.0062, 0.0008, M["blue"], Tr(0.0455, -ARM, 0) @ ALONG_X, 20, 6, parent=crank)
+arm = []
+for t in (0.0, 0.08, 0.3, 0.55, 0.8, 0.94, 1.0):
+    x = 0.0075 + t * 0.0062 + 0.0018 * math.sin(t * math.pi); y = -ARM * t
+    arm.append(ring_se(x, y, 0.0, 0.0047 - 0.0011 * t, 0.0098 - 0.0028 * t, 3.2, 16, "xz"))
+loft("crank_arm", arm, M["gun"], crank, subd=1)
+lathe("crank_stud", [(0.0, 0.0), (0.0026, 0.0), (0.0026, 0.006), (0.0, 0.006)], M["chrome"], Tr(0.014, -ARM, 0) @ ALONG_X, 16, crank)
+lathe("crank_knob", [(0.0, 0.0), (0.006, 0.0), (0.0092, 0.004), (0.0098, 0.012), (0.0092, 0.02), (0.007, 0.025), (0.0, 0.026)], M["rubber"], Tr(0.019, -ARM, 0) @ ALONG_X, 32, crank)
+torus("crank_cap", 0.0062, 0.0008, M["chrome"], Tr(0.0455, -ARM, 0) @ ALONG_X, 24, 6, parent=crank)
 pivot("att_knob", (0.032, -ARM, 0), crank)
 
 # =========================================================================================== the rod's handle

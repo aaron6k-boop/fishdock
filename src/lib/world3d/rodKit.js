@@ -11,6 +11,7 @@
 // Materials are physically based, with small drawn maps (a fine carbon scrim, EVA foam, brushed metal, braid), and take
 // the scene's environment map for their reflections, so they follow the light, rain, dusk and night like everything else.
 import * as THREE from "three";
+import { thinTubes } from "./thinAA.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 export const GUIDE_DROP = 1.85; // (the guide's ring centre below its feet, in ring radii: build_rodkit.py)
@@ -229,6 +230,9 @@ export function buildRod(scene, R) {
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.62, .64, .66), w); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.95, .16, .02), o); }`);
     };
     mat.customProgramCacheKey = () => "fdblank2";
+    // (the top of the rod, a millimetre or two across a few metres off, is under a pixel: never drawn thinner than a pixel
+    // and a half, fading by as much, so the tip doesn't crawl and flicker against the sky: thinAA.js)
+    thinTubes(mat, 1.5, `(${R.r0.toFixed(5)} + ${(R.r1 - R.r0).toFixed(5)} * pow(max(aLab.x, 0.0), 0.8))`);
   }
   const blank = new THREE.Mesh(geo, mat); blank.castShadow = true; blank.frustumCulled = false; group.add(blank);
   const radius = (s) => R.r0 + (R.r1 - R.r0) * Math.pow(s, 0.8);
