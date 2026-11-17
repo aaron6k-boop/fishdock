@@ -159,6 +159,26 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    (`tests/fpRig.test.js`), so a cleaner wind-up needs the cast solved again in Blender with the view as a condition.
 19. **The wellies were straight tubes.** **Changed:** each leg a moulded shape: a little flare at the top, full over
    the calf, narrowing to the ankle, a raised band near the top.
+20. **The slowest frames at 1440p Ultra (47 fps for the slowest 1%).** Measured on Aaron's PC, 17 November, at
+   Gorleston with the 3D view full screen, one thing off at a time (Ultra; each run repeats to within about 5 fps):
+
+   | Ultra with | 1080p avg fps | slowest 1% | 1440p avg fps | slowest 1% |
+   |---|---|---|---|---|
+   | everything | 95 | 56 | 83 | 47 |
+   | no temporal antialiasing | 101 | 56 | 91 | 56 |
+   | no multisampling or temporal antialiasing | 114 | 72 | 113 | 92 |
+   | no ambient occlusion | 129 | 93 | 127 | 92 |
+   | no spectrum sea | 100 | 56 | 92 | 56 |
+   | no reflections | 102 | 56 | 92 | 56 |
+   | lighter shadows | 98 | 54 | 89 | 47 |
+
+   The ambient occlusion was the costliest part of the frame and the slowest frames came with it. **Changed:** on a
+   big picture (High and Ultra on a computer draw at up to twice the window's size) it is worked out at half size, still
+   a sample for every pixel of the window. Measured again on the PC while it was busy with other work (its graphics
+   card already at 49% before the run), so those numbers don't compare with these; the live game is measured again
+   below.
+21. **A hooked or landed shark's jaw tip vanished** as it gaped: its swimming wave was not a number a little ahead of
+   the snout, where a dropped jaw reaches. **Fixed**, with a check for every kind of swimming.
 
 ## What is left, in order of what it would add
 
