@@ -10,6 +10,7 @@
 // same either way.
 import * as THREE from "three";
 import { EffectComposer } from "./vendor/three-post/postprocessing/EffectComposer.js";
+import { TAAPass } from "./taa.js";
 import { RenderPass } from "./vendor/three-post/postprocessing/RenderPass.js";
 import { GTAOPass } from "./vendor/three-post/postprocessing/GTAOPass.js";
 import { UnrealBloomPass } from "./vendor/three-post/postprocessing/UnrealBloomPass.js";
@@ -64,9 +65,13 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   if (!level || !renderer.capabilities.isWebGL2 || !(ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float"))) return null;
   const size = renderer.getSize(new THREE.Vector2()), pr = renderer.getPixelRatio();
   const rt = new THREE.WebGLRenderTarget(size.x * pr, size.y * pr, { type: THREE.HalfFloatType, samples: 4 });
+  // (the scene's depth kept with it, for the temporal antialiasing to find where each pixel was last frame)
+  rt.depthTexture = new THREE.DepthTexture(size.x * pr, size.y * pr); rt.depthTexture.type = THREE.UnsignedIntType;
   const composer = new EffectComposer(renderer, rt);
   composer.setPixelRatio(pr); composer.setSize(size.x, size.y);
   composer.addPass(new RenderPass(scene, camera));
+  // temporal antialiasing (taa.js): straight after the scene, before the shade and the glow (off until set on)
+  const taa = new TAAPass(camera, size.x * pr, size.y * pr); taa.on = false; composer.addPass(taa);
   let ao = null, aoLevel = 0;
   // (made when first needed: at level 2 or 3 from the start, or later when Settings → Graphics turns it on)
   function makeAO() {
@@ -130,7 +135,13 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
       n = n >= 4 ? 4 : n >= 2 ? 2 : 0; if (n === samples) return; samples = n;
       for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = n; t.dispose(); }
     },
-    render() { grade.uniforms.uSeed.value = (seed = (seed + 1) % 97); composer.render(); },
+    render() {
+      grade.uniforms.uSeed.value = (seed = (seed + 1) % 97);
+      const t = composer.renderTarget1; taa.jitter(t.width, t.height); composer.render(); taa.unjitter();
+    },
+    /** temporal antialiasing on or off (taa.js) */
+    setTemporal(on) { if (taa.on !== !!on) { taa.on = !!on; taa.reset = true; } },
+    get temporal() { return taa.on; },
     setSize(w, h) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); const r = renderer.getPixelRatio(); grade.uniforms.uTexel.value.set(1 / (w * r), 1 / (h * r)); },
     /** sharpening, 0..1 (Settings → Graphics) */
     setSharp(v) { grade.uniforms.uSharp.value = Math.max(0, Math.min(1, +v || 0)); },

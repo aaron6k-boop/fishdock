@@ -32,11 +32,14 @@ export const QUALITY3D = {
   performance: { dpr: 1.5, ss: 1, floor: 1, shadows: 0, q: 0.5, post: 0 },
   balanced: { dpr: 2, ss: 1, floor: 1.25, shadows: 1, q: 1, post: 1, late: 0.025, easy: 10 }, // (steps down when frames run under about 40 a second, as landing a fish with the deck filling the view did on a phone, and back up after 20 s of easy frames; never below 1.25)
   // (High also steps down, the same as Balanced, so a phone that can't hold it at a busy moment gets smoother rather than jerky)
-  high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2, late: 0.025, easy: 10 },
+  high: { dpr: 2.5, ss: 1.75, floor: 1.25, shadows: 1, q: 2, post: 2, late: 0.025, easy: 10, px: 6.2e6 },
   // a computer with a graphics card: drawn at twice the screen's pixels (or more) and scaled down, finer shade
   // (and kept smooth: a frame slower than about 48 a second counts as late, where the others allow down to 28)
   // (sea: the spectrum sea, fftSea.js: the wind sea simulated from a wave spectrum on the graphics card)
-  ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021, sea: 1 },
+  // (px: never more pixels drawn than this, 3840 by 2160, however big the window: at 1440p twice the screen's pixels
+  // each way was 5120 by 2880, 14.7 million a frame, and the slowest 1% of frames fell to 47 a second; at 4K it would be
+  // four times that. The temporal antialiasing, on with Ultra, steadies the picture as much as the extra pixels did)
+  ultra: { dpr: 3, ss: 2, floor: 1.5, shadows: 1, q: 2, post: 3, late: 0.021, sea: 1, px: 8.3e6 },
 };
 /**
  * Every model and texture the world fetches goes through three.js's one loading manager: tell `on(loaded, total)` as
@@ -707,7 +710,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // (late: under about 28 frames a second. It used to count anything under 42 as late, so a steady 40 on a good
   // phone, or a busy moment, sent the picture down to one pixel per pixel for good, which is what made it look blocky.
   // It never goes below the setting's floor; at the floor, the ambient occlusion goes first)
-  let dprFloor = Math.min(dprMax, Q.floor || 1), dprNow = dprMax, late = 0, paceAt = 0, easyFor = 0;
+  let dprFloor = Math.min(dprMax, Q.floor || 1), dprNow = dprMax, late = 0, paceAt = 0, easyFor = 0, resFrac = 1; // (resFrac: Settings → Graphics → Resolution, for the pixel budget)
   // (where this device settled on this setting last time: it starts there, so a phone that can't hold the setting's
   // full sharpness doesn't spend the first ten seconds of every visit stuttering its way down to what it can. It still
   // climbs back when frames are easy)
@@ -955,6 +958,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   }
   function resize() {
     const w = canvas.clientWidth || canvas.parentElement?.clientWidth || 1, h = canvas.clientHeight || canvas.parentElement?.clientHeight || 1;
+    // (the pixel budget, Q.px: a big window draws at less than the preset's multiple of its pixels)
+    if (Q.px) {
+      const cap = Math.max(1, Math.sqrt(Q.px / (w * h))), want = Math.min(Math.max(1, dprTop * resFrac), cap);
+      if (Math.abs(want - dprMax) > 1e-3) { dprMax = want; dprFloor = Math.min(Q.floor || 1, dprMax); if (dprNow > dprMax || dprNow < dprFloor) { dprNow = Math.min(dprMax, Math.max(dprFloor, dprNow)); renderer.setPixelRatio(dprNow); } }
+    }
     // (only when the size or sharpness has changed: setting a canvas's size, even to what it already is, throws its
     // drawing buffer away and makes a new one, and a step in resolution had already done that once)
     const pr = renderer.getPixelRatio(); if (canvas.width !== Math.floor(w * pr) || canvas.height !== Math.floor(h * pr)) renderer.setSize(w, h, false);
@@ -974,13 +982,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // (only when it changes: World3D sends the preset's 100% straight after the world is made, and that put the
     // sharpness back to full, throwing away where this device had settled last time, so every visit stuttered its way
     // down again)
-    if (o.res != null && Math.max(0.5, Math.min(1, +o.res || 1)) !== G.res) { G.res = Math.max(0.5, Math.min(1, +o.res || 1)); dprMax = Math.max(1, dprTop * G.res); dprFloor = Math.min(dprMax, Q.floor || 1); dprNow = dprMax; renderer.setPixelRatio(dprNow); resize(); late = 0; easyFor = 0; }
+    if (o.res != null && Math.max(0.5, Math.min(1, +o.res || 1)) !== G.res) { G.res = Math.max(0.5, Math.min(1, +o.res || 1)); resFrac = G.res; dprMax = Math.max(1, dprTop * G.res); dprFloor = Math.min(dprMax, Q.floor || 1); dprNow = dprMax; renderer.setPixelRatio(dprNow); resize(); late = 0; easyFor = 0; }
     if (o.fps != null) { G.fps = [30, 60].includes(+o.fps) ? +o.fps : 0; fpsCap = G.fps; }
     if (o.tex != null) { G.tex = Math.max(1, Math.min(anisoCap, +o.tex || 1)); maxAniso = G.tex; texSeen = -1; sharpenAt = 60; }
     if (post) {
       if (o.ao != null) { G.ao = Math.max(0, Math.min(2, o.ao | 0)); post.setAO(G.ao); }
       if (o.bloom != null) { G.bloom = o.bloom ? 1 : 0; post.setBloom(!!G.bloom); }
-      if (o.aa != null) { G.aa = o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(G.aa); }
+      if (o.aa != null) { G.aa = o.aa >= 5 ? 5 : o.aa >= 4 ? 4 : o.aa >= 2 ? 2 : 0; post.setAA(Math.min(4, G.aa)); post.setTemporal(G.aa >= 5); } // (5: 4x and temporal, taa.js)
       if (o.sharp != null) { G.sharp = Math.max(0, Math.min(1, +o.sharp || 0)); post.setSharp(G.sharp); }
       if (o.refl != null) { G.refl = Math.max(0, Math.min(2, o.refl | 0)); env.setReflections(G.refl, renderer, { bigOnly: Q.q < 2 }); } // (Medium: the big things only, environment.js)
       if (o.sea != null) G.sea = env.setFftSea(!!o.sea, renderer) ? 1 : 0; // (the spectrum sea: Settings, or Ultra's default)
