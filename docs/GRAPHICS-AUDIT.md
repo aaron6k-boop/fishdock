@@ -274,6 +274,15 @@ level of detail on trees, frame pacing, the sea's multiple wave scales and wind 
    stage (now faint, so the lamps' own pools show); and walking away from a landed fish, the drop net was drawn on the
    deck beside you all the way, its rope trailing (now left out while you walk).
 
+31. **Filmed again on Aaron's PC after those fixes** (17 November, 23:25, the same scenes at 1080p Ultra, 497 frames):
+   the foam is a soft, broken lace on the water, not a grid; at night the deck is lit in pools by its own lamps and the
+   coastwatch's windows; the net is gone from the deck while you walk. The game's benchmark in the same run (the graphics
+   card again busy with other work beforehand, 21 to 42%, so not clean figures): Low 212 fps, Medium 102 (one
+   100 ms hitch as its textures loaded), High 120 fps with the slowest 1% at 70 and 8.1 ms of graphics card a frame,
+   drawn at 3318 by 1729. **Not done:** a frame-by-frame check of the temporal antialiasing against none for ghosting
+   on moving things (the line, the rod tip, a fish swinging up). It was started here in software rendering and was
+   too slow to finish; in the PC's footage nothing trails, but that footage wasn't made to show it.
+
 ## What is left, in order of what it would add
 
 1. Temporal anti-aliasing: done on High and Ultra (item 15), from depth and the camera's own motion; motion vectors from
