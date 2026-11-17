@@ -48,7 +48,6 @@ const USE = {
   "rodkit.glb": ["The rod (handle, seat, guides, blank) and the spinning reel", "close; the 3D view hides it past a few metres"],
   "reel.glb": ["The reel, older single model", "close"],
   "nets.glb": ["Drop net and landing net", "close to mid"],
-  "fish.glb": ["Fish bodies, fins and eyes", "close (in the hand) to mid (in the water)"],
   "eels.glb": ["The conger and the eel (from their straightened pictures)", "close (in the hand) to mid (in the water)"],
   "pierprops.glb": ["Lamps, lifebuoy stations, bollards, benches", "all distances, instanced along the pier"],
 };
@@ -68,7 +67,7 @@ export function build() {
   try {
     const list = readdirSync(fd).filter((x) => x.endsWith(".glb")).sort();
     let bytes = 0, tris = 0; for (const f of list) { const buf = readFileSync(join(fd, f)); bytes += buf.length; tris += glbStats(buf).tris; }
-    out.push(`| fish2/*.glb (${list.length} files) | The other species with a cut-out picture, one file each (${list.map((f) => f.replace(".glb", "")).join(", ")}) | close (in the hand) to mid (in the water); only the one hooked is fetched | ${kb(bytes)} in all | ${tris.toLocaleString("en-GB")} in all | none | none |`);
+    out.push(`| fish2/*.glb (${list.length} files) | Every sea fish with a cut-out picture, one file each, with its gill covers, mouth, sockets, rayed fins and the jaw and gill shape keys (build_fish3.py) (${list.map((f) => f.replace(".glb", "")).join(", ")}) | close (in the hand) to mid (in the water); only the one hooked is fetched | ${kb(bytes)} in all | ${tris.toLocaleString("en-GB")} in all | none | none |`);
   } catch { /* (none yet) */ }
   out.push("", "## Game-ready textures (`public/textures/`)", "", "| File | Size | Pixels | Format |", "|---|---|---|---|");
   const td = join(ROOT, "public/textures");

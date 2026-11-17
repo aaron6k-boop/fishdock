@@ -1643,6 +1643,182 @@
      "url": "https://bigsoundbank.com/UPLOAD/ogg/0597.ogg"
     }
    ]
+  },
+  {
+   "id": "polyhaven:boulder_01",
+   "name": "Boulder 01",
+   "source": "https://polyhaven.com/a/boulder_01",
+   "author": "Rico Cilliers",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "one of the four stones of the rock armour (public/models/armour.glb, made by source-assets/blender/build_armour.py: turned down to 2,000 and 300 triangles, its photograph tinted towards grey granite)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/polyhaven/armour/boulder_01/boulder_01_1k.gltf",
+     "bytes": 2773,
+     "sha256": "51487934db898b4c24072780a451e34eca5c02e3ada24a62bbc600bbc4019e92",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/boulder_01/boulder_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/armour/boulder_01/boulder_01.bin",
+     "bytes": 2938808,
+     "sha256": "7f5b06503d62bd95bfe9c6b8a354a5cc8ff04a4d271a8cf87a3e3125db4232d7",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/boulder_01/boulder_01.bin"
+    },
+    {
+     "file": "downloads/polyhaven/armour/boulder_01/textures/boulder_01_diff_1k.jpg",
+     "bytes": 987467,
+     "sha256": "c38f0e918f6dc16b8d386ba3cdd89805c78320c119a1ceec85856f82b09a65b8",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/boulder_01/textures/boulder_01_nor_gl_1k.jpg",
+     "bytes": 1183552,
+     "sha256": "0810cf6e89d89bb6eb065b4d2e2855288f5dcbd2c15c6e40ab90d462021b50aa",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/boulder_01/textures/boulder_01_arm_1k.jpg",
+     "bytes": 659386,
+     "sha256": "c57187c5746b6be913fa53846cb44ff78743e7ca5000f131c9627b99563c2b87",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_arm_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:namaqualand_boulder_03",
+   "name": "Namaqualand Boulder 03",
+   "source": "https://polyhaven.com/a/namaqualand_boulder_03",
+   "author": "Jenelle van Heerden (modelling) and Dario Barresi (photography)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "one of the four stones of the rock armour (public/models/armour.glb, made by source-assets/blender/build_armour.py: turned down to 2,000 and 300 triangles, its photograph tinted towards grey granite)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_03/namaqualand_boulder_03_1k.gltf",
+     "bytes": 2823,
+     "sha256": "14560936aaad68da0c0fc549b54c67bba4cd573dfe5b07f92835b9ca044a0092",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_03/namaqualand_boulder_03_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_03/namaqualand_boulder_03.bin",
+     "bytes": 1450268,
+     "sha256": "d24151021ed310fe3207f1b5964bff22b583e77d2617427a88b5dcbc0447a475",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_03/namaqualand_boulder_03.bin"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_03/textures/namaqualand_boulder_03_diff_1k.jpg",
+     "bytes": 867015,
+     "sha256": "cd1a44c22932eb18a5989474f60bdccd622a1fdb0854fd69899a32ab8efe3bd4",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_03/namaqualand_boulder_03_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_03/textures/namaqualand_boulder_03_nor_gl_1k.jpg",
+     "bytes": 851531,
+     "sha256": "c4c1d34d5fe79fdda70ddf1dc52046f3bb6002576d75c9a4643403c0ecdc55f4",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_03/namaqualand_boulder_03_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_03/textures/namaqualand_boulder_03_arm_1k.jpg",
+     "bytes": 607318,
+     "sha256": "604806ac2a67d6ae97d7bdeea2a0c859eac2cc42a08af480abdec70fd0385cf5",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_03/namaqualand_boulder_03_arm_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:namaqualand_boulder_04",
+   "name": "Namaqualand Boulder 04",
+   "source": "https://polyhaven.com/a/namaqualand_boulder_04",
+   "author": "Jenelle van Heerden",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "one of the four stones of the rock armour (public/models/armour.glb, made by source-assets/blender/build_armour.py: turned down to 2,000 and 300 triangles, its photograph tinted towards grey granite)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_04/namaqualand_boulder_04_1k.gltf",
+     "bytes": 2818,
+     "sha256": "04c858a3bdb22873efa988633e0c0d9d1468055f34c94d47742f75165a192078",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_04/namaqualand_boulder_04_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_04/namaqualand_boulder_04.bin",
+     "bytes": 1319676,
+     "sha256": "99ba28ddc8da9ba24e1a419e69ed05f14c4b483bf06268a8a77495545985318a",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_04/namaqualand_boulder_04.bin"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_04/textures/namaqualand_boulder_04_diff_1k.jpg",
+     "bytes": 886013,
+     "sha256": "1673e031ebcf5015206fec10bec676e55b049705b01fcef6bb2b2fb79e8de54c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_04/namaqualand_boulder_04_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_04/textures/namaqualand_boulder_04_nor_gl_1k.jpg",
+     "bytes": 906782,
+     "sha256": "a7042070d6e369c80d818b7e787b977bf84c1f78b0c83e3ecf690ac2fa17d291",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_04/namaqualand_boulder_04_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_04/textures/namaqualand_boulder_04_arm_1k.jpg",
+     "bytes": 600523,
+     "sha256": "b9556284b65a603cee0c282f1a13f1642ac64cd586db14caa065e7322ec95db2",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_04/namaqualand_boulder_04_arm_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:namaqualand_boulder_05",
+   "name": "Namaqualand Boulder 05",
+   "source": "https://polyhaven.com/a/namaqualand_boulder_05",
+   "author": "Jenelle van Heerden (modelling) and Dario Barresi (photography)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "one of the four stones of the rock armour (public/models/armour.glb, made by source-assets/blender/build_armour.py: turned down to 2,000 and 300 triangles, its photograph tinted towards grey granite)",
+   "downloaded": "2026-11-17",
+   "files": [
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_05/namaqualand_boulder_05_1k.gltf",
+     "bytes": 2872,
+     "sha256": "f8e5fd8fd981e889d621ba4e53170a52c47cd3053b8748ee7025ed1083f36a5f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_05/namaqualand_boulder_05_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_05/namaqualand_boulder_05.bin",
+     "bytes": 2015628,
+     "sha256": "a60ade71de8612c873f9112159ed5d93dcba58979007a0915bc10d551a9ed03c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/namaqualand_boulder_05/namaqualand_boulder_05.bin"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_05/textures/namaqualand_boulder_05_diff_1k.jpg",
+     "bytes": 867775,
+     "sha256": "58d1fba55e16a56fe2d6e016ac75bcddfbc3bb2273ca8c9127f1de497c54db2a",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_05/namaqualand_boulder_05_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_05/textures/namaqualand_boulder_05_nor_gl_1k.jpg",
+     "bytes": 1099873,
+     "sha256": "027359a8a79febee925cc29af3106cc12bdeed5bc91cb26f1d88f589c77f448d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_05/namaqualand_boulder_05_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/armour/namaqualand_boulder_05/textures/namaqualand_boulder_05_arm_1k.jpg",
+     "bytes": 713844,
+     "sha256": "1466c8467188f54c2fb655b05f9e1d0a9a93a366f3cd45878bcf6905487c5f3e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/namaqualand_boulder_05/namaqualand_boulder_05_arm_1k.jpg"
+    }
+   ]
   }
  ]
 }

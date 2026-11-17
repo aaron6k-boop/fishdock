@@ -12,8 +12,8 @@ const NAME = Object.fromEntries(PRESETS);
 export const PRESET_GFX = {
   performance: { res: 1, fps: 0, shadows: 0, shadowDist: 30, ao: 0, bloom: 0, aa: 0, refl: 0, tex: 4, sea: 0 },
   balanced: { res: 1, fps: 0, shadows: 1, shadowDist: 30, ao: 0, bloom: 1, aa: 4, sharp: 0.7, refl: 1, tex: 16, sea: 0 },
-  high: { res: 1, fps: 0, shadows: 2, shadowDist: 30, ao: 1, bloom: 1, aa: 4, sharp: 0.7, refl: 1, tex: 16, sea: 0 },
-  ultra: { res: 1, fps: 0, shadows: 2, shadowDist: 80, ao: 2, bloom: 1, aa: 4, sharp: 0.7, refl: 2, tex: 16, sea: 1 },
+  high: { res: 1, fps: 0, shadows: 2, shadowDist: 30, ao: 1, bloom: 1, aa: 5, sharp: 0.7, refl: 1, tex: 16, sea: 0 },
+  ultra: { res: 1, fps: 0, shadows: 2, shadowDist: 80, ao: 2, bloom: 1, aa: 5, sharp: 0.7, refl: 2, tex: 16, sea: 1 },
 };
 // Battery saver: 30 frames a second, three quarters of the pixels, no contact shade, glow or mirrored scene
 export const BATTERY = { fps: 30, res: 0.75, ao: 0, bloom: 0, refl: 0 };
@@ -32,7 +32,7 @@ const CONTROLS = [
   { k: "sea", label: "Sea", opts: [[0, "Waves"], [1, "Spectrum"]], why: "Spectrum simulates the wind sea from a wave spectrum on the graphics card: crowding crests, chop and whitecaps that come and go. Needs a graphics card with WebGL 2 float textures; a phone keeps Waves.", post: true },
   { k: "refl", label: "Water reflections", opts: [[0, "Sky only"], [1, "Scene"], [2, "Scene, smooth"]], why: "The dune, rocks, pier and town mirrored in the water. Scene draws the place a second time, smaller; smooth does it every frame.", post: true },
   { k: "sharp", label: "Sharpening", opts: [[0, "Off"], [0.5, "On"], [1, "Strong"]], why: "Crisper textures and edges after anti-aliasing, without bright halos round them.", post: true },
-  { k: "aa", label: "Anti-aliasing", opts: [[0, "Off"], [2, "2x"], [4, "4x"]], why: "Smooths jagged edges on railings, rods and the line.", post: true },
+  { k: "aa", label: "Anti-aliasing", opts: [[0, "Off"], [2, "2x"], [4, "4x"], [5, "4x + temporal"]], why: "Smooths jagged edges on railings, rods and the line. Temporal also steadies thin things and glints as you look about, over a few frames.", post: true },
   { k: "tex", label: "Texture sharpness", opts: [[2, "Low"], [4, "Medium"], [8, "High"], [16, "Highest"]], why: "How clear the deck, brick and sea stay when seen at a low angle." },
 ];
 

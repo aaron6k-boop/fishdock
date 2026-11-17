@@ -121,9 +121,69 @@ Looked at and found sound: tone mapping and exposure (one Neutral curve, exposur
 management (sRGB textures marked as such, linear lighting), anisotropic filtering, instancing, shader precompiling,
 level of detail on trees, frame pacing, the sea's multiple wave scales and wind response.
 
+14. **The fish were a cut-out picture wrapped on a smooth loft** (Aaron, 17 November: "rebuild the existing British
+   fish species with accurate anatomy"). **Changed** (`source-assets/blender/build_fish3.py`,
+   `public/models/fish2/<species>.glb`, all twenty sea fish): each body lofted finely over its picture's own outline,
+   its cross-section by kind of fish (a round fish's narrower back, a bream's deep flat sides, a shark's flat belly, a
+   gurnard's bony wedge of a head, a flatfish domed and thin to its fringe); the gill cover's edge and the
+   preopercle's line as grooves with the cover's flap standing proud; the mouth a lipped slit; each eye a dome with a
+   cornea's bulge in its socket; a shark's five gill slits; the fins' rays as ridges fading to the edge; the pelvic
+   fins a pair turned out from the belly; the pectoral fins, which the pictures paint on the flank, stood off it as a
+   rayed pair; a shark's pectorals turned out flat as its wings are. Two shape keys the game plays: the jaw drops and
+   the gill covers lift (slowly in the water, half open on the hook, gasping out of it). Each kind swims its own way
+   (an eel's long wave, a shark's, a mackerel's stiff body), a hooked fish shakes its head now and then, and a landed
+   fish flaps in bursts and tires. Filmed close on Aaron's PC. **Still:** the skins are the 480 by 320 pictures; no
+   larger licensed photographs of these species were found to replace them.
+15. **Shimmer in motion** (item 4). **Changed** (`src/lib/world3d/taa.js`): temporal anti-aliasing on High and Ultra
+   ("4x + temporal" in Settings, Graphics). Each frame is drawn from a slightly different point inside the pixel
+   (eight, in a fixed order) and blended with where that point of the world was last frame, found from the depth and
+   last frame's camera; anything that moved by itself (the sea, the fish, the rod, your hands, rain) is held to this
+   frame's colours round the pixel, which is what stops ghosts and smears; a cut or a jump starts it afresh. It reads
+   the ambient occlusion pass's own depth: resolving the multisampled picture's depth into a texture every frame
+   halved the frame rate on Direct3D (Aaron's PC), so with the ambient occlusion off it passes the picture through.
+   The sea's sharp glints are also widened to the turn of the reflected ray across the pixel (steadier glitter with
+   nothing carried over from earlier frames).
+16. **The rock armour was drawn stones.** **Changed** (`source-assets/blender/build_armour.py`, `public/models/armour.glb`):
+   four scanned boulders from Poly Haven (CC0), turned down to 2,000 triangles near and 300 far, their photographs
+   laid in one atlas and turned towards a grey granite's colour, put in the drawn stones' places, turns and sizes.
+17. **The harbour wall's piling was a flat sheet with its pans drawn on**: from out on the water it read as a painted
+   board. **Changed:** within 300 m of the marks on a computer, each 0.6 m of piling is a trapezoid 9 cm deep, each
+   face lit flat, on the drawn pans' own places; the waterline zigzags along it as it does on real sheet piling.
+18. **In your own view the cast's follow-through held your hands at the foot of the picture or below it** while the
+   lead flew, the rod standing straight up the middle (Aaron's PC, 17 November). **Changed:** the follow-through is
+   held out in front at chest height, the rod pointing up the lead's line a little right of your eye's, both hands in
+   view. Through the wind-up your left arm, holding the butt, came up across the lower left of the picture, its sleeve
+   17 to 23 cm from your eye: the sleeve within about 24 cm of your eye now dissolves (dithered over 6 cm, smoothed by
+   the temporal antialiasing). **Still:** the left forearm crosses the lower part of the picture in the wind-up and the
+   right hand passes close; moving the cast's moments or forcing the elbow down put the wrist past its range
+   (`tests/fpRig.test.js`), so a cleaner wind-up needs the cast solved again in Blender with the view as a condition.
+19. **The wellies were straight tubes.** **Changed:** each leg a moulded shape: a little flare at the top, full over
+   the calf, narrowing to the ankle, a raised band near the top.
+20. **The slowest frames at 1440p Ultra (47 fps for the slowest 1%).** Measured on Aaron's PC, 17 November, at
+   Gorleston with the 3D view full screen, one thing off at a time (Ultra; each run repeats to within about 5 fps):
+
+   | Ultra with | 1080p avg fps | slowest 1% | 1440p avg fps | slowest 1% |
+   |---|---|---|---|---|
+   | everything | 95 | 56 | 83 | 47 |
+   | no temporal antialiasing | 101 | 56 | 91 | 56 |
+   | no multisampling or temporal antialiasing | 114 | 72 | 113 | 92 |
+   | no ambient occlusion | 129 | 93 | 127 | 92 |
+   | no spectrum sea | 100 | 56 | 92 | 56 |
+   | no reflections | 102 | 56 | 92 | 56 |
+   | lighter shadows | 98 | 54 | 89 | 47 |
+
+   The ambient occlusion was the costliest part of the frame and the slowest frames came with it. **Changed:** on a
+   big picture (High and Ultra on a computer draw at up to twice the window's size) it is worked out at half size, still
+   a sample for every pixel of the window. Measured again on the PC while it was busy with other work (its graphics
+   card already at 49% before the run), so those numbers don't compare with these; the live game is measured again
+   below.
+21. **A hooked or landed shark's jaw tip vanished** as it gaped: its swimming wave was not a number a little ahead of
+   the snout, where a dropped jaw reaches. **Fixed**, with a check for every kind of swimming.
+
 ## What is left, in order of what it would add
 
-1. Temporal anti-aliasing (motion vectors for the custom shaders), for the shimmer in motion.
+1. Temporal anti-aliasing: done on High and Ultra (item 15), from depth and the camera's own motion; motion vectors from
+   the custom shaders would let it keep more of last frame on moving things (it holds them to this frame instead).
 2. KTX2 textures, and with them the 2K texture sets the PC launcher could carry (`docs/PC-ARCHITECTURE.md` section 4).
 3. The town: it is shown by photographs, as Aaron chose (10 November); modelled buildings would need his say.
 4. Frame rates at 4K on Aaron's PC. Done for 1080p and 1440p (17 November, the live game after #151, Microsoft Edge

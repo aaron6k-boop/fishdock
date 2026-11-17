@@ -11,7 +11,7 @@ import { phaseAt, DUR, lineState } from "../liveEvents.js";
 import { biteTaps, fightProfile, fightStyle, fishLoad, landingTimes, landingTech } from "../sceneActors.js";
 import { fishShape, buildFishMesh, bodyWidth } from "../fish3d.js";
 import { hasArt, artUrl } from "../../data/fishart.js";
-import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway, bodyWaveSlope } from "../fishMotion.js";
+import { bodyWave, turnToward, restHeight, surfaceSpine, releasePlan, releaseStep, swimAway, bodyWaveSlope, breathing, flapping, swimKind } from "../fishMotion.js";
 import { fishMaterials, donorOf, paintSkin } from "./fishLook.js";
 import { castPoint, dirOf } from "./spots.js";
 import { tripodPlan, buildTripod, TRIPOD, restHead } from "./tripod.js";
@@ -145,17 +145,18 @@ function netTexture() {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(10, 4); return t;
 }
 
-// ---- the species modelled in Blender (public/models/fish.glb, source-assets/blender/build_fish.py) ----
+// ---- the species modelled in Blender (public/models/fish2/<species>.glb, source-assets/blender/build_fish3.py: since 17
+// November each one's anatomy too, its gill covers, mouth, eyes in their sockets, fins with rays and paired pelvic fins,
+// and shape keys for its jaw and gill covers) ----
 const MODELLED_FISH = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack", "conger", "eel",
   // (the rest of the species with a cut-out picture: fish2.glb, build_fish2.py; the perch has none and stays lofted)
   "ballan-wrasse", "black-bream", "coalfish", "dab", "flounder", "garfish", "gurnard", "lesser-spotted-dogfish", "pouting", "smoothhound", "sole",
   "thick-lipped-mullet", "thornback-ray", "tope"]);
-const FIRST_SIX = new Set(["cod", "bass", "whiting", "mackerel", "plaice", "pollack"]);
 // (the conger and the eel are drawn curled in their pictures: their 3D body comes from a straight picture of them,
 // source-assets/fish-straight/straighten.py, and their model from eels.glb, build_eels.py. From the curled picture
 // the body was as deep as the whole curl, a third of its length at the tail)
 const STRAIGHT_PIC = new Set(["conger", "eel"]);
-const fishPart = (pic) => (STRAIGHT_PIC.has(pic) ? "eels" : FIRST_SIX.has(pic) ? "fish" : "fish2/" + pic); // (one file each, about 130 kB: only the fish you've hooked is fetched)
+const fishPart = (pic) => (STRAIGHT_PIC.has(pic) ? "eels" : "fish2/" + pic); // (one file each, about 350 kB: only the fish you've hooked is fetched)
 const EARLY_FISH = new Set(["cast", "waiting", "bite"]); // (the phases in which the coming fish is got ready)
 const modelledCache = new Map();
 /** One geometry for a modelled species: its body, fins and eyes as three groups (materials 0, 1 and 2), its uvs the
@@ -163,25 +164,47 @@ const modelledCache = new Map();
 function modelledFish(scene, species) {
   if (!modelledCache.has(species)) {
     const node = scene.getObjectByName("fish_" + species); if (!node) return null;
-    const parts = { fish_body: null, fish_fin: null, fish_eye: null };
+    const parts = { fish_body: null, fish_fin: null, fish_eye: null }, turn = new THREE.Matrix3();
     node.updateWorldMatrix(true, true);
-    node.traverse((o) => { if (o.isMesh && o.material?.name in parts) parts[o.material.name] = o.geometry.clone().applyMatrix4(o.matrixWorld); });
+    node.traverse((o) => {
+      if (!(o.isMesh && o.material?.name in parts)) return;
+      const g = o.geometry.clone().applyMatrix4(o.matrixWorld);
+      // (build_fish3.py's shape keys, the jaw dropping and the gill covers lifting, as glTF morph targets: turned as the
+      // part was, kept as plain arrays poseFish adds in)
+      const names = o.morphTargetDictionary || {}; turn.setFromMatrix4(o.matrixWorld);
+      g.userData.morph = {};
+      for (const k of ["gape", "gills"]) {
+        const a = o.geometry.morphAttributes?.position?.[names[k]]; if (!a) continue;
+        const d = new Float32Array(a.count * 3), v = new THREE.Vector3();
+        for (let i = 0; i < a.count; i++) { v.fromBufferAttribute(a, i).applyMatrix3(turn); d[i * 3] = v.x; d[i * 3 + 1] = v.y; d[i * 3 + 2] = v.z; }
+        g.userData.morph[k] = d;
+      }
+      g.morphAttributes = {}; parts[o.material.name] = g;
+    });
     const list = [parts.fish_body, parts.fish_fin, parts.fish_eye].filter(Boolean); if (!list.length || !parts.fish_body) return null;
-    const pos = [], uv = [], idx = [], groups = []; let base = 0;
+    const pos = [], uv = [], col = [], idx = [], groups = [], morph = { gape: [], gills: [] }; let base = 0;
     list.forEach((g, gi) => {
       const p = g.attributes.position.array, t = g.attributes.uv.array, ix = g.index ? g.index.array : [...Array(p.length / 3).keys()];
       for (let i = 0; i < p.length; i++) pos.push(p[i]);
       for (let i = 0; i < t.length; i += 2) { uv.push(t[i], 1 - t[i + 1]); }
+      // (the shade: build_fish3.py's colour, darkest in the grooves; white where a model has none)
+      const c = g.attributes.color;
+      for (let i = 0; i < p.length / 3; i++) { if (c) col.push(c.getX(i), c.getY(i), c.getZ(i)); else col.push(1, 1, 1); }
+      for (const k of ["gape", "gills"]) { const d = g.userData.morph?.[k]; for (let i = 0; i < p.length; i++) morph[k].push(d ? d[i] : 0); }
       groups.push([idx.length, ix.length, [parts.fish_body, parts.fish_fin, parts.fish_eye].indexOf(g)]);
       for (const k of ix) idx.push(k + base); base += p.length / 3;
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(base > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
     for (const [st, n, m] of groups) geo.addGroup(st, n, m);
-    geo.computeVertexNormals(); modelledCache.set(species, geo);
+    geo.computeVertexNormals();
+    const has = (a) => a.some((v) => v !== 0);
+    geo.userData.morph = { gape: has(morph.gape) ? new Float32Array(morph.gape) : null, gills: has(morph.gills) ? new Float32Array(morph.gills) : null };
+    modelledCache.set(species, geo);
   }
-  return modelledCache.get(species).clone();
+  const src = modelledCache.get(species), g = src.clone(); g.userData = { ...src.userData }; return g;
 }
 
 /** A generic fish (for species without a FishDock picture): a smooth lofted body and a forked tail. */
@@ -520,8 +543,13 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // the rod jumped with it, 10 to 13 cm in a frame as a ray's modelled shape, thicker along its spine, replaced the
   // picture's, tools/arm-steady.mjs, 15 November. A fish not yet shown takes its size at once)
   const easeFishBox = (dt) => { if (!fishBoxWant) return; const k = 1 - Math.exp(-Math.max(0, dt || 0) / 0.35); for (const q of ["up", "down", "thick"]) fishBox[q] += (fishBoxWant[q] - fishBox[q]) * k; };
+  let fishMorph = null; // (the modelled fish's jaw and gill covers: build_fish3.py's shape keys, in fish lengths)
+  let breathMode = "water", fishSeed = 0, fishKind = "carangiform"; // (how it's breathing this frame: in the water, hooked, or gasping in the air; its own rhythm)
   function useGeometry(geo, materials) {
     assetsN++;
+    // (every fish skin multiplies by its vertices' shade: a fish without one is white all over)
+    if (!geo.attributes.color) geo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
+    fishMorph = geo.userData?.morph && (geo.userData.morph.gape || geo.userData.morph.gills) ? geo.userData.morph : null;
     fish.geometry = fishGeo = geo; fishBase = geo.attributes.position.array.slice(); fishBaseN = baseNormals(geo);
     let up = 0, down = 0, thick = 0;
     // (a thornback's thorns left out: they don't change how the fish lies or sits in the water. Counted, they made it
@@ -538,7 +566,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   function setFish(species, lengthCm, weightKg) {
     const key = `${species}|${lengthCm}|${weightKg}`;
     if (key === fishFor) return; fishFor = key;
-    prof = fightProfile(species); fishLen = clamp((lengthCm || 40) / 100, 0.12, 2);
+    { let h = 0; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0; fishSeed = (h % 1000) / 1000; }
+    prof = fightProfile(species); fishLen = clamp((lengthCm || 40) / 100, 0.12, 2); fishKind = swimKind(species, { eel: !!prof.eel });
     load = fishLoad(species, lengthCm, weightKg); LT = landingTimes(species, lengthCm, weightKg, venue); tech = landingTech(species, lengthCm, weightKg, venue);
     setMats(fishMaterials(species, { len: fishLen })); useGeometry(genericFishGeometry(), mats.body);
     // its own picture where FishDock has one; otherwise the picture of a fish of a similar build (fishLook.js DONORS),
@@ -569,7 +598,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         geo.computeVertexNormals();
         setMats(fishMaterials(species, { map: tex, len: fishLen }));
         useGeometry(geo, [mats.body, mats.fin, mats.eye]);
-        // the species modelled in Blender (fish.glb: a rounder body, a fuller belly, eyes standing proud), where there
+        // the species modelled in Blender (fish2/<species>.glb: its anatomy, see build_fish3.py), where there
         // is one: the same picture over it, the same bending
         if (MODELLED_FISH.has(pic)) loadPart(fishPart(pic)).then((sc) => {
           if (fishFor !== key) return;
@@ -590,10 +619,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // turn from the last frame's, for a fish swimming (its heading changes at a fish's pace, not in a jump)
   const fBase = new THREE.Vector3(), fishQ = new THREE.Quaternion(), mtx = new THREE.Matrix4(), fUp = new THREE.Vector3(), fZ = new THREE.Vector3(), fRef = new THREE.Vector3();
   let fishShown = false;
-  function poseFish(at, dir, t, { beat = 1, curl = 0, roll = 0, ease: easeK = 0 } = {}) {
-    const p = fishGeo.attributes.position, a = p.array, na = fishGeo.attributes.normal.array, wave = { tempo: prof.tempo, flex: prof.flex, beat, curl };
+  function poseFish(at, dir, t, { beat = 1, curl = 0, roll = 0, ease: easeK = 0, shake = 0 } = {}) {
+    const p = fishGeo.attributes.position, a = p.array, na = fishGeo.attributes.normal.array, wave = { tempo: prof.tempo, flex: prof.flex, beat, curl, kind: fishKind, shake };
+    // breathing: the mouth and the gill covers (fishMotion.js breathing), in the water slow and slight, hooked held
+    // half open, out of it gasping
+    const br = fishMorph ? breathing(t, { mode: breathMode, flat: !!prof.flat, seed: fishSeed }) : null;
+    const mg = br && fishMorph.gape ? fishMorph.gape : null, ml = br && fishMorph.gills ? fishMorph.gills : null, kg = br ? br.gape : 0, kl = br ? br.gills : 0;
     for (let i = 0; i < a.length; i += 3) {
-      const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2];
+      let u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2];
+      if (mg) { u += mg[i] * kg; y += mg[i + 1] * kg; z += mg[i + 2] * kg; }
+      if (ml) { u += ml[i] * kl; y += ml[i + 1] * kl; z += ml[i + 2] * kl; }
       a[i] = u * fishLen; a[i + 1] = y * fishLen; a[i + 2] = (z + bodyWave(u, t, wave)) * fishLen;
       // (z goes to z + w(u): a normal (nx, ny, nz) goes to (nx - w'(u) nz, ny, nz), made unit again)
       const nz = fishBaseN[i + 2], nx = fishBaseN[i] - bodyWaveSlope(u, t, wave) * nz, ny = fishBaseN[i + 1], nl = 1 / (Math.hypot(nx, ny, nz) || 1);
@@ -867,7 +902,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         const dir = new THREE.Vector3(-Math.cos(fishHead), clamp(vel.y * 0.3, -0.4, 0.4), -Math.sin(fishHead)).normalize();
         const wallow = upK > 0.8 && !prof.flat ? Math.max(0, Math.sin(age * 1.3 + P.s1)) ** 6 * 0.9 * P.side : 0;
         if (wallow && Math.abs(wallow) > 0.6 && Math.floor(age / 0.5) !== Math.floor((age - dt) / 0.5)) { const w2 = f.clone(); w2.y = surfNow; rippleCb?.(w2, 0.35); }
-        fishPose = { mouth: f.clone(), dir, beat: 1.1 + 0.9 * surge, curl: clamp(-turnRate * 0.12, -0.35, 0.35), roll: (prof.flat ? -Math.PI / 2 : 0) + wallow, ease: 1 - Math.exp(-dt * 10) };
+        // (now and then it shakes its head against the hook, the head swinging fast and the tail barely: more for a
+        // darting fish, and most when it's near the top)
+        const shake = clamp(Math.max(0, Math.sin(age * 0.8 + P.s1 * 3)) ** 10 * (0.4 + 0.6 * upK) * (0.3 + prof.erratic) * 1.3, 0, 1);
+        fishPose = { mouth: f.clone(), dir, beat: 1.1 + 0.9 * surge, curl: clamp(-turnRate * 0.12, -0.35, 0.35), roll: (prof.flat ? -Math.PI / 2 : 0) + wallow, ease: 1 - Math.exp(-dt * 10), shake };
       }
       fishPrev = f.clone();
       // where the line cuts the surface over the fish: a small wake of rings as it moves, stronger as it surges or
@@ -1084,7 +1122,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const T_TAKE = 0.6, T_LAY = 1.9, f = ease(seg(kt, T_TAKE, T_LAY));
           const hang = toWorld(fp ? SWING_FP.clone() : SWING_TP.clone()), down = new THREE.Vector3(0, -1, 0), centre0 = hang.clone().addScaledVector(down, fishLen * 0.5);
           if (kept.from === "line" && kt < T_LAY) { const c = centre0.clone().lerp(onMat, f); c.y += Math.sin(f * Math.PI) * 0.06; keptPose = poseD(c, down.clone().lerp(side.clone().negate(), f).normalize(), lerp(0, LIE, f), { beat: 0.5 * (1 - f) + 0.1, curl: Math.sin(kt * 7) * 0.12 * (1 - f), lift: true }); keptPose.take = kt < T_TAKE; }
-          else { keptPose = pose(onMat, LIE, { beat: 0.08, curl: Math.max(0, Math.sin(kt * 1.7)) ** 8 * 0.5 }); keptPose.rest = true; } // (then a hand resting on it, as when you've looked at it: the arms didn't vanish from round it)
+          else { keptPose = pose(onMat, LIE, { ...flapping(kt, { seed: fishSeed, tired: Math.min(1, kt / 60) }) }); keptPose.rest = true; } // (then a hand resting on it, as when you've looked at it: the arms didn't vanish from round it)
           if (kept.from === "line" && crossed2(kt, T_LAY - 0.05)) onSound?.("mat", onMat);
         } // (a fish swung up by hand is laid on the unhooking mat: on the bare deck it lay half under the mat)
       } else if (kept.state === "inspect") {
@@ -1099,8 +1137,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         const T_LIFT = 1.1, T_HOLD = 3.6, T_DOWN = 4.7;
         const crossDir = side.clone().multiplyScalar(-0.82).addScaledVector(away, -0.57).normalize(); // (on the mat: across it at a slant, so the camera on your left sees its length)
         if (kt < T_LIFT) { const f = ease(kt / T_LIFT), c = from.clone().lerp(hold, f); c.y += Math.sin(f * Math.PI) * 0.12; keptPose = poseD(c, crossDir.clone().lerp(holdDir, f), lerp(LIE, 0, f), { beat: 0.35, curl: Math.sin(kt * 6) * 0.1, lift: true }); }
-        else if (kt < T_HOLD) { const c = hold.clone(); c.y += Math.sin(kt * 1.6) * 0.008; keptPose = poseD(c, holdDir, 0, { beat: 0.12, curl: Math.max(0, Math.sin(kt * 2.1)) ** 12 * 0.3, lift: true }); }
-        else { const f = ease(seg(kt, T_HOLD, T_DOWN)), c = hold.clone().lerp(onMat, f); keptPose = poseD(c, holdDir.clone().lerp(crossDir, f), lerp(0, LIE, f), { beat: 0.08, curl: f < 1 ? 0 : Math.max(0, Math.sin(kt * 1.1)) ** 10 * 0.25, lift: f < 1 }); }
+        else if (kt < T_HOLD) { const c = hold.clone(); c.y += Math.sin(kt * 1.6) * 0.008; keptPose = poseD(c, holdDir, 0, { ...flapping(kt + 1.3, { seed: fishSeed, tired: 0.3 + Math.min(0.7, kt / 60) }), lift: true }); }
+        else { const f = ease(seg(kt, T_HOLD, T_DOWN)), c = hold.clone().lerp(onMat, f); keptPose = poseD(c, holdDir.clone().lerp(crossDir, f), lerp(0, LIE, f), { ...(f < 1 ? { beat: 0.08, curl: 0 } : flapping(kt, { seed: fishSeed, tired: 0.5 + Math.min(0.5, kt / 60) })), lift: f < 1 }); }
         if (crossed2(kt, T_DOWN - 0.05)) onSound?.("mat", keptPose.centre); // laid down on the mat
         if (kt > T_DOWN + 1 && Math.sin(prevKt * 1.1) < 0.97 && Math.sin(kt * 1.1) >= 0.97) onSound?.("flap", keptPose.centre); // (each flap of its tail)
       } else if (kept.state === "release") {
@@ -1146,7 +1184,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const fall = seg(kt, plan.over, plan.lower), g = 9.81, drop = Math.max(0.5, dropHold.y - edgeAt.y), tFall = Math.sqrt(2 * drop / g), tt = fall * (plan.lower - plan.over);
           const c = dropHold.clone(); c.y = Math.max(edgeAt.y - 0.3 * fishLen, dropHold.y - 0.5 * g * Math.min(tt, tFall + 0.15) ** 2); c.addScaledVector(away, Math.min(tt, tFall) * 0.65);
           const d0 = holdD, dir = step === "over" ? d0 : d0.clone().lerp(new THREE.Vector3(0, -1, 0), ease(Math.min(1, tt / tFall))).normalize();
-          keptPose = { mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir, roll: 0, beat: step === "over" ? 0.15 : 1.6, curl: step === "over" ? Math.max(0, Math.sin(kt * 2.1)) ** 12 * 0.3 : Math.sin(kt * 14) * 0.25, centre: c, lift: step === "over" };
+          keptPose = { mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir, roll: 0, beat: step === "over" ? flapping(kt, { seed: fishSeed, tired: 0.4 }).beat : 1.6, curl: step === "over" ? flapping(kt, { seed: fishSeed, tired: 0.4 }).curl : Math.sin(kt * 14) * 0.25, centre: c, lift: step === "over" };
           rel.stage = step === "over" ? "in" : "lower"; rel.water = edgeAt.y;
           if (crossed2(kt, plan.over + tFall)) { const sp = c.clone(); sp.y = wh(sp.x, sp.z); splashCb?.(sp, 0.4 + 0.3 * prof.splashy); rippleCb?.(sp, 0.7); onSound?.("splash", sp); }
         } else if (step === "over" || step === "lower") {
@@ -1776,6 +1814,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     tag.visible = !fp && !tagOff && !(kept && (kept.state === "inspect" || kept.state === "release")); // (no name label in your catch photo)
     talk.visible = speaking && !fp; if (speaking) { const k = 0.3 + Math.abs(Math.sin(t * 6)) * 0.08; talk.scale.set(k, k, 1); }
     const eK = 1 - Math.exp(-dt * 10); // (how far a swimming fish's turn eases this frame)
+    // (out of the water it gasps: on the mat, in your hands, in the net, swung up on the line or drawn up the sand;
+    // swimming off when put back it breathes as it swims; otherwise it's on the hook)
+    breathMode = keptPose ? (keptPose.ease ? "water" : "air") : showFish && inNet ? "air" : ph === "landing" && (tech === "lift" || tech === "beach") && age >= LT.T1 ? "air" : "hooked";
     if (keptPose) poseFish(keptPose.mouth, keptPose.dir, t, { beat: keptPose.beat, curl: keptPose.curl, roll: keptPose.roll, ease: keptPose.ease ? eK : 0 });
     else if (showFish && inNet && netAt) {
       // in the net: lying across the bag, curled to fit, sagging into the mesh while it hangs; set down on the deck or

@@ -148,7 +148,10 @@ export function createRockSpray(scene, edge = []) {
         const h = heightAt(e.x + e.ox * 1.5, e.z + e.oz * 1.5), lim = breakHeight(energy);
         if (h > lim && e.was <= lim && t - e.last > e.wait) {
           const s = burstStrength((h - e.was) / dt, energy, Math.random());
-          if (s > 0) { e.last = t; e.wait = 1.2 + Math.random() * 2.2; burst(e.x + e.ox * 1.3, h, e.z + e.oz * 1.3, s, -e.ox, -e.oz); } // (on the stone's seaward face, where it shows)
+          // (in a moderate sea a stone takes a wave white now and then, not every few seconds: along the far armour in a
+          // 13 mph breeze the bursts every second or two, each leaving white lying on the water, read as a row of cotton
+          // wool on the rocks, seen on Aaron's PC, 17 November)
+          if (s > 0) { e.last = t; e.wait = (1.2 + Math.random() * 2.2) * (1 + 2.2 * (1 - Math.min(1, energy))); burst(e.x + e.ox * 1.3, h, e.z + e.oz * 1.3, s, -e.ox, -e.oz); } // (on the stone's seaward face, where it shows)
         }
         e.was = h;
       }
@@ -170,7 +173,7 @@ export function createRockSpray(scene, edge = []) {
           if (afloat[i]) { vel[i * 3] *= dragM; vel[i * 3 + 2] *= dragM; vel[i * 3 + 1] = 0; pos[i * 3 + 1] = (heightAt ? heightAt(pos[i * 3], pos[i * 3 + 2]) : 0) + 0.06; }
           else { vel[i * 3] = (vel[i * 3] - wx) * dragM + wx; vel[i * 3 + 2] = (vel[i * 3 + 2] - wz) * dragM + wz; vel[i * 3 + 1] = vel[i * 3 + 1] * dragM - 4.2 * dt; }
           const u = age[i] / life[i];
-          size[i] += dt * grow[i]; fade[i] = Math.min(1, age[i] * 10) * Math.pow(1 - u, 1.35) * (afloat[i] ? 0.55 : 0.9);
+          size[i] += dt * grow[i]; fade[i] = Math.min(1, age[i] * 10) * Math.pow(1 - u, afloat[i] ? 2.2 : 1.35) * (afloat[i] ? 0.3 : 0.9); // (the white left lying on the water fainter, and gone sooner: foam breaking up, not a lump)
         }
         pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] += vel[i * 3 + 1] * dt; pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
       }

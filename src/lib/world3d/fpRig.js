@@ -160,6 +160,12 @@ let DIM = 1, WET = 0; const liveMats = new Set();
 const tint = (m) => m.color.copy(m.userData.base).multiplyScalar(DIM * (1 - (m.userData.wetDark || 0) * WET));
 /** the arms in the dark: the colours scaled down at night unless a torch is on (world.js) */
 export function setHandsDim(k) { DIM = clamp(k, 0.2, 1); for (const m of liveMats) tint(m); }
+// (with the temporal antialiasing on, the coat's cut near your eye looking down may dissolve over a wider band: the
+// dither is smoothed into a fade there, where without it a wide band showed as a screen of dots (15 November). Looking
+// down at the drop net the cut's hard edge left the sleeve a torn blue ribbon, in the 17 November film on Aaron's PC)
+let SOFT = false;
+/** the temporal antialiasing on or off (world.js, with Settings → Graphics) */
+export function setSoftCut(on) { SOFT = !!on; }
 // ---- your arms in the rain ----
 // Wet skin and a wet nylon coat are glossier and a little darker: water fills the skin's fine grain and soaks the
 // coat's weave. They wet through in about a minute of rain and dry over a few once it stops, rather than with the
@@ -345,7 +351,11 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // (and further off when you look down past your arms at a net or the deck below the rail: from above, the sleeves
   // between your shoulders and elbows are right under your eye, and filled half the picture in the 13 November
   // recording, hauling the drop net and putting the cod back. Your forearms and hands still show)
-  const nearCut = { value: 0.16 };
+  const nearCut = { value: 0.16 }, cutSoft = { value: 0.012 };
+  // (and through a cast's wind-up, further still and dissolving rather than cut: the left arm holding the butt comes up
+  // in front of you, and its sleeve, 17 to 23 cm from your eye, filled the lower left of the picture in the 17 November
+  // film on Aaron's PC. Within about 24 cm of your eye it fades out over 6 cm, finely dithered (smoothed into a fade by
+  // the temporal antialiasing on High and Ultra); your forearms and hands, further off, still show)
   // (and near your eye the inside of a sleeve is never drawn: where the cut opens a sleeve, its lining showed as a
   // ring or a dark flap round your forearm, hauling or lowering the drop net looking down over the rail (Aaron's
   // screenshots of 14 November, putting a thornback ray back). Without it you see your forearm inside, or the cut
@@ -355,12 +365,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // parts are its body is marked on each vertex when the rig is built (markTorso); your sleeves still show)
   const lookDown = { value: 0 };
   coatMat.onBeforeCompile = (sh) => {
-    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown;
+    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown; sh.uniforms.fpCutSoft = cutSoft;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nvarying float vTorso;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso;");
     // (the cut's edge softened by a fine ordered dither over 1.2 cm. It was 5 cm, against a sawtooth seen through the
     // cast that turned out to be the cuff's own edge (dropLining, fixed 15 November); looking down at the drop net the
     // upper sleeve lies almost wholly inside a 5 cm band, and showed as a screen of dots)
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nvarying float vTorso;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * 0.012 || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nuniform float fpCutSoft;\nvarying float vTorso;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * fpCutSoft || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
   };
   clothe(coatMat);
   { const prev = coatMat.onBeforeCompile; coatMat.onBeforeCompile = (sh, r) => { prev.call(coatMat, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(0.9, 0.025, 10, 0.75)); }; }
@@ -679,7 +689,8 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     pose(o) {
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
-      { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0; nearCut.value += (0.16 + 0.17 * down - nearCut.value) * Math.min(1, dt * 6); lookDown.value = down; }
+      { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0, ct = o.castT, wind = ct == null ? 0 : clamp((ct - 0.12) / 0.15, 0, 1) * (1 - clamp((ct - 0.8) / 0.15, 0, 1));
+        nearCut.value += (Math.max(0.16 + 0.17 * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.012 + Math.max(0.06 * wind, SOFT ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)

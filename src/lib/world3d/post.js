@@ -10,6 +10,7 @@
 // same either way.
 import * as THREE from "three";
 import { EffectComposer } from "./vendor/three-post/postprocessing/EffectComposer.js";
+import { TAAPass } from "./taa.js";
 import { RenderPass } from "./vendor/three-post/postprocessing/RenderPass.js";
 import { GTAOPass } from "./vendor/three-post/postprocessing/GTAOPass.js";
 import { UnrealBloomPass } from "./vendor/three-post/postprocessing/UnrealBloomPass.js";
@@ -56,6 +57,11 @@ export const GradeShader = {
     }`,
 };
 
+// the drawn picture's size (pixels) from which the ambient occlusion is worked out at half size (the film build can
+// change it, for measuring both on one run)
+export const AO_SIZE = { halfFrom: 4e6 };
+if (typeof window !== "undefined" && window.__fdFilm) window.__fdAoSize = AO_SIZE;
+
 /** level 0: none (draw straight to the screen); 1: MSAA, bloom and grade; 2: plus ambient occlusion; 3: finer AO. */
 export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   // (the buffer is half-float, for the light brighter than white that the bloom needs: a graphics chip that can't
@@ -67,6 +73,10 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
   const composer = new EffectComposer(renderer, rt);
   composer.setPixelRatio(pr); composer.setSize(size.x, size.y);
   composer.addPass(new RenderPass(scene, camera));
+  // temporal antialiasing (taa.js): after the scene and its shade (the ambient occlusion goes in before it, and its
+  // depth is what this uses), before the glow. Off until set on
+  const taa = new TAAPass(camera, size.x * pr, size.y * pr); taa.on = false; composer.addPass(taa);
+  taa.depthSource = () => (ao && ao.enabled ? ao.depthTexture : null);
   let ao = null, aoLevel = 0;
   // (made when first needed: at level 2 or 3 from the start, or later when Settings → Graphics turns it on)
   function makeAO() {
@@ -88,6 +98,14 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
         if (o.isPoints || o.isLine || o.isSprite || see || o.userData.noAO) o.visible = false;
       });
     };
+    // (on a big picture the shade is worked out at half its size, a sample for every four pixels: drawing High or Ultra
+    // on a computer at up to twice the window's size, that is still a sample for every pixel of the window, and the
+    // shade is soft by nature. Measured on Aaron's PC (17 November, Ultra, Gorleston, 1920 by 1080): the full-size
+    // shade cost about 2.8 ms of a 10.5 ms frame, more than any other part, and the slowest frames came with it.
+    // The temporal antialiasing reads this pass's depth, at this size too)
+    const aoSet = ao.setSize.bind(ao);
+    ao.setSize = (w, h) => { const k = w * h >= AO_SIZE.halfFrom ? 0.5 : 1; aoSet(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))); };
+    ao.setSize(composer.renderTarget1.width, composer.renderTarget1.height);
     composer.insertPass(ao, 1); // (straight after the scene is drawn)
   }
   // contact shade at a person's or a bucket's scale (half a metre), fading with distance so the far town isn't dirty.
@@ -130,7 +148,13 @@ export function createPost(renderer, scene, camera, { level = 1 } = {}) {
       n = n >= 4 ? 4 : n >= 2 ? 2 : 0; if (n === samples) return; samples = n;
       for (const t of [composer.renderTarget1, composer.renderTarget2]) { t.samples = n; t.dispose(); }
     },
-    render() { grade.uniforms.uSeed.value = (seed = (seed + 1) % 97); composer.render(); },
+    render() {
+      grade.uniforms.uSeed.value = (seed = (seed + 1) % 97);
+      const t = composer.renderTarget1; taa.jitter(t.width, t.height); composer.render(); taa.unjitter();
+    },
+    /** temporal antialiasing on or off (taa.js) */
+    setTemporal(on) { if (taa.on !== !!on) { taa.on = !!on; taa.reset = true; } },
+    get temporal() { return taa.on; },
     setSize(w, h) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); const r = renderer.getPixelRatio(); grade.uniforms.uTexel.value.set(1 / (w * r), 1 / (h * r)); },
     /** sharpening, 0..1 (Settings → Graphics) */
     setSharp(v) { grade.uniforms.uSharp.value = Math.max(0, Math.min(1, +v || 0)); },
