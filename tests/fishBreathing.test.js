@@ -57,3 +57,11 @@ test("a head shake swings the head, not the tail", () => {
   let head = 0, tail = 0; for (let t = 0; t < 2; t += 0.005) { head = Math.max(head, Math.abs(bodyWave(0.05, t, { beat: 0, shake: 1 }))); tail = Math.max(tail, Math.abs(bodyWave(0.95, t, { beat: 0, shake: 1 }))); }
   assert.ok(head > 10 * tail);
 });
+test("every kind of swimming stays a number a little ahead of the snout and past the tail (a gaping jaw's tip, a fin's edge)", () => {
+  // (17 November: a hooked dogfish's jaw, half open, reached ahead of its snout, and the shark's wave there was not a
+  // number: its jaw's points vanished and three warned of a geometry with no size)
+  for (const kind of ["carangiform", "eel", "shark", "tuna"]) for (const u of [-0.08, -0.01, 0, 1, 1.05]) for (const t of [0.3, 1.1]) {
+    assert.ok(Number.isFinite(bodyWave(u, t, { kind, shake: 0.5, curl: 0.2 })), `${kind} at ${u}`);
+    assert.ok(Number.isFinite(bodyWaveSlope(u, t, { kind, shake: 0.5, curl: 0.2 })), `${kind}'s slope at ${u}`);
+  }
+});

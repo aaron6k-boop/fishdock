@@ -36,7 +36,7 @@ export function bodyWaveSlope(u, t, { tempo = 1, flex = 1, beat = 1, curl = 0, k
 const WAVES = {
   carangiform: { lam: 5.2, env: (u) => 0.18 + 0.82 * u * u, envD: (u) => 1.64 * u },
   eel: { lam: 9.5, env: (u) => 0.35 + 0.65 * u, envD: () => 0.65 },
-  shark: { lam: 7.5, env: (u) => 0.25 + 0.75 * u ** 1.5, envD: (u) => 1.125 * Math.sqrt(Math.max(0, u)) },
+  shark: { lam: 7.5, env: (u) => 0.25 + 0.75 * Math.max(0, u) ** 1.5, envD: (u) => 1.125 * Math.sqrt(Math.max(0, u)) }, // (from 0: a gaping shark's jaw tip reaches a little ahead of its snout, u below 0, and a fractional power of that was not a number: its jaw's points vanished, the 17 November release check)
   tuna: { lam: 4.6, env: (u) => 0.12 + 0.88 * u ** 3, envD: (u) => 2.64 * u * u },
 };
 const HEAD_SHAKE = 0.06; // (a hooked fish shaking its head: the head swings most, the tail barely)
