@@ -71,3 +71,21 @@ test("every person's model, portrait and the shared movements are in public/peop
     if (p !== "anims") { const hd = new URL(`${p}_hd.glb`, dir); assert.ok(existsSync(hd), `${p}_hd`); const m = statSync(hd).size; assert.ok(m > n && m < lim[1], `${p}_hd ${m} bytes`); assert.equal(readFileSync(hd).subarray(0, 4).toString(), "glTF"); }
   }
 });
+
+test("the new people's skeletons have the Rocketbox files' top, which the moves are made for", async () => {
+  // (Blender wrote Bip01 with the file's 1/100 scale on it; the moves set Bip01's position in centimetres, which lifted
+  // the whole skeleton 89 m and every hat and pair of glasses with it: source-assets/blender/people2/fix_rig.py)
+  const { PEOPLE } = await import("../src/lib/world3d/people.js");
+  const { readFileSync } = await import("node:fs");
+  for (const p of PEOPLE.filter((x) => x.v2)) {
+    for (const f of [p.file, p.file + "_hd"]) {
+      const b = readFileSync(new URL(`../public/people/${f}.glb`, import.meta.url)); const n = b.readUInt32LE(12); const j = JSON.parse(b.subarray(20, 20 + n).toString());
+      const nodes = j.nodes, par = {}; nodes.forEach((nd, i) => (nd.children || []).forEach((c) => { par[c] = i; }));
+      const bi = nodes.findIndex((nd) => nd.name === "Bip01"), pi = nodes.findIndex((nd) => nd.name === "Bip01_Pelvis");
+      assert.ok(bi >= 0 && pi >= 0, f);
+      assert.ok(!nodes[bi].scale || Math.abs(nodes[bi].scale[0] - 1) < 1e-3, `${f}: Bip01 has no scale of its own`);
+      assert.ok(par[bi] != null && Math.abs((nodes[par[bi]].scale || [1])[0] - 0.01) < 1e-4, `${f}: Bip01 sits under the 1/100 scale`);
+      assert.ok((nodes[pi].translation || [0, 0, 0]).every((v) => Math.abs(v) < 1e-3), `${f}: the hips' bone has no offset`);
+    }
+  }
+});

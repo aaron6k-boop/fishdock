@@ -6,9 +6,9 @@
 # the 1/100 scale and the hips' bone has no offset. On Blender's layout the moves lifted the whole skeleton 89 m into
 # the air, and everything carried by a bone (hats, glasses, the head torch) with it.
 #
-# This rewrites only the nodes' transforms and the skin's inverse bind matrices (so the mesh at rest is exactly where
-# it was): a new node above Bip01 with the 1/100 scale; Bip01 with the turn and the hips' height in centimetres; the
-# hips' bone with no offset. No vertex is touched.
+# This rewrites only the nodes' transforms: a new node above Bip01 with the 1/100 scale; Bip01 with the turn and the
+# hips' height in centimetres; the hips' bone with no offset (Blender had added the hips' height to it a second time,
+# and bound the mesh to that, so the man stood 0.9 m up in the air). No vertex and no bind matrix is touched.
 #   python3 fix_rig.py <in.glb> <out.glb>
 import json, struct, sys
 import numpy as np
@@ -56,19 +56,11 @@ def fix(src, dst):
   b01.pop("scale"); b01["translation"] = t.tolist()
   # the hips' bone: its offset (the hips' height again, in Bip01's own axes) taken off
   nodes[pi]["translation"] = [0.0, 0.0, 0.0]
-  G1 = globals_of(j)
-  # the skin's inverse bind matrices, so each joint at rest maps the mesh exactly as before
-  for sk in j["skins"]:
-    a = j["accessors"][sk["inverseBindMatrices"]]; bv = j["bufferViews"][a["bufferView"]]; o = bv.get("byteOffset", 0) + a.get("byteOffset", 0)
-    ibm = np.frombuffer(bytes(binc[o:o + a["count"] * 64]), np.float32).reshape(-1, 4, 4).transpose(0, 2, 1).astype(np.float64)
-    for k, jn in enumerate(sk["joints"]):
-      ibm[k] = np.linalg.inv(G1[jn]) @ G0[jn] @ ibm[k]
-    binc[o:o + a["count"] * 64] = ibm.transpose(0, 2, 1).astype(np.float32).tobytes()
-  # check: every mesh node and every joint's rest mapping unchanged
-  G2 = globals_of(j); worst = 0.0
-  for i, nd in enumerate(nodes):
-    if "mesh" in nd and i in G0: worst = max(worst, float(np.abs(G2[i] - G0[i]).max()))
-  print(src, "-> skeleton under fdScale; hips' height", round(float(t[1]), 3), "cm on Bip01; mesh nodes moved by at most", worst)
+  # (the inverse bind matrices are left as they are: Blender's skeleton stood the hips' height too high, the hips'
+  # bone offset by it a second time, and the mesh bound to that, so with the offset taken off the mesh comes down onto
+  # the ground with the skeleton, where the moves expect both)
+  G2 = globals_of(j)
+  print(src, "-> skeleton under fdScale; hips' height", round(float(t[1]), 3), "cm on Bip01; the hips' bone now at", np.round(G2[pi][:3, 3], 3), "m (was", np.round(G0[pi][:3, 3], 3), ")")
   write(dst, j, binc)
 
 if __name__ == "__main__":
