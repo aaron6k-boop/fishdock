@@ -157,6 +157,62 @@ function prepGeometry(geo, bones) {
   };
   return info;
 }
+// ---- body types: slim, medium or broad, one morph on every part of a person, the body and the clothes alike ----
+// Each point moves out from (or in towards) the bones that carry it: the torso from the spine's line (wider at the
+// sides, fuller in front at the belly, a little at the back), the arms, legs and neck from their bones' lines, and the
+// whole arm and leg a little out with the wider chest and hips; the head, hands and feet keep their size. A garment's
+// points carry the same bones as the body under them (they were made from it), so the cloth moves with the body and
+// the two never cross. Worked out once per mesh from its own bind pose, so it fits every person, old or new.
+export const BUILD_AT = [-0.75, 0, 1]; // (BUILDS: Slim, Medium, Broad)
+const BULK = { UpperArm: 0.12, Forearm: 0.08, Thigh: 0.1, Calf: 0.06, Neck: 0.1 };
+const LIMB_END = { UpperArm: "Forearm", Forearm: "Hand", Thigh: "Calf", Calf: "Foot", Neck: "Head" };
+const morphed = new WeakMap();
+export function buildMorph(geo, bones, boneInverses, bindMatrixInverse) {
+  if (morphed.has(geo)) return morphed.get(geo);
+  const at = {}, mt = new THREE.Matrix4();
+  bones.forEach((b, i) => { if (b && boneInverses[i]) at[b.name.replace(/^Bip01_/, "")] = new THREE.Vector3().setFromMatrixPosition(mt.copy(boneInverses[i]).invert().premultiply(bindMatrixInverse)); });
+  const need = ["Pelvis", "Neck", "Head", "L_UpperArm", "R_UpperArm", "L_Thigh", "R_Thigh", "L_Foot", "R_Foot", "L_Toe0"];
+  if (need.some((n) => !at[n])) { morphed.set(geo, null); return null; }
+  const feet = at.L_Foot.clone().add(at.R_Foot).multiplyScalar(0.5);
+  const up = at.Head.clone().sub(feet).normalize();
+  const lat = at.L_UpperArm.clone().sub(at.R_UpperArm); lat.addScaledVector(up, -lat.dot(up)).normalize();
+  const fwd = new THREE.Vector3().crossVectors(up, lat); if (at.L_Toe0.clone().sub(at.L_Foot).dot(fwd) < 0) fwd.negate();
+  const pel = at.Pelvis, spine = at.Neck.clone().sub(pel), sp2 = spine.lengthSq();
+  const half = (n) => Math.abs(at["L_" + n].clone().sub(at["R_" + n]).dot(lat)) / 2;
+  const armOut = half("UpperArm") * 0.06, legOut = half("Thigh") * 0.05;
+  const K = bones.map((b) => {
+    const nm = (b?.name || "").replace(/^Bip01_/, "");
+    if (/^(Pelvis|Spine\d?)$/.test(nm)) return { torso: 0.07 };
+    if (/Clavicle$/.test(nm)) return { torso: 0.05 };
+    const sd = /^([LR])_/.exec(nm), sg = sd ? (sd[1] === "L" ? 1 : -1) : 0;
+    const shift = sd && /UpperArm|Forearm|Hand|Finger/.test(nm) ? lat.clone().multiplyScalar(sg * armOut) : sd && /Thigh|Calf|Foot|Toe/.test(nm) ? lat.clone().multiplyScalar(sg * legOut) : null;
+    const mm = /^(?:[LR]_)?(UpperArm|Forearm|Thigh|Calf|Neck)$/.exec(nm);
+    const a = mm ? at[nm] : null, e = mm ? at[(mm[1] === "Neck" ? "" : nm.slice(0, 2)) + LIMB_END[mm[1]]] : null;
+    return a && e ? { a, ax: e.clone().sub(a), k: BULK[mm[1]], shift } : shift ? { shift } : null;
+  });
+  const pos = geo.attributes.position, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight;
+  if (!pos || !si || !sw) { morphed.set(geo, null); return null; }
+  const n = pos.count, out = new Float32Array(n * 3), p = V(), d = V(), r = V(), q = V();
+  for (let i = 0; i < n; i++) {
+    p.fromBufferAttribute(pos, i); d.set(0, 0, 0);
+    for (let j = 0; j < 4; j++) {
+      const w = sw.getComponent(i, j); if (w < 1e-3) continue;
+      const k = K[si.getComponent(i, j)]; if (!k) continue;
+      if (k.shift) d.addScaledVector(k.shift, w);
+      if (k.ax) {
+        const t = clamp(r.copy(p).sub(k.a).dot(k.ax) / k.ax.lengthSq(), 0, 1);
+        r.copy(p).sub(q.copy(k.a).addScaledVector(k.ax, t)); d.addScaledVector(r, k.k * w);
+      } else if (k.torso) {
+        const t = clamp(r.copy(p).sub(pel).dot(spine) / sp2, -0.3, 1.2);
+        r.copy(p).sub(q.copy(pel).addScaledVector(spine, t));
+        const x = r.dot(lat), f = r.dot(fwd), hb = t - 0.28, belly = Math.exp(-(hb * hb) / 0.0968);
+        d.addScaledVector(lat, x * k.torso * w).addScaledVector(fwd, f * (f > 0 ? 0.05 + 0.16 * belly : 0.06) * w);
+      }
+    }
+    out[i * 3] = d.x; out[i * 3 + 1] = d.y; out[i * 3 + 2] = d.z;
+  }
+  const attr = new THREE.BufferAttribute(out, 3); morphed.set(geo, attr); return attr;
+}
 // the average brightness of each region's fabric (linear), so a new colour keeps the fabric's own light and shade
 function regionMeans(map, uv, reg) {
   const out = [0.2, 0.2, 0.2, 0.2];
@@ -222,6 +278,15 @@ const tint = (hex, on = 1) => (hex == null ? new THREE.Vector4(0, 0, 0, 0) : (()
 
 // ---- small knitted / waxed textures for the add-ons ----
 let knitTex = null;
+// (the beanie's knit, from Poly Haven's knitted_fleece (CC0): its colour in grey, coloured as the hat, and its normal
+// map, at its real size: the 26 cm tile about twice round a head)
+let knitMaps = null;
+function knitPBR() {
+  if (knitMaps || typeof document === "undefined") return knitMaps;
+  const ld = new THREE.TextureLoader(), set = (t, srgb) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2.2, 0.62); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+  knitMaps = { map: set(ld.load(PEOPLE_BASE + "knit_c.jpg"), true), normalMap: set(ld.load(PEOPLE_BASE + "knit_n.jpg"), false) };
+  return knitMaps;
+}
 function knit() {
   if (knitTex) return knitTex;
   const c = document.createElement("canvas"); c.width = 64; c.height = 64; const g = c.getContext("2d");
@@ -277,32 +342,94 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const inner = new THREE.Group(); inner.rotation.y = Math.PI; inner.add(model); // the models face +z; the figure faces -z
   const root = new THREE.Group(); root.name = "human"; root.add(inner);
   const k = 0.97 + ((L.seed >>> 4) & 255) / 255 * 0.06; root.scale.setScalar(k); // a little taller or shorter, per person
+  const swayPh = (((L.seed || 7) >>> 9) & 1023) / 1023 * Math.PI * 2; // (when in its slow waves this person's weight shifts)
   const bone = {}; let skinned = [];
   model.traverse((o) => { if (o.isBone || o.name?.startsWith("Bip01")) bone[o.name] = o; if (o.isSkinnedMesh) skinned.push(o); });
   // fewer draw calls: the model comes as several pieces sharing one set of vertices; joined into one mesh per material
   // (body, head, hair), the joined geometry made once per model and shared by everyone who chose that person
   skinned = mergeByMaterial(skinned, gltf);
   const B = (n) => bone["Bip01_" + n];
+  // ---- levels of detail (the new people: every part also as <part>_lod1 and <part>_lod2, about 25,000 and 8,000
+  // triangles against 60,000): the set drawn picked by how far the camera is, a frame behind (found when one of them
+  // is drawn for the view itself, not for a shadow or the water's mirror), with a margin so it doesn't flicker ----
+  const lodOf = (o) => { for (let p = o; p && p !== model; p = p.parent) { const mm = /_lod([12])(?:_\d+)?$/.exec(p.name || ""); if (mm) return +mm[1]; } return 0; };
+  const lodSets = [[], [], []]; for (const m of skinned) lodSets[lodOf(m)].push(m);
+  let lodNow = -1; const camAt = V(), meAt = V();
+  const setLod = (n) => { if (n === lodNow) return; lodNow = n; lodSets.forEach((set, i) => set.forEach((m) => { m.visible = i === n && !m.userData.off; })); };
+  if (lodSets[1].length) {
+    setLod(0);
+    const pick = (_r, _s, cam) => {
+      if (!cam || cam.isOrthographicCamera || cam.userData?.fdMirror) return;
+      const d = camAt.setFromMatrixPosition(cam.matrixWorld).distanceTo(root.getWorldPosition(meAt));
+      let want = d < (lodNow === 1 ? 11 : 13) ? 0 : d < (lodNow === 2 ? 32 : 36) ? 1 : 2;
+      while (want > 0 && !lodSets[want].length) want--; // (the light file has two levels)
+      setLod(want);
+    };
+    for (const set of lodSets) for (const m of set) m.onBeforeRender = pick;
+  }
 
   // ---- materials: the clothes recolourable, the hair soft-edged ----
   // (your own angler, coat "as they come": the model's top is coloured as your outfit's jacket, the same jacket as the
   // sleeves you see in first person, and bare hands are bare, as there, not the model's own gardening gloves. Left as the model came, the 8 November recording showed navy sleeves in first
   // person and a white cardigan in third)
-  const U = { uTop: { value: tint(COATS[L.coat]?.hex ?? (outfit?.sameTop ? outfit.jacket : null)) }, uLegs: { value: tint(LEGS[L.legs]?.hex) }, uFeet: { value: tint(FOOTWEAR[L.boots]?.hex) }, uHands: { value: tint(L.gloves ? 0x1c1e21 : outfit?.sameTop ? (SKINS[L.skin]?.hex ?? 0xc99a74) : null) }, uMean: { value: new THREE.Vector4(0.2, 0.2, 0.2, 0.2) }, uWet: { value: 0 }, uWind: { value: V() }, uTime: { value: 0 } };
+  const U = { uTop: { value: tint(COATS[L.coat]?.hex ?? (outfit?.sameTop ? outfit.jacket : null)) }, uLegs: { value: tint(LEGS[L.legs]?.hex) }, uFeet: { value: tint(FOOTWEAR[L.boots]?.hex) }, uHands: { value: tint(L.gloves ? 0x1c1e21 : outfit?.sameTop && !L.v2 ? (SKINS[L.skin]?.hex ?? 0xc99a74) : null) }, uMean: { value: new THREE.Vector4(0.2, 0.2, 0.2, 0.2) }, uWet: { value: 0 }, uWind: { value: V() }, uTime: { value: 0 } };
+  // (the new people's bare hands keep their own skin, as their faces do: coloured flat as the skin tone they came out
+  // orange beside a face drawn from its photographed texture, in the 18 November film)
   // ---- the modelled clothes (people with clothes: their own jacket, trousers and wellies, made in Blender) ----
   // coloured as the kit, and the body's own clothes underneath the same colours, so anywhere the body shows through a
   // seam it's the same cloth
-  const worn = skinned.some((m) => /^fd_(jacket|trousers|boots)/.test(m.material?.name || ""));
-  const wornHex = worn ? { jacket: COATS[L.coat]?.hex ?? outfit?.jacket ?? 0x1d3150, trousers: LEGS[L.legs]?.hex ?? 0x3b3e42, boots: FOOTWEAR[L.boots]?.hex ?? 0x2f4a2c } : null;
+  const worn = skinned.some((m) => /^fd2?_(jacket|trousers|boots)/.test(m.material?.name || ""));
+  // ("as they come" for the new people (people.js own): their own colours, the main angler's black jacket and green wellies)
+  const own = L.own || null;
+  const wornHex = worn ? { jacket: COATS[L.coat]?.hex ?? own?.coat ?? outfit?.jacket ?? 0x1d3150, trousers: LEGS[L.legs]?.hex ?? own?.legs ?? 0x3b3e42, boots: FOOTWEAR[L.boots]?.hex ?? own?.boots ?? 0x2f4a2c } : null;
   if (worn) { U.uTop.value = tint(wornHex.jacket); U.uLegs.value = tint(wornHex.trousers); U.uFeet.value = tint(wornHex.boots); }
   const mats = [];
   let unit = 1, clothMesh = null; const clothInv = new THREE.Matrix4(); // metres per unit of the meshes' own geometry
   for (const m of skinned) {
     m.castShadow = true; m.receiveShadow = false; m.frustumCulled = false;
     const mat = m.material;
+    // the new people's clothes (source-assets/blender/people2): their own colour, normal and roughness maps, the
+    // colour map the cloth's detail in grey, coloured as the kit; the beard's strands cut out by their alpha; the studs,
+    // toggles and buckles as they come
+    { const w2 = /^fd2_(jacket|trousers|boots|beard|trim)/.exec(mat.name || "");
+      if (w2) {
+        let c = mat.clone();
+        if (w2[1] === "beard") {
+          // (the beard's three layers of hair, in the colour chosen for the hair: close to the skin and dense, then
+          // two further out over less of the face; the strands' soft edges kept with alpha to coverage. Stubble is the
+          // inner layer alone, thinned; none hides them all)
+          const layer = /_c$|_c_/.test(mat.name) ? 2 : /_b$|_b_/.test(mat.name) ? 1 : 0;
+          c.transparent = false; c.alphaTest = L.beard === 1 ? 0.62 : [0.3, 0.4, 0.46][layer]; c.alphaToCoverage = true; c.depthWrite = true; c.side = THREE.DoubleSide; c.roughness = 0.62; c.metalness = 0;
+          if (L.hairHex != null) c.color = new THREE.Color(L.hairHex).multiplyScalar([1.35, 1.5, 1.65][layer]);
+          if (L.beard === 0 || (L.beard === 1 && layer > 0)) m.userData.off = true;
+        }
+        else if (w2[1] !== "trim") {
+          c.color = new THREE.Color(wornHex[w2[1]]); c.metalness = 0; c.roughness = 1; if (c.normalMap) c.normalScale = new THREE.Vector2(1, 1);
+          // (the jacket and trousers as cloth: a soft sheen at grazing angles, as coated polyester has, so the folds and
+          // creases read on a black jacket instead of it going flat; the rubber boots keep their own satin finish)
+          if (w2[1] !== "boots") {
+            const pm = new THREE.MeshPhysicalMaterial(); THREE.MeshStandardMaterial.prototype.copy.call(pm, c); pm.defines = { STANDARD: "", PHYSICAL: "" };
+            pm.sheen = w2[1] === "jacket" ? 0.7 : 0.5; pm.sheenRoughness = 0.5; pm.sheenColor = c.color.clone().lerp(new THREE.Color(0.75, 0.77, 0.8), 0.3);
+            c = pm;
+          }
+        }
+        m.material = c; mats.push(c); continue;
+      }
+    }
     { const w = /^fd_(jacket|trousers|boots)/.exec(mat.name || "");
       if (w) { const c = mat.clone(); c.map = null; c.color = new THREE.Color(wornHex[w[1]]); if (w[1] === "boots") { c.roughness = 0.38; c.metalness = 0; } else if (weave()) { c.normalMap = weave(); c.normalScale = new THREE.Vector2(0.5, 0.5); } m.castShadow = true; m.frustumCulled = false; m.material = c; mats.push(c); continue; } }
+    // (hair and eyelashes: for the new people cut out with alpha to coverage, so the strands' edges stay soft and they
+    // sort themselves, a ponytail no longer drawn through the head behind it)
+    if (/opacity/.test(mat.name) && L.v2) { const h = mat.clone(); h.transparent = false; h.alphaTest = 0.3; h.alphaToCoverage = true; h.depthWrite = true; h.side = THREE.DoubleSide; m.material = h; mats.push(h); continue; }
     if (/opacity/.test(mat.name)) { const h = mat.clone(); h.transparent = true; h.alphaTest = 0.04; h.depthWrite = false; m.material = h; mats.push(h); m.renderOrder = 1; continue; }
+    // the new people's skin: a faint, warm sheen at grazing angles (the light skin scatters back), over its own
+    // roughness map (oilier forehead and nose, wet eyes)
+    if (L.v2 && /head/.test(mat.name)) {
+      const hm = new THREE.MeshPhysicalMaterial(); THREE.MeshStandardMaterial.prototype.copy.call(hm, mat); hm.defines = { STANDARD: "", PHYSICAL: "" };
+      hm.sheen = 0.35; hm.sheenRoughness = 0.55; hm.sheenColor = new THREE.Color(0.95, 0.62, 0.52); hm.specularIntensity = 0.55;
+      if (hm.roughnessMap) hm.roughness = 1;
+      m.material = hm; mats.push(hm); continue;
+    }
     if (/body/.test(mat.name)) {
       const info = prepGeometry(m.geometry, m.skeleton.bones);
       if (!m.geometry.attributes.fdRegion) { const { reg, flut } = info.make(L.hem || 0.5); m.geometry.setAttribute("fdRegion", new THREE.BufferAttribute(reg, 4)); m.geometry.setAttribute("fdFlutter", new THREE.BufferAttribute(flut, 1)); m.geometry.userData.means = regionMeans(mat.map, m.geometry.attributes.uv, reg); }
@@ -311,6 +438,17 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       const c = clothMaterial(mat, U); m.material = c; mats.push(c); clothMesh = m; continue;
     }
     const c = mat.clone(); m.material = c; mats.push(c);
+  }
+
+  for (const m of skinned) if (m.userData.off) m.visible = false;
+  // ---- the body type (people.js BUILDS): the same morph on the body and everything worn, every level of detail ----
+  // (every mesh gets the morph, a medium build at nought, as the geometry is shared by everyone who chose this person)
+  const build = BUILD_AT[L.build] ?? 0;
+  for (const m of skinned) {
+    const g = m.geometry, D = g.morphAttributes.position?.[0] || buildMorph(g, m.skeleton.bones, m.skeleton.boneInverses, m.bindMatrixInverse);
+    if (!D) continue;
+    if (!g.morphAttributes.position) { g.morphAttributes.position = [D]; g.morphTargetsRelative = true; }
+    m.updateMorphTargets(); m.morphTargetInfluences[0] = build;
   }
 
   // ---- motion: the clips on one mixer ----
@@ -345,7 +483,8 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     b.add(obj); return obj;
   };
   const hatCol = new THREE.Color(outfit?.hat ?? 0x8a2f2a), coatHex = COATS[L.coat]?.hex ?? outfit?.jacket ?? 0x1f3a5f;
-  const knitMat = new THREE.MeshStandardMaterial({ color: hatCol, map: knit(), roughness: 1 }); extraMats.push(knitMat);
+  const kp = L.v2 ? knitPBR() : null;
+  const knitMat = kp ? new THREE.MeshStandardMaterial({ color: hatCol, map: kp.map, normalMap: kp.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), roughness: 0.95 }) : new THREE.MeshStandardMaterial({ color: hatCol, map: knit(), roughness: 1 }); extraMats.push(knitMat);
   const capMat = new THREE.MeshStandardMaterial({ color: hatCol.clone().multiplyScalar(0.8), roughness: 0.85 }); extraMats.push(capMat);
   const hoodMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.8 }); extraMats.push(hoodMat);
   const hd = bounds.head; // { cx, cz, rx, rz (the head with its hair, above the eyes), eye (eye height), top }
@@ -373,6 +512,49 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     brim.scale.set(hd.rx + 0.016, 1, hd.rz + 0.016); brim.position.set(hd.cx, cy - 0.016, hd.cz); hats.add(brim);
   }
   if (hats.children.length) attach("Head", hats);
+  // glasses: a thin frame (dark tortoiseshell) with clear lenses, or black sunglasses with dark lenses; the lenses in
+  // front of the eyes, the arms along the sides of the head to behind the ears
+  if (L.glasses) {
+    const f = hd.face || { front: hd.cz - hd.rz, side: hd.rx }, sun = L.glasses === 2;
+    const eyes = ["LEye", "REye"].map((n) => (B(n) ? restAt(n).x : null));
+    const ex = eyes.every((x) => x != null) && Math.abs(eyes[0] - eyes[1]) > 0.04 ? eyes : [hd.cx - 0.032, hd.cx + 0.032];
+    const y = hd.eye + 0.003, z = f.front - 0.009, w = sun ? 0.029 : 0.025, h = sun ? 0.021 : 0.017, tr = sun ? 0.0021 : 0.0015;
+    const rimMat = new THREE.MeshStandardMaterial({ color: sun ? 0x121315 : 0x3a2a20, roughness: 0.32, metalness: sun ? 0.1 : 0.05 });
+    const lensMat = new THREE.MeshStandardMaterial({ color: sun ? 0x0d1114 : 0xdfe8ee, transparent: true, opacity: sun ? 0.86 : 0.1, roughness: 0.04, metalness: 0.3, depthWrite: false, side: THREE.DoubleSide });
+    extraMats.push(rimMat, lensMat);
+    const gl = new THREE.Group(); gl.name = "glasses";
+    const outline = (cx, sg) => { const pts = []; for (let i = 0; i < 28; i++) { const a = (i / 28) * Math.PI * 2, c = Math.cos(a), s2 = Math.sin(a); pts.push(new THREE.Vector2(cx + Math.sign(c) * Math.abs(c) ** 0.55 * w * (c * sg > 0 ? 1.04 : 0.96), y + Math.sign(s2) * Math.abs(s2) ** 0.7 * h * (s2 < 0 ? 0.9 : 1))); } return pts; };
+    for (const cx of ex) {
+      const sg = Math.sign(cx - hd.cx) || 1, o2 = outline(cx, sg);
+      // (the frame wraps back a little towards the temples)
+      const z3 = (p) => z + Math.max(0, (p.x - cx) * sg) / w * 0.004;
+      gl.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(o2.map((p) => V(p.x, p.y, z3(p))), true), 56, tr, 5, true), rimMat));
+      const lens = new THREE.ShapeGeometry(new THREE.Shape(o2), 1), lp = lens.attributes.position;
+      for (let i = 0; i < lp.count; i++) lp.setZ(i, z3({ x: lp.getX(i) }) + 0.0005);
+      lens.computeVertexNormals(); const lm = new THREE.Mesh(lens, lensMat); lm.renderOrder = 2; lm.castShadow = false; gl.add(lm);
+      // the arm: from the frame's outer edge back along the side of the head, over the ear and a little down behind it
+      const ox = cx + sg * w * 1.02, sx = hd.cx + sg * (f.side + 0.004);
+      gl.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(ox, y + h * 0.45, z + 0.004), V(sx, y + h * 0.4, z + 0.03), V(sx + sg * 0.002, y + 0.004, hd.cz + 0.01), V(sx - sg * 0.004, y - 0.022, hd.cz + 0.03)]), 24, tr * 0.9, 5, false), rimMat));
+    }
+    // the bridge over the nose
+    const ins = ex.map((cx) => cx - (Math.sign(cx - hd.cx) || 1) * w * 0.96);
+    gl.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(ins[0], y + h * 0.35, z), V(hd.cx, y + h * 0.55, z - 0.002), V(ins[1], y + h * 0.35, z)]), 10, tr, 5, false), rimMat));
+    attach("Head", gl);
+  }
+  // a head torch: an elastic band round the head (over the hat or hood if one's worn), the lamp at the front of it
+  if (L.torch) {
+    const over = L.hat === 0 ? 0.013 : L.hat === 1 ? 0.012 : L.hat === 2 ? 0.018 : L.hat === 4 ? 0.036 : 0.005;
+    const by = brow + 0.026, rx = hd.rx + over, rz = hd.rz + over, pts = [];
+    for (let i = 0; i < 40; i++) { const a = (i / 40) * Math.PI * 2; pts.push(V(hd.cx + Math.sin(a) * rx, by + 0.02 * (1 + Math.cos(a)) * 0.5, hd.cz - Math.cos(a) * rz)); } // (a = 0 at the front; the band rides higher at the back)
+    const bandMat = new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.9 }), lampMat = new THREE.MeshStandardMaterial({ color: 0x2b2e31, roughness: 0.45, metalness: 0.2 });
+    const lensMat = new THREE.MeshStandardMaterial({ color: 0xf2f0e8, emissive: 0xfff1d0, emissiveIntensity: 0.35, roughness: 0.1 });
+    extraMats.push(bandMat, lampMat, lensMat);
+    const ht = new THREE.Group(); ht.name = "headTorch";
+    ht.add(new THREE.Mesh(strap(new THREE.CatmullRomCurve3(pts, true), (q) => V(q.x - hd.cx, 0, q.z - hd.cz), 0.024, 0.003), bandMat));
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.034, 0.026), lampMat); lamp.position.set(hd.cx, by, hd.cz - rz - 0.012); lamp.rotation.x = -0.12; ht.add(lamp);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.012, 0.004, 18), lensMat); lens.rotation.x = Math.PI / 2 - 0.12; lens.position.set(hd.cx, by - 0.001, hd.cz - rz - 0.026); ht.add(lens);
+    attach("Head", ht);
+  }
   // the hood (chosen as "Hood up"): cut to the head like a real jacket's hood rather than a shell over it: close round
   // the back and top of the head with a centre seam, wider below where it meets the collar, open at the face with the
   // edge rolled; lined a shade darker inside
@@ -422,7 +604,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     const wg = new THREE.Group(); wg.add(ring, buckle); attach("Spine", wg);
   }
   // wellies: a shaft round each calf up to just below the knee, a moulded boot over the foot
-  if (L.boots > 0) {
+  if (L.boots > 0 && !worn) { // (people with modelled boots have them coloured instead)
     const wm = new THREE.MeshStandardMaterial({ color: FOOTWEAR[L.boots].hex, roughness: 0.42, side: THREE.DoubleSide }); extraMats.push(wm); // (both sides: looking down into the top, the boot's inside, not through it)
     const sole = new THREE.MeshStandardMaterial({ color: 0x16181a, roughness: 0.9 }); extraMats.push(sole);
     for (const s of ["L", "R"]) {
@@ -451,6 +633,34 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const FINGERS = { L: [], R: [] };
   for (const s of ["L", "R"]) for (const f of [1, 2, 3, 4]) for (const j of ["", "1", "2"]) { const b = B(`${s}_Finger${f}${j}`); if (b) FINGERS[s].push([b, j === "" ? 0.75 : j === "1" ? 1.15 : 0.8]); }
   const THUMB = { L: [B("L_Finger0"), B("L_Finger01"), B("L_Finger02")].filter(Boolean), R: [B("R_Finger0"), B("R_Finger01"), B("R_Finger02")].filter(Boolean) };
+  // ---- fingers wrapped round a handle (a cylinder: a point on its line, its direction, its radius; world space) ----
+  // Each finger's three joints in turn, from the knuckle: the joint bends (about its own z, the way the set curl bends
+  // it) through up to its limit in small steps until the end of its bone comes to the handle's surface, a finger's
+  // half thickness out; a bone that never reaches it takes the bend that brings it nearest. ew eases it on and off.
+  const CHAINS = { L: [1, 2, 3, 4].map((f) => ["", "1", "2"].map((j) => B(`L_Finger${f}${j}`))).filter((c) => c.every(Boolean)), R: [1, 2, 3, 4].map((f) => ["", "1", "2"].map((j) => B(`R_Finger${f}${j}`))).filter((c) => c.every(Boolean)) };
+  const LIMIT = [1.45, 1.75, 1.3], HALF = 0.0085 * k;
+  const wrapV = { j: V(), e: V(), z: V(), x: V(), d: V(), q: new THREE.Quaternion(), wq: new THREE.Quaternion() };
+  const distToLine = (p, o, dir) => { wrapV.d.copy(p).sub(o); const t = wrapV.d.dot(dir); return Math.sqrt(Math.max(0, wrapV.d.lengthSq() - t * t)); };
+  function wrapFingers(s, o, dir, r, ew) {
+    const R = r + HALF;   // (the rod is not scaled with the person; their fingers are)
+    for (const chain of CHAINS[s]) {
+      for (let j = 0; j < 3; j++) {
+        const b = chain[j]; b.updateMatrixWorld(true);
+        b.getWorldPosition(wrapV.j); b.getWorldQuaternion(wrapV.wq);
+        if (j < 2) chain[j + 1].getWorldPosition(wrapV.e);
+        else { const L1 = chain[2].position.length() * b.getWorldScale(wrapV.x).x * 0.85; wrapV.e.copy(wrapV.j).addScaledVector(wrapV.x.set(1, 0, 0).applyQuaternion(wrapV.wq), L1); }
+        wrapV.z.set(0, 0, 1).applyQuaternion(wrapV.wq);
+        const arm = wrapV.e.clone().sub(wrapV.j);
+        let best = 0, bestD = Infinity; const N = 18;
+        for (let n = 0; n <= N; n++) {
+          const th = LIMIT[j] * n / N; const e2 = arm.clone().applyAxisAngle(wrapV.z, th).add(wrapV.j); const d = distToLine(e2, o, dir);
+          if (d <= R) { best = th; bestD = 0; break; }
+          if (d < bestD) { bestD = d; best = th; }
+        }
+        b.quaternion.multiply(wrapV.q.setFromAxisAngle(V(0, 0, 1), best * ew)); b.updateMatrixWorld(true);
+      }
+    }
+  }
   const wq = (b, out = new THREE.Quaternion()) => b.getWorldQuaternion(out);
   const wp = (b, out = V()) => b.getWorldPosition(out);
   const setWQ = (b, q) => { b.parent.getWorldQuaternion(tmp.q2); b.quaternion.copy(tmp.q2.invert().multiply(q)); b.updateMatrixWorld(true); };
@@ -574,6 +784,13 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     const feet = {};
     if (standing) for (const s of ["L", "R"]) feet[s] = { p: wp(B(s + "_Foot")), q: wq(B(s + "_Foot")) };
     if (st.drop > 0.002 || st.brace > 0.01 || st.dip > 0.0005) { inner.position.y = -(st.drop + st.dip) / k; root.updateMatrixWorld(true); }
+    // standing still, the weight shifts from foot to foot: the hips drift a centimetre or so to one side and back over
+    // several seconds (two slow waves, each person's own), the planted feet taking it up in the legs below, the chest
+    // leaning back over them; eased in as they stop walking, out as they kneel, sit or walk
+    const swayOn = standing && !o.walk && (o.kneel || 0) < 0.1 && !o.sit ? 1 : 0;
+    st.swayW = (st.swayW || 0) + (swayOn - (st.swayW || 0)) * (1 - Math.exp(-dt * 1.2));
+    const sway = (Math.sin(t * Math.PI * 2 / 7.7 + swayPh) * 0.011 + Math.sin(t * Math.PI * 2 / 19.3 + swayPh * 2.3) * 0.006) * st.swayW;
+    if (Math.abs(sway) > 1e-4) { inner.position.x += sway / k; root.updateMatrixWorld(true); }
     const right = figDirW(V(1, 0, 0)), up = figDirW(V(0, 1, 0));
     turnW(B("Spine1"), right, -st.lean * 0.45); turnW(B("Spine2"), right, -st.lean * 0.4); turnW(B("Neck"), right, -st.lean * 0.15);
     turnW(B("Spine1"), up, -st.twist * 0.45); turnW(B("Spine2"), up, -st.twist * 0.35);
@@ -583,7 +800,8 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     if (Math.abs(st.lead) > 1e-3) { turnW(B("Spine1"), up, st.lead * 0.35); turnW(B("Spine2"), up, st.lead * 0.25); if (!o.look) turnW(B("Head"), up, st.lead * 0.5); }
     const br = Math.sin((t * Math.PI * 2) / 4.3) * 0.011 * w.idle * (1 - (st.kn || 0));
     if (Math.abs(br) > 1e-4) { turnW(B("Spine1"), right, br * 0.5); turnW(B("Spine2"), right, br * 0.6); turnW(B("Neck"), right, -br * 0.9); }
-    if (standing && (st.drop > 0.002 || st.brace > 0.01)) {
+    if (Math.abs(sway) > 1e-4) { const fw = figDirW(V(0, 0, -1)); turnW(B("Pelvis"), fw, sway * 2.2); turnW(B("Spine1"), fw, -sway * 3.2); turnW(B("Neck"), fw, -sway * 1.2); }
+    if (standing && (st.drop > 0.002 || st.brace > 0.01 || Math.abs(sway) > 2e-4)) {
       for (const [s, sx, fz] of [["L", -1, -0.13], ["R", 1, 0.07]]) {
         const target = feet[s].p.clone().add(figVecW(V(sx * 0.05 * st.brace, 0, fz * st.brace)));
         const hip = wp(B(s + "_Thigh")), knee0 = wp(B(s + "_Calf")), L1 = hip.distanceTo(knee0), L2 = knee0.distanceTo(wp(B(s + "_Foot")));
@@ -800,6 +1018,18 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         if (hs.flip) { X.negate(); Yh.negate(); }
         wrist = at.clone().addScaledVector(Yh, -GRIP.y).addScaledVector(Zh, -GRIP.z);
       }
+      // the shoulder goes with the arm: reaching up (the rod back over the shoulder in a cast, lifting into a fish)
+      // the collarbone lifts; reaching out (the rod held well forward, the net's pole) it comes forward, as a real
+      // shoulder does, instead of the arm swinging from a shoulder fixed in place
+      const clav = B(s + "_Clavicle");
+      if (clav) {
+        const C0 = wp(clav), Sh = wp(B(s + "_UpperArm")), Wt = figW(wrist), armL = Sh.distanceTo(wp(B(s + "_Forearm"))) + wp(B(s + "_Forearm")).distanceTo(wp(B(s + "_Hand")));
+        const to = Wt.clone().sub(Sh), dist = to.length(), upF = figDirW(V(0, 1, 0)), fwdF = figDirW(V(0, 0, -1));
+        const lift = clamp((to.dot(upF) + 0.05) / (armL * 0.9), 0, 1), reachF = clamp((dist - armL * 0.7) / (armL * 0.3), 0, 1);
+        const off = upF.clone().multiplyScalar(0.03 * lift).addScaledVector(fwdF, 0.025 * reachF).addScaledVector(to.normalize(), 0.012 * reachF);
+        const a0 = Sh.clone().sub(C0), a1 = a0.clone().add(off.multiplyScalar(k * ease(hs.w)));   // (eased on and off with the hand's hold; ew is set further down)
+        if (a0.lengthSq() > 1e-8) { setWQ(clav, new THREE.Quaternion().setFromUnitVectors(a0.normalize(), a1.normalize()).multiply(wq(clav))); }
+      }
       const S0 = wp(B(s + "_UpperArm")), E0 = wp(B(s + "_Forearm")), W0 = wp(B(s + "_Hand"));
       const r = twoBone(S0, figW(wrist), S0.distanceTo(E0), E0.distanceTo(W0), figDirW(use.pole ? use.pole : V(sg * 0.55, -0.45, 0.55)));
       aim(B(s + "_UpperArm"), B(s + "_Forearm"), r.B); aim(B(s + "_Forearm"), B(s + "_Hand"), r.C);
@@ -814,7 +1044,11 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       // fingers resting on it, curving over a little: it was a fist round a handle, the fish hanging off the knuckles)
       const fishHold = use.kind === "fish", cradle = fishHold && use.palm && use.palm.y > 0.5;
       const grip = fishHold ? (cradle ? 0.42 : 0.22) : use.kind === "open" ? 0.12 : use.axis ? (use.kind === "crank" ? 0.75 : 1) : use.kind === "wave" || use.kind === "cheer" || use.kind === "clap" ? -0.1 : 0.15;
-      for (const [b, f] of FINGERS[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), grip * f * ew));
+      // (round a handle each finger wraps it: every joint, from the knuckle out, bends until the end of its bone meets
+      // the handle's surface (a finger's half thickness out from it), so the rod or the reel's knob is held in the
+      // fingers, not beside a fist; elsewhere the fingers take their set curl)
+      if (use.axis && hs.w > 0.05 && lodNow <= 0) wrapFingers(s, figW(at), figDirW(use.axis), (use.r || (use.kind === "crank" ? 0.008 : 0.0135)), ew);
+      else for (const [b, f] of FINGERS[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), grip * f * ew));
       for (const b of THUMB[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), (fishHold ? 0.12 : use.axis ? 0.35 : 0) * ew));
       B(s + "_UpperArm").updateMatrixWorld(true);
     }
@@ -869,8 +1103,16 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   }
 
   let fp = false;
+  // (far off, at the lightest level of detail, the pose is worked out every other frame, the time carried over: a
+  // person 40 m away moves as smoothly to the eye, for half the work)
+  let skip = 0, owed = 0;
+  const poseAtDistance = (o) => {
+    if (lodNow === 2 && lodSets[2].length) { skip ^= 1; if (skip) { owed += o.dt || 0; return; } if (owed) { o = { ...o, dt: (o.dt || 0) + owed }; owed = 0; } }
+    else owed = 0;
+    pose(o);
+  };
   return {
-    root, pose,
+    root, pose: poseAtDistance,
     get top() { return wFigSafe(B("Head")).y + (top0 - headY0) * k; },
     get headAt() { return wFigSafe(B("Head")); },
     get eyeAt() { const a = B("LEye"), b = B("REye"); if (!a || !b) return wFigSafe(B("Head")).add(V(0, 0.1, -0.08)); return wFigSafe(a).add(wFigSafe(b)).multiplyScalar(0.5).add(V(0, 0, -0.02)); },
@@ -915,7 +1157,7 @@ function calibrate(mixer, act, B, clips) {
 function measure(skinned, root, k) {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), v = V();
-  const pts = { head: [], chest: [], waist: [], calfL: [], calfR: [], footL: [], footR: [] };
+  const pts = { head: [], skin: [], hair: [], chest: [], waist: [], calfL: [], calfR: [], footL: [], footR: [] };
   let top = 0;
   const sk = skinned[0]?.skeleton; if (!sk) return null;
   const idx = (n) => sk.bones.findIndex((b) => b.name === "Bip01_" + n);
@@ -926,10 +1168,12 @@ function measure(skinned, root, k) {
     const hair = /opacity/.test(m.material.name);
     for (let i = 0; i < n; i += 1) {
       let best = 0, bw = -1; for (let c = 0; c < 4; c++) { const w = sw.getComponent(i, c); if (w > bw) { bw = w; best = si.getComponent(i, c); } }
-      m.getVertexPosition(i, v); m.applyBoneTransform(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(inv).multiplyScalar(k);
+      // (a skinned mesh's getVertexPosition already moves the point by its bones: moved a second time, as it was, the
+      // new people's heads measured metres wide and their hats floated far off in the air, 18 November film)
+      m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(inv).multiplyScalar(k);
       v.x = v.x; // (root has only the scale k; the inner's half turn is already in matrixWorld)
       if (v.y > top) top = v.y;
-      if (best === bi.head || (hair && best === bi.neck)) pts.head.push(v.clone());
+      if (best === bi.head || (hair && best === bi.neck)) { pts.head.push(v.clone()); (hair ? pts.hair : pts.skin).push(v.clone()); }
       else if ((best === bi.sp2 || best === bi.sp1) && !hair) pts.chest.push(v.clone());
       else if (best === bi.sp || best === bi.pel) pts.waist.push(v.clone());
       else if (best === bi.cL) pts.calfL.push(v.clone()); else if (best === bi.cR) pts.calfR.push(v.clone());
@@ -940,8 +1184,20 @@ function measure(skinned, root, k) {
   // the head: its middle and size above the eyes (hair included)
   const eye = bi.eye >= 0 ? at(bi.eye).y : 0;
   const hb = box(pts.head), eyesY = eye || hb.min.y + (hb.max.y - hb.min.y) * 0.55;
-  const hb2 = box(pts.head.filter((p) => p.y > eyesY));
-  const head = { cx: (hb2.min.x + hb2.max.x) / 2, cz: (hb2.min.z + hb2.max.z) / 2, rx: (hb2.max.x - hb2.min.x) / 2, rz: (hb2.max.z - hb2.min.z) / 2, eye: eyesY, top: hb.max.y };
+  // (the skull's own size, with the hair over it allowed for up to 1.5 cm: a ponytail or a bun reaching back made a
+  // cap or a beanie twice as deep as the head under it)
+  const above = (a) => a.filter((p) => p.y > eyesY), skb = above(pts.skin).length > 20 ? box(above(pts.skin)) : box(above(pts.head)), hr = box(above(pts.head));
+  const ext = (lo, hi, lo2, hi2) => [Math.max(lo2, lo - 0.015), Math.min(hi2, hi + 0.015)];
+  const [x0, x1] = ext(skb.min.x, skb.max.x, hr.min.x, hr.max.x); let [z0, z1] = ext(skb.min.z, skb.max.z, hr.min.z, hr.max.z);
+  // (and no deeper than a head is (front to back about 1.22 times its width), from the face back: hair modelled solid
+  // with the head, a ponytail's tie, reaches further)
+  z1 = Math.min(z1, z0 + (x1 - x0) * 1.22);
+  const head = { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, rx: (x1 - x0) / 2, rz: (z1 - z0) / 2, eye: eyesY, top: hb.max.y };
+  // the face at the eyes (for glasses): how far forward it comes there (the brow and the bridge of the nose) and how wide
+  // the head is
+  { let front = Infinity, side = 0;
+    for (const p of pts.head) if (Math.abs(p.y - eyesY) < 0.015) { if (Math.abs(p.x - head.cx) < 0.045) front = Math.min(front, p.z); side = Math.max(side, Math.abs(p.x - head.cx)); }
+    head.face = { front: Number.isFinite(front) ? front : head.cz - head.rz, side: side || head.rx }; }
   // the chest: shoulder height, width and front/back at the chest
   const neck = at(bi.neck), sh = neck.y - 0.02;
   const cs = pts.chest.filter((p) => p.y > sh - 0.3 && p.y < sh - 0.05), cb = box(cs.length ? cs : pts.chest);

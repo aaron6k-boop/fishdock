@@ -293,7 +293,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   // then, loading and building them stopped the game for over a second, the 13 November recording at 11 s. Counted as
   // an asset once loaded, so the world builds their shaders while the place is still loading)
   let fpvCounted = false;
-  function makeFpv() { if (fpv) return; const L = fig.look || {}; fpv = createFpRig({ gloves: !!L.gloves || !!(FILM && typeof window !== "undefined" && window.__fdGloves), skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? O?.jacket ?? 0x2f3a48 }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
+  function makeFpv() { if (fpv) return; const L = fig.look || {}; fpv = createFpRig({ gloves: !!L.gloves || !!(FILM && typeof window !== "undefined" && window.__fdGloves), skinHex: SKINS[L.skin]?.hex ?? 0xc99a74, coatHex: COATS[L.coat]?.hex ?? L.own?.coat ?? O?.jacket ?? 0x2f3a48 }); fpv.group.name = "fdNoReflect"; root.add(fpv.group); }
   const part = (geo, mat, x, y, z, parent = root) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
   const tagY = fig.look.height + 0.3;
   let tag = label(name || "Angler", local ? "#7ee8de" : "#ffffff"); tag.position.set(0, tagY, 0); root.add(tag);
@@ -1635,6 +1635,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           hands[0] = { at: net0.clone().addScaledVector(sideL, -rr * 0.8).add(V3(0, 0.03, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
           hands[1] = { at: net0.clone().addScaledVector(sideL, rr * 0.8).add(V3(0, 0.03, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
           crouch = clamp(0.9 - net0.y * 0.7, 0, 0.75); lean = 0.25 * crouch; brace = 0;
+          // (watching the net in your hands as you pick it up, not the fish still in the water: in first person the
+          // hands on the hoop were out of the picture below it, 18 November film)
+          lookAtW = netAt ? netAt.clone() : lookAtW;
         } else if (landStage === "lower" || landStage === "lead" || landStage === "haul") {
           // both hands on the rope just behind the top rail, leaning over a little to watch the net. Letting it down,
           // the rope runs through loose hands; hauling, one hand pulls down and back while the other reaches up for the
