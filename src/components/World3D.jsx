@@ -88,7 +88,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         // (only when the server used that listed position: some marks have a checked position kept on the server)
         const listed = spotById(spotId);
         const approx = listed?.coordsVerified === false && Math.abs(listed.lat - lat) < 1e-4 && Math.abs(listed.lon - lon) < 1e-4;
-        const place = buildPlace(osm, lat, lon, venue, { approx }); place.id = spotId; mark("place-laid-out");
+        const place = buildPlace(osm, lat, lon, venue, { approx, id: spotId }); place.id = spotId; mark("place-laid-out");
         // only a layout that passes the check (anglers at the mark, water in front); otherwise the labelled drawing
         if (!gone) setReal(place.grid && place.spots.length === 4 && place.check?.ok ? place : null);
       } catch { if (!gone) setReal(null); }
