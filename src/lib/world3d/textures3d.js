@@ -332,14 +332,17 @@ export function turf({ size = 256, seed = 29 } = {}) {
 // Loaded once each and shared; a material that uses one shows its drawn look until it has arrived (or if it can't).
 export const TEX_BASE = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/textures/";
 const photos = new Map();
-export function photoTex(name, { srgb = true } = {}) {
+export function photoTex(name, { srgb = true, repeat = 1 } = {}) {
   if (typeof document === "undefined") return null;
-  if (!photos.has(name)) {
+  // (repeat: its own copy at another scale, loaded on its own: a copy of a picture still loading never reaches the GPU)
+  const key = repeat === 1 ? name : `${name}@${repeat}`;
+  if (!photos.has(key)) {
     const t = new THREE.TextureLoader().load(TEX_BASE + name + ".jpg");
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-    photos.set(name, t);
+    if (repeat !== 1) t.repeat.set(repeat, repeat);
+    photos.set(key, t);
   }
-  return photos.get(name);
+  return photos.get(key);
 }
 
 // ---- weathering noise: one small tiling texture every weathered material shares ----

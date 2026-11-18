@@ -10,6 +10,9 @@
 //   o.slip: (x, z) => true over a slipway (no railing, no planks: its own ramp); o.keepOff: (x, z) => true where a
 //   building stands on the deck (no railing or bench along it); o.landAt, o.bedAt (the seabed or the beach under a
 //   point); o.spots (no bench in front of an angler); o.quality.
+//   o.style "trestle": a harbour pier's timber extension instead (Whitby's, 1912 to 1914): a solid concrete base from
+//   the seabed to a little above the water, and on it a frame of square timber posts, beams and braces carrying the
+//   deck; o.benches false, o.lamps false: none along it.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { weather, fbm, noise2, photoTex } from "./textures3d.js";
@@ -17,6 +20,9 @@ import { deckHeight, clipHalf } from "./pierDeck.js";
 export { deckHeight };
 
 export const OPEN_PIER = { bay: 6.2, across: 3.6, inset: 0.75, deckT: 0.32, girderH: 0.62, col: 0.15, rail: { h: 1.05, post: 1.9, inset: 0.18 }, lampEvery: 24, plank: 0.16 };
+// (the timber frame on a concrete base: posts every 2.6 m along it at its edges and down its middle, the base's top
+// 1.6 m over the sea at mid-tide: the photographs, estimated)
+export const TRESTLE = { bay: 2.6, across: 3.4, inset: 0.3, girderH: 0.36, col: 0.15, baseUp: 1.6, baseIn: 0.15 };
 
 const inside = (p, ring) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, zi] = ring[i], [xj, zj] = ring[j]; if ((zi > p[1]) !== (zj > p[1]) && p[0] < ((xj - xi) * (p[1] - zi)) / (zj - zi) + xi) c = !c; } return c; };
 
@@ -52,7 +58,8 @@ function plankTex() {
  * [x1, z1, x2, z2, nx, nz, "pier", y] along the railing (for walking and fishing), deckAt(x, z) the deck's height.
  */
 export function buildOpenPier(group, ring, h, o = {}) {
-  const C = { ...OPEN_PIER, ...(o.sizes || {}) }, ramps = o.ramps || [], slip = o.slip || (() => false), keepOff = o.keepOff || (() => false);
+  const trestle = o.style === "trestle";
+  const C = { ...OPEN_PIER, ...(trestle ? TRESTLE : {}), ...(o.sizes || {}) }, ramps = o.ramps || [], slip = o.slip || (() => false), keepOff = o.keepOff || (() => false);
   const deckAt = deckHeight(h, ramps), bedAt = o.bedAt || (() => -2.4), landAt = o.landAt || (() => false), spots = o.spots || [];
   const meshes = [], fishEdges = [], glow = [], solids = [];
   // ---- the pier's own axis: the long way of its outline ----
@@ -73,6 +80,9 @@ export function buildOpenPier(group, ring, h, o = {}) {
   weather(mUnder, { scale: 1.2, mottle: 0.25, grime: [h - 1.5, h, 0.3] });
   const mIron = new THREE.MeshStandardMaterial({ color: 0x3a3833, roughness: 0.68, metalness: 0.35 });
   weather(mIron, { scale: 0.9, mottle: 0.3, rust: [0.55, 0.36, 0.17, 0.07], grime: [(o.waterY ?? -0.25) - 1.2, (o.waterY ?? -0.25) + 2.2, 0.75], streaks: [h - 0.4, 3.5, 0.25], rough: [0.8, 1.15] });
+  // (a trestle's frame: square timber gone grey with the weather, darker and green-stained low down near the sea)
+  const mFrame = trestle ? new THREE.MeshStandardMaterial({ color: 0x6b655b, roughness: 0.92 }) : null;
+  if (mFrame) weather(mFrame, { wood: "y", scale: 1.1, mottle: 0.3, bump: 0.35, grime: [(o.waterY ?? -0.25) + C.baseUp, (o.waterY ?? -0.25) + C.baseUp + 1.4, 0.55], rough: [0.85, 1.05], wet: o.wet });
   const mSlip = new THREE.MeshStandardMaterial({ color: 0x8a8780, roughness: 0.9 });
   weather(mSlip, { scale: 1.5, mottle: 0.3, grime: [(o.waterY ?? -0.25) - 1, (o.waterY ?? -0.25) + 2.5, 0.6] });
   const mWhite = new THREE.MeshStandardMaterial({ color: 0xf2f1ec, roughness: 0.45, metalness: 0.1 }); // (gloss white paint: the railings and bench ends)
@@ -99,8 +109,11 @@ export function buildOpenPier(group, ring, h, o = {}) {
       const mx = pts.reduce((s, p) => s + p[0], 0) / pts.length, mz = pts.reduce((s, p) => s + p[1], 0) / pts.length, isSlip = slip(mx, mz);
       const list = isSlip ? top.slip : top.deck;
       for (const t of tris) {
-        // (wound upwards whichever way the outline ran)
-        const [i, j, k] = A > 0 ? [t[0], t[2], t[1]] : t;
+        // (wound upwards whichever way the outline ran: the triangulation hands each triangle back turning the same way
+        // in x, z whatever the outline's own direction, so each is turned by its own winding, not the outline's. Turned
+        // by the outline's, a deck mapped the other way round (Whitby's extensions) faced down and drew black)
+        const [a0, b0, c0] = [pts[t[0]], pts[t[1]], pts[t[2]]], up = (b0[0] - a0[0]) * (c0[1] - a0[1]) - (b0[1] - a0[1]) * (c0[0] - a0[0]);
+        const [i, j, k] = up > 0 ? [t[0], t[2], t[1]] : t;
         for (const q of [pts[i], pts[j], pts[k]]) list.push(q[0], deckAt(q[0], q[1]), q[1]);
         for (const q of [pts[i], pts[k], pts[j]]) under.push(q[0], deckAt(q[0], q[1]) - C.deckT, q[1]);
       }
@@ -138,7 +151,7 @@ export function buildOpenPier(group, ring, h, o = {}) {
       const n = Math.max(1, Math.round((v1 - v0) / C.across));
       for (let i = 0; i <= n; i++) {
         const v = v0 + ((v1 - v0) * i) / n, [x, z] = at(u, v); if (slip(x, z)) continue;
-        const yTop = deckAt(x, z) - C.deckT - C.girderH, yBot = landAt(x, z) ? Math.min(yTop - 0.5, o.landY ?? 2.2) : bedAt(x, z) - 0.6;
+        const yTop = deckAt(x, z) - C.deckT - C.girderH, yBot = trestle ? (o.waterY ?? -0.25) + C.baseUp : landAt(x, z) ? Math.min(yTop - 0.5, o.landY ?? 2.2) : bedAt(x, z) - 0.6;
         if (yTop - yBot < 0.6) continue;
         row.push({ x, z, v, yTop, yBot });
       }
@@ -150,7 +163,8 @@ export function buildOpenPier(group, ring, h, o = {}) {
       const a = row[i], b = row[i + 1]; if (b.v - a.v > C.across * 1.6) continue;
       beams.push([a.x, a.yTop + C.girderH * 0.5, a.z, b.x, b.yTop + C.girderH * 0.5, b.z, 0.22, C.girderH]);
       const lo = Math.max(Math.max(a.yBot, b.yBot) + 0.8, (o.waterY ?? -0.25) - 1.0), hi = Math.min(a.yTop, b.yTop) - 0.25;
-      if (hi - lo > 1.2) {
+      if (trestle) { const lo2 = a.yBot + 0.15, hi2 = Math.min(a.yTop, b.yTop) - 0.1; if (hi2 - lo2 > 0.8) beams.push([a.x, lo2, a.z, b.x, hi2, b.z, 0.12, 0.2]); } // (one timber brace across each pair of posts, alternating)
+      else if (hi - lo > 1.2) {
         beams.push([a.x, lo, a.z, b.x, hi, b.z, 0.07, 0.14], [a.x, hi, a.z, b.x, lo, b.z, 0.07, 0.14]);
         beams.push([a.x, (lo + hi) / 2 + 0.6, a.z, b.x, (lo + hi) / 2 + 0.6, b.z, 0.08, 0.12]); // (a horizontal tie)
       }
@@ -164,10 +178,17 @@ export function buildOpenPier(group, ring, h, o = {}) {
       if (!best) continue;
       beams.push([a.x, a.yTop + C.girderH * 0.5, a.z, best.x, best.yTop + C.girderH * 0.5, best.z, 0.2, C.girderH]);
       const outer = a === A[0] || a === A[A.length - 1];
+      if (trestle) { if (outer && r % 2 === 0) beams.push([a.x, a.yBot + 0.15, a.z, best.x, best.yTop - 0.1, best.z, 0.12, 0.2]); continue; }
       if (outer && r % 2 === 0) { const lo = Math.max(Math.max(a.yBot, best.yBot) + 0.8, (o.waterY ?? -0.25) - 1.0), hi = Math.min(a.yTop, best.yTop) - 0.25; if (hi - lo > 1.2) beams.push([a.x, lo, a.z, best.x, hi, best.z, 0.07, 0.14]); }
     }
   }
-  if (cols.length) {
+  if (cols.length && trestle) {
+    // a post: square timber, 30 cm, from the base to the beam under the deck
+    const post = new THREE.BoxGeometry(C.col * 2, 1, C.col * 2).translate(0, 0.5, 0);
+    const im = new THREE.InstancedMesh(post, mFrame, cols.length), mx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+    cols.forEach((c, i) => { mx.compose(p.set(c.x, c.yBot, c.z), q.identity(), s.set(1, c.yTop - c.yBot, 1)); im.setMatrixAt(i, mx); });
+    im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); meshes.push(im);
+  } else if (cols.length) {
     // a column: a cast-iron shaft, flaring at its foot (the screw pile's collar) and its head (the cap under the girder)
     const shaft = new THREE.CylinderGeometry(C.col * 0.9, C.col, 1, 10, 1, true).translate(0, 0.5, 0);
     const im = new THREE.InstancedMesh(shaft, mIron, cols.length), mx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
@@ -180,9 +201,20 @@ export function buildOpenPier(group, ring, h, o = {}) {
     void footG; caps.castShadow = true; caps.computeBoundingSphere(); group.add(caps); meshes.push(caps);
   }
   if (beams.length) {
-    const box = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(box, mIron, beams.length), mx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), d = new THREE.Vector3(), X = new THREE.Vector3(1, 0, 0);
+    const box = new THREE.BoxGeometry(1, 1, 1), im = new THREE.InstancedMesh(box, trestle ? mFrame : mIron, beams.length), mx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), d = new THREE.Vector3(), X = new THREE.Vector3(1, 0, 0);
     beams.forEach(([x1, y1, z1, x2, y2, z2, w, hh], i) => { d.set(x2 - x1, y2 - y1, z2 - z1); const L = d.length(); q.setFromUnitVectors(X, d.normalize()); mx.compose(p.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2), q, s.set(L, hh, w)); im.setMatrixAt(i, mx); });
     im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); group.add(im); meshes.push(im);
+  }
+
+  // ---- a trestle's base: solid concrete from the seabed up to a little above the sea, the deck's outline ----
+  if (trestle) {
+    const wy = o.waterY ?? -0.25, top = wy + C.baseUp, bot = Math.min(...ring.map(([x, z]) => bedAt(x, z))) - 0.8;
+    const pts = ring.slice(); let A2 = 0; for (let i = 0; i < pts.length; i++) { const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length]; A2 += x1 * z2 - x2 * z1; } if (A2 < 0) pts.reverse();
+    const sh = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, -z)));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: top - bot, bevelEnabled: false }); g.rotateX(-Math.PI / 2); g.translate(0, bot, 0);
+    const mBase = new THREE.MeshStandardMaterial({ color: 0x9a968c, roughness: 0.95 });
+    weather(mBase, { scale: 0.8, mottle: 0.35, grime: [wy - 1.2, wy + 1.0, 0.7], streaks: [top, 1.4, 0.25], rough: [0.9, 1.1] });
+    const m = new THREE.Mesh(g, mBase); m.castShadow = m.receiveShadow = true; m.userData.kind = "the pier"; group.add(m); meshes.push(m);
   }
 
   // ---- the railing along the deck's edge over the water, with the benches set into it ----
@@ -207,7 +239,7 @@ export function buildOpenPier(group, ring, h, o = {}) {
         const x2 = a[0] + (b[0] - a[0]) * ((k + 1) / steps) - nrm[0] * C.rail.inset, z2 = a[1] + (b[1] - a[1]) * ((k + 1) / steps) - nrm[1] * C.rail.inset;
         // a bench along the inside of the railing (Cromer's are part of it: white cast-iron ends, timber slats), not
         // where an angler stands at the rail
-        if (len > 5 && !nearSpot((x + x2) / 2, (z + z2) / 2, 5) && !keepOff((x + x2) / 2 - nrm[0] * 1, (z + z2) / 2 - nrm[1] * 1) && (k % 4 !== 3)) {
+        if (o.benches !== false && len > 5 && !nearSpot((x + x2) / 2, (z + z2) / 2, 5) && !keepOff((x + x2) / 2 - nrm[0] * 1, (z + z2) / 2 - nrm[1] * 1) && (k % 4 !== 3)) {
           seats.push([x, y, z, x2, deckAt(x2, z2), z2, nrm[0], nrm[1]]);
           benchEnds.push([x, y, z, Math.atan2(nrm[0], nrm[1])]);
         }
@@ -262,7 +294,7 @@ export function buildOpenPier(group, ring, h, o = {}) {
   }
 
   // ---- the lamps: black Victorian columns with two lanterns on a scrolled arm, down the middle of the pier ----
-  {
+  if (o.lamps !== false) {
     for (let u = u0 + 10; u <= u1 - 6; u += C.lampEvery) {
       // the middle of the deck across this point
       const xs = []; for (let i = 0; i < ring.length; i++) { const a = ring[i], b = ring[(i + 1) % ring.length], ua = uOf(a[0], a[1]), ub = uOf(b[0], b[1]); if ((ua > u) !== (ub > u)) { const t = (u - ua) / (ub - ua); xs.push(vOf(a[0], a[1]) + (vOf(b[0], b[1]) - vOf(a[0], a[1])) * t); } }

@@ -142,3 +142,12 @@ from Poly Haven (https://polyhaven.com/a/brown_planks_03), CC0 1.0. Credited wit
 The beaches' sand (public/textures/beach_sand_*.jpg and beach_wet_*.jpg, from 18 November 2026) is "Aerial Sand" by
 Rob Tuytel (https://polyhaven.com/a/aerial_sand) and "Damp Beach Sand" by Dimitrios Savva
 (https://polyhaven.com/a/damp_beach_sand), both from Poly Haven, CC0 1.0. Credited with thanks.
+
+The sandstone at Whitby (public/textures/sandstone_wall_*.jpg, from 18 November 2026: the piers, the lighthouses, the
+Abbey's ruins and St Mary's Church) is "Large Sandstone Blocks 01" by Rob Tuytel
+(https://polyhaven.com/a/large_sandstone_blocks_01), from Poly Haven, CC0 1.0. Credited with thanks.
+
+The shape of the ground round Whitby's piers (src/lib/world3d/terrain3d.js) is from the Environment Agency's LIDAR
+Composite DTM 2022, 1 m (https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc):
+© Environment Agency copyright and/or database right 2022. All rights reserved. Contains public sector information
+licensed under the Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).

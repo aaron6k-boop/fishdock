@@ -36,7 +36,10 @@ export const SCENE_CHECKS = {
   "lowestoft-south-pier": passed("pier", pier(5, 5, 184, 184), { approx: true, data: "2026-11-18", checked: "2026-11-18" }),
   "deal-pier": passed("pier", pier(359, 359, 359, 359)),
   "southend-pier": passed("pier", pier(258, 258, 258, 257)),
-  "whitby-piers": passed("pier", pier(232, 232, 232, 232)),
+  // (checked again on 18 November, its anglers moved to the East Pier's seaward side facing out to sea: casting into the
+  // harbour entrance between the piers, where they faced before, is banned. The layout check in Node on OpenStreetMap's
+  // answer fetched that day, the scene check in Chromium and on Aaron's PC)
+  "whitby-piers": passed("pier", pier(55, 55, 55, 55), { data: "2026-11-18", checked: "2026-11-18" }),
   "brixham-breakwater": passed("pier", pier(44, 46, 39, 52)),
   // (listed positions approximate: the layout passed, but the 3D view treats the mark as approximate, so not "exact")
   "st-ives-the-island": passed("pier", pier(45, 19, 67, 38), { approx: true }),

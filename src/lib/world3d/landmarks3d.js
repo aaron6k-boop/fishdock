@@ -8,6 +8,7 @@ import { TOWN_BUILDERS } from "./landmarksTown.js";
 import { CROMER_BUILDERS } from "./landmarksCromer.js";
 import { YARMOUTH_BUILDERS } from "./landmarksYarmouth.js";
 import { LOWESTOFT_BUILDERS } from "./landmarksLowestoft.js";
+import { WHITBY_BUILDERS } from "./landmarksWhitby.js";
 
 // ---- a few shapes merged by material: one mesh (one draw call) per material ----
 function kit() {
@@ -289,4 +290,4 @@ function gorlestonLighthouse(group, ring, base) {
   };
 }
 
-export const LANDMARK_BUILDERS = { gorlestonLighthouse, ...TOWN_BUILDERS, ...CROMER_BUILDERS, ...YARMOUTH_BUILDERS, ...LOWESTOFT_BUILDERS };
+export const LANDMARK_BUILDERS = { gorlestonLighthouse, ...TOWN_BUILDERS, ...CROMER_BUILDERS, ...YARMOUTH_BUILDERS, ...LOWESTOFT_BUILDERS, ...WHITBY_BUILDERS };

@@ -41,9 +41,12 @@ export function styleFor(b) {
   }
   const storeys = b.levels || (/^(hotel|apartments|flats)$/.test(k) ? 4 : town?.tall ? (A < 70 ? 2 : r < 0.3 ? 4 : 3) : A < 110 ? 2 : r < 0.7 ? 2 : 3);
   const brick = town?.render != null ? r < 1 - town.render : /^(terrace|house|semidetached_house|detached)$/.test(k) ? r < 0.6 : r < 0.45;
+  // (where a town's photographs show its houses built of stone, town.stoneAt(x, z): Whitby's Abbey headland, the
+  // mansion and the farm by the Abbey: stone walls under slate)
+  if (town?.stoneAt) { let cx = 0, cz = 0; for (const [x, z] of b.ring) { cx += x / b.ring.length; cz += z / b.ring.length; } if (town.stoneAt(cx, cz)) { const roofShape = b.roof === "flat" ? "flat" : r2 < 0.5 ? "hip" : "gable"; return { type: "house", walls: "stone", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : "slate", storeys, h: b.tall ? Math.max(3, b.h) : storeys * storeyH, shop: false, chimneys: roofShape !== "flat" ? (A > 60 ? 2 : 1) : 0, tint: [1, 1, 1], wide: false }; } }
   const roofShape = b.roof === "flat" ? "flat" : b.roof === "gabled" ? "gable" : b.roof === "hipped" ? "hip" : k === "terrace" ? "gable" : r2 < 0.55 ? "hip" : "gable";
   return {
-    type: "house", walls: brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < 0.62 ? "slate" : "clay",
+    type: "house", walls: brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < (town?.clay != null ? 1 - town.clay : 0.62) ? "slate" : "clay", // (town.clay: how many of a town's roofs are red clay tiles, Whitby's pantiles)
     storeys, h: b.tall ? Math.max(3, b.h) : storeys * storeyH, shop: b.use === "shop", chimneys: roofShape !== "flat" ? (A > 60 ? 2 : 1) : 0,
     tint: brick ? tinted(BRICK) : tinted(RENDER),
     wide: r2 > 0.45, // (the wider three-light windows of a seafront house on its upper storeys, on about half of them)

@@ -23,6 +23,10 @@ it goes in (an asset site's other assets may be under other terms).
 
 | File | Size | Pixels | Format |
 |---|---|---|---|
+| beach_sand_diff.jpg | 213 KB | 1024x1024 | jpeg |
+| beach_sand_nor.jpg | 81 KB | 512x512 | jpeg |
+| beach_wet_diff.jpg | 139 KB | 1024x1024 | jpeg |
+| beach_wet_nor.jpg | 22 KB | 512x512 | jpeg |
 | brick_red_diff.jpg | 269 KB | 1024x1024 | jpeg |
 | brick_red_nor.jpg | 47 KB | 512x512 | jpeg |
 | brick_red_rough.jpg | 11 KB | 256x256 | jpeg |
@@ -35,6 +39,9 @@ it goes in (an asset site's other assets may be under other terms).
 | deck_broom_nor_2k.jpg | 1.3 MB | 2048x2048 | jpeg |
 | deck_broom_rough.jpg | 58 KB | 512x512 | jpeg |
 | deck_broom_rough_2k.jpg | 263 KB | 1024x1024 | jpeg |
+| deck_planks_diff.jpg | 285 KB | 1024x1024 | jpeg |
+| deck_planks_nor.jpg | 36 KB | 512x512 | jpeg |
+| deck_planks_rough.jpg | 9 KB | 256x256 | jpeg |
 | deck_worn_diff.jpg | 20 KB | 512x512 | jpeg |
 | gorleston_northbank.webp | 41 KB | 2260x228 | webp |
 | gorleston_northbank_lights.webp | 3 KB | 2260x228 | webp |
@@ -55,6 +62,8 @@ it goes in (an asset site's other assets may be under other terms).
 | rock_granite_diff.jpg | 100 KB | 512x512 | jpeg |
 | rock_granite_nor.jpg | 206 KB | 512x512 | jpeg |
 | rock_granite_rough.jpg | 18 KB | 256x256 | jpeg |
+| sandstone_wall_diff.jpg | 255 KB | 1024x1024 | jpeg |
+| sandstone_wall_nor.jpg | 88 KB | 512x512 | jpeg |
 | wall_moss_diff.jpg | 29 KB | 512x512 | jpeg |
 | wall_rust_diff.jpg | 77 KB | 1024x1024 | jpeg |
 | wall_rust_nor.jpg | 50 KB | 1024x1024 | jpeg |
@@ -82,9 +91,6 @@ it goes in (an asset site's other assets may be under other terms).
 | MPFB (MakeHuman plugin for Blender), installed from extensions.blender.org | MakeHuman team | https://extensions.blender.org/add-ons/mpfb/ | GPL-3.0 (the tool); the humans it makes are CC0 1.0 | Not required for the models it produces | makes and rigs the anglers |  |
 | Concrete Floor Worn 001 | Dimitrios Savva, Rico Cilliers | https://polyhaven.com/a/concrete_floor_worn_001 | CC0 1.0 | Not required (credited anyway in CREDITS) | worn patches on the pier deck (public/textures/deck_worn_diff.jpg, 512 px) | `concrete_floor_worn_001_1k.gltf` (3 KB), `concrete_floor_worn_001_diff_1k.jpg` (116 KB), `concrete_floor_worn_001.bin` (2.3 MB), `concrete_floor_worn_001_rough_1k.jpg` (178 KB), `concrete_floor_worn_001_nor_gl_1k.jpg` (108 KB) |
 | Concrete Floor 02 | Rob Tuytel | https://polyhaven.com/a/concrete_floor_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | the pier deck (public/textures/pier_concrete_*.jpg) (until 17 November 2026; replaced by concrete_floor_03) | `concrete_floor_02_1k.gltf` (4 KB), `concrete_floor_02_rough_1k.jpg` (311 KB), `concrete_floor_02_diff_1k.jpg` (758 KB), `concrete_floor_02.bin` (2.3 MB), `concrete_floor_02_nor_gl_1k.jpg` (188 KB) |
-| Brown Planks 03 | Rob Tuytel | https://polyhaven.com/a/brown_planks_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | Cromer Pier's weathered timber deck, its boards laid across the pier (public/textures/deck_planks_*.jpg: 1024 px colour, 512 px normal, 256 px roughness), from 18 November 2026 | `brown_planks_03_diff_1k.jpg` (571 KB), `brown_planks_03_nor_1k.jpg` (517 KB), `brown_planks_03_rough_1k.jpg` (222 KB) |
-| Aerial Sand | Rob Tuytel | https://polyhaven.com/a/aerial_sand | CC0 1.0 | Not required (credited anyway in CREDITS) | a beach mark's dry sand, footprints and ripples (public/textures/beach_sand_*.jpg: 1024 px colour, 512 px normal), Great Yarmouth's beach first, from 18 November 2026 | `aerial_sand_diff_1k.jpg` (491 KB), `aerial_sand_nor_1k.jpg` (665 KB) |
-| Damp Beach Sand | Dimitrios Savva | https://polyhaven.com/a/damp_beach_sand | CC0 1.0 | Not required (credited anyway in CREDITS) | a beach mark's wet sand, below where the last waves reached (public/textures/beach_wet_*.jpg: 1024 px colour, 512 px normal), from 18 November 2026 | `damp_beach_sand_diff_1k.jpg` (687 KB), `damp_beach_sand_nor_1k.jpg` (685 KB) |
 | Concrete Wall 004 | Dario Barresi, Charlotte Baglioni | https://polyhaven.com/a/concrete_wall_004 | CC0 1.0 | Not required (credited anyway in CREDITS) | the harbour wall's concrete cap (public/textures/cap_concrete_*.jpg, 512 px colour and normal, 256 px roughness) | `concrete_wall_004_1k.gltf` (3 KB), `concrete_wall_004_rough_1k.jpg` (228 KB), `concrete_wall_004_nor_gl_1k.jpg` (970 KB), `concrete_wall_004_diff_1k.jpg` (520 KB), `concrete_wall_004.bin` (2.3 MB) |
 | Water normals | three.js authors | https://github.com/mrdoob/three.js/blob/dev/examples/textures/waternormals.jpg | MIT (the three.js repository's licence) | Copyright 2010-2025 three.js authors, MIT licence | the sea's fine ripples (public/textures/water_normal.jpg) | `water_normal.jpg` (NaN KB) |
 | Red Brick 03 | Poly Haven | https://polyhaven.com/a/red_brick_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness) | `red_brick_03_diff_1k.jpg` (678 KB), `red_brick_03_nor_gl_1k.jpg` (933 KB), `red_brick_03_rough_1k.jpg` (280 KB) |
@@ -161,6 +167,10 @@ it goes in (an asset site's other assets may be under other terms).
 | Fabric Leather 02 (creased faux leather) | Poly Haven | Poly Haven | CC0 1.0 | None needed (credited in public/people/CREDITS.txt) | the creases in the anglers' jackets and trousers, laid along the arms, body and legs, and where the wellies flex over the ankle (textures.py) |  |
 | Brown Planks 03 (weathered grey-brown boards) | Poly Haven | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | the pier benches' slats (public/models/pierprops.glb): four of its boards cut out at 512 x 1024 (the ORM at 256 x 512), each slat mapped along the grain of one board (source-assets/blender/props2/build_pierprops2.py) | `brown_planks_03_diff_1k.jpg` (557 KB), `brown_planks_03_nor_gl_1k.jpg` (505 KB), `brown_planks_03_arm_1k.jpg` (123 KB), `bench_slat_diff.jpg` (165 KB), `bench_slat_nor.jpg` (99 KB), `bench_slat_orm.jpg` (19 KB) |
 | Inter (Bold, SemiBold) | Rasmus Andersson | https://rsms.me/inter/ | SIL Open Font License 1.1 | Credited in public/models/CREDITS.txt | the lettering on the pier lifebuoy stations' name board and 999 notice (textures/props2/station_sign.jpg, drawn for FishDock with Pillow; in public/models/pierprops.glb) | `station_sign.jpg` (100 KB) |
+| Aerial Sand (dry beach sand, footprints and ripples) | Rob Tuytel | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | a beach mark's dry sand, its light and dark kept and its colour the beach's own (src/lib/world3d/realPlace.js), Great Yarmouth's beach first (the colour at 1024 px, the normal at 512 px) | `aerial_sand_diff_1k.jpg` (479 KB), `aerial_sand_nor_1k.jpg` (650 KB), `beach_sand_diff.jpg` (213 KB), `beach_sand_nor.jpg` (81 KB) |
+| Damp Beach Sand | Dimitrios Savva | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | a beach mark's wet sand, below where the last waves reached (src/lib/world3d/realPlace.js) (the colour at 1024 px, the normal at 512 px) | `damp_beach_sand_diff_1k.jpg` (671 KB), `damp_beach_sand_nor_1k.jpg` (669 KB), `beach_wet_diff.jpg` (139 KB), `beach_wet_nor.jpg` (22 KB) |
+| Large Sandstone Blocks 01 | Rob Tuytel | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | Whitby's sandstone: the piers' battered walls and decks, the lighthouses, the Abbey's ruins and St Mary's Church (src/lib/world3d/realPlace.js, landmarksWhitby.js) (public/textures/sandstone_wall_*.jpg: the colour at 1024 px, the normal at 512 px) | `large_sandstone_blocks_01_diff_1k.jpg` (597 KB), `large_sandstone_blocks_01_nor_1k.jpg` (928 KB), `large_sandstone_blocks_01_rough_1k.jpg` (313 KB) |
+| LIDAR Composite DTM 2022, 1 m (Whitby) | Environment Agency | Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs) | Open Government Licence v3.0 | Required: "© Environment Agency copyright and/or database right 2022. All rights reserved." Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note) | the ground round Whitby's piers: the East and West Cliffs at their surveyed heights (src/lib/world3d/terrain3d.js: resampled every 8 m, 640 m each way round the mark) | `dtm_1m.tif` (16.0 MB) |
 
 Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench (its
 slats textured with Poly Haven's Brown Planks 03, above), the bollard and the lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA

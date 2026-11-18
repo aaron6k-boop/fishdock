@@ -1688,3 +1688,69 @@ The photographs FishDock's modelled places were built from. They were looked at,
 | [Pier head, I., Lowestoft, England-LCCN2002696980.jpg](https://commons.wikimedia.org/wiki/File:Pier_head,_I.,_Lowestoft,_England-LCCN2002696980.jpg) | Photochrom Print Collection | Public domain | between 18 |
 | [Pier head, II., Lowestoft, England-LCCN2002696981.jpg](https://commons.wikimedia.org/wiki/File:Pier_head,_II.,_Lowestoft,_England-LCCN2002696981.jpg) | Photochrom Print Collection | Public domain | between 18 |
 | [The cargo ship Hagland Boss entering Lowestoft inner harbour - geograph.org.uk - 7464007.j](https://commons.wikimedia.org/wiki/File:The_cargo_ship_Hagland_Boss_entering_Lowestoft_inner_harbour_-_geograph.org.uk_-_7464007.jpg) | Adrian S Pye | CC BY-SA 2.0 | 2023-04-23 |
+
+## Whitby, the West and East Piers, the Abbey and St Mary's (fetched 18 November 2026)
+
+1170 previews were fetched (the piers, the harbour entrance, the Abbey and St Mary's Church); the 59 below were looked at to model the piers, their lighthouses, extensions, beacons and footbridges, the Abbey's ruins and the church.
+
+| Photograph | Author | Licence | Date |
+|---|---|---|---|
+| [Lighthouse , West Pier. - geograph.org.uk - 159141.jpg](https://commons.wikimedia.org/wiki/File:Lighthouse_,_West_Pier._-_geograph.org.uk_-_159141.jpg) | Hugh Mortimer | CC BY-SA 2.0 | 2006-02-15 |
+| [West Pier, Whitby. - geograph.org.uk - 184505.jpg](https://commons.wikimedia.org/wiki/File:West_Pier,_Whitby._-_geograph.org.uk_-_184505.jpg) | Steve Partridge | CC BY-SA 2.0 | 2006-06-11 |
+| [West Pier Lighthouse, Whitby. - geograph.org.uk - 363119.jpg](https://commons.wikimedia.org/wiki/File:West_Pier_Lighthouse,_Whitby._-_geograph.org.uk_-_363119.jpg) | Steve Partridge | CC BY-SA 2.0 | 2007-03-11 |
+| [Whitby piers.jpg](https://commons.wikimedia.org/wiki/File:Whitby_piers.jpg) | Photograph by Mike Peel (www.mikepeel.net). | CC BY-SA 4.0 | 2008-08-23 |
+| [Whitby West Pier - geograph.org.uk - 467862.jpg](https://commons.wikimedia.org/wiki/File:Whitby_West_Pier_-_geograph.org.uk_-_467862.jpg) | John Fielding | CC BY-SA 2.0 | 2007-06-12 |
+| [Whitby West lighthouse. - geograph.org.uk - 517793.jpg](https://commons.wikimedia.org/wiki/File:Whitby_West_lighthouse._-_geograph.org.uk_-_517793.jpg) | Steve  F | CC BY-SA 2.0 | 2004-12-27 |
+| [The West Pier and lighthouse, Whitby - geograph.org.uk - 573186.jpg](https://commons.wikimedia.org/wiki/File:The_West_Pier_and_lighthouse,_Whitby_-_geograph.org.uk_-_573186.jpg) | Andrew Smith | CC BY-SA 2.0 | 2007-09-30 |
+| [Whitby West Pier - geograph.org.uk - 659029.jpg](https://commons.wikimedia.org/wiki/File:Whitby_West_Pier_-_geograph.org.uk_-_659029.jpg) | dennis smith | CC BY-SA 2.0 | 2007-06-02 |
+| [All the 4 Whitby lights - geograph.org.uk - 662898.jpg](https://commons.wikimedia.org/wiki/File:All_the_4_Whitby_lights_-_geograph.org.uk_-_662898.jpg) | Steve  F | CC BY-SA 2.0 | 2008-01-19 |
+| [Whitby West Pier - geograph.org.uk - 661434.jpg](https://commons.wikimedia.org/wiki/File:Whitby_West_Pier_-_geograph.org.uk_-_661434.jpg) | dennis smith | CC BY-SA 2.0 | 2007-06-02 |
+| [Whitby - West Pier Ends Here - geograph.org.uk - 679066.jpg](https://commons.wikimedia.org/wiki/File:Whitby_-_West_Pier_Ends_Here_-_geograph.org.uk_-_679066.jpg) | Alan Heardman | CC BY-SA 2.0 | 2008-02-05 |
+| [Whitby - West Pier Lighthouse Erosion - geograph.org.uk - 679595.jpg](https://commons.wikimedia.org/wiki/File:Whitby_-_West_Pier_Lighthouse_Erosion_-_geograph.org.uk_-_679595.jpg) | Alan Heardman | CC BY-SA 2.0 | 2008-02-05 |
+| [West Pier lighthouse - geograph.org.uk - 930517.jpg](https://commons.wikimedia.org/wiki/File:West_Pier_lighthouse_-_geograph.org.uk_-_930517.jpg) | Mike Kirby | CC BY-SA 2.0 | 2008-06 |
+| [West pier and lighthouse - geograph.org.uk - 1394894.jpg](https://commons.wikimedia.org/wiki/File:West_pier_and_lighthouse_-_geograph.org.uk_-_1394894.jpg) | Mike Kirby | CC BY-SA 2.0 | 2009-07-07 |
+| [Looking along the West Pier towards Whitby town - geograph.org.uk - 1423433.jpg](https://commons.wikimedia.org/wiki/File:Looking_along_the_West_Pier_towards_Whitby_town_-_geograph.org.uk_-_1423433.jpg) | Nicholas Mutton | CC BY-SA 2.0 | 2009-05-03 |
+| [West pier extension, Whitby - geograph.org.uk - 1426545.jpg](https://commons.wikimedia.org/wiki/File:West_pier_extension,_Whitby_-_geograph.org.uk_-_1426545.jpg) | hayley green | CC BY-SA 2.0 | 2009-08-02 |
+| [West Pier Extension, Whitby - geograph.org.uk - 1434270.jpg](https://commons.wikimedia.org/wiki/File:West_Pier_Extension,_Whitby_-_geograph.org.uk_-_1434270.jpg) | JThomas | CC BY-SA 2.0 | 2009-08-06 |
+| [Whitby MMB 31 Harbour.jpg](https://commons.wikimedia.org/wiki/File:Whitby_MMB_31_Harbour.jpg) | mattbuck (category) | CC BY-SA 3.0 | 2011-07-04 |
+| [West Pier Whitby.jpg](https://commons.wikimedia.org/wiki/File:West_Pier_Whitby.jpg) | Stevekraken | CC BY-SA 4.0 | 2015-08-03 |
+| [Whitby Seawall - panoramio.jpg](https://commons.wikimedia.org/wiki/File:Whitby_Seawall_-_panoramio.jpg) | Lobster1 | CC BY-SA 3.0 | Taken on 1 |
+| [Whitby West and East Pier Lighthouses (49497821608).jpg](https://commons.wikimedia.org/wiki/File:Whitby_West_and_East_Pier_Lighthouses_(49497821608).jpg) | Reading Tom from Reading, UK | CC BY 2.0 | 2020-02-01 |
+| [Light Tower, Whitby west pier - geograph.org.uk - 2346049.jpg](https://commons.wikimedia.org/wiki/File:Light_Tower,_Whitby_west_pier_-_geograph.org.uk_-_2346049.jpg) | JThomas | CC BY-SA 2.0 | 2011-04-07 |
+| [Lighthouse on West Pier, Whitby - geograph.org.uk - 2587406.jpg](https://commons.wikimedia.org/wiki/File:Lighthouse_on_West_Pier,_Whitby_-_geograph.org.uk_-_2587406.jpg) | J.Hannan-Briggs | CC BY-SA 2.0 | 2005-05-31 |
+| [West Pier, Whitby - geograph.org.uk - 2634640.jpg](https://commons.wikimedia.org/wiki/File:West_Pier,_Whitby_-_geograph.org.uk_-_2634640.jpg) | Dave Hitchborne | CC BY-SA 2.0 | 2011-08-09 |
+| [The West Pier at Whitby - geograph.org.uk - 3098937.jpg](https://commons.wikimedia.org/wiki/File:The_West_Pier_at_Whitby_-_geograph.org.uk_-_3098937.jpg) | Steve Daniels | CC BY-SA 2.0 | 2012-06-01 |
+| [The West Pier at Whitby - geograph.org.uk - 3098950.jpg](https://commons.wikimedia.org/wiki/File:The_West_Pier_at_Whitby_-_geograph.org.uk_-_3098950.jpg) | Steve Daniels | CC BY-SA 2.0 | 2012-06-01 |
+| [Lighthouse on the West Pier, Whitby - geograph.org.uk - 4121746.jpg](https://commons.wikimedia.org/wiki/File:Lighthouse_on_the_West_Pier,_Whitby_-_geograph.org.uk_-_4121746.jpg) | Christine Matthews | CC BY-SA 2.0 | 2014-07-02 |
+| [Whitby west pier - geograph.org.uk - 662905.jpg](https://commons.wikimedia.org/wiki/File:Whitby_west_pier_-_geograph.org.uk_-_662905.jpg) | Steve  F | CC BY-SA 2.0 | 2008-01-19 |
+| [East pier extension, from West pier, Whitby - geograph.org.uk - 1426568.jpg](https://commons.wikimedia.org/wiki/File:East_pier_extension,_from_West_pier,_Whitby_-_geograph.org.uk_-_1426568.jpg) | hayley green | CC BY-SA 2.0 | 2009-08-02 |
+| [Looking across to the East Pier extension - geograph.org.uk - 1423430.jpg](https://commons.wikimedia.org/wiki/File:Looking_across_to_the_East_Pier_extension_-_geograph.org.uk_-_1423430.jpg) | Nicholas Mutton | CC BY-SA 2.0 | 2009-05-03 |
+| [West Pier Extension, Whitby - geograph.org.uk - 1426540.jpg](https://commons.wikimedia.org/wiki/File:West_Pier_Extension,_Whitby_-_geograph.org.uk_-_1426540.jpg) | hayley green | CC BY-SA 2.0 | 2009-08-02 |
+| [West Pier Extension - geograph.org.uk - 1600173.jpg](https://commons.wikimedia.org/wiki/File:West_Pier_Extension_-_geograph.org.uk_-_1600173.jpg) | Mick Garratt | CC BY-SA 2.0 | 2009-11-28 |
+| [West Pier, Whitby - geograph.org.uk - 2637026.jpg](https://commons.wikimedia.org/wiki/File:West_Pier,_Whitby_-_geograph.org.uk_-_2637026.jpg) | Dave Hitchborne | CC BY-SA 2.0 | 2011-08-09 |
+| [West Pier, Whitby - geograph.org.uk - 2639392.jpg](https://commons.wikimedia.org/wiki/File:West_Pier,_Whitby_-_geograph.org.uk_-_2639392.jpg) | Dave Hitchborne | CC BY-SA 2.0 | 2011-08-09 |
+| [Whitby West Pier Extension - geograph.org.uk - 5582682.jpg](https://commons.wikimedia.org/wiki/File:Whitby_West_Pier_Extension_-_geograph.org.uk_-_5582682.jpg) | David Dixon | CC BY-SA 2.0 | 2017-10-23 |
+| [Beacon on the East Pier Extension - geograph.org.uk - 5582701.jpg](https://commons.wikimedia.org/wiki/File:Beacon_on_the_East_Pier_Extension_-_geograph.org.uk_-_5582701.jpg) | David Dixon | CC BY-SA 2.0 | 2017-10-23 |
+| [Piers and Extensions, Whitby Harbour - geograph.org.uk - 5583277.jpg](https://commons.wikimedia.org/wiki/File:Piers_and_Extensions,_Whitby_Harbour_-_geograph.org.uk_-_5583277.jpg) | David Dixon | CC BY-SA 2.0 | 2017-10-23 |
+| [Zoom photo of Whitby's Pier Extensions - geograph.org.uk - 5861557.jpg](https://commons.wikimedia.org/wiki/File:Zoom_photo_of_Whitby%27s_Pier_Extensions_-_geograph.org.uk_-_5861557.jpg) | Andrew Diack | CC BY-SA 2.0 | 2016-08-06 |
+| [The Entrance to Whitby Harbour - geograph.org.uk - 533903.jpg](https://commons.wikimedia.org/wiki/File:The_Entrance_to_Whitby_Harbour_-_geograph.org.uk_-_533903.jpg) | Peter Church | CC BY-SA 2.0 | 2004-04-17 |
+| [Whitby Harbour and Beach from West Cliff - geograph.org.uk - 345610.jpg](https://commons.wikimedia.org/wiki/File:Whitby_Harbour_and_Beach_from_West_Cliff_-_geograph.org.uk_-_345610.jpg) | Robert  Neilson | CC BY-SA 2.0 | 2004-10-25 |
+| [Spa Ladder, Whitby East Pier - geograph.org.uk - 1013632.jpg](https://commons.wikimedia.org/wiki/File:Spa_Ladder,_Whitby_East_Pier_-_geograph.org.uk_-_1013632.jpg) | J G Harston | CC BY-SA 2.0 | 1994-05 |
+| [West and East Piers, Whitby - geograph.org.uk - 2640272.jpg](https://commons.wikimedia.org/wiki/File:West_and_East_Piers,_Whitby_-_geograph.org.uk_-_2640272.jpg) | Dave Hitchborne | CC BY-SA 2.0 | 2011-08-09 |
+| [Stormy seas, East Pier, Whitby - geograph.org.uk - 7636447.jpg](https://commons.wikimedia.org/wiki/File:Stormy_seas,_East_Pier,_Whitby_-_geograph.org.uk_-_7636447.jpg) | David Robinson | CC BY-SA 2.0 | 2023-10-25 |
+| [The East Pier - geograph.org.uk - 1600213.jpg](https://commons.wikimedia.org/wiki/File:The_East_Pier_-_geograph.org.uk_-_1600213.jpg) | Mick Garratt | CC BY-SA 2.0 | 2009-11-28 |
+| [Choppy seas by East Pier - geograph.org.uk - 5542226.jpg](https://commons.wikimedia.org/wiki/File:Choppy_seas_by_East_Pier_-_geograph.org.uk_-_5542226.jpg) | E Gammie | CC BY-SA 2.0 | 2017-09-15 |
+| [East End of Whitby Abbey.JPG](https://commons.wikimedia.org/wiki/File:East_End_of_Whitby_Abbey.JPG) | Nessy-Pic | CC BY-SA 3.0 | 2012-05-18 |
+| [East front of Whitby Abbey - geograph.org.uk - 4831185.jpg](https://commons.wikimedia.org/wiki/File:East_front_of_Whitby_Abbey_-_geograph.org.uk_-_4831185.jpg) | Gordon Hatton | CC BY-SA 2.0 | 2016-02-07 |
+| [North Transept of Whitby Abbey - geograph.org.uk - 3106233.jpg](https://commons.wikimedia.org/wiki/File:North_Transept_of_Whitby_Abbey_-_geograph.org.uk_-_3106233.jpg) | Andrew Abbott | CC BY-SA 2.0 | 2011-10-22 |
+| [Whitby - The west end of the abbey - geograph.org.uk - 8085502.jpg](https://commons.wikimedia.org/wiki/File:Whitby_-_The_west_end_of_the_abbey_-_geograph.org.uk_-_8085502.jpg) | Chris Gorringe | CC BY-SA 2.0 | 2007-04-25 |
+| [Whitby - The east end of the abbey - geograph.org.uk - 8085528.jpg](https://commons.wikimedia.org/wiki/File:Whitby_-_The_east_end_of_the_abbey_-_geograph.org.uk_-_8085528.jpg) | Chris Gorringe | CC BY-SA 2.0 | 2007-04-25 |
+| [Whitby - The north side and transept of the abbey - geograph.org.uk - 8085548.jpg](https://commons.wikimedia.org/wiki/File:Whitby_-_The_north_side_and_transept_of_the_abbey_-_geograph.org.uk_-_8085548.jpg) | Chris Gorringe | CC BY-SA 2.0 | 2007-04-25 |
+| [Whitby Abbey and Church from West Pier - geograph.org.uk - 575832.jpg](https://commons.wikimedia.org/wiki/File:Whitby_Abbey_and_Church_from_West_Pier_-_geograph.org.uk_-_575832.jpg) | Bill Turnpenny | CC BY-SA 2.0 | 2005-08-27 |
+| [Whitby Abbey and St Mary's Church - geograph.org.uk - 186818.jpg](https://commons.wikimedia.org/wiki/File:Whitby_Abbey_and_St_Mary%27s_Church_-_geograph.org.uk_-_186818.jpg) | Phil Catterall | CC BY-SA 2.0 | 2006-06-15 |
+| [Whitby Abbey as seen from the West Pier, Whitby - geograph.org.uk - 4121743.jpg](https://commons.wikimedia.org/wiki/File:Whitby_Abbey_as_seen_from_the_West_Pier,_Whitby_-_geograph.org.uk_-_4121743.jpg) | Christine Matthews | CC BY-SA 2.0 | 2014-07-02 |
+| [Parish church of St Mary, north side - geograph.org.uk - 2504847.jpg](https://commons.wikimedia.org/wiki/File:Parish_church_of_St_Mary,_north_side_-_geograph.org.uk_-_2504847.jpg) | Mike Kirby | CC BY-SA 2.0 | 2011-07-03 |
+| [St Mary's Church as seen from the West Pier, Whitby - geograph.org.uk - 4121744.jpg](https://commons.wikimedia.org/wiki/File:St_Mary%27s_Church_as_seen_from_the_West_Pier,_Whitby_-_geograph.org.uk_-_4121744.jpg) | Christine Matthews | CC BY-SA 2.0 | 2014-07-02 |
+| [St Mary's Church Whitby (view from the south west) - geograph.org.uk - 8349618.jpg](https://commons.wikimedia.org/wiki/File:St_Mary%27s_Church_Whitby_(view_from_the_south_west)_-_geograph.org.uk_-_8349618.jpg) | Bill Harrison | CC BY-SA 2.0 | 2026-04-27 |
+| [St Mary's Church, Whitby with Henrietta Street from East Pier - geograph.org.uk - 1416757.jpg](https://commons.wikimedia.org/wiki/File:St_Mary%27s_Church,_Whitby_with_Henrietta_Street_from_East_Pier_-_geograph.org.uk_-_1416757.jpg) | Karen Chantrey Wood | CC BY-SA 2.0 | 2004-08-25 |
+| [St. Marys , from the West. - geograph.org.uk - 159196.jpg](https://commons.wikimedia.org/wiki/File:St._Marys_,_from_the_West._-_geograph.org.uk_-_159196.jpg) | Hugh Mortimer | CC BY-SA 2.0 | 2005-01-22 |
