@@ -416,17 +416,45 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const solid = new Uint8Array(n * n); // 1: land or a vertex moved onto a wall's line
   const h = new Float32Array(n * n);
   for (let k = 0; k < n * n; k++) { h[k] = H_OF[cls[k]]; solid[k] = cls[k] !== 0 ? 1 : 0; }
+  // ---- a beach mark's own beach (localDetail.js beach): sand rises gently from the water's edge, about 1 in 30, a
+  // shingle bank steeply, up to the promenade or the bank's crest. (Drawn level at 0.9 m, a hundred metres of beach read
+  // as a table of sand with a step down into the sea.) toWater: metres from the water's edge, on the beach ----
+  const BP = local?.beach || (place.venue === "beach" ? {} : null), toWater = new Float32Array(n * n).fill(-1);
+  if (BP) {
+    const slope = BP.slope ?? 0.032, top = BP.top ?? LAND, foot = BP.foot ?? 0.12;
+    const src = new Int32Array(n * n).fill(-1), queue = [];
+    for (let k = 0; k < n * n; k++) if (cls[k] === 0) { src[k] = k; queue.push(k); }
+    for (let qi = 0; qi < queue.length; qi++) {
+      const k = queue[qi], i = k % n, j = (k - i) / n;
+      for (const [ii, jj] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; const q = jj * n + ii; if (src[q] < 0 && cls[q] === 2) { src[q] = src[k]; queue.push(q); } }
+    }
+    for (let k = 0; k < n * n; k++) {
+      if (cls[k] !== 2 || src[k] < 0) continue;
+      const s0 = src[k], d = Math.hypot(xs[k % n] - xs[s0 % n], xs[Math.floor(k / n)] - xs[Math.floor(s0 / n)]);
+      toWater[k] = d; h[k] = Math.min(top, foot + d * slope);
+    }
+  }
   // beaches slope gently into the water (walls stay upright)
   for (let it = 0; it < 4; it++) {
     const nh = h.slice();
     for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
       const k = j * n + i, c = cls[k];
       if (c !== 2 && c !== 0) continue;
+      if (BP && c === 2) continue; // (a beach mark's beach has its own slope, above: smoothed again it bulged at the water's edge)
       const nb = [k - 1, k + 1, k - n, k + n];
       if (c === 0 && !nb.some((q) => cls[q] === 2)) continue;
       nh[k] = (h[k] * 2 + nb.reduce((s, q) => s + h[q], 0)) / 6;
     }
     h.set(nh);
+  }
+  // (the anglers stand on the beach as it is now drawn: its height where each stands, from the grid's four corners)
+  if (BP) {
+    const cellOf = (v) => { let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m; else hi = m; } return lo; };
+    for (const sp of spots) {
+      const i = cellOf(sp.at[0]), j = cellOf(sp.at[2]), fx = (sp.at[0] - xs[i]) / (xs[i + 1] - xs[i] || 1), fz = (sp.at[2] - xs[j]) / (xs[j + 1] - xs[j] || 1);
+      const a = h[j * n + i], b = h[j * n + i + 1], c = h[(j + 1) * n + i], d = h[(j + 1) * n + i + 1];
+      sp.at[1] = Math.round(((a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz) * 100) / 100;
+    }
   }
   // a dune (localDetail.js): a beach the photographs show grown over with marram grass rises gently from the water
   const dune = new Float32Array(n * n), duneH = new Float32Array(n * n);
@@ -542,6 +570,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const grs = new Float32Array(n * n); for (let k = 0; k < n * n; k++) grs[k] = bank[k] || dune[k] > 0.05 ? 0 : cls[k] === 3 || town[k] ? 1 : 0;
   g.setAttribute("aGrass", new THREE.BufferAttribute(grs, 1));
   for (let k = 0; k < n * n; k++) if (bank[k] || dune[k] <= 0) faceA[k] = -1; // (-1: not the dune, no scrub drawn)
+  // the beach's sand (a beach mark's: localDetail.js beach), drawn from a photograph of sand, wet below the last waves
+  const sandA = new Float32Array(n * n); if (BP) for (let k = 0; k < n * n; k++) sandA[k] = (cls[k] === 2 || (cls[k] === 0 && h[k] > GROUND.water + 0.05)) && !dune[k] ? 1 : 0;
+  g.setAttribute("aSand", new THREE.BufferAttribute(sandA, 1));
   g.setAttribute("aFace", new THREE.BufferAttribute(faceA, 1));
   const all = idxDeck.concat(idxSoft);
   g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(all, 1) : new THREE.Uint16BufferAttribute(all, 1));
@@ -559,19 +590,46 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // scrub, bare earth and stones) at about 6 m a tile, coloured by the ground's own tint (green on the cliff, sandy
   // ochre on the dune), and its bumps in the lighting, in place of the plain speckle
   const rufMap = photoTex("ground_rough_diff"), rufNor = photoTex("ground_rough_nor", { srgb: false });
+  // (the beach's sand: Poly Haven's Aerial Sand, dry, footprints and all, and Damp Beach Sand where the waves have
+  // been, both CC0; their colour the beach's own, BP.tint, their light and dark the photographs')
+  const sandName = BP?.tex || "beach_sand", wetName = BP?.texWet || "beach_wet";
+  const sandMap = BP ? photoTex(sandName + "_diff") : null, sandNor = BP ? photoTex(sandName + "_nor", { srgb: false }) : null;
+  const wetMap = BP ? photoTex(wetName + "_diff") : null, wetNor = BP ? photoTex(wetName + "_nor", { srgb: false }) : null;
   const turfT = turf();
   if (rufMap) {
     softMat.onBeforeCompile = (sh) => {
       sh.uniforms.uRuf = { value: rufMap }; sh.uniforms.uRufN = { value: rufNor }; sh.uniforms.uTurf = { value: turfT.map }; sh.uniforms.uTurfN = { value: turfT.normalMap };
-      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; varying float vRuf; varying float vFace; varying float vGrass; varying vec2 vRufUv; varying vec3 vWPos;")
-        .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz;");
+      sh.uniforms.uSand = { value: sandMap || rufMap }; sh.uniforms.uSandN = { value: sandNor || rufNor }; sh.uniforms.uSandW = { value: wetMap || rufMap }; sh.uniforms.uSandWN = { value: wetNor || rufNor };
+      sh.uniforms.uSandK = { value: new THREE.Vector4(...(BP?.tint || [0.56, 0.46, 0.31]), BP?.tile || 3.5) }; sh.uniforms.uSandL = { value: new THREE.Vector3(BP?.lum || 0.283, BP?.lumWet || 0.122, BP?.tileWet || 2.2) };
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying vec2 vRufUv; varying vec3 vWPos;")
+        .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz;");
       sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
-          uniform sampler2D uRuf, uRufN, uTurf, uTurfN; varying float vRuf; varying float vFace; varying float vGrass; varying vec2 vRufUv; varying vec3 vWPos;
-          float fdDuneH = 0.0;
+          uniform sampler2D uRuf, uRufN, uTurf, uTurfN, uSand, uSandN, uSandW, uSandWN; uniform vec4 uSandK; uniform vec3 uSandL; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying vec2 vRufUv; varying vec3 vWPos;
+          float fdDuneH = 0.0, fdWet = 0.0;
           float fdDH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float fdDN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fdDH(i), fdDH(i + vec2(1.0, 0.0)), f.x), mix(fdDH(i + vec2(0.0, 1.0)), fdDH(i + vec2(1.0, 1.0)), f.x), f.y); }
           float fdDF(vec2 p) { float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++) { s += a * fdDN(p); p = p * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }`)
         .replace("#include <color_fragment>", `#include <color_fragment>
+          if (vSand > 0.01) {
+            // the beach: a photograph of dry sand at two scales (so its tile doesn't show across a hundred metres), its
+            // light and dark kept and its colour the beach's own; and where the waves have wet it, from the water's edge
+            // up to where the last of them reached (a ragged line, higher where a bigger wave ran up), a photograph of
+            // damp sand, darker, browner and smoother
+            vec2 wp = vWPos.xz; float sdist = length(vViewPosition), far = smoothstep(20.0, 90.0, sdist);
+            // (the second scale turned, so the first's footprints and ripples don't line up into stripes far off)
+            vec3 a1 = texture2D(uSand, wp / uSandK.w).rgb, a2 = texture2D(uSand, mat2(0.8, 0.6, -0.6, 0.8) * wp / (uSandK.w * 2.9) + 0.37).rgb;
+            float lum = dot(mix(a1, a2, 0.5), vec3(0.3, 0.55, 0.15)) / uSandL.x;
+            // (further off the photograph's footprints fade to a soft, slow variation of tone: seen from above at 80 m their
+            // tile read as a quilt)
+            vec3 dry = uSandK.rgb * mix(clamp(pow(lum, 0.8), 0.55, 1.45), 1.0, far * 0.85) * (0.93 + 0.1 * fdDN(wp / 9.0) + 0.06 * fdDN(wp / 41.0));
+            vec3 w1 = texture2D(uSandW, wp / uSandL.z).rgb;
+            float lw = dot(w1, vec3(0.3, 0.55, 0.15)) / uSandL.y;
+            vec3 wetC = uSandK.rgb * vec3(0.52, 0.48, 0.42) * mix(clamp(pow(lw, 0.7), 0.6, 1.4), 1.0, far * 0.6);
+            float reach = 0.42 + 0.14 * fdDN(wp * vec2(0.09, 0.03)) + 0.08 * fdDN(wp * 0.31);
+            fdWet = 1.0 - smoothstep(reach - 0.12, reach + 0.04, vWPos.y);
+            diffuseColor.rgb = mix(diffuseColor.rgb, mix(dry, wetC, fdWet), vSand);
+            fdWet *= vSand;
+          }
           if (vGrass > 0.01) {
             // turf at two scales (2 m and about 7 m) so the blades don't repeat visibly across a lawn; the tint is the ground's
             vec2 tuv = vRufUv * 4.0;
@@ -624,8 +682,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
+        // (wet sand shines: a film of water over it)
+        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.46, fdWet);")
         .replace("#include <normal_fragment_maps>", `vec3 fdFlatN = normal;
           #include <normal_fragment_maps>
+          if (vSand > 0.01) { vec3 sn = mix(texture2D(uSandN, vWPos.xz / uSandK.w).xyz, texture2D(uSandWN, vWPos.xz / uSandL.z).xyz, fdWet) * 2.0 - 1.0; float sk = 1.0 - smoothstep(12.0, 45.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(sn.x, sn.y, 0.0) * 0.6 * sk), vSand)); }
           if (vGrass > 0.01) { vec3 gn = texture2D(uTurfN, vRufUv * 4.0).xyz * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
           if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; float nk = vFace >= 0.0 ? 1.0 - smoothstep(10.0, 35.0, length(vViewPosition)) : 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf * nk * (vFace >= 0.0 ? 0.3 : 1.0))); }
           if (vFace >= 0.0 && fdDuneH > 0.0) {
@@ -635,7 +696,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
           }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf10";
+    softMat.customProgramCacheKey = () => "fdruf11";
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);

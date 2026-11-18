@@ -408,15 +408,18 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           vec2 e = vec2(.5, 0.); float sdx = shoreDist(p + e.xy), sdz = shoreDist(p + e.yx);
           vec2 sg = vec2(surf(p + e.xy, sdx).x - sf.x, surf(p + e.yx, sdz).x - sf.x)/.5;
           g += sg*bkf*(1. - smoothstep(60., 220., dist)); h += sf.x*bkf;
-          // white water: at a breaking crest and trailing back from it (the bore running in), thinning as it goes; a
-          // lip of spray where each wave first spills; a lace of old foam over the whole surf zone; and the swash, a
-          // thin sheet of bubbles where the water runs up the sand and drains back
-          float lace = smoothstep(.32, .78, noise(p*vec2(2.1, 1.7) + vec2(uTime*.21, -uTime*.17))*.6 + noise(p*6.3 - uTime*.3)*.4);
-          float patchy = smoothstep(.25, .6, noise(p*.17 + vec2(-uTime*.04, uTime*.03)));
-          float bore = (1. - smoothstep(.0, .3 + .15*sf.y, sf.z)) + smoothstep(.93, .995, sf.z);
-          float lip = smoothstep(.86, .99, sf.z)*smoothstep(4., 0., abs(sd - surfLine()))*patchy;
-          float swash = (1. - smoothstep(.3, 2.6 + 1.5*uSwell, sd))*(.45 + .55*smoothstep(.55, .9, fract(sf.z + .15)));
-          surfF = (bore*sf.y*(.55 + .45*lace)*(.7 + .3*patchy) + lip*.7 + sf.y*.22*lace + swash*(.35 + .5*lace))*bkf;
+          // white water: a line of it at each breaking crest, along the stretches of the crest that are breaking (not
+          // its whole length at once); a trail of it left behind each crest, thinning and broken into streaks as it
+          // goes; a little old foam lying over the whole surf zone; a lip where each wave first spills; and the
+          // swash, a thin sheet of bubbles where the water runs up the sand and drains back
+          float fine = smoothstep(.35, .8, noise(p*vec2(3.3, 2.7) + vec2(uTime*.3, -uTime*.2))*.55 + noise(p*9.7 - uTime*.4)*.45);
+          float streaks = smoothstep(.42, .72, noise(p*vec2(.9, .5) + vec2(uTime*.05, uTime*.03)));
+          float breaking = smoothstep(.3, .62, noise(p*.045 + vec2(uTime*.02, -uTime*.015))*.75 + sf.y*.25);
+          float crestL = smoothstep(.9, .985, sf.z) + 1. - smoothstep(.015, .075, sf.z);
+          float trail = (1. - smoothstep(.05, .45, sf.z))*smoothstep(.0, .05, sf.z);
+          float lip = smoothstep(.88, .99, sf.z)*smoothstep(4., 0., abs(sd - surfLine()))*breaking;
+          float swash = (1. - smoothstep(.3, 2.2 + 1.2*uSwell, sd))*(.5 + .5*smoothstep(.55, .9, fract(sf.z + .15)));
+          surfF = (sf.y*(crestL*.85*(.55 + .45*fine)*breaking + trail*.5*fine*(.35 + .65*streaks)*(.4 + .6*breaking) + .1*fine*streaks) + lip*.6 + swash*(.3 + .45*fine))*bkf;
           surfF *= 1. - smoothstep(150., 600., dist);
         }
         // ---- the spectrum sea (Ultra): slopes from both cascades (the maps' mip levels average them out with

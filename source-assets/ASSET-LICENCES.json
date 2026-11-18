@@ -2343,6 +2343,78 @@
     }
    ],
    "date": "2026-11-18"
+  },
+  {
+   "id": "polyhaven:aerial_sand",
+   "name": "Aerial Sand (dry beach sand, footprints and ripples)",
+   "source": "Poly Haven",
+   "page": "https://polyhaven.com/a/aerial_sand",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/models/CREDITS.txt)",
+   "type": "PBR texture (1k: colour, normal (OpenGL), roughness)",
+   "resolution": "1024",
+   "use": "a beach mark's dry sand, its light and dark kept and its colour the beach's own (src/lib/world3d/realPlace.js), Great Yarmouth's beach first (the colour at 1024 px, the normal at 512 px)",
+   "files": [
+    {
+     "file": "downloads/polyhaven-sand/aerial_sand_diff_1k.jpg",
+     "bytes": 490916,
+     "sha256": "d5195c44aec087d2a30d3ca3a3fa3458a1898986e0572e9a8043f8245598557a",
+     "url": "https://polyhaven.com/a/aerial_sand"
+    },
+    {
+     "file": "downloads/polyhaven-sand/aerial_sand_nor_1k.jpg",
+     "bytes": 665488,
+     "sha256": "cba74d670a681dfcdd72db72afbcb9879c7ec9f5854adae24cac8da2c432ad99"
+    },
+    {
+     "file": "public/textures/beach_sand_diff.jpg",
+     "bytes": 218538,
+     "sha256": "67dc73cb9625ab0404018f3005aee490cfd9584fb50966462f16cc19a2d23c7c"
+    },
+    {
+     "file": "public/textures/beach_sand_nor.jpg",
+     "bytes": 82864,
+     "sha256": "538d6bb21b743f498004c95bc9a0dcc62f755869adfc821d02cef9f3f14af4c9"
+    }
+   ],
+   "date": "2026-11-18"
+  },
+  {
+   "id": "polyhaven:damp_beach_sand",
+   "name": "Damp Beach Sand",
+   "source": "Poly Haven",
+   "page": "https://polyhaven.com/a/damp_beach_sand",
+   "author": "Dimitrios Savva",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/models/CREDITS.txt)",
+   "type": "PBR texture (1k: colour, normal (OpenGL), roughness)",
+   "resolution": "1024",
+   "use": "a beach mark's wet sand, below where the last waves reached (src/lib/world3d/realPlace.js) (the colour at 1024 px, the normal at 512 px)",
+   "files": [
+    {
+     "file": "downloads/polyhaven-sand/damp_beach_sand_diff_1k.jpg",
+     "bytes": 686694,
+     "sha256": "99420d879aa16e6f262a83048bca7cd022e2b41533916d21cb5ccb97b1d3ff0c",
+     "url": "https://polyhaven.com/a/damp_beach_sand"
+    },
+    {
+     "file": "downloads/polyhaven-sand/damp_beach_sand_nor_1k.jpg",
+     "bytes": 684809,
+     "sha256": "91e167ebe090703dc05861c296fa897e9e3ddb53227f108e29cc46688bf248b2"
+    },
+    {
+     "file": "public/textures/beach_wet_diff.jpg",
+     "bytes": 142384,
+     "sha256": "711347493c906ecf5ce1ef5bdf405bbadcb2e1db06890ae32b636c8b35a789ff"
+    },
+    {
+     "file": "public/textures/beach_wet_nor.jpg",
+     "bytes": 22194,
+     "sha256": "d8c306fdfacd695edd8ffbde96c446bcb5162a2b975f4a5fc38a14a0269b78e5"
+    }
+   ],
+   "date": "2026-11-18"
   }
  ]
 }
