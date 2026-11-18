@@ -163,9 +163,12 @@ export function setHandsDim(k) { DIM = clamp(k, 0.2, 1); for (const m of liveMat
 // (with the temporal antialiasing on, the coat's cut near your eye looking down may dissolve over a wider band: the
 // dither is smoothed into a fade there, where without it a wide band showed as a screen of dots (15 November). Looking
 // down at the drop net the cut's hard edge left the sleeve a torn blue ribbon, in the 17 November film on Aaron's PC)
+// (since 18 November the cut is crisp whatever the antialiasing, and only right by your eye: see pose below. Kept, so
+// Settings → Graphics can still say whether the temporal antialiasing is on)
 let SOFT = false;
 /** the temporal antialiasing on or off (world.js, with Settings → Graphics) */
 export function setSoftCut(on) { SOFT = !!on; }
+export const softCut = () => SOFT;
 // ---- your arms in the rain ----
 // Wet skin and a wet nylon coat are glossier and a little darker: water fills the skin's fine grain and soaks the
 // coat's weave. They wet through in about a minute of rain and dry over a few once it stops, rather than with the
@@ -352,7 +355,8 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // (a soft sheen, kept to the coat's own colour: at 0.55 and a third of the way to white, the forearms seen along
   // their length, holding a fish out or letting it go, caught the dusk sky's pink and went magenta in Aaron's 14
   // November recording)
-  const coatMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.8, metalness: 0, sheen: 0.22, sheenRoughness: 0.8, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xffffff), 0.12) });
+  // (two-sided: a sleeve opened by the cut by your eye shows its dark inside, not a hollow shell you see through)
+  const coatMat = new THREE.MeshPhysicalMaterial({ color: coatHex, roughness: 0.8, metalness: 0, sheen: 0.22, sheenRoughness: 0.8, sheenColor: new THREE.Color(coatHex).lerp(new THREE.Color(0xffffff), 0.12), side: THREE.DoubleSide });
   // (cloth right at your eye isn't drawn: the collar and the shoulders sit around the camera)
   // (and further off when you look down past your arms at a net or the deck below the rail: from above, the sleeves
   // between your shoulders and elbows are right under your eye, and filled half the picture in the 13 November
@@ -369,14 +373,17 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // (and looking down, the jacket's body isn't drawn at all: its chest and front, right under your eye, were cut by
   // that sphere into ragged dark flaps across the bottom of the picture, looking down at the mat or over the rail. Which
   // parts are its body is marked on each vertex when the rig is built (markTorso); your sleeves still show)
-  const lookDown = { value: 0 };
+  // (lining: how far past the cut a sleeve's inside is left out. With the upper arms drawn whole (18 November), 18 cm
+  // left the elbow's sleeve a hollow shell when an arm crossed in front of you putting a fish back: a black fin with a
+  // torn edge. Now only just past the cut, where a cut sleeve's opening shows)
+  const lookDown = { value: 0 }, upperOn = { value: 0 }, lining = { value: 0.03 };
   coatMat.onBeforeCompile = (sh) => {
-    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown; sh.uniforms.fpCutSoft = cutSoft;
+    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown; sh.uniforms.fpCutSoft = cutSoft; sh.uniforms.fpUpperOn = upperOn; sh.uniforms.fpLining = lining;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nattribute float fpUpper;\nvarying float vTorso;\nvarying float vUpper;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso; vUpper = fpUpper;");
     // (the cut's edge softened by a fine ordered dither over 1.2 cm. It was 5 cm, against a sawtooth seen through the
     // cast that turned out to be the cuff's own edge (dropLining, fixed 15 November); looking down at the drop net the
     // upper sleeve lies almost wholly inside a 5 cm band, and showed as a screen of dots)
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nuniform float fpCutSoft;\nvarying float vTorso;\nvarying float vUpper;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * fpCutSoft || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3) || (fpDown > 0.6 && vUpper > 0.12 + 0.6 * fpB4(gl_FragCoord.xy))) discard;\n#include <opaque_fragment>");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nuniform float fpCutSoft;\nuniform float fpUpperOn;\nuniform float fpLining;\nvarying float vTorso;\nvarying float vUpper;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * fpCutSoft || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + fpLining) || (vTorso > 0.5 && fpDown > 0.3) || (fpUpperOn > 0.5 && fpDown > 0.6 && vUpper > 0.12 + 0.6 * fpB4(gl_FragCoord.xy))) discard;\n#include <opaque_fragment>");
   };
   clothe(coatMat);
   { const prev = coatMat.onBeforeCompile; coatMat.onBeforeCompile = (sh, r) => { prev.call(coatMat, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(0.9, 0.025, 10, 0.75)); }; }
@@ -722,7 +729,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
       { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0, ct = o.castT, wind = ct == null ? 0 : clamp((ct - 0.12) / 0.15, 0, 1) * (1 - clamp((ct - 0.8) / 0.15, 0, 1));
-        nearCut.value += (Math.max(0.16 + 0.17 * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.012 + Math.max(0.06 * wind, SOFT ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; }
+        const fc = FILM && typeof window !== "undefined" ? window.__fdFpCut || null : null; // (film only: other ways of cutting your sleeves near the eye, to compare)
+        // (looking down, your upper arms are drawn whole and your sleeves cut only right by your eye, crisply: faded out
+        // over the elbow and dissolving into dots near the eye, the sleeves looked as if they were melting away, hauling
+        // the drop net; kept whole they come in from the bottom corners of the picture as your own arms do. Chosen from
+        // four ways of drawing it, filmed on Aaron's PC on 18 November)
+        nearCut.value += (Math.max(0.16 + (fc?.nearDown ?? 0.04) * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.006 + Math.max(0.06 * wind, (fc?.soft ?? false) ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; upperOn.value = fc?.upper === true ? 1 : 0; }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)

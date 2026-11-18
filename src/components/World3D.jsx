@@ -17,6 +17,9 @@ import { fretAndStorm } from "../lib/world3d/skyLook.js";
 
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
 // from where they happen: your friend's reel from their side, quieter further away) ----
+// ---- where the time goes while a place loads: performance marks (fd:...), read by the loading checks on the PC ----
+// (cheap, and nothing is sent anywhere: the browser keeps them for the page)
+const mark = (name, detail) => { try { performance.mark(`fd:${name}`, detail ? { detail } : undefined); } catch { /* old browsers */ } };
 const VIEW_KEY = "fishdock.view3d.v1";
 // (landCam2: the landing camera. New users get it on; an earlier choice to turn it off ("landCam": false) is kept)
 export const VIEW_DEFAULTS = { track: true, spatial: true, side: "right", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto", camDist: "auto", autoBtn: false };
@@ -75,16 +78,17 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
     let gone = false; setReal(undefined);
     (async () => {
       try {
+        mark("place-fetch");
         const r = await fetch(`/api/place?spot=${encodeURIComponent(spotId)}`, { headers: { accept: "application/json", "x-fishdock": "1" } });
         if (!r.ok) throw new Error("no place");
         const [lat, lon] = (r.headers.get("x-mark") || "").split(",").map(Number);
-        const osm = await r.json();
+        const osm = await r.json(); mark("place-data");
         const { buildPlace } = await import("../lib/world3d/osmPlace.js");
         // a mark whose listed position is approximate may use the nearest bank within 400 m (and the label says so)
         // (only when the server used that listed position: some marks have a checked position kept on the server)
         const listed = spotById(spotId);
         const approx = listed?.coordsVerified === false && Math.abs(listed.lat - lat) < 1e-4 && Math.abs(listed.lon - lon) < 1e-4;
-        const place = buildPlace(osm, lat, lon, venue, { approx }); place.id = spotId;
+        const place = buildPlace(osm, lat, lon, venue, { approx, id: spotId }); place.id = spotId; mark("place-laid-out");
         // only a layout that passes the check (anglers at the mark, water in front); otherwise the labelled drawing
         if (!gone) setReal(place.grid && place.spots.length === 4 && place.check?.ok ? place : null);
       } catch { if (!gone) setReal(null); }
@@ -100,7 +104,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
     let gone = false, w = null, untrack = null;
     (async () => {
       try {
-        const mod = await import("../lib/world3d/world.js");
+        const mod = await import("../lib/world3d/world.js"); mark("world-code");
         if (gone) return;
         const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
         const q = quality === "auto" ? mod.autoQuality3d() : quality;
@@ -111,6 +115,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
           onFeel: (n, d) => props.current.feel?.(n, d),
           onSound: (name, pos, _who, data) => { if (!props.current.sound) return; const cam = W.current?.camera; if (soundPan && !loadView().spatial) soundPan(0, 1); else if (cam && pos && soundPan) { const d = pos.clone().sub(cam.position); const r = new cam.position.constructor(1, 0, 0).applyQuaternion(cam.quaternion); soundPan(Math.max(-1, Math.min(1, d.normalize().dot(r))), Math.max(0.25, 1 - cam.position.distanceTo(pos) / 60)); } play(name, data); },
         });
+        mark("world-built");
         // the real place as built failed its scene check (sceneCheck.js): don't serve it as a real scene
         if (real && w.realCheck && !w.realCheck.ok) { w.dispose(); if (!gone) setReal(null); return; }
         if (canvas.current) canvas.current.dataset.check = w.realCheck ? (w.realCheck.ok ? "ok" : "failed") : "drawn";
@@ -122,10 +127,11 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         if (canvas.current && w.spawn) { canvas.current.dataset.spawn = JSON.stringify({ safe: w.spawn.spots.length, report: w.spawn.report.filter((r) => r.problem) }); canvas.current.dataset.me = JSON.stringify(w.mySpot); }
         if (startMode !== "first") { w.setMode(startMode); setMode(w.mode || startMode); }
         let keptWas = null, heardAt = 0, busyWas = null;
-        gate.built(); w.setPacing(false); let pctWas = -1; let liveWas = null, warmed = false;
+        gate.built(); w.setPacing(false); let pctWas = -1; let liveWas = null, warmed = false, frameN = 0;
         w.onFrame(({ outs, view, walk: wk, kept, localId }) => {
+          if (!frameN++) mark("first-frame");
           { const fl = props.current.fightLive; if (fl && fl.current !== liveWas) { liveWas = fl.current; w.setFight(liveWas); } } // (each new step of the fight, the frame it arrives)
-          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (!warmed && p >= 85) { warmed = true; w.warm(); } /* (the files are in: everything not yet drawn is built now, under the loading screen) */ if (gate.ready) { gate = null; untrack?.(); untrack = null; w.warm(); /* (and again as the loading screen goes: whatever arrived since 85% is readied under it, not in your first seconds of fishing) */ w.setPacing(true); if (!gone) setShown(true); } }
+          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (!warmed && p >= 85) { warmed = true; w.warm(); } /* (the files are in: everything not yet drawn is built now, under the loading screen) */ if (gate.ready) { mark("files-in", gate.counts.join("/")); gate = null; untrack?.(); untrack = null; w.setLoading(false); w.warm(); mark("shown"); /* (and again as the loading screen goes: whatever arrived since 85% is readied under it, not in your first seconds of fishing) */ w.setPacing(true); if (!gone) setShown(true); } }
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }

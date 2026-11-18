@@ -263,3 +263,5 @@ function bandstand(group, ring, base) {
 }
 
 export const TOWN_BUILDERS = { pierHotel, cliffHotel, pavilion, bandstand };
+// (the kit, for the other places' own buildings: landmarksCromer.js)
+export { kit, walls, prepRing, edgeInfo, inset, bbox, mansard, hipRoof, chimney, signTex, materials, finish };

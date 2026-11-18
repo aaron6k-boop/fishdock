@@ -179,6 +179,21 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     }
     scene.traverseVisible((o) => { if (o.geometry) sentGeo.add(o.geometry); });
   }
+  // ---- while the place loads: every shader handed to the graphics driver together, and nothing drawn until they are built ----
+  // Measured on Aaron's PC (RTX 3090, Edge, 18 November): loading Gorleston for the first time, the page stood still for
+  // 30 seconds in all, 21 of them waiting for 192 shader programs to be built, one after another, as each was first used
+  // (three.js builds a shader the first time something drawn needs it, and its first use waits for it). Handed over
+  // together (renderer.compile), the driver builds them side by side where the browser can (the parallel-compile
+  // extension: Chrome and Edge on a PC); and until they are built, nothing that needs them is drawn, so the page stays
+  // free to take in the files still arriving and to move the loading bar. What arrives later is handed over as it comes.
+  let loading = true, loadPend = null, loadN = 0;
+  const pendingNow = () => { if (!loadPend) return 0; for (const m of loadPend) { const pr = renderer.properties.get(m).currentProgram; if (!pr || pr.isReady?.() !== false) loadPend.delete(m); } return loadPend.size; };
+  function submitShaders() {
+    const hidden = []; scene.traverse((o) => { if (!o.visible && !o.isLight) { hidden.push(o); o.visible = true; } });
+    const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
+    try { const mats = renderer.compile(scene, camera); loadPend ||= new Set(); for (const m of mats) loadPend.add(m); } catch { /* (built as they are met instead) */ }
+    finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
+  }
   let warmMs = 0, warmCalls = 0; // (film checks only: how often the scene was readied, and the time it took on the page)
   function warm(root = scene, late = false) {
     const t0w = performance.now(); warmCalls++;
@@ -253,9 +268,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   env.onThunder = (delay, far) => onSound?.("thunder", null, localId, { delay, far }); // (a storm's lightning: its thunder, as late as it's far)
   const buildMs = Math.round(performance.now() - tBuild);
   if (Q.sea) env.setFftSea(true, renderer);
-  // (every material's shader compiled now, in parallel where the driver allows, rather than the first time its object
-  // comes into view: the first look round used to stall on each new shader)
-  warm(); // (see warm below: for the target the scene is really drawn into)
+  // (every material's shader handed over now, to be built in parallel where the driver allows, rather than the first
+  // time its object comes into view: the first look round used to stall on each new shader. Not waited for here: see
+  // submitShaders above. The rest of warm (every model's vertices and textures sent) follows once they are built)
+  submitShaders();
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
@@ -391,14 +407,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // they do of your own, and more of the pier shows either side)
   const FP_TALL = 1.27;
   /** Glide the camera from where it is now to wherever the next frames put it, over `sec` seconds. */
-  function blendCamera(sec = 0.7) { camBlend = reduceMotion ? null : { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, t0: clockT, sec }; }
+  // (pos false: the view turns and widens as a glide, but the camera stays at your eyes as you move: walking off in first
+  // person, a camera gliding from where you stood was left behind you as you stepped off, looking at the back of your own
+  // jacket for half a second; the PC's live check, 18 November)
+  function blendCamera(sec = 0.7, { pos = true } = {}) { camBlend = reduceMotion ? null : { pos: pos ? camera.position.clone() : null, quat: camera.quaternion.clone(), fov: camera.fov, t0: clockT, sec }; }
   // (a long way round takes a little longer: the glide back to your spot turns at most about 150° a second)
   const blendFor = (yawTo, far = 0) => blendCamera(0.65 + Math.min(0.6, Math.abs(wrap(yawTo - look.yaw)) / 2.6) + Math.min(0.45, far / 20));
   function applyBlend() {
     if (!camBlend) return 1;
     const u = (clockT - camBlend.t0) / camBlend.sec; if (u >= 1) { camBlend = null; return 1; }
     const k = easeBlend(u), q = camera.quaternion.clone();
-    camera.position.lerpVectors(camBlend.pos, camera.position.clone(), k); camera.quaternion.copy(camBlend.quat).slerp(q, k);
+    if (camBlend.pos) camera.position.lerpVectors(camBlend.pos, camera.position.clone(), k);
+    camera.quaternion.copy(camBlend.quat).slerp(q, k);
     camera.fov = camBlend.fov + (camera.fov - camBlend.fov) * k; camera.updateProjectionMatrix();
     return k;
   }
@@ -510,6 +530,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         // first person: a subtle bob and sway with your steps (none with reduced motion)
         const sp = Math.min(1, (W.speed || 0) / 4), ph = (W.phase || 0) * 2;
         pos.copy(tgt).add(new THREE.Vector3(0, 0.07 + (reduceMotion ? 0 : Math.abs(Math.sin(ph)) * 0.035 * sp - 0.015 * sp), 0));
+        // (at your eyes as they lean ahead of your feet into a stride: at the feet's line, the camera was up to 26 cm
+        // behind your eyes, and the top of your own collar showed at the bottom of the view; eased, so a step doesn't jolt)
+        // (and at the height of your own eyes, eased: the camera stood at the same height for everyone, 8 cm above the
+        // woman's eyes)
+        { const ld = anglers.get(localId)?.out?.lead, kl = 1 - Math.exp(-dt * 10); W.lead ||= [0, 0, 0];
+          if (ld) { const m = Math.hypot(ld[0], ld[1]), c = m > 0.35 ? 0.35 / m : 1; W.lead[0] += (ld[0] * c - W.lead[0]) * kl; W.lead[1] += (ld[1] * c - W.lead[1]) * kl;
+            const dy = ld[2] > 1.2 && ld[2] < 2 ? ld[2] - 1.62 : 0; W.lead[2] += (dy - W.lead[2]) * (1 - Math.exp(-dt * 3)); }
+          pos.x += W.lead[0]; pos.z += W.lead[1]; pos.y += W.lead[2]; }
         if (!reduceMotion) { const sx = Math.cos(yaw), sz = Math.sin(yaw), w = Math.sin(ph * 0.5) * 0.02 * sp; pos.x += sx * w; pos.z += sz * w; }
         anglers.get(localId)?.a.setFirstPerson(true);
       }
@@ -953,13 +981,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // for 7.2 seconds in the software renderer, mid-landing, as their shaders were built and checked. That renderer
     // can't build them in parallel, and even there the work now falls across frames, the worst 3.6 s; where the browser
     // can, the building is off the page. One at a time: while one is under way, looked at again next frame)
-    { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum && !warmBusy) { warmSum = sum; warm(scene, true); } } // (the whole scene: a fish and a net live in the world, not under their angler)
+    { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum && !warmBusy && !loading) { warmSum = sum; warm(scene, true); } } // (the whole scene: a fish and a net live in the world, not under their angler)
     // and anything else that turns up after the start (the pier's lifebuoys, benches, signs and lamp posts, someone
     // walking on the pier, a fish model): counted every half second, and readied once it has stopped arriving. Measured
     // on the 14 November build at Medium: 17 shaders and 11 textures were built or sent in the first seconds of fishing,
     // as the cast swung the view round to things never drawn before, and 3 more on the first look round. Those were the
     // stalls in Aaron's recording at the cast and at 16 to 22 s, turning to the lookout
-    if (++growN % 30 === 0 && !(FILM && typeof window !== "undefined" && window.__fdNoGrow)) { let n = 0; scene.traverse((o) => { if (o.material) n++; }); if (n !== warmedN && n === growWas) { warmedN = n; warmCount++; warm(scene, true); } growWas = n; }
+    if (++growN % 30 === 0 && !loading && !(FILM && typeof window !== "undefined" && window.__fdNoGrow)) { let n = 0; scene.traverse((o) => { if (o.material) n++; }); if (n !== warmedN && n === growWas) { warmedN = n; warmCount++; warm(scene, true); } growWas = n; }
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
@@ -972,6 +1000,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera); simT = t; setThinPixel(camera, renderer.domElement.height); // (thinAA.js: the railings never drawn thinner than a pixel and a half)
     adapt();
+    // (every frame while loading: what has arrived since is handed over before anything is drawn. Every eighth frame
+    // was too few: what arrived in between was drawn, and built one at a time, the moment it was; on the PC on 18
+    // November that was most of them, in one 9-second stop. And the scene is readied (warm: its vertices and textures
+    // sent) only once everything handed over is built)
+    if (loading && draw) {
+      const n0 = loadPend?.size || 0; submitShaders(); loadN++;
+      if (pendingNow() > 0) draw = false;
+      else if (loadPend && (n0 || loadN === 1)) { if (performance.mark) try { performance.mark("fd:shaders-built", { detail: String(renderer.info.programs?.length || 0) }); } catch { /* (loading checks only) */ } warm(scene); }
+    }
     if (draw) drawFrame();
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
@@ -1100,7 +1137,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         W = walker(p.x, p.z, me.out?.face ?? 0, p.y); W.floor = (x, z) => env.ground.heightAt(x, z); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
         fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56, eyes: 28 }[dist] || 47); // (eyes: zoomed right in, the walking camera at your eyes: first person) look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);
         // (from your eyes out to behind you as a glide; a drag turns the view by what the walking camera shows)
-        followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8);
+        followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8, { pos: dist !== "eyes" });
         // (a comfortable range to look up and down while walking, no vertical flick; a double tap recentres behind you at
         // this distance rather than at the fishing view's)
         look.setPitchRange(WALK_PITCH.min, WALK_PITCH.max, false); look.setBaseFov(look.fov); look.setHome(W.face, WALK_PITCH.level);
@@ -1172,11 +1209,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },
     /** Build every shader and send every texture the scene has, drawn yet or not (the loading screen calls this once the files are in). */
-    warm() { warm(scene); },
+    warm() { if (loading && pendingNow() > 0) return; warm(scene); }, // (while loading, not while shaders handed over are still being built: see tick)
     /** Every frame's time (ms) with what you were doing and the graphics card's running counts, to `cb`; null stops it. For the frame log (frameLog.js). */
     tapFrames(cb) { frameTap = cb || null; },
     /** Frame pacing on or off (off while the loading screen is up). */
     setPacing(on) { pacing = !!on; late = 0; easyFor = 0; },
+    /** the place is still loading (World3D, until its loading screen goes): shaders built together, nothing drawn until they are */
+    setLoading(on) { loading = !!on; if (!loading) loadPend = null; },
     /** What the graphics card holds so far: while these still change from frame to frame, the place is still arriving. */
     loadInfo() { return { programs: renderer.info.programs?.length || 0, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries }; },
     /** The rod-tip lights: "auto" (green in the dark), "on" or "off". */

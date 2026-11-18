@@ -20,6 +20,8 @@ import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
 import { columnGeometry, lanternAt, lampPools, shadeFromOwnLantern, COLUMN } from "./lamps3d.js";
+import { buildOpenPier } from "./openPier.js";
+import { deckHeight } from "./pierDeck.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // colours multiplied over the materials: concrete stays near white (its texture has the colour); sand, grass and the
@@ -403,7 +405,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const perches = []; // lamp tops (wildlife.js)
   const nearestWall = segIndex(walls);
   // the exact land, for the vertices along a wall (the grid's own answer is only right to a cell)
-  const landRings = place.land || [], waterRings = place.water || [], pierRings = (place.piers || []).filter((p) => p.ring).map((p) => p.ring);
+  // (an open pier on iron legs, localDetail.js, is no part of the land: the sea and the beach run on under its deck)
+  const landRings = place.land || [], waterRings = place.water || [], pierRings = (place.piers || []).filter((p) => p.ring && !p.open).map((p) => p.ring);
   const bb = (r) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of r) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { r, x0, x1, z0, z1 }; };
   const LR = landRings.map(bb), WR = waterRings.map(bb), PR = pierRings.map(bb), inB = (q, b) => q[0] >= b.x0 && q[0] <= b.x1 && q[1] >= b.z0 && q[1] <= b.z1 && inside(q, b.r);
   const landAt = (q) => (LR.some((b) => inB(q, b)) || PR.some((b) => inB(q, b))) && !WR.some((b) => inB(q, b));
@@ -1067,9 +1070,17 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const backs = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null /* (__fdNoBackdrop: a measuring switch, for comparing the scene with and without it) */, mid = (b) => { let x = 0, z = 0; for (const [px, pz] of b.ring) { x += px; z += pz; } return [x / b.ring.length, z / b.ring.length]; };
   const behindBackdrop = (b) => { if (!backs) return false; const [x, z] = mid(b); return backdropCovers(backs, x, z); };
   // a mark's own landmark buildings, built from photographs (localDetail.js), in place of the generic style
+  // ---- an open pier's deck: its heights first, for what stands on it (its ramps: localDetail.js) ----
+  const openPiers = (place.piers || []).filter((p) => p.ring && p.open);
+  for (const p of openPiers) {
+    const y = (v) => (v === "land" ? LAND : v === "deck" ? p.h : v === "under" ? GROUND.water - 0.6 : v);
+    p.ramps = (local?.pier?.ramps || []).map((r) => ({ a: r.a, b: r.b, ya: y(r.ya), yb: y(r.yb) })); p.deckAt = deckHeight(p.h, p.ramps);
+  }
+  const openDeckAt = (q) => { for (const p of openPiers) if (inside(q, p.ring)) return p.deckAt(q[0], q[1]); return null; };
   const marks = Object.fromEntries(Object.entries(local?.landmarks || {}).filter(([, k]) => LANDMARK_BUILDERS[k])), beacons = [];
   for (const b of (place.buildings || []).filter((b) => marks[b.id] && !behindBackdrop(b))) { // (not one a photograph of the place already shows)
-    const lm = LANDMARK_BUILDERS[marks[b.id]](group, b.ring, Math.min(...b.ring.map(([x, z]) => groundAt(x, z) || LAND)));
+    const od = openDeckAt(mid(b)); // (standing on an open pier's deck: on the deck, not the sea or the beach under it)
+    const lm = LANDMARK_BUILDERS[marks[b.id]](group, b.ring, od != null ? od : Math.min(...b.ring.map(([x, z]) => groundAt(x, z) || LAND)));
     for (const m of lm.meshes) { m.userData.kind = "a building"; targets.push(m); }
     place.buildingGlow = [...(place.buildingGlow || []), ...lm.glow];
     if (lm.flash) beacons.push(lm.flash);
@@ -1106,6 +1117,20 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // (all the jetties' decks, piles and rails as three instanced meshes: one draw call each, not one per piece)
   const jDeck = [], jPile = [], jRail = [];
   for (const p of place.piers) {
+    if (p.open && p.ring) {
+      // ---- an open pier on iron legs (openPier.js): not the solid block a pier's outline is drawn as otherwise ----
+      const onDeck = (place.buildings || []).filter((b) => marks[b.id] && openDeckAt(mid(b)) != null).map((b) => b.ring);
+      const nearRing = (r, x, z) => { if (inside([x, z], r)) return 0; let d = Infinity; for (let k = 0; k < r.length; k++) d = Math.min(d, segDist([x, z], r[k], r[(k + 1) % r.length])); return d; };
+      const op = buildOpenPier(group, p.ring, p.h, {
+        ramps: p.ramps, slip: local?.pier?.slip || null, keepOff: (x, z) => onDeck.some((r) => nearRing(r, x, z) < 0.9),
+        landAt: (x, z) => landAt([x, z]), landY: LAND, bedAt: () => GROUND.water - 0.2, waterY: -0.25, spots, quality, wet: place.deckWet,
+      });
+      for (const m of op.meshes) { if (!m.userData.kind) m.userData.kind = "the pier"; }
+      targets.push(...op.solids); solids.push(...op.solids); fishEdges.push(...op.fishEdges);
+      place.buildingGlow = [...(place.buildingGlow || []), ...op.glow];
+      for (const q of op.lamps) perches.push(q);
+      continue;
+    }
     if (p.line) {
       // the deck at the height and width the anglers' spots use (osmPlace: p.h, and half the width less 60 cm from the middle)
       // (only a jetty someone stands on needs that: the others stay lower and narrower, so they don't block the view)
@@ -1179,12 +1204,13 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // pier) is taken as a ramp. "Fish here" faces you out over the nearest real water's edge.
   const KEEP = 0.45;
   const drawnB = (place.buildings || []).filter((b) => !spots.some((sp) => b.ring.some(([x, z]) => Math.hypot(x - sp.at[0], z - sp.at[2]) < 6))).map((b) => bb(b.ring));
-  const PRh = (place.piers || []).filter((p) => p.ring).map((p) => ({ ...bb(p.ring), h: p.h }));
+  const PRh = (place.piers || []).filter((p) => p.ring).map((p) => ({ ...bb(p.ring), h: p.h, deckAt: p.deckAt || null }));
   const jettyAt = (x, z) => jetties.find((j) => segDist([x, z], j.a, j.b) < j.w / 2 - KEEP);
   const allEdges = [...walls.map((e) => [...e.slice(0, 6), "wall", LAND]), ...fishEdges], nearestEdge = segIndex(allEdges);
-  const heightAt = (x, z) => { const j = jettyAt(x, z); if (j) return j.y; const pr = PRh.find((b) => inB([x, z], b)); if (pr) return pr.h; const g = groundAt(x, z); return g || (landAt([x, z]) ? LAND : 0); };
+  const heightAt = (x, z) => { const j = jettyAt(x, z); if (j) return j.y; const pr = PRh.find((b) => inB([x, z], b)); if (pr) return pr.deckAt ? pr.deckAt(x, z) : pr.h; const g = groundAt(x, z); return g || (landAt([x, z]) ? LAND : 0); };
   const walkable = (x, z) => {
     if (local?.walkArea && !local.walkArea(x, z)) return false; // (as far as the mark's photographs hold up: localDetail.js)
+    if (openPiers.length && local?.pier?.slip?.(x, z)) return false; // (not down an open pier's lifeboat slipway into the sea)
     if (jettyAt(x, z)) return true;
     const onPier = PRh.some((b) => inB([x, z], b));
     if (!onPier && !landAt([x, z])) return false;

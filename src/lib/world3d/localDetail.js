@@ -81,8 +81,50 @@ export const LOCAL = {
     // the bandstand in Pier Gardens; the Cliff Hotel on the cliff top)
     note: "The lighthouse, lamps, fences, the height of the cliff and the dune across the harbour mouth at Gorleston are modelled from photographs and descriptions; their sizes are estimates. The town is shown by two photographs of it; no other buildings are drawn, and you can walk the pier but not on into the town.",
   },
+  // Cromer Pier (photographs on Wikimedia Commons, 2008 to 2025: the pier from the beach and the cliff, along its deck,
+  // its Pavilion Theatre and lifeboat station, and the town from the pier; their authors are listed in
+  // docs/ASSET_LICENCES.md). The pier (1901, Grade II listed) is "a short structure, on iron girders, with a small
+  // pavilion with shaped roof at the sea end ... a modern lifeboat house immediately behind the pavilion" (its listing,
+  // Historic England 1049005); the lifeboat station of 1999 at its end (Wikipedia, Cromer Lifeboat Station)
+  "cromer-pier": {
+    // an open pier: a timber deck on cast-iron columns over the beach and the sea (openPier.js), its outline OSM way
+    // 29146061 (surface wood). The deck's height, 6 m over the sea at mid-tide, is an estimate from photographs
+    pier: {
+      open: true, id: 29146061,
+      // where anglers fish: from the railings either side of the pier's main arm, between the shelters and the pavilion;
+      // not on the slipway past the lifeboat station, nor by the gates at its root
+      fishFrom: [[-27, 78], [-15, 84]], noFish: (x, z) => z < 66 || z > 96,
+      // the deck slopes down to the promenade at its root, and the lifeboat's slipway runs down into the sea past the
+      // station (from its doors at the deck to under the water: about 1 in 5, estimated)
+      ramps: [{ a: [-45.6, 168], b: [-40.2, 147], ya: "land", yb: "deck" }, { a: [14.8, -44.8], b: [7.4, -17.1], ya: "under", yb: "deck" }],
+      slip: (x, z) => (x - 4.3) * 0.307 + (z + 18.1) * -0.952 > -0.3,
+    },
+    // its buildings, each built from photographs on its own outline: the Pavilion Theatre, the lifeboat station, the
+    // two domed kiosks at the gates, the glazed shelters on the deck, the Hotel de Paris on the cliff above the pier,
+    // and the parish church's tower (48 m, the tallest in Norfolk: Norfolk Heritage Explorer, NHER 6475)
+    landmarks: { 345723596: "cromerPavilion", 345720938: "cromerLifeboat", 1105720160: "cromerGates", 1105721360: "pierShelter", 1105721359: "pierShelter", 345720803: "hotelDeParis", 30047775: "cromerChurch" },
+    // the town on the cliff: Victorian and Edwardian, most of it red brick, some painted render, three storeys and more
+    town: { render: 0.3, tall: true },
+    // the cliff behind the promenade: the retaining walls along its foot (OSM), the town on top about 12 m up
+    // (estimated: no survey heights)
+    hill: cromerHill,
+    note: "Cromer Pier's iron legs, its deck, railings and lamps, the Pavilion Theatre, the lifeboat station and its slipway, the Hotel de Paris and the church tower are modelled from photographs and descriptions; their sizes, the deck's height and the cliff's are estimates. The other buildings of the town are drawn in a general style from their outlines on the map.",
+  },
 };
 export const localFor = (id) => LOCAL[id] || null;
+
+// ---- the cliff behind Cromer's promenade ----
+// The foot of the slope (z for a given x, metres round the pier head), along the retaining walls at the back of the
+// promenade (OpenStreetMap), and up to the cliff top over about 14 m: the town about 12 m above the promenade
+// (estimated from photographs: no survey heights).
+const CROMER_FOOT = [[-900, -40], [-700, 0], [-450, 72], [-300, 108], [-200, 158], [-143, 175], [-80, 197], [-50, 203], [-32, 222], [0, 245], [22, 262], [64, 292], [130, 330], [200, 352], [300, 410], [700, 560], [1200, 760]];
+const lerpX = (tab, x) => { if (x <= tab[0][0]) return tab[0][1]; for (let i = 1; i < tab.length; i++) if (x <= tab[i][0]) { const [x0, v0] = tab[i - 1], [x1, v1] = tab[i]; return v0 + ((v1 - v0) * (x - x0)) / (x1 - x0); } return tab[tab.length - 1][1]; };
+/** metres above the promenade's level at (x, z): 0 seaward of the cliff's foot */
+export function cromerHill(x, z) {
+  const d = z - lerpX(CROMER_FOOT, x); if (d <= 0) return 0;
+  const t = Math.min(1, d / 14), s = t * t * (3 - 2 * t);
+  return 12 * s;
+}
 
 // ---- the cliff behind Gorleston's sea front ----
 // The foot of the slope (x for a given z, in metres round the pier head): along Pavilion Road and Quay Road, behind
