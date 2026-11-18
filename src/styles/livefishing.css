@@ -177,6 +177,9 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
   .watch { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; padding: 16px; height: 100vh; height: 100dvh; }
   .watch-stage .fscene { height: calc(100dvh - 32px); border-radius: var(--r-l); }
   .watch-panel { overflow-y: auto; padding: 0 2px 16px; }
+  /* (the 3D view the full height beside the panel: kept to 4:3.3 and 72% of the height, it left a black band a
+     quarter of the window deep under the game on a PC, the PC film of 18 November) */
+  .watch-stage .stage3d:not(.is-fs):not(:fullscreen) { height: calc(100dvh - 32px); aspect-ratio: auto; max-height: none; }
 }
 /* (a PC's wide screen: the game's view takes the width, not a 1280 px column with black either side; at 1920 px the
    3D view was 850 px wide, Aaron's review footage of 18 November) */
