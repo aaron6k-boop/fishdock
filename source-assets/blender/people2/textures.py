@@ -3,7 +3,7 @@
 # and the detail is drawn there in three dimensions, so seams run where seams run on a jacket whatever the unwrap:
 #   the jacket: coated nylon with a fine ripstop grid; seams pressed in (shoulders, yoke, sides, sleeves, armholes)
 #     with a line of stitching beside each; the storm flap's, pockets' and bands' edges stitched; creases where the
-#     cloth folds; salt left in pale tide marks, dirt at the hem and cuffs, the coating worn paler on edges
+#     cloth folds; salt dried in soft pale patches, dirt at the hem and cuffs, the coating worn paler on edges
 #   the trousers: the same cloth, a little rougher; knee darts, side seams, the cargo pocket; mud splashes low down
 #   the boots: rubber, moulding lines, the top band, a tread on the sole and a heel; mud on the sole and splashed up
 #   the beard: short strands growing down the face, dark brown with grey in it, thinner at its edges
@@ -106,6 +106,42 @@ def detail(pid, pos, nor, size_m, m):
   print("  CC0", pid, "height" if M["h"] is not None else "-", "rough" if M["r"] is not None else "-", "colour" if M["c"] is not None else "-", flush=True)
   return h, r, c
 
+_FOLD = {}
+def fold_map(pid="fabric_leather_02"):
+  """A photographed creased material's height (CC0) as a unit-variance field, its finest grain blurred away (only the
+  folds kept), or None when it isn't here."""
+  if pid in _FOLD: return _FOLD[pid]
+  h = cc0_maps(pid)["h"] if CC0 else None
+  if h is not None:
+    if h.ndim == 3: h = h.mean(2)
+    h = cv2.GaussianBlur(h.astype(np.float32), (0, 0), 1.5); h = (h - h.mean()) / (h.std() + 1e-6)
+  _FOLD[pid] = h; return h
+def along_around(img, u, v, size_m):
+  """img (tiling, size_m across) sampled at surface coordinates u (across the image) and v (down it), in metres."""
+  Hh_, Ww_ = img.shape[:2]
+  return cv2.remap(img, ((u / size_m * Ww_) % Ww_).astype(np.float32), ((v / size_m * Hh_) % Hh_).astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
+def ring_folds(img, s_along, ang, radius, size_m, seed=0.0):
+  """Folds round a limb or a body: the map's long creases laid round it (its rows along s_along, its columns round
+  it), sampled twice half a turn apart and blended so there is no join where the angle wraps."""
+  o = seed * 0.37
+  a1 = along_around(img, s_along + o, ang * radius, size_m)
+  a2 = along_around(img, s_along + o + 0.13, (np.mod(ang, 2 * np.pi)) * radius + 0.21, size_m)
+  w1 = np.cos(ang / 2) ** 2; w2 = 1 - w1
+  return (a1 * w1 + a2 * w2) / np.sqrt(w1 * w1 + w2 * w2 + 1e-6)
+
+def rim(Z, piece, pm, du, dv, pos, nor, Et):
+  """Distance from a part's real edge (metres) at each of its texels, and a coordinate running along that edge (for
+  the stitches' dashes): from the distance over its surface a_build kept on each point (fd_edge), or, for a part
+  without it, from its texture island's edge."""
+  if Et is not None and (np.abs(Et[pm > 0] - 1.0) > 1e-3).mean() > 0.5:
+    dist = Et.copy()
+  else:
+    dist = cv2.distanceTransform(pm, cv2.DIST_L2, 5) * np.maximum(np.linalg.norm(du, axis=2), 1e-5)
+  gx = cv2.Sobel(dist.astype(np.float32), cv2.CV_32F, 1, 0, ksize=3); gy = cv2.Sobel(dist.astype(np.float32), cv2.CV_32F, 0, 1, ksize=3)
+  g3 = gx[..., None] * du / (np.linalg.norm(du, axis=2, keepdims=True) ** 2 + 1e-12) + gy[..., None] * dv / (np.linalg.norm(dv, axis=2, keepdims=True) ** 2 + 1e-12)
+  t = np.cross(nor, g3); t = t / (np.linalg.norm(t, axis=2, keepdims=True) + 1e-9)
+  return dist, (pos * t).sum(2)
+
 def groove(dist, width):
   """A pressed seam's height: 0 off it, down to -1 in its middle (dist in metres from the seam's line)."""
   return -np.clip(1 - np.abs(dist) / width, 0, 1) ** 1.5
@@ -139,6 +175,11 @@ def dilate(img, mask, n=8):
 
 def save(name, colour, nrm, rough, mask):
   c = dilate(colour, mask); n = dilate(nrm, mask); r = dilate(rough, mask)
+  # (past the dilated edges, the texture's empty space a flat average: the smaller copies the graphics card filters
+  # from it then never pull stray patterns or dark lines into the islands' edges from a distance)
+  grown = cv2.dilate(mask.astype(np.uint8), np.ones((3, 3), np.uint8), iterations=8) > 0
+  mc = c[mask > 0].mean(0) if c.ndim == 3 else c[mask > 0].mean(); c[~grown] = mc
+  n[~grown] = np.array([0, 0, 1.0]); r[~grown] = r[mask > 0].mean()
   cv2.imwrite(f"{OUT}/{name}_c.png", cv2.cvtColor((np.clip(c, 0, 1) ** (1 / 2.2) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR))
   nn = np.where(mask[..., None] > 0, n, np.array([0, 0, 1.0])) if False else n
   cv2.imwrite(f"{OUT}/{name}_n.png", cv2.cvtColor(((nn * 0.5 + 0.5) * 255).clip(0, 255).astype(np.uint8), cv2.COLOR_RGB2BGR))
@@ -148,7 +189,7 @@ def save(name, colour, nrm, rough, mask):
 # ---------------- the jacket ----------------
 def jacket(size=2048):
   Z = np.load(f"{SRC}/{TAG}_jacket.npz"); names = [str(x) for x in Z["names"]]
-  pos, nor, piece, du, dv, mpt = raster(Z, size); m = piece >= 0
+  pos, nor, piece, du, dv, mpt = raster(Z, size, Z["E"] if "E" in Z.files else None); m = piece >= 0; Et = raster.extra if "E" in Z.files else None
   cx, cy, zmin, H, fwd, side, B = frame_of(Z)
   bone = lambda n: B.get("Bip01_" + n, B.get("Bip01 " + n))
   rel = pos - np.array([cx, cy, 0]); fro = rel @ fwd; lat = rel @ side; z = pos[..., 2]
@@ -168,6 +209,9 @@ def jacket(size=2048):
     nonlocal Hh, stitch, seamline
     d = fval / np.maximum(gradlen, 1e-6); s2 = sel & m
     g = groove(d, width); Hh[s2] += g[s2] * 0.0011
+    # (the seam allowance under the cloth, pressed to the sides: a soft raised band either side of the groove, which is
+    # what makes a seam read from a few metres away)
+    rdg = np.exp(-((np.abs(d) - 0.0042) / 0.0022) ** 2); Hh[s2] += rdg[s2] * 0.0005
     a = along if along is not None else z
     st = stitches(d, a, st_off); stitch[s2] = np.maximum(stitch[s2], st[s2]); seamline[s2] = np.maximum(seamline[s2], -g[s2])
   torso = (z < zN + 0.02) & (z > hem - 0.02)
@@ -194,13 +238,12 @@ def jacket(size=2048):
     if nm == "fd2_jacket" or nm in ("fd2_jacket_studs", "fd2_jacket_toggles"): continue
     pm = (piece == k).astype(np.uint8)
     if not pm.any(): continue
-    # (distance to the island's edge in texels, then in metres by the texel's size)
-    dist = cv2.distanceTransform(pm, cv2.DIST_L2, 5) * np.maximum(np.linalg.norm(du, axis=2), 1e-5)
+    # (distance to the part's edge over its surface, and along it; the turned-back edge itself counts as on the edge)
+    dist, along = rim(Z, piece, pm, du, dv, pos, nor, Et)
     on = (np.abs(dist - 0.004) < 0.0006) & (pm > 0)
-    along = (pos @ np.array([0.31, 0.53, 0.79]))
     stitch[on] = np.maximum(stitch[on], ((np.modf(along[on] / 0.0035)[0] % 1.0) < 0.62).astype(np.float32))
-    edge[pm > 0] = np.maximum(edge[pm > 0], np.clip(1 - dist[pm > 0] / 0.003, 0, 1))
-  Hh += stitch * 0.00025 - edge * 0.0003
+    edge[pm > 0] = np.maximum(edge[pm > 0], np.clip(1 - np.maximum(dist[pm > 0], 0) / 0.003, 0, 1))
+  Hh += stitch * 0.0003 - edge * 0.0003
   # creases where cloth folds: inside the elbows and round the waist (finer than the modelled folds)
   for S2 in arms:
     t, r, rad, ax, a, w = arms[S2]; e = bone(f"{S2}_Forearm"); s = (pos - e) @ ax
@@ -209,30 +252,48 @@ def jacket(size=2048):
     Hh[near] += cr[near] * 0.0005
   wz = (z > hem) & (z < hem + 0.12); cr = np.sin((z - hem) / 0.01 + 4 * fbm(pos, 0.05, 2, 9)) * (1 - np.abs(z - hem - 0.06) / 0.06)
   Hh[wz] += cr[wz] * 0.0002
-  # creases where the cloth bunches, from a photographed creased fabric (Poly Haven's denmin_fabric_02, CC0) laid on
-  # at its real size: inside the elbows and down the forearms to the cuffs, under the arms, round the waist above the
-  # hem band; and a faint crinkle all over, as a coated shell has
-  ch, _, _ = detail("denmin_fabric_02", pos, nor, 0.42, m); ch2, _, _ = detail("denmin_fabric_02", pos + 0.37, nor, 0.19, m)
-  cmask = np.full(m.shape, 0.22, np.float32)
-  for S2 in arms:
-    t, r, rad, ax, a, w = arms[S2]; e = bone(f"{S2}_Forearm"); s0 = (pos - e) @ ax
-    cmask = np.maximum(cmask, np.clip(1 - np.abs(s0) / 0.15, 0, 1) * (r < 0.11))
-    cmask = np.maximum(cmask, np.clip((t - 0.55) / 0.25, 0, 1) * (r < 0.11) * 0.8)
-    ap = a - np.array([0, 0, 0.08]); cmask = np.maximum(cmask, np.clip(1 - np.linalg.norm(pos - ap, axis=2) / 0.13, 0, 1) * 0.8)
-  cmask = np.maximum(cmask, np.clip(1 - np.abs(z - hem - 0.07) / 0.08, 0, 1) * 0.85)
-  cmask = cmask * (0.7 + 0.6 * fbm(pos, 0.12, 2, 71))
-  Hh += ch * 0.0011 * cmask + ch2 * 0.00022
+  # creases where the cloth bunches, from a photographed creased material (Poly Haven's fabric_leather_02, CC0, its
+  # finest grain blurred away) laid along the body as cloth creases: round the sleeves (rings, deepest inside the
+  # elbows and stacked above the cuffs), hanging down the body from the shoulders, pulled round the waist above the
+  # hem band; fainter everywhere, and a fine crinkle over all of it as a coated shell has
+  FM = fold_map("fabric_leather_02")
+  if FM is not None:
+    tz = np.arctan2(lat, fro)
+    # (on the body the map's columns stand upright: v down the body, u round it)
+    hang_f = along_around(FM, tz * 0.17, -z, 0.5) * np.cos(tz / 2) ** 2 + along_around(FM, np.mod(tz, 2 * np.pi) * 0.17 + 0.2, -z + 0.11, 0.5) * np.sin(tz / 2) ** 2
+    wsum = np.zeros(m.shape, np.float32); ring_all = np.zeros(m.shape, np.float32)
+    amp = np.full(m.shape, 0.4, np.float32)
+    for k2, S2 in enumerate(arms):
+      t, r, rad, ax, a, w = arms[S2]; e = bone(f"{S2}_Forearm"); sa = (pos - a) @ ax
+      up2 = np.cross(ax, fwd); up2 = up2 / (np.linalg.norm(up2) + 1e-9)
+      ang = np.arctan2(rad @ fwd, rad @ up2)
+      rf = ring_folds(FM, sa, ang, 0.055, 0.3, 2.0 + k2)
+      wa = np.clip((t - 0.06) / 0.06, 0, 1) * (r < 0.11)
+      ring_all += rf * wa; wsum += wa
+      s0 = (pos - e) @ ax; Lw = np.linalg.norm(w - a); sw = (1 - t) * Lw
+      amp = np.maximum(amp, np.clip(1 - np.abs(s0 - 0.02) / 0.13, 0, 1) * wa)
+      amp = np.maximum(amp, np.clip(1 - np.abs(sw - 0.12) / 0.09, 0, 1) * wa * 0.95)
+      ap = a - np.array([0, 0, 0.08]); amp = np.maximum(amp, np.clip(1 - np.linalg.norm(pos - ap, axis=2) / 0.14, 0, 1) * 0.85)
+    wsum = np.clip(wsum, 0, 1)
+    folds_f = ring_all + hang_f * (1 - wsum)
+    amp = np.maximum(amp, np.clip(1 - np.abs(z - hem - 0.07) / 0.08, 0, 1) * 0.9)
+    amp = np.maximum(amp, (fro < 0) * np.clip((zN - 0.12 - z) / 0.2, 0, 1) * 0.6)
+    amp = amp * (0.75 + 0.5 * fbm(pos, 0.15, 2, 71))
+    Hh += folds_f * 0.00085 * amp
+    fine = triplanar(FM, pos, nor, 0.09); Hh += fine * 0.00012
   nrm = normal_from_height(Hh, du, dv, 1.0, m)
   # colour (grey, coloured in the game): the cloth a little uneven; the seams darker in their groove; the stitching a
-  # touch lighter; salt in pale tide marks; dirt towards the hem and cuffs; the coating worn paler on edges
+  # touch lighter; salt dried in soft pale patches; dirt towards the hem and cuffs; the coating worn paler on edges
   base = 0.82 + (fbm(pos, 0.08, 3, 11) - 0.5) * 0.06 + wc * 0.12
   salt = np.clip((fbm(pos, 0.06, 4, 13) - 0.62) * 6, 0, 1) * np.clip((zN - z) / 0.5, 0.2, 1)
-  saltline = np.clip(1 - np.abs(fbm(pos, 0.09, 3, 15) - 0.55) / 0.012, 0, 1) * 0.6
   cuffs = sum(np.clip(1 - (1 - arms[S2][0]) / 0.12, 0, 1) * (arms[S2][1] < 0.09) for S2 in arms)
   dirt = np.clip((hem + 0.12 - z) / 0.12, 0, 1) * 0.5 + cuffs * 0.4
   dirt = dirt * (0.6 + 0.8 * fbm(pos, 0.03, 3, 17))
-  L = base * (1 - 0.45 * seamline) * (1 + 0.25 * stitch) * (1 - 0.25 * dirt) + 0.35 * np.maximum(salt * 0.5, saltline * (fbm(pos, 0.02, 2, 19) > 0.45))
+  # (salt dried in soft pale patches, no lines: drawn as lines it looked like cracks in marble)
+  L = base * (1 - 0.45 * seamline) * (1 + 0.35 * stitch) * (1 - 0.25 * dirt) + 0.12 * salt
   L = L + edge * 0.08
+  yoke = np.clip((z - (zN - 0.11)) / 0.003, 0, 1) * (~onarm["L"] & ~onarm["R"] | (z > zN - 0.06))
+  L = L * (1 - 0.06 * yoke)
   col = np.dstack([L * 1.0, L * 0.995, L * 0.985]).astype(np.float32)
   # the studs and toggles: dark grey metal and black plastic, not coloured as the cloth
   for k, nm in enumerate(names):
@@ -240,13 +301,13 @@ def jacket(size=2048):
   # coated polyester: matte with a soft sheen (not plastic), rougher where salt has dried and dirt sits, the coating
   # worn a little rougher along edges and seams, the weave's own variation
   worn = np.clip(edge * 0.6 + seamline * 0.5, 0, 1)
-  rough = np.clip(0.7 + 0.08 * (fbm(pos, 0.05, 3, 21) - 0.5) + wr * 0.35 + 0.15 * salt + 0.12 * dirt + 0.08 * worn, 0.5, 0.95)
+  rough = np.clip(0.7 + 0.08 * (fbm(pos, 0.05, 3, 21) - 0.5) + wr * 0.35 + 0.15 * salt + 0.12 * dirt + 0.08 * worn + 0.05 * yoke, 0.5, 0.95)
   save(f"{TAG}_jacket", col, nrm, rough, m)
 
 # ---------------- the trousers ----------------
 def trousers(size=2048):
   Z = np.load(f"{SRC}/{TAG}_trousers.npz"); names = [str(x) for x in Z["names"]]
-  pos, nor, piece, du, dv, mpt = raster(Z, size); m = piece >= 0
+  pos, nor, piece, du, dv, mpt = raster(Z, size, Z["E"] if "E" in Z.files else None); m = piece >= 0; Et = raster.extra if "E" in Z.files else None
   cx, cy, zmin, H, fwd, side, B = frame_of(Z); bone = lambda n: B.get("Bip01_" + n, B.get("Bip01 " + n))
   rel = pos - np.array([cx, cy, 0]); fro = rel @ fwd; lat = rel @ side; z = pos[..., 2]
   th_, tr_, tc_ = detail("terlenka", pos, nor, 0.3, m)
@@ -266,21 +327,32 @@ def trousers(size=2048):
   edge = np.zeros(m.shape, np.float32)
   for k, nm in enumerate(names):
     if nm == "fd2_trousers": continue
-    pm = (piece == k).astype(np.uint8); dist = cv2.distanceTransform(pm, cv2.DIST_L2, 5) * np.maximum(np.linalg.norm(du, axis=2), 1e-5)
-    on = (np.abs(dist - 0.004) < 0.0006) & (pm > 0); along = pos @ np.array([0.31, 0.53, 0.79])
-    stitch[on] = np.maximum(stitch[on], ((np.modf(along[on] / 0.0035)[0] % 1.0) < 0.62).astype(np.float32)); edge[pm > 0] = np.maximum(edge[pm > 0], np.clip(1 - dist[pm > 0] / 0.003, 0, 1))
+    pm = (piece == k).astype(np.uint8); dist, along = rim(Z, piece, pm, du, dv, pos, nor, Et)
+    on = (np.abs(dist - 0.004) < 0.0006) & (pm > 0)
+    stitch[on] = np.maximum(stitch[on], ((np.modf(along[on] / 0.0035)[0] % 1.0) < 0.62).astype(np.float32)); edge[pm > 0] = np.maximum(edge[pm > 0], np.clip(1 - np.maximum(dist[pm > 0], 0) / 0.003, 0, 1))
   Hh += stitch * 0.00025 - edge * 0.0003
-  # creases (the same photographed creased fabric): behind and across the knees, the crotch, the front of the hips,
-  # stacked above the boots; faint everywhere else
-  ch, _, _ = detail("denmin_fabric_02", pos + 1.3, nor, 0.4, m)
-  cmask = np.full(m.shape, 0.2, np.float32)
-  for S2 in ("L", "R"):
-    kn, th = bone(f"{S2}_Calf"), bone(f"{S2}_Thigh")
-    cmask = np.maximum(cmask, np.clip(1 - np.linalg.norm(pos - kn, axis=2) / 0.14, 0, 1))
-    cr = np.array([cx, cy, th[2] - 0.06]); cmask = np.maximum(cmask, np.clip(1 - np.linalg.norm(pos - cr, axis=2) / 0.18, 0, 1) * 0.8)
-  cmask = np.maximum(cmask, np.clip((zmin + 0.27 * H + 0.14 - z) / 0.14, 0, 1))
-  cmask = cmask * (0.7 + 0.6 * fbm(pos, 0.12, 2, 73))
-  Hh += ch * 0.001 * cmask
+  # creases (the same photographed creased material, laid along the legs): rings round the leg behind and across the
+  # knees and stacked above the boots, long folds hanging down the thighs and shins, drag lines at the crotch
+  FM = fold_map("fabric_leather_02")
+  if FM is not None:
+    amp = np.full(m.shape, 0.35, np.float32); ring_all = np.zeros(m.shape, np.float32); hang_all = np.zeros(m.shape, np.float32); wl = np.zeros(m.shape, np.float32)
+    for k2, (S2, sg) in enumerate((("L", 1), ("R", -1))):
+      kn, th = bone(f"{S2}_Calf"), bone(f"{S2}_Thigh")
+      legc = th + (kn - th) * np.clip((th[2] - z) / (th[2] - kn[2]), 0, 1.6)[..., None]
+      q = pos - legc; ang = np.arctan2(q @ fwd, q @ side)
+      mine = ((lat - (th - np.array([cx, cy, 0])) @ side) * sg > -0.06).astype(np.float32)
+      ring_all += ring_folds(FM, z, ang, 0.075, 0.3, 4.0 + k2) * mine
+      hang_all += (along_around(FM, ang * 0.075, -z, 0.45) * np.cos(ang / 2) ** 2 + along_around(FM, np.mod(ang, 2 * np.pi) * 0.075 + 0.17, -z + 0.09, 0.45) * np.sin(ang / 2) ** 2) * mine
+      wl += mine
+      kring = np.clip(1 - np.abs(z - kn[2]) / 0.11, 0, 1) * (np.linalg.norm(pos - kn, axis=2) < 0.16)
+      amp = np.maximum(amp, kring)
+      cr = np.array([cx, cy, th[2] - 0.06]); amp = np.maximum(amp, np.clip(1 - np.linalg.norm(pos - cr, axis=2) / 0.18, 0, 1) * 0.8)
+    wl = np.maximum(wl, 1e-3)
+    zb = zmin + 0.27 * H; boot = np.clip((zb + 0.14 - z) / 0.14, 0, 1)
+    ringw = np.clip(amp - 0.35, 0, 1) / 0.65; ringw = np.maximum(ringw, boot)
+    folds_f = (ring_all * ringw + hang_all * (1 - ringw)) / wl
+    amp = np.maximum(amp, boot) * (0.75 + 0.5 * fbm(pos, 0.12, 2, 73))
+    Hh += folds_f * 0.0008 * amp + triplanar(FM, pos, nor, 0.1) * 0.0001
   nrm = normal_from_height(Hh, du, dv, 1.0, m)
   low = np.clip((zmin + 0.42 - z) / 0.25, 0, 1)
   mud = np.clip((fbm(pos, 0.015, 4, 33) - 0.55) * 5, 0, 1) * low
@@ -301,20 +373,39 @@ def boots(size=1024):
   # the sole's edge: a moulded line 2.5 cm up, and the tread under it (blocks and grooves across the foot)
   rel = pos - np.array([cx, cy, 0]); fro = rel @ fwd
   sole = z < zmin + 0.025; underside = nor[..., 2] < -0.5
-  tread = ((np.modf(fro / 0.011)[0] % 1.0) < 0.55).astype(np.float32) * ((np.modf((rel @ side) / 0.017)[0] % 1.0) < 0.75)
-  Hh[underside] += tread[underside] * 0.0015
+  # (the tread: chevrons under the ball of the foot, bars across the heel, a plain waist under the arch)
+  latl = np.abs(rel @ side) - np.median(np.abs(rel @ side)[m]); B0 = frame_of(Z)[6]
+  anz = {S2: B0.get(f"Bip01_{S2}_Foot", B0.get(f"Bip01 {S2}_Foot")) for S2 in ("L", "R")}
+  fa = np.where((rel @ side) > 0, (anz["L"] - np.array([cx, cy, 0])) @ fwd, (anz["R"] - np.array([cx, cy, 0])) @ fwd)
+  ff = fro - fa
+  chev = ((np.modf((ff + 0.55 * np.abs(latl)) / 0.012)[0] % 1.0) < 0.55).astype(np.float32)
+  bars = ((np.modf(ff / 0.009)[0] % 1.0) < 0.6).astype(np.float32)
+  tread = np.where(ff > 0.095, chev, np.where(ff < 0.005, bars, 0.0))
+  Hh[underside] += tread[underside] * 0.0018
   ml = groove(z - (zmin + 0.026), 0.0012); Hh += ml * 0.0008
   # moulding lines up the sides of the shaft, and a band of texture round the ankle
-  side_line = groove(rel @ fwd, 0.001) * (z > zmin + 0.03); Hh += side_line * 0.0004
+  # (the mould's parting line: a fine raised ridge up each side of the shaft, the rubber dipping a little either side)
+  pl = rel @ fwd
+  side_line = (np.exp(-(pl / 0.0006) ** 2) * 1.0 - np.exp(-(pl / 0.0025) ** 2) * 0.35) * (z > zmin + 0.03); Hh += side_line * 0.00035
   rib = (np.sin(z / 0.0025) * 0.5 + 0.5) * ((z > zmin + 0.035) & (z < zmin + 0.06)); Hh += rib * 0.0003
   # (fine creases where the rubber flexes over the ankle and the top of the foot, from a photographed wrinkled leather
   # (Poly Haven's fabric_leather_02, CC0) at a small scale)
   fl, _, _ = detail("fabric_leather_02", pos, nor, 0.22, m)
   Hh += fl * 0.00025 * np.clip(1 - np.abs(z - (zmin + 0.1)) / 0.06, 0, 1)
+  # the rand (the sole's moulded edge round the foot): fine ribs round it
+  randm = np.zeros(m.shape, bool)
+  for k, nm in enumerate(names):
+    if nm == "fd2_boots_sole": randm |= piece == k
+  Hh[randm] += (np.sin(z[randm] / 0.0016) * 0.5 + 0.5) * 0.00025
   nrm = normal_from_height(Hh, du, dv, 1.0, m)
   base = 0.82 + (fbm(pos, 0.05, 3, 43) - 0.5) * 0.05 + gc_ * 0.05
-  # (the sole and heel a darker, browner rubber than the boot; the sole's top edge a crisp line)
+  # (the sole, its rand and the heel a darker rubber than the boot; the sole's top edge a crisp line)
+  sole = sole | randm
   L = base * np.where(sole, 0.42, 1.0)
+  # scuffed toes: the rubber rubbed paler and duller in patches over the front of the foot
+  toe = np.clip((ff - 0.1) / 0.06, 0, 1) * np.clip((zmin + 0.09 - z) / 0.04, 0, 1) * ~sole
+  scuff = toe * np.clip((fbm(pos, 0.008, 3, 53) - 0.45) * 4, 0, 1)
+  L = L * (1 + 0.18 * scuff)
   col = np.dstack([L, L, L]).astype(np.float32)
   # mud: caked on the sole and the foot, splashed up the shaft
   mud = np.clip((zmin + 0.06 - z) / 0.05, 0, 1) * np.clip((fbm(pos, 0.01, 4, 45) - 0.35) * 3, 0, 1)
@@ -327,7 +418,7 @@ def boots(size=1024):
   # it has bloomed and where mud has dried, the sole matt
   flex = np.clip(1 - np.abs(z - (zmin + 0.09)) / 0.05, 0, 1) * 0.5
   bloom = np.clip((fbm(pos, 0.04, 3, 51) - 0.5) * 3, 0, 1) * 0.12
-  rough = np.clip(0.55 + 0.06 * (fbm(pos, 0.03, 3, 49) - 0.5) + gr_ * 0.2 - 0.1 * flex + bloom + 0.35 * mm + 0.3 * sole, 0.32, 0.96)
+  rough = np.clip(0.55 + 0.06 * (fbm(pos, 0.03, 3, 49) - 0.5) + gr_ * 0.2 - 0.1 * flex + bloom + 0.35 * mm + 0.3 * sole + 0.2 * scuff, 0.32, 0.96)
   save(f"{TAG}_boots", col, nrm, rough, m)
 
 # ---------------- the beard ----------------

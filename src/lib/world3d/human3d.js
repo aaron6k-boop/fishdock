@@ -371,7 +371,9 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // (your own angler, coat "as they come": the model's top is coloured as your outfit's jacket, the same jacket as the
   // sleeves you see in first person, and bare hands are bare, as there, not the model's own gardening gloves. Left as the model came, the 8 November recording showed navy sleeves in first
   // person and a white cardigan in third)
-  const U = { uTop: { value: tint(COATS[L.coat]?.hex ?? (outfit?.sameTop ? outfit.jacket : null)) }, uLegs: { value: tint(LEGS[L.legs]?.hex) }, uFeet: { value: tint(FOOTWEAR[L.boots]?.hex) }, uHands: { value: tint(L.gloves ? 0x1c1e21 : outfit?.sameTop ? (SKINS[L.skin]?.hex ?? 0xc99a74) : null) }, uMean: { value: new THREE.Vector4(0.2, 0.2, 0.2, 0.2) }, uWet: { value: 0 }, uWind: { value: V() }, uTime: { value: 0 } };
+  const U = { uTop: { value: tint(COATS[L.coat]?.hex ?? (outfit?.sameTop ? outfit.jacket : null)) }, uLegs: { value: tint(LEGS[L.legs]?.hex) }, uFeet: { value: tint(FOOTWEAR[L.boots]?.hex) }, uHands: { value: tint(L.gloves ? 0x1c1e21 : outfit?.sameTop && !L.v2 ? (SKINS[L.skin]?.hex ?? 0xc99a74) : null) }, uMean: { value: new THREE.Vector4(0.2, 0.2, 0.2, 0.2) }, uWet: { value: 0 }, uWind: { value: V() }, uTime: { value: 0 } };
+  // (the new people's bare hands keep their own skin, as their faces do: coloured flat as the skin tone they came out
+  // orange beside a face drawn from its photographed texture, in the 18 November film)
   // ---- the modelled clothes (people with clothes: their own jacket, trousers and wellies, made in Blender) ----
   // coloured as the kit, and the body's own clothes underneath the same colours, so anywhere the body shows through a
   // seam it's the same cloth
@@ -390,7 +392,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     // toggles and buckles as they come
     { const w2 = /^fd2_(jacket|trousers|boots|beard|trim)/.exec(mat.name || "");
       if (w2) {
-        const c = mat.clone();
+        let c = mat.clone();
         if (w2[1] === "beard") {
           // (the beard's three layers of hair, in the colour chosen for the hair: close to the skin and dense, then
           // two further out over less of the face; the strands' soft edges kept with alpha to coverage. Stubble is the
@@ -400,7 +402,16 @@ function makeHuman(L, gltf, clips, outfit, venue) {
           if (L.hairHex != null) c.color = new THREE.Color(L.hairHex).multiplyScalar([1.35, 1.5, 1.65][layer]);
           if (L.beard === 0 || (L.beard === 1 && layer > 0)) m.userData.off = true;
         }
-        else if (w2[1] !== "trim") { c.color = new THREE.Color(wornHex[w2[1]]); c.metalness = 0; c.roughness = 1; if (c.normalMap) c.normalScale = new THREE.Vector2(1, 1); }
+        else if (w2[1] !== "trim") {
+          c.color = new THREE.Color(wornHex[w2[1]]); c.metalness = 0; c.roughness = 1; if (c.normalMap) c.normalScale = new THREE.Vector2(1, 1);
+          // (the jacket and trousers as cloth: a soft sheen at grazing angles, as coated polyester has, so the folds and
+          // creases read on a black jacket instead of it going flat; the rubber boots keep their own satin finish)
+          if (w2[1] !== "boots") {
+            const pm = new THREE.MeshPhysicalMaterial(); THREE.MeshStandardMaterial.prototype.copy.call(pm, c); pm.defines = { STANDARD: "", PHYSICAL: "" };
+            pm.sheen = w2[1] === "jacket" ? 0.7 : 0.5; pm.sheenRoughness = 0.5; pm.sheenColor = c.color.clone().lerp(new THREE.Color(0.75, 0.77, 0.8), 0.3);
+            c = pm;
+          }
+        }
         m.material = c; mats.push(c); continue;
       }
     }
@@ -1104,7 +1115,9 @@ function measure(skinned, root, k) {
     const hair = /opacity/.test(m.material.name);
     for (let i = 0; i < n; i += 1) {
       let best = 0, bw = -1; for (let c = 0; c < 4; c++) { const w = sw.getComponent(i, c); if (w > bw) { bw = w; best = si.getComponent(i, c); } }
-      m.getVertexPosition(i, v); m.applyBoneTransform(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(inv).multiplyScalar(k);
+      // (a skinned mesh's getVertexPosition already moves the point by its bones: moved a second time, as it was, the
+      // new people's heads measured metres wide and their hats floated far off in the air, 18 November film)
+      m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(inv).multiplyScalar(k);
       v.x = v.x; // (root has only the scale k; the inner's half turn is already in matrixWorld)
       if (v.y > top) top = v.y;
       if (best === bi.head || (hair && best === bi.neck)) pts.head.push(v.clone());

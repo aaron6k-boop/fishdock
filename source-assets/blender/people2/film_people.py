@@ -78,22 +78,26 @@ for name, look in LOOKS.items():
     import traceback; print(name, "stopped:", traceback.format_exc()[-800:], flush=True)
   finally:
     close(proc, ws)
-# the catch in real time from behind, as the game films it, and walking
+# the catch in real time from behind, as the game films it, and walking (for each look named in LIVE, or the first)
 first = next(iter(LOOKS.values())) if LOOKS else {}
-proc, ws = page(first)
-try:
-  env(ws)
-  ws.ev("(() => { const W = window.__fdWorld; %s; let last = performance.now(); const loop = (t) => { const d = Math.min(100, Math.max(1, t - last)); last = t; W.step(d, true); requestAnimationFrame(loop); }; requestAnimationFrame(loop); return 1; })()" % SEQ)
-  t3 = time.time()
-  while time.time() - t3 < 34: shot(ws, "live_catch", 0.5); time.sleep(0.12)
-  ok = ws.ev("(() => { const b = [...document.querySelectorAll('button')].find((x) => /Walk about/.test(x.getAttribute('aria-label') || x.textContent || '')); if (!b) return 'no walk button'; b.click(); return 'walking'; })()")
-  print("walk:", ok, flush=True); time.sleep(1.5); t3 = time.time()
-  while time.time() - t3 < 6: ws.ev("(window.__fdWorld.walkInput(0, 1), 1)"); shot(ws, "live_walk", 0.5); time.sleep(0.1)
-  ws.ev("(window.__fdWorld.walkInput(0, 0), 1)")
-except Exception:
-  import traceback; print("live stopped:", traceback.format_exc()[-800:], flush=True)
-finally:
-  close(proc, ws)
+for lname in (globals().get("LIVE") or [next(iter(LOOKS), None)]):
+  proc, ws = page(LOOKS.get(lname, first))
+  try:
+    env(ws)
+    # walking first (the Walk about button is there only while nothing is being fished), then E to fish here again
+    ok = ws.ev("(() => { const b = [...document.querySelectorAll('button')].find((x) => /Walk about/.test(x.getAttribute('aria-label') || x.textContent || '')); if (!b) return 'no walk button'; b.click(); return 'walking'; })()")
+    print("walk:", ok, flush=True); time.sleep(1.5); t3 = time.time()
+    while time.time() - t3 < 7: ws.ev("(window.__fdWorld.walkInput(0, 1), 1)"); shot(ws, f"live_{lname}_walk", 0.5); time.sleep(0.1)
+    ws.ev("(window.__fdWorld.walkInput(0, 0), 1)"); time.sleep(1)
+    for typ in ("keyDown", "keyUp"): ws.call("Input.dispatchKeyEvent", {"type": typ, "key": "e", "code": "KeyE", "windowsVirtualKeyCode": 69, "text": "e" if typ == "keyDown" else ""})
+    time.sleep(3)
+    ws.ev("(() => { const W = window.__fdWorld; %s; let last = performance.now(); const loop = (t) => { const d = Math.min(100, Math.max(1, t - last)); last = t; W.step(d, true); requestAnimationFrame(loop); }; requestAnimationFrame(loop); return 1; })()" % SEQ)
+    t3 = time.time()
+    while time.time() - t3 < 34: shot(ws, f"live_{lname}_catch", 0.5); time.sleep(0.12)
+  except Exception:
+    import traceback; print("live stopped:", traceback.format_exc()[-800:], flush=True)
+  finally:
+    close(proc, ws)
 # first person
 proc, ws = page(first, cam="first")
 try:

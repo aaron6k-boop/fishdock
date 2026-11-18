@@ -21,7 +21,9 @@ from mathutils.kdtree import KDTree
 OUT = "C:/Users/aaron/Documents/FishDock-assets"
 WHO = globals().get("WHO", "m05")
 SRC = f"{OUT}/source/people/{WHO}_hd.glb"
-TAG = globals().get("TAG", "p2a"); SUBDIV = globals().get("SUBDIV", True); BEARD = globals().get("BEARD", True); SIM = globals().get("SIM", True)
+TAG = globals().get("TAG", "p2a"); SUBDIV = globals().get("SUBDIV", True); BEARD = globals().get("BEARD", True); SIM = globals().get("SIM", False)
+# (SIM: Blender's cloth simulation, tried four times (h035 to h038): run headless here the cloth fell through the body
+# wherever it wasn't pinned, whatever the collider's thickness, so the folds are modelled instead)
 CT = globals().get("CT", 0.004); CD = globals().get("CD", 0.005); SLACK = globals().get("SLACK", 1.0)   # (the collider's thickness, the cloth's collision distance, how much of the slack to use)
 DST = f"{OUT}/people2"; os.makedirs(DST, exist_ok=True); os.makedirs(f"{OUT}/renders/people2", exist_ok=True)
 log = []
@@ -210,10 +212,29 @@ try:
       if (np.array(tuple(pw3)) - P[i3]) @ N0[i3] < 0.002: inside += 1
     L("cloth", label, "settled over", frames, "frames,", npin, "points pinned of", len(ob.data.vertices), "| within 2 mm of the skin or under it:", inside)
     return npin
+  def rim_dist(bm, cap=0.05):
+    # how far each point is from the piece's edge, over its surface (metres, up to cap), kept on the points as
+    # fd_edge: the textures draw the stitching round each pocket, flap and band 4 mm in from its real edge with it
+    import heapq
+    lay = bm.verts.layers.float.get("fd_edge") or bm.verts.layers.float.new("fd_edge")
+    bm.verts.index_update(); bm.verts.ensure_lookup_table()
+    dist = [0.0 if v.is_boundary else cap for v in bm.verts]
+    hq = [(0.0, v.index) for v in bm.verts if v.is_boundary]; heapq.heapify(hq)
+    while hq:
+      d0, i = heapq.heappop(hq)
+      if d0 > dist[i] or d0 >= cap: continue
+      v = bm.verts[i]
+      for e in v.link_edges:
+        o = e.other_vert(v); d1 = d0 + e.calc_length() * S
+        if d1 < dist[o.index]: dist[o.index] = d1; heapq.heappush(hq, (d1, o.index))
+    for v in bm.verts: v[lay] = dist[v.index]
+    return lay
   def thicken_edges(bm, depth):
     bnd = [e for e in bm.edges if e.is_boundary]
     if not bnd: return
+    lay = rim_dist(bm)
     ret = bmesh.ops.extrude_edge_only(bm, edges=bnd)
+    for v in [g for g in ret["geom"] if isinstance(g, bmesh.types.BMVert)]: v[lay] = -0.002   # (the turned-back edge)
     for v in [g for g in ret["geom"] if isinstance(g, bmesh.types.BMVert)]:
       n = v.normal if v.normal.length > 0 else Vector((0, 0, 1)); v.co -= n * (depth / S)
     bm.normal_update()
@@ -329,7 +350,14 @@ try:
       if r < 0.1 and -0.12 < s0 < 0.16:
         rad = (p - e) - ax * s0; rad = rad / (np.linalg.norm(rad) or 1); inside = max(0.0, rad @ fwd); ang = math.atan2(rad @ fwd, rad[2])
         env = (1 - abs(s0 - 0.02) / 0.14) if abs(s0 - 0.02) < 0.14 else 0.0
-        d += 0.0042 * env * fold((s0 + 0.012 * math.sin(ang * 2 + k2)) / 0.038, 3 + k2) * (0.35 + 0.65 * inside)
+        d += 0.0056 * env * fold((s0 + 0.012 * math.sin(ang * 2 + k2)) / 0.038, 3 + k2) * (0.35 + 0.65 * inside)
+      # stacked above the cuff: the sleeve is longer than the arm, so it gathers in three or four rings over the wrist,
+      # each set at its own slant and broken round the sleeve
+      Lw = np.linalg.norm(w - a); sw = (1 - t) * Lw
+      if r < 0.1 and 0.05 < sw < 0.2:
+        rad2 = (p - (a + ax * (t * Lw))); rad2 = rad2 / (np.linalg.norm(rad2) or 1); ang2 = math.atan2(rad2 @ fwd, rad2[2])
+        env2 = math.sin(math.pi * (sw - 0.05) / 0.15) ** 0.7
+        d += 0.0052 * env2 * fold((sw + 0.011 * math.sin(ang2 * 2 + 1.7 * k2) + 0.006 * math.sin(ang2 * 3 + 0.4)) / 0.034, 41 + k2)
       # drag lines from the armpit, down and across the side of the chest
       ap = sh[S2] - np.array([0, 0, 0.09]); q = p - ap; dd = np.linalg.norm(q)
       if dd < 0.16 and q[2] < 0.02:
@@ -342,6 +370,13 @@ try:
       ang = math.atan2(lat(p), fro(p)); u = (p[2] - zh)
       d += 0.0026 * (1 - u / 0.16) * fold((p[2] + 0.015 * math.sin(ang * 3)) / 0.045, 17) * (0.6 + 0.4 * abs(math.sin(ang)))
       if u < 0.07: d += 0.0024 * (1 - u / 0.07) * fold(ang * 4.0, 19)   # (about 25 round the hem)
+    # hanging folds: long soft upright folds down the back from the shoulder blades, and down the front below the
+    # chest pockets, as a loose shell hangs (not on the sleeves)
+    onsleeve = any(seg_param(p, sh[S2], wr[S2])[1] < 0.1 and seg_param(p, sh[S2], wr[S2])[0] > 0.1 for S2 in ("L", "R"))
+    if not onsleeve and zh + 0.03 < p[2] < zN0 - 0.2:
+      u2 = (p[2] - zh - 0.03) / (zN0 - 0.23 - zh); env3 = math.sin(math.pi * min(1.0, max(0.0, u2))) ** 0.6
+      if fro(p) < 0: d += 0.0032 * env3 * fold((lat(p) + 0.012 * math.sin(p[2] * 21.0)) / 0.085, 45)
+      elif p[2] < zN0 - 0.33: d += 0.0024 * env3 * fold((lat(p) + 0.01 * math.sin(p[2] * 17.0)) / 0.07, 47)
     # the small of the back: one or two long horizontal folds where the jacket hangs from the shoulder blades
     if fro(p) < 0 and zh + 0.12 < p[2] < zh + 0.30:
       d += 0.002 * fold((p[2] - zh) / 0.07, 23) * (1 - abs(lat(p)) / 0.2 if abs(lat(p)) < 0.2 else 0.0)
@@ -523,7 +558,7 @@ try:
     for k2, S2 in enumerate(("L", "R")):
       k = kn[S2]; s0 = p[2] - k[2]; behind = fro(p) - fro(k) < 0; rr = np.linalg.norm((p - k)[:2])
       # behind the knee: cloth bunched into deep creases; in front, a few soft ones across the kneecap
-      if abs(s0) < 0.11 and rr < 0.13: d += (0.0048 if behind else 0.0022) * (1 - abs(s0) / 0.11) * fold((s0 + 0.01 * math.sin(math.atan2(lat(p - k), fro(p - k)) * 2)) / (0.03 if behind else 0.05), 21 + k2)
+      if abs(s0) < 0.11 and rr < 0.13: d += (0.0055 if behind else 0.003) * (1 - abs(s0) / 0.11) * fold((s0 + 0.01 * math.sin(math.atan2(lat(p - k), fro(p - k)) * 2)) / (0.03 if behind else 0.05), 21 + k2)
       # drag lines from the crotch across the inside of the thigh
       t0 = th[S2]; cr = np.array([cx, cy, t0[2] - 0.06]); q = p - cr
       if np.linalg.norm(q) < 0.2 and q[2] < 0.02:
@@ -531,6 +566,12 @@ try:
       # the front of the hip: a crease where the leg meets the body
       hp = t0 + fwd * 0.08; q = p - hp
       if abs(q[2]) < 0.06 and fro(p) > fro(t0) and abs(lat(p) - lat(t0)) < 0.09: d += 0.0018 * (1 - abs(q[2]) / 0.06) * fold(q[2] / 0.03, 29 + k2)
+    # long soft folds hanging down the shins from the knees to the boots
+    for k2, S2 in enumerate(("L", "R")):
+      k = kn[S2]
+      if zmin + BOOT * H + 0.05 < p[2] < k[2] - 0.07 and np.linalg.norm((p - k)[:2]) < 0.14:
+        ang = math.atan2(lat(p - k), fro(p - k)); u3 = (k[2] - 0.07 - p[2]) / (k[2] - 0.12 - zmin - BOOT * H)
+        d += 0.0022 * math.sin(math.pi * min(1.0, max(0.0, u3))) * fold((ang + 0.15 * math.sin(p[2] * 13.0 + k2)) * 1.6, 51 + k2)
     # stacked folds where they go into the boots, settling down onto the boot tops
     zb = zmin + BOOT * H
     if p[2] < zb + 0.12:
@@ -581,10 +622,43 @@ try:
   subdivide(bm)
   cut_level(bm, BOOT, keep_below=True)
   L("boots after the cut", len(bm.faces))
-  # (the shaft's top 8 cm smoothed round: moulded rubber, not the calf's every bump; the rim held where it was cut)
-  topz = zmin + BOOT * H
-  shaft = [v for v in bm.verts if not v.is_boundary and world(v)[2] > topz - 0.08]
-  for _ in range(4): bmesh.ops.smooth_vert(bm, verts=shaft, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=False)
+  # the shaft moulded: a welly's shaft is one smooth rubber surface, not the calf's every bump. Round each leg, in
+  # slices 2 cm deep and 10-degree sectors, the widest the boot reaches; that kept smooth round the leg (its first
+  # four harmonics) and up it, and never narrower above the calf than at it (a welly stands open under the knee as
+  # its mouth); every point of the shaft then set out to it, eased in over the ankle so the foot keeps its shape
+  topz = zmin + BOOT * H; NA, DZ = 36, 0.02
+  for S2 in ("L", "R"):
+    k_, a_ = kn[S2], an[S2]
+    def centre(z, k_=k_, a_=a_): t3 = (z - a_[2]) / (k_[2] - a_[2]); return a_[:2] + (k_[:2] - a_[:2]) * t3
+    z0 = a_[2] + 0.02; nz = int((topz - z0) / DZ) + 2
+    vs = [v for v in bm.verts if world(v)[2] > z0 - 0.01 and np.linalg.norm(world(v)[:2] - centre(world(v)[2])) < 0.16 and (lat(world(v)) > 0) == (S2 == "L")]
+    if not vs: continue
+    R = np.zeros((nz, NA))
+    pol = []
+    for v in vs:
+      pw = world(v); q = pw[:2] - centre(pw[2]); r = math.hypot(*q); th3 = math.atan2(q[1], q[0])
+      iz = min(nz - 1, max(0, int((pw[2] - z0) / DZ))); ia = int((th3 + math.pi) / (2 * math.pi) * NA) % NA
+      R[iz, ia] = max(R[iz, ia], r); pol.append((v, pw, th3, iz))
+    for iz in range(nz):
+      row = R[iz]
+      if (row > 0).sum() < NA // 3: R[iz] = 0; continue
+      row = np.where(row > 0, row, row[row > 0].mean()); F = np.fft.rfft(row); F[5:] = 0; R[iz] = np.fft.irfft(F, NA)
+    good = R.max(1) > 0; gi = [j for j in range(nz) if good[j]]
+    for iz in range(nz):
+      if not good[iz] and gi: R[iz] = R[min(gi, key=lambda j: abs(j - iz))]   # (a slice with too few points: its nearest full one)
+    R = np.array([R[max(0, iz - 2):iz + 3].mean(0) for iz in range(nz)])
+    ic = int(np.argmax(R.mean(1)[: max(1, nz - 2)]))
+    for iz in range(ic + 1, nz): R[iz] = np.maximum(R[iz], R[iz - 1] * 0.995)
+    R += 0.002
+    for v, pw, th3, iz0 in pol:
+      fz = (pw[2] - z0) / DZ - 0.5; i0 = int(min(nz - 1, max(0, math.floor(fz)))); i1 = min(nz - 1, i0 + 1); tz = min(1.0, max(0.0, fz - i0))
+      fa = (th3 + math.pi) / (2 * math.pi) * NA - 0.5; j0 = int(math.floor(fa)) % NA; j1 = (j0 + 1) % NA; ta = fa - math.floor(fa)
+      Rt = (R[i0, j0] * (1 - ta) + R[i0, j1] * ta) * (1 - tz) + (R[i1, j0] * (1 - ta) + R[i1, j1] * ta) * tz
+      c = centre(pw[2]); q = pw[:2] - c; r = math.hypot(*q)
+      if r < 1e-6: continue
+      e = min(1.0, max(0.0, (pw[2] - z0) / 0.06)); e = e * e * (3 - 2 * e)
+      r2 = r + (Rt - r) * e; pw2 = pw.copy(); pw2[:2] = c + q / r * r2; v.co = mwi @ Vector(pw2)
+    L("boot", S2, "shaft moulded:", len(pol), "points; widest", round(float(R.max()), 3), "m from the leg's line")
   bm.normal_update()
   # the sole: everything near the ground pushed down to a flat, slightly wider sole 2 cm thick
   bm.normal_update()
@@ -596,12 +670,22 @@ try:
     elif pw[2] < zmin + 0.035:
       pw2 = pw.copy(); pw2[2] = max(zmin - 0.002, pw[2] - 0.018)
       v.co = mwi @ Vector(pw2)
+  # the arch: under the instep the sole lifts off the ground between the heel and the tread, 7 mm at most
+  for S2 in ("L", "R"):
+    a_ = an[S2]; f0 = fro(a_)
+    for v in bm.verts:
+      pw = np.array(tuple(mw @ v.co))
+      if abs(pw[2] - (zmin - 0.002)) < 2e-4 and (lat(pw) > 0) == (S2 == "L"):
+        u4 = (fro(pw) - f0 - 0.01) / 0.085
+        if 0 < u4 < 1: pw[2] += 0.007 * math.sin(math.pi * u4) ** 0.8; v.co = mwi @ Vector(pw)
   thicken_edges(bm, 0.006)
   L("boots made", len(bm.faces))
   bm.to_mesh(bt.data); bm.free(); made["boots"] = bt
   # the top band, raised 2 mm, 4 cm deep
   topZ = zmin + BOOT * H
   parts["band"] = cut_part(bt, "fd2_boots_band", slab(UP, topZ - 0.04, topZ - 0.004), lambda c, n: abs(n[2]) < 0.6, 0.002, 0.002)
+  # the rand: the sole's moulded edge, a band of rubber 2.8 cm high round the foot standing 3 mm proud of the upper
+  parts["sole"] = cut_part(bt, "fd2_boots_sole", slab(UP, -0.02, 0.028, np.array([cx, cy, zmin])), lambda c, n: n[2] > -0.45, 0.003, 0.003)
   # a buckle on each boot's outer side under the band
   bk = []
   for S2, sg in (("L", 1), ("R", -1)):
