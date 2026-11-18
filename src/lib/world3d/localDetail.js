@@ -194,6 +194,9 @@ export const LOCAL = {
     // the ground: the East Cliff and the West Cliff at their surveyed heights (terrain3d.js: the Environment Agency's
     // LIDAR survey of the bare ground, Open Government Licence)
     terrain: "whitby",
+    // (the cliffs' slopes are open grass and scrub, a few bushes: the usual scattering of trees on a bank read from the
+    // piers as lollipops dotted over the East Cliff, which the photographs don't show)
+    bankTrees: 0.15,
     // St Mary's Church on its outline, at the top of the 199 Steps
     landmarks: { 158276579: "stMarys" },
     // the old town under the cliffs: brick, stone and painted render under red pantile roofs (the photographs from the

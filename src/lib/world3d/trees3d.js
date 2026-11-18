@@ -174,11 +174,12 @@ function windy(mat, U) {
  * @param o.cls ground classes (0 water, 1 land, 2 beach, 3 grass), o.xs the grid axis, o.n its size
  * @param o.heightAt (x, z) => ground height; o.avoid (x, z) => true where nothing may grow (spots, roads, buildings)
  * @param o.bank (x, z) => 0..1 how much the cliff's grassy bank is here (scrub and a few trees on it)
+ * @param o.bankTrees how many trees the bank grows, against the usual (a place's own: Whitby's cliffs are grass)
  * @param o.wood (x, z) => true inside a wood on the map (dense, tall)
  * @param o.quality 0.5 | 1 | 2 (how many, and whether trees are built close to: from 1 up)
  * @returns { mesh (the cards), count, update(t, cam, wind), dispose }
  */
-export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, bank = () => 0, wood = () => false, quality = 1, seed = 3 } = {}) {
+export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, bank = () => 0, bankTrees = 1, wood = () => false, quality = 1, seed = 3 } = {}) {
   const cardTex = cardTexture(seed); if (!cardTex) return null;
   let s = seed * 104729 + 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   const hash = (x, z) => { const v = Math.sin(x * 127.1 + z * 311.7 + seed) * 43758.5453; return v - Math.floor(v); };
@@ -193,7 +194,7 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
     if (!grass && bk < 0.3) continue;
     let deep = 0; if (grass) { deep = 1; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (cls[(j + dj) * n + i + di] !== 3) deep = 0; }
     const inWood = grass && wood(x, z);
-    const p = inWood ? 0.95 : grass ? (deep ? 0.5 : 0.12) : 0.035 * bk;
+    const p = inWood ? 0.95 : grass ? (deep ? 0.5 : 0.12) : 0.035 * bk * bankTrees;
     if (hash(i, j) > p * density) continue;
     const px = x + (rnd() - 0.5) * cw * 0.8, pz = z + (rnd() - 0.5) * cw * 0.8;
     if (avoid(px, pz) || tooClose(px, pz, inWood ? 3.5 : grass ? 5.5 : 5)) continue;

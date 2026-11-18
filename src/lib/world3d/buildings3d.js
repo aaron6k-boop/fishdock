@@ -26,6 +26,16 @@ function meshOf(B, mat) {
  */
 export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = () => false, near = () => false } = {}) {
   const tex = { brick: facade("brick", 7), render: facade("render", 3), cladding: facade("cladding", 5), stone: facade("stone", 9) };
+  // ---- the house fronts modelled in Blender (source-assets/blender/build_facades.py) ----
+  // The same five bays at full size: the wall in a photoscanned brick, render or sandstone (Poly Haven, CC0) with its
+  // openings cut into it, box-sash windows set back in their reveals (frames, sashes, glazing bars, a stone sill, a
+  // brick arch or lintel over), a panelled door in its case under a fanlight, a shop front with its fascia, a downpipe;
+  // baked by Cycles into colour (with the reveals' shading), normals, roughness and a mask of the glass (lit after
+  // dark), 512 px a bay where the drawn ones are 256. They replace the drawn atlas where they're published.
+  for (const k of ["brick", "render", "stone"]) {
+    const map = photoTex(`facade_${k}_diff`); if (!map) continue;
+    tex[k] = { map, normalMap: photoTex(`facade_${k}_nor`, { srgb: false }), roughnessMap: photoTex(`facade_${k}_rough`, { srgb: false }), emissiveMap: photoTex(`facade_${k}_glass`, { srgb: false }), baked: true };
+  }
   const roofs = { slate: roof("slate", 11), clay: roof("clay", 12), felt: roof("felt", 13) };
   const brk = bricks(17);
   const M = {};
@@ -39,7 +49,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   // its variation is taken, over its own average, so each house keeps its colour.
   const wallPhoto = { brick: photoTex("brick_red_diff"), render: photoTex("plaster_diff"), stone: photoTex("plaster_diff") };
   for (const [k, ph] of Object.entries(wallPhoto)) {
-    if (!ph || !M[k]) continue;
+    if (!ph || !M[k] || tex[k].baked) continue; // (the baked fronts carry their own photographed surface)
     const m = M[k], strong = k === "brick" ? 0.8 : 0.3; // (lighter than before: the drawn facade now carries its own courses and grain, and the photographed plaster at .55 made every painted house read as grey, streaked stucco)
     m.onBeforeCompile = (sh) => {
       sh.uniforms.uWallPh = { value: ph };
@@ -172,14 +182,16 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
           // from the wall as geometry too, so they catch the sun and throw shadows close to ----
           if (fine && (t === FACADE_TILE.window || t === FACADE_TILE.window2 || t === FACADE_TILE.door) && st.walls !== "cladding") {
             const bw = len / nb, ux = (x2 - x1) / len, uz = (z2 - z1) / len, u = [ux, uz], nrm = [-uz, ux], tileM = 3; // (the tile is 3 m across; the bay is stretched to its width)
-            const kx = bw / tileM; // metres in the world per metre of the drawn tile, along the wall
+            const kx = bw / tileM, ky = sh / 3; // metres in the world per metre of the drawn tile, along the wall and up it
             if (t === FACADE_TILE.door) {
-              const w = 0.95 * kx, x = (bw - w) / 2, hD = 2.1, yTop = y1 - 0.04 - 0.0, yBot = Math.max(y0, yTop - hD);
+              // (the door stands on the floor: its foot 4 cm up, 2.1 m tall, as drawn. Its case used to be placed from the
+              // storey's top down, so it stood 0.86 m above the drawn door and poked above the storey)
+              const w = 0.95 * kx, x = (bw - w) / 2, yBot = y0 + 0.04 * ky, yTop = yBot + 2.1 * ky;
               wallBox(B.trim, A, u, nrm, x - 0.06 * kx, x, yBot, yTop + 0.36, 0, 0.06, trimCol); wallBox(B.trim, A, u, nrm, x + w, x + w + 0.06 * kx, yBot, yTop + 0.36, 0, 0.06, trimCol); // the case
               wallBox(B.trim, A, u, nrm, x - 0.06 * kx, x + w + 0.06 * kx, yTop + 0.3, yTop + 0.36, 0, 0.06, trimCol); // its head
               wallBox(B.trim, A, u, nrm, x - 0.1 * kx, x + w + 0.1 * kx, y0 - 0.02, y0 + 0.14, 0, 0.32, [0.74, 0.72, 0.68]); // the step
             } else {
-              const wide = t === FACADE_TILE.window2, w = (wide ? 1.7 : 1.05) * kx, h = 1.55, x = (bw - w) / 2, yTop = y1 - 0.55, yBot = yTop - h;
+              const wide = t === FACADE_TILE.window2, w = (wide ? 1.7 : 1.05) * kx, h = 1.55 * ky, x = (bw - w) / 2, yTop = y1 - 0.55 * ky, yBot = yTop - h;
               const f = 0.05 * kx;
               wallBox(B.trim, A, u, nrm, x - f, x, yBot, yTop, 0, 0.045, trimCol); wallBox(B.trim, A, u, nrm, x + w, x + w + f, yBot, yTop, 0, 0.045, trimCol); // the box frame's sides
               wallBox(B.trim, A, u, nrm, x - f, x + w + f, yTop, yTop + 0.05, 0, 0.045, trimCol); // its head

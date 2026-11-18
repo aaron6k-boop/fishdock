@@ -10,10 +10,16 @@ import { weather, photoTex } from "./textures3d.js";
 import { heroSwap } from "./heroAssets.js";
 
 // the Blender models of the two lighthouses (source-assets/blender/build_whitby_lights.py), swapped in for the shapes
-// below once loaded: the scan's sandstone warmed to the honey of Whitby's stone, and weathered (streaks and grime)
+// below once loaded. Their stone is the piers' own ashlar, baked in Blender (build_whitby_stone.py), laid by the model's
+// UVs (one tile every 2.4 m, the courses level, a whole number of tiles round the column); the model's vertex colours
+// carry its baked ambient occlusion. Then the game's weathering: grime at the foot, rain streaks down from the top
 const lookLight = (base, top) => (mt) => {
-  if (/sandstone/i.test(mt.name)) { mt.color.setHex(0xf3dfbd); weather(mt, { scale: 0.6, mottle: 0.25, grime: [base, base + 1.2, 0.35], streaks: [top, 6, 0.3], rough: [0.92, 1.08] }); }
-  else if (/white/i.test(mt.name)) weather(mt, { scale: 0.8, mottle: 0.08, rust: [0.1, 0.4, 0.25, 0.1] });
+  if (/sandstone/i.test(mt.name)) {
+    const d = photoTex("whitby_ashlar_diff");
+    if (d) { mt.map = d; mt.normalMap = photoTex("whitby_ashlar_nor", { srgb: false }); mt.roughnessMap = photoTex("whitby_ashlar_rough", { srgb: false }); mt.roughness = 1; mt.metalness = 0; mt.color.setHex(0xfff8ec); mt.needsUpdate = true; }
+    weather(mt, { scale: 0.6, mottle: 0.12, grime: [base, base + 1.2, 0.35], streaks: [top, 6, 0.25], rough: [0.94, 1.06] });
+  } else if (/white/i.test(mt.name)) weather(mt, { scale: 0.8, mottle: 0.08, rust: [0.1, 0.4, 0.25, 0.1] });
+  else if (/glass/i.test(mt.name)) { mt.vertexColors = false; mt.transparent = true; mt.opacity = 0.55; mt.side = THREE.DoubleSide; mt.needsUpdate = true; }
 };
 
 function whitbyMaterials(base, top) {

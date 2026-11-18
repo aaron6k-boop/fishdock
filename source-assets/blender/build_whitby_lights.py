@@ -6,9 +6,11 @@
 #   lh_east  the East Pier lighthouse (1855): a shorter, plain tapering round tower on a square plinth, a corbelled
 #            cornice, gallery and an eight-sided lantern under a lead cone (tower 13 m)
 # Proportions measured from photographs on Wikimedia Commons (docs/REFERENCE-PHOTOS.md: the column from the pier, from
-# below and from the harbour); sizes in metres, estimates. Stone is the photoscanned sandstone given in STONE (CC0),
-# its UVs laid at a real scale (a picture every TILE metres) so every stone is the same size; the turned parts are
-# unwrapped round their own axis. Ambient occlusion is baked into each vertex's colour (Cycles, on the PC's GPU), so the
+# below and from the harbour); sizes in metres, estimates. Stone is Whitby's ashlar baked by build_whitby_stone.py (from
+# a photoscan, CC0) when it's there (ASHLAR), else the photoscanned sandstone in STONE; its UVs are laid at a real
+# scale (one tile every TILE metres, the ashlar tile's own size) so the courses run level and every stone is the same
+# size as on the piers; the turned parts are unwrapped round their own axis, a whole number of tiles round, so no
+# seam shows. The game lays its own copy of the same ashlar on them (the .glb carries no pictures). Ambient occlusion is baked into each vertex's colour (Cycles, on the PC's GPU), so the
 # flutes, mouldings and the gallery's underside are shaded without any work at run time.
 # Each tower is three meshes, LOD0 (close), LOD1 (about a quarter of the triangles) and LOD2 (a few hundred), named
 # <tower>_LOD<n>; three.js picks one by distance. In three.js's frame (y up), standing on the origin, the door to +z.
@@ -16,7 +18,8 @@ import bpy, bmesh, math, os, random
 from mathutils import Vector
 OUT = "C:/Users/aaron/Documents/FishDock-assets"
 STONE = globals().get("STONE", OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01")  # (+ _diff_1k.jpg, _nor_1k.jpg, _rough_1k.jpg)
-TILE = globals().get("TILE", 1.6)  # metres a picture of the stone covers
+TILE = globals().get("TILE", 2.4)  # metres a picture of the stone covers (the ashlar tile)
+ASHLAR = globals().get("ASHLAR", OUT + "/exports/whitby_stone/whitby_ashlar")  # (+ _diff.jpg, _nor.jpg, _rough.jpg)
 P = lambda x, y, z: Vector((x, -z, y))
 random.seed(1831)
 for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
@@ -34,12 +37,14 @@ def mat(name, rgb, metal=0.0, rough=0.5, alpha=1.0):
     if alpha < 1: b.inputs["Alpha"].default_value = alpha; m.blend_method = "BLEND" if hasattr(m, "blend_method") else None
     return m
 def stone_mat(name):
-    # (the scan's own colour: the game tints it, and weathers it, at run time)
+    # (for the check pictures: the game lays its own copy of the ashlar, tints it and weathers it at run time)
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; b = nt.nodes["Principled BSDF"]
-    d = nt.nodes.new("ShaderNodeTexImage"); d.image = img(STONE + "_diff_1k.jpg"); nt.links.new(d.outputs["Color"], b.inputs["Base Color"])
-    n = nt.nodes.new("ShaderNodeTexImage"); n.image = img(STONE + "_nor_1k.jpg", True)
+    src = (ASHLAR + "_diff.jpg", ASHLAR + "_nor.jpg", ASHLAR + "_rough.jpg") if os.path.exists(ASHLAR + "_diff.jpg") else (STONE + "_diff_1k.jpg", STONE + "_nor_1k.jpg", STONE + "_rough_1k.jpg")
+    print("STONE MAPS", src[0], flush=True)
+    d = nt.nodes.new("ShaderNodeTexImage"); d.image = img(src[0]); nt.links.new(d.outputs["Color"], b.inputs["Base Color"])
+    n = nt.nodes.new("ShaderNodeTexImage"); n.image = img(src[1], True)
     nm = nt.nodes.new("ShaderNodeNormalMap"); nt.links.new(n.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
-    r = nt.nodes.new("ShaderNodeTexImage"); r.image = img(STONE + "_rough_1k.jpg", True); nt.links.new(r.outputs["Color"], b.inputs["Roughness"])
+    r = nt.nodes.new("ShaderNodeTexImage"); r.image = img(src[2], True); nt.links.new(r.outputs["Color"], b.inputs["Roughness"])
     return m
 M = {"stone": stone_mat("whitby_sandstone"), "white": mat("lantern_white", (0.86, 0.86, 0.83), 0.1, 0.35),
      "glass": mat("lantern_glass", (0.55, 0.62, 0.64), 0.6, 0.06), "lead": mat("lead_dome", (0.24, 0.26, 0.27), 0.35, 0.5),
@@ -60,8 +65,11 @@ def uv_world(bm, tile=TILE):
             l[uv].uv = ((c.y, c.z) if ax == 0 else (c.x, c.z) if ax == 1 else (c.x, c.y))
             l[uv].uv = (l[uv].uv[0] / tile, l[uv].uv[1] / tile)
 def uv_turned(bm, cx=0.0, cy=0.0, tile=TILE):
-    # turned faces (about Blender's z, three's y): round the axis by arc length, up by height; the caps flat
+    # turned faces (about Blender's z, three's y): round the axis by arc length, up by height; the caps flat. Round
+    # the axis it's a whole number of tiles (at the part's middle radius), so the stones meet where the unwrap closes
     uv = bm.loops.layers.uv.verify()
+    rs = sorted(math.hypot(v.co.x - cx, v.co.y - cy) for v in bm.verts); rmid = max(rs[len(rs) // 2], 0.3)
+    turns = max(1, round(2 * math.pi * rmid / tile))
     for f in bm.faces:
         if abs(f.normal.z) > 0.7:
             for l in f.loops: l[uv].uv = (l.vert.co.x / tile, l.vert.co.y / tile)
@@ -69,7 +77,7 @@ def uv_turned(bm, cx=0.0, cy=0.0, tile=TILE):
         angs = [math.atan2(l.vert.co.y - cy, l.vert.co.x - cx) for l in f.loops]
         if max(angs) - min(angs) > math.pi: angs = [a + 2 * math.pi if a < 0 else a for a in angs]
         for l, a in zip(f.loops, angs):
-            r = math.hypot(l.vert.co.x - cx, l.vert.co.y - cy); l[uv].uv = (a * max(r, 0.3) / tile, l.vert.co.z / tile)
+            l[uv].uv = (a / (2 * math.pi) * turns, l.vert.co.z / tile)
 def box(name, sx, sy, sz, cx, cy, cz, m, parent, bevel=0.03):
     # sx, sz across, sy up (three's frame), centred at (cx, cy, cz)
     bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0); bmesh.ops.scale(bm, vec=(sx, sz, sy), verts=bm.verts)
@@ -162,14 +170,17 @@ def west():
     ys, ye, r0, r1 = y0 + 0.56, 17.15, 1.66, 1.33
     bands = [random.uniform(0, 1) for _ in range(60)]
     def flute(a, h):
-        k = (a * 20 / (2 * math.pi)) % 1.0; groove = 1 - 0.045 * math.sin(math.pi * k)
-        c = int((h - ys) / 0.34); wear = 1 - 0.012 * bands[min(c, 59)] * (0.5 + 0.5 * math.sin(h * 9.1))
+        k = (a * 20 / (2 * math.pi)) % 1.0; groove = 1 - 0.052 * math.sin(math.pi * k) ** 0.55
+        c = int(h / 0.48) % 60; wear = 1 - 0.012 * bands[min(c, 59)] * (0.5 + 0.5 * math.sin(h * 9.1))
         return groove * wear
     prof = []
     n = 46
     for i in range(n + 1):
         f = i / n; h = ys + (ye - ys) * f; r = r0 + (r1 - r0) * f + 0.035 * math.sin(math.pi * f); prof.append((r, h))
-    lathe("shaft", prof, M["stone"], R, seg=160, ripple=flute)
+    sh = lathe("shaft", prof, M["stone"], R, seg=240, ripple=flute)
+    bpy.ops.object.select_all(action="DESELECT"); sh.select_set(True); bpy.context.view_layer.objects.active = sh
+    try: bpy.ops.object.shade_smooth_by_angle(angle=math.radians(32))  # (the arrises sharp, each flute smooth)
+    except Exception as e: print("smooth by angle:", e)
     # the capital: three annulets, the echinus swelling out, the square abacus
     yc = ye
     for k in range(3): lathe(f"annulet{k}", [(r1 + 0.02, yc + k * 0.07), (r1 + 0.06, yc + k * 0.07 + 0.025), (r1 + 0.02, yc + k * 0.07 + 0.05)], M["stone"], R, seg=64)
@@ -203,7 +214,7 @@ def east():
     ys, ye = y0 + 0.3, 9.9
     prof = [(1.6 - 0.38 * (i / 30) + 0.02 * math.sin(math.pi * i / 30), ys + (ye - ys) * i / 30) for i in range(31)]
     bands = [random.uniform(0, 1) for _ in range(40)]
-    lathe("shaft", prof, M["stone"], R, seg=64, ripple=lambda a, h: 1 - 0.01 * bands[min(int((h - ys) / 0.32), 39)])
+    lathe("shaft", prof, M["stone"], R, seg=64, ripple=lambda a, h: 1 - 0.01 * bands[int(h / 0.48) % 40])  # (each course of the ashlar worn back its own amount)
     # the corbelled cornice carrying the gallery
     lathe("cornice_ring", [(1.22, ye), (1.3, ye + 0.12), (1.45, ye + 0.3), (1.62, ye + 0.42), (1.68, ye + 0.55), (1.6, ye + 0.58)], M["stone"], R, seg=48)
     yc = ye + 0.58
@@ -242,11 +253,17 @@ try:
     for d in prefs.devices: d.use = True
     sc.cycles.device = "GPU"
 except Exception as e: print("GPU not set:", e)
+sc.world = sc.world or bpy.data.worlds.new("w"); sc.world.light_settings.distance = 0.6  # (contact shade: a door in its reveal stays readable)
 for j in lod0:
     j.data.color_attributes.new("AO", "BYTE_COLOR", "CORNER"); j.data.color_attributes.active_color_name = "AO"
     bpy.ops.object.select_all(action="DESELECT"); j.select_set(True); bpy.context.view_layer.objects.active = j
     sc.cycles.bake_type = "AO"; sc.render.bake.target = "VERTEX_COLORS"; sc.world = sc.world or bpy.data.worlds.new("w")
     bpy.ops.object.bake(type="AO")
+    ca = j.data.color_attributes["AO"]; keep = {i for i, m in enumerate(j.data.materials) if m and m.name in ("lantern_glass",)}
+    for p in j.data.polygons:
+        if p.material_index in keep:
+            for li in p.loop_indices: ca.data[li].color = (1, 1, 1, 1)
+    vals = [ca.data[i].color[0] for i in range(0, len(ca.data), 7)]; print("AO", j.name, "mean", round(sum(vals) / len(vals), 3), "min", round(min(vals), 3), flush=True)
 def lod(src, ratio, name):
     o = src.copy(); o.data = src.data.copy(); col.objects.link(o); o.name = name
     d = o.modifiers.new("dec", "DECIMATE"); d.ratio = ratio; d.use_collapse_triangulate = True
@@ -262,7 +279,7 @@ os.makedirs(OUT + "/source/whitby", exist_ok=True); os.makedirs(OUT + "/exports"
 bpy.ops.wm.save_as_mainfile(filepath=OUT + "/source/whitby/whitby_lights.blend")
 for o in bpy.data.objects: o.select_set(o.type == "MESH")
 opts = dict(filepath=OUT + "/exports/whitby_lights.glb", export_format="GLB", use_selection=True, export_apply=True, export_yup=True,
-            export_image_format="JPEG", export_jpeg_quality=82, export_cameras=False, export_lights=False)
+            export_image_format="NONE", export_cameras=False, export_lights=False)
 try: bpy.ops.export_scene.gltf(**opts, export_vertex_color="ACTIVE")
 except TypeError as e: print("export: older options", e); bpy.ops.export_scene.gltf(**opts, export_colors=True)
 print("LIGHTS DONE", os.path.getsize(OUT + "/exports/whitby_lights.glb") // 1000, "kB")
