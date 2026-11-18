@@ -1027,7 +1027,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         const to = Wt.clone().sub(Sh), dist = to.length(), upF = figDirW(V(0, 1, 0)), fwdF = figDirW(V(0, 0, -1));
         const lift = clamp((to.dot(upF) + 0.05) / (armL * 0.9), 0, 1), reachF = clamp((dist - armL * 0.7) / (armL * 0.3), 0, 1);
         const off = upF.clone().multiplyScalar(0.03 * lift).addScaledVector(fwdF, 0.025 * reachF).addScaledVector(to.normalize(), 0.012 * reachF);
-        const a0 = Sh.clone().sub(C0), a1 = a0.clone().add(off.multiplyScalar(k * ew));
+        const a0 = Sh.clone().sub(C0), a1 = a0.clone().add(off.multiplyScalar(k * ease(hs.w)));   // (eased on and off with the hand's hold; ew is set further down)
         if (a0.lengthSq() > 1e-8) { setWQ(clav, new THREE.Quaternion().setFromUnitVectors(a0.normalize(), a1.normalize()).multiply(wq(clav))); }
       }
       const S0 = wp(B(s + "_UpperArm")), E0 = wp(B(s + "_Forearm")), W0 = wp(B(s + "_Hand"));
