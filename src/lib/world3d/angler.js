@@ -1864,7 +1864,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // (so now the hand goes out towards the rim as far as the arm reaches, closed as it will be on it, and takes
         // hold when the hoop comes within reach: closed on a rope that isn't drawn there, the two hands were held up
         // in front of you like claws, on Aaron's review of 12 November)
-        if (toH.length() > reach + 0.3) { hoopPrev[hands.indexOf(hh)] = null; hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
+        // (but bringing it in over the rail, never: you step back as it comes over and lift it on its rope, your hands
+        // out on the rope towards it. Let go, the net rose up the wall and swung over the rail by itself, no hands on it,
+        // and an arm came out after it at full stretch (the PC's first-person landing, 18 November))
+        const lifting = landStage === "in" || releaseInfo?.stage === "in";
+        if (toH.length() > reach + 0.3 && !lifting) { hoopPrev[hands.indexOf(hh)] = null; hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
         at.copy(sh).addScaledVector(toH.normalize(), reach);
         hoopPace(hh, at);
         hh.at = at; hh.kind = "rope"; hh.loose = 0.5; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };
