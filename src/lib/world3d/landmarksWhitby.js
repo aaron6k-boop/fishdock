@@ -7,6 +7,14 @@
 import * as THREE from "three";
 import { kit, walls, prepRing, edgeInfo, bbox, hipRoof, finish } from "./landmarksTown.js";
 import { weather, photoTex } from "./textures3d.js";
+import { heroSwap } from "./heroAssets.js";
+
+// the Blender models of the two lighthouses (source-assets/blender/build_whitby_lights.py), swapped in for the shapes
+// below once loaded: the scan's sandstone warmed to the honey of Whitby's stone, and weathered (streaks and grime)
+const lookLight = (base, top) => (mt) => {
+  if (/sandstone/i.test(mt.name)) { mt.color.setHex(0xf3dfbd); weather(mt, { scale: 0.6, mottle: 0.25, grime: [base, base + 1.2, 0.35], streaks: [top, 6, 0.3], rough: [0.92, 1.08] }); }
+  else if (/white/i.test(mt.name)) weather(mt, { scale: 0.8, mottle: 0.08, rust: [0.1, 0.4, 0.25, 0.1] });
+};
 
 function whitbyMaterials(base, top) {
   // (sandstone: the photographed ashlar of the piers, at about 2.2 m a tile; finish() lays it by world position)
@@ -90,7 +98,9 @@ function westPierLight(group, ring, base) {
   const top = lantern(K, cx, cz, yg, 1.05, 1.6, { sides: 6, dome: true });
   // the vane: a rod and an arrow
   K.box("dark", 0.05, 1.2, 0.05, cx, top + 0.6, cz); K.box("dark", 1.0, 0.06, 0.04, cx, top + 0.9, cz);
-  return finish(group, K, M, { ring: [[cx - 2.4, cz - 2.4], [cx + 2.4, cz - 2.4], [cx + 2.4, cz + 2.4], [cx - 2.4, cz + 2.4]], base, top: base + H });
+  const res = finish(group, K, M, { ring: [[cx - 2.95, cz - 2.95], [cx + 2.95, cz - 2.95], [cx + 2.95, cz + 2.95], [cx - 2.95, cz + 2.95]], base, top: base + H });
+  heroSwap(group, res.meshes, "whitby_lights", "lh_west", { at: [cx, cz], base, look: lookLight(base, base + H) });
+  return res;
 }
 
 // ---- the East Pier lighthouse (1855): a shorter stone tower, plain and tapering, eight-sided, on a square base, a
@@ -106,7 +116,9 @@ function eastPierLight(group, ring, base) {
   const yg = y0 + sh + 0.6;
   gallery(K, cx, cz, yg, 1.55, 8);
   lantern(K, cx, cz, yg, 0.95, 1.4, { sides: 8, dome: false });
-  return finish(group, K, M, { ring: [[cx - 2.2, cz - 2.2], [cx + 2.2, cz - 2.2], [cx + 2.2, cz + 2.2], [cx - 2.2, cz + 2.2]], base, top: base + H });
+  const res = finish(group, K, M, { ring: [[cx - 2.3, cz - 2.3], [cx + 2.3, cz - 2.3], [cx + 2.3, cz + 2.3], [cx - 2.3, cz + 2.3]], base, top: base + H });
+  heroSwap(group, res.meshes, "whitby_lights", "lh_east", { at: [cx, cz], base, look: lookLight(base, base + H) });
+  return res;
 }
 
 // ---- a beacon at the end of a pier extension (1914): four steel legs braced together, about 7 m to the top, a ladder

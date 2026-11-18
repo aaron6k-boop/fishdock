@@ -60,10 +60,28 @@ function offPiers(hill, piers) {
 }
 
 // ---- sandstone ashlar (Whitby's piers): the photographed blocks, honey-brown, darker and weedy towards the sea ----
-function stoneWall(st, h) {
+function stoneWall(st, h, part = "wall") {
+  // (st.kit: the stonework modelled block by block in Blender and baked to seamless maps (source-assets/blender/
+  // build_whitby_stone.py): <kit>_ashlar for walls, <kit>_flags for decks, each a tile of st.wallTile or st.deckTile
+  // metres; their own joints, wear and shading in them. Without one, the photographed blocks)
+  if (st.kit) {
+    const name = `${st.kit}_${part === "deck" ? "flags" : "ashlar"}`, rep = 1 / (part === "deck" ? st.deckTile ?? 3 : st.wallTile ?? 2.4);
+    const d = photoTex(name + "_diff", { repeat: rep }), nn = d && photoTex(name + "_nor", { srgb: false, repeat: rep }), rr = d && photoTex(name + "_rough", { srgb: false, repeat: rep });
+    const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1, 1), roughnessMap: rr, roughness: 1, color: part === "deck" ? st.deckTint ?? 0xffffff : st.tint ?? 0xffffff });
+    return part === "deck" ? weather(m, { scale: 1.6, mottle: 0.18, rough: [0.92, 1.06] }) : weather(m, { scale: 0.9, mottle: 0.16, grime: [WALL_BOTTOM, 1.1, 0.8], streaks: [h, 3.5, 0.28], rough: [0.94, 1.06] });
+  }
   const tile = st.tile ?? 0.4, d = photoTex("sandstone_wall_diff", { repeat: tile }), nn = d && photoTex("sandstone_wall_nor", { srgb: false, repeat: tile });
   const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1.2, 1.2), color: st.tint ?? 0xf0d8ac, roughness: 0.93 });
   return weather(m, { scale: 0.55, mottle: 0.35, grime: [WALL_BOTTOM, 1.1, 0.75], streaks: [h, 3.5, 0.3], rough: [0.9, 1.1] });
+}
+// a box's faces mapped at world scale, each in its own plane (for a tiling texture laid at its real size)
+function worldUV(geo) {
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
+    if (ny >= nx && ny >= nz) uv.setXY(i, p.getX(i), p.getZ(i)); else if (nx >= nz) uv.setXY(i, p.getZ(i), p.getY(i)); else uv.setXY(i, p.getX(i), p.getY(i));
+  }
+  uv.needsUpdate = true; return geo;
 }
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
@@ -1301,7 +1319,24 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (local?.stone) batter(geo, ring, p.h, local.stone.batter ?? 0.14);
       const sideMat = local?.stone ? (stoneSide ||= stoneWall(local.stone, p.h)) : local?.concrete ? (concSide ||= weather(new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb9b5ad, roughness: 0.95 }), { scale: 0.7, mottle: 0.3, grime: [WALL_BOTTOM, 0.6, 0.45], streaks: [p.h, 2.5, 0.2], rough: [0.9, 1.1] })) : new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 });
       // (and its top: sandstone flags where the walls are sandstone)
-      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall({ ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h)) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall(local.stone.kit ? local.stone : { ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h, "deck")) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      // the coping: a course of big squared stones along its edges over the water, a little proud of the wall and of the
+      // deck (Whitby's piers: the photographs along them), in the same stone
+      if (local?.stone?.coping) {
+        const cg = [], C = local.stone.coping;
+        for (let k = 0; k < ring.length; k++) {
+          const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
+          let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
+          if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) { nx = -nx; nz = -nz; }
+          if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) continue;
+          const g2 = new THREE.BoxGeometry(len + C.d * 0.9, C.h, C.d); g2.rotateY(-Math.atan2(z2 - z1, x2 - x1));
+          g2.translate(mid[0] - nx * (C.d / 2 - C.out), p.h + C.up - C.h / 2, mid[1] - nz * (C.d / 2 - C.out)); cg.push(worldUV(g2));
+        }
+        if (cg.length) {
+          const cm = new THREE.Mesh(mergeGeometries(cg), stoneSide); cg.forEach((q) => q.dispose());
+          cm.castShadow = cm.receiveShadow = true; cm.userData.kind = `a ${p.kind}`; group.add(cm); targets.push(cm);
+        }
+      }
       // a solid concrete parapet along its edges over the water, where the mark's photographs show one (Lowestoft's South
       // Pier: both sides and round its head), its outer face flush with the pier's side
       if (local?.concrete) {

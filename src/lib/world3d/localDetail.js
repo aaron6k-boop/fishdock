@@ -164,7 +164,9 @@ export const LOCAL = {
     },
     // the stone piers: honey-coloured sandstone blocks, their walls leaning back as they rise, dark and weedy towards
     // the sea, white-painted railings along both sides (the photographs)
-    stone: { batter: 0.14, deckTint: 0xddd5c6 },
+    // (kit: the stonework modelled in Blender and baked, source-assets/blender/build_whitby_stone.py; coping: the
+    // edge's course of big stones, h tall, d deep, standing out over the wall's face and up from the deck)
+    stone: { batter: 0.14, kit: "whitby", wallTile: 2.4, deckTile: 3.0, tint: 0xf6e4c4, deckTint: 0xe9e1d2, coping: { h: 0.42, d: 0.78, out: 0.12, up: 0.05 } },
     // (the West Pier's own lamps are modelled below; none of the usual ones along the stone piers' edges, and none on the
     // East Pier, where the photographs show none)
     pierLamps: false,
