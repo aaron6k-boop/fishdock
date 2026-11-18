@@ -106,13 +106,16 @@ const ACTS = ["cast", "pull_rope", "turn_l", "turn_r", "pick_up"];
 const SPEED0 = { m: { walk_slow: 0.81, walk: 1.39, walk_fast: 1.49, run: 2.42 }, f: { walk_slow: 0.88, walk: 1.28, walk_fast: 1.51, run: 2.25 } };
 let clipsP = null;
 function clipSet() {
+  // (both files asked for at once: the second used to be asked for only once the first was in and read, 2.5 s later on
+  // the PC as a place loaded, and every person waited on it)
+  const second = clipsP ? null : loadGLB("anims2").catch(() => null);
   clipsP ||= loadGLB("anims").then(async (g) => {
     const out = { m: {}, f: {} };
     for (const c of g.animations) { const sex = c.name.startsWith("f_") ? "f" : "m"; const key = c.name.slice(2); out[sex][key] = prepClip(c, SPEED0[sex][key]); }
     // Mixamo movements retargeted onto the same skeleton in Blender (anims2.glb, source-assets/blender/
     // retarget_mixamo.py): a fishing stance, kneeling, crouching, kneeling to look closely at something. Both sexes.
     // Without it (offline, an old cache) the procedural poses stand in, as before
-    try { const g2 = await loadGLB("anims2"); for (const c of g2.animations) { const key = c.name.slice(2); if (c.name.startsWith("x_") && (POSES.includes(key) || ACTS.includes(key))) out.m[key] = out.f[key] = c; if (c.name === "x_run") out.m.sprint = out.f.sprint = prepClip(c, SPRINT_SPEED); } } catch { /* the procedural poses */ }
+    try { const g2 = await (second || loadGLB("anims2")); if (!g2) throw new Error("none"); for (const c of g2.animations) { const key = c.name.slice(2); if (c.name.startsWith("x_") && (POSES.includes(key) || ACTS.includes(key))) out.m[key] = out.f[key] = c; if (c.name === "x_run") out.m.sprint = out.f.sprint = prepClip(c, SPRINT_SPEED); } } catch { /* the procedural poses */ }
     return out;
   });
   clipsP.catch(() => { clipsP = null; });
