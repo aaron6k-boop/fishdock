@@ -136,8 +136,9 @@ export const LOCAL = {
     // along the pier and from the beach)
     concrete: () => ({ h: 1.1, t: 0.45, tint: 0.92 }),
     fence: () => "none",
-    // and rock armour in the sea along its south side by the root (the photographs from the beach)
-    rocks: (x, z) => z > 8 && x < -40 && x > -240,
+    // and rock armour in the sea along its south side by the root, where it meets the beach (the photographs from the
+    // beach; not along the whole inner half of the pier, where no photograph shows them)
+    rocks: (x, z) => z > 8 && x < -150 && x > -240,
     // the buildings at its root, each on its own outline: the South Pier Family Entertainment Centre, the Royal Norfolk
     // and Suffolk Yacht Club and the East Point Pavilion (landmarksLowestoft.js)
     landmarks: { 211742397: "southPierFEC", 1473914181: "yachtClub", 1065924544: "eastPointPavilion" },
