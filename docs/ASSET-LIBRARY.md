@@ -159,7 +159,7 @@ it goes in (an asset site's other assets may be under other terms).
 | Brown Planks 03 (weathered grey-brown boards) | Poly Haven | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | the pier benches' slats (public/models/pierprops.glb): four of its boards cut out at 512 x 1024 (the ORM at 256 x 512), each slat mapped along the grain of one board (source-assets/blender/props2/build_pierprops2.py) | `brown_planks_03_diff_1k.jpg` (557 KB), `brown_planks_03_nor_gl_1k.jpg` (505 KB), `brown_planks_03_arm_1k.jpg` (123 KB), `bench_slat_diff.jpg` (165 KB), `bench_slat_nor.jpg` (99 KB), `bench_slat_orm.jpg` (19 KB) |
 | Inter (Bold, SemiBold) | Rasmus Andersson | https://rsms.me/inter/ | SIL Open Font License 1.1 | Credited in public/models/CREDITS.txt | the lettering on the pier lifebuoy stations' name board and 999 notice (textures/props2/station_sign.jpg, drawn for FishDock with Pillow; in public/models/pierprops.glb) | `station_sign.jpg` (100 KB) |
 
-Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench,
-bollard and lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA
+Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench (its
+slats textured with Poly Haven's Brown Planks 03, above), the bollard and the lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA
 (the Gorleston photographs) is given in the app and in `public/models/CREDITS.txt`.
 
