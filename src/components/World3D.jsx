@@ -7,7 +7,7 @@ import { spotById } from "../data/spots.js";
 import { Icon } from "./ui.jsx";
 import { compassPoint } from "../lib/world3d/look.js";
 import { layoutFor } from "../lib/world3d/spots.js";
-import { landCamOn, fishCamOf } from "../lib/viewPrefs.js";
+import { landCamOn, fishCamOf, walkCamOf } from "../lib/viewPrefs.js";
 import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
 import { effectiveGfx } from "./GraphicsPanel.jsx";
 import { localFor } from "../lib/world3d/localDetail.js";
@@ -19,7 +19,7 @@ import { fretAndStorm } from "../lib/world3d/skyLook.js";
 // from where they happen: your friend's reel from their side, quieter further away) ----
 const VIEW_KEY = "fishdock.view3d.v1";
 // (landCam2: the landing camera. New users get it on; an earlier choice to turn it off ("landCam": false) is kept)
-export const VIEW_DEFAULTS = { track: true, spatial: true, side: "right", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto", camDist: "normal", autoBtn: false };
+export const VIEW_DEFAULTS = { track: true, spatial: true, side: "right", look: "normal", smooth: true, stick: "m", stickFloat: false, gfx: "auto", camDist: "auto", autoBtn: false };
 // sound levels for the three kinds of sound (sceneAudio.js setVolumes), saved on this phone
 const LEVELS_KEY = "fishdock.sound.levels";
 export function loadLevels() { try { return { environment: 0.8, equipment: 0.8, events: 1, ...JSON.parse(localStorage.getItem(LEVELS_KEY) || "{}") }; } catch { return { environment: 0.8, equipment: 0.8, events: 1 }; } }
@@ -32,6 +32,8 @@ export function loadView() {
     v.landCam2 = landCamOn(v);
     // the fishing camera: first person, third person or cinematic (framed landing shots); first person unless chosen
     v.fishCam = fishCamOf(v);
+    // the walking camera: as you fish unless chosen (viewPrefs.js)
+    v.camDist = walkCamOf(v);
     return v;
   } catch { return { ...VIEW_DEFAULTS }; }
 }

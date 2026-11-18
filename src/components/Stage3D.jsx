@@ -11,6 +11,7 @@ import { speciesById } from "../data/species.js";
 import { catchInfo } from "../lib/catchInfo.js";
 import { landingTech } from "../lib/sceneActors.js";
 import GraphicsPanel, { FpsMeter } from "./GraphicsPanel.jsx";
+import { walkDist } from "../lib/viewPrefs.js";
 const TORCHES = ["off", "white", "red", "green"], TORCH_NAMES = { off: "Off", white: "White", red: "Red", green: "Green" }; // (as nightKit.js)
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
@@ -26,7 +27,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   const say = (m) => { setWalkMsg(m); setTimeout(() => setWalkMsg((x) => (x === m ? "" : x)), 3200); };
   const [view, setView] = useState(loadView);
   const startWalk = (retry = false) => {
-    const why = w.current?.walk(true, { dist: view.camDist });
+    const why = w.current?.walk(true, { dist: walkDist(view.camDist, mode) }); // (as you fish: walking off in first person stays at your eyes)
     // your line's still in the water: wind it in, then walk (one step, never "reel in first" with nothing to reel)
     if (why === "line") { if (!retry && onWindIn?.()) setTimeout(() => startWalk(true), 250); else say("Wind your line in first."); return; }
     if (why) say(why); else { setMenu(false); say(retry ? "Line wound in. Use the stick to walk; Start fishing shows at the water's edge." : "Use the stick to walk and drag to look round. Start fishing shows at the water's edge."); }
@@ -257,7 +258,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
               <button type="button" role="menuitemcheckbox" aria-checked={view.smooth !== false} className={`ft-pill${view.smooth !== false ? " on" : ""}`} onClick={() => setOpt("smooth", view.smooth === false)} title="The view carries on turning a little after a flick">Smooth camera</button>
               <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("stick", { s: "m", m: "l", l: "s" }[view.stick] || "m")} title="The walking stick's size">Stick size: {{ s: "Small", m: "Medium", l: "Large" }[view.stick] || "Medium"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={!!view.stickFloat} className={`ft-pill${view.stickFloat ? " on" : ""}`} onClick={() => setOpt("stickFloat", !view.stickFloat)} title="Touch anywhere in the lower left to walk, instead of a stick in the corner">Floating stick</button>
-              <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpt("camDist", { near: "normal", normal: "far", far: "near" }[view.camDist] || "normal")} title="How far behind you the camera follows when you walk about (pinch to change it as you go)">Walking camera: {{ near: "Near", normal: "Normal", far: "Far" }[view.camDist] || "Normal"}</button>
+              <button type="button" role="menuitem" className="ft-pill" onClick={() => setOpts({ camDist: { auto: "near", near: "normal", normal: "far", far: "eyes", eyes: "auto" }[view.camDist] || "auto", walkCam2: true })} title="Where the camera is when you walk about: as you fish (at your eyes in first person, behind you in third), behind you near, normal or far, or at your eyes. Pinch or the wheel changes it as you go">Walking camera: {{ auto: "As you fish", near: "Near", normal: "Normal", far: "Far", eyes: "Your eyes" }[view.camDist] || "As you fish"}</button>
               <button type="button" role="menuitemcheckbox" aria-checked={!!view.autoBtn} className={`ft-pill${view.autoBtn ? " on" : ""}`} onClick={() => setOpt("autoBtn", !view.autoBtn)} title="An Auto button when you walk about: keep walking where you look until you touch the stick">Auto-walk button</button>
               {reelOpts ? <>
                 <button type="button" role="menuitemcheckbox" aria-checked={reelOpts.holdReel !== false} className={`ft-pill${reelOpts.holdReel !== false ? " on" : ""}`} onClick={() => onReelOpts?.({ holdReel: reelOpts.holdReel === false })} title="Press and hold the Reel button to wind in steadily, a little slower than tapping in a steady rhythm">Hold to reel</button>

@@ -1098,7 +1098,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         if (line === "out") return "line";
         const p = me.a.root.position;
         W = walker(p.x, p.z, me.out?.face ?? 0, p.y); W.floor = (x, z) => env.ground.heightAt(x, z); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
-        fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56 }[dist] || 47); look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);
+        fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56, eyes: 28 }[dist] || 47); // (eyes: zoomed right in, the walking camera at your eyes: first person) look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);
         // (from your eyes out to behind you as a glide; a drag turns the view by what the walking camera shows)
         followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8);
         // (a comfortable range to look up and down while walking, no vertical flick; a double tap recentres behind you at
