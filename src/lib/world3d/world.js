@@ -21,7 +21,12 @@ import { planCast } from "./castAim.js";
 import { addRipple, stepRipples } from "./waterFx.js";
 import { shotFor } from "./landCam.js";
 import { createPost } from "./post.js";
-import { setPeopleDetail } from "./human3d.js";
+import { setPeopleDetail, prefetchPeople, holdDetail } from "./human3d.js";
+export { holdDetail };
+import { loadPart } from "./glbParts.js";
+/** The files every place needs, asked for before the world is built so they come in while it is (World3D.jsx): the
+ * people's own (human3d.js prefetchPeople), the rod and reel, the nets. */
+export function prefetch(anglers) { prefetchPeople(anglers); for (const n of ["rodkit", "nets"]) loadPart(n).catch(() => {}); }
 import { FILM } from "./film.js";
 import { stepDown, recallPace, rememberPace, SHED, capGfx, recallShed, rememberShed } from "../pacing.js";
 

@@ -10,7 +10,7 @@ import { createRain } from "./rain3d.js";
 import { layoutFor, drawnGround } from "./spots.js";
 import { buildRealPlace } from "./realPlace.js";
 import { createWildlife } from "./wildlife.js";
-import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand } from "./shoreMap.js";
+import { SHORE, SHORE_FINE, shoreDistances, shoreBytes, drawnLand, beachNearest } from "./shoreMap.js";
 import { lightingFor, lampPools, poolLight, lookQuality, fretAndStorm } from "./skyLook.js";
 import { FILM } from "./film.js";
 
@@ -272,6 +272,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     uLamps: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
     uShore: { value: null }, uShoreOn: { value: 0 }, uShoreHalf: { value: SHORE.half },
     uShoreF: { value: null }, uShoreFHalf: { value: SHORE_FINE.half },
+    uBeachM: { value: null }, uSurfOn: { value: 0 }, // (the surf on a real beach: where the nearest land is sand or shingle)
     uNrm: { value: null }, uNrmOn: { value: 0 },
     uRefl: { value: null }, uReflOn: { value: 0 }, uReflMat: { value: new THREE.Matrix4() }, uFdSun: { value: new THREE.Vector3() },
     fdCloudA: { value: CLOUDS.a }, fdCloudB: { value: CLOUDS.b }, fdCamX: { value: CLOUDS.camX }, fdCamY: { value: CLOUDS.camY }, // (the clouds' shadows, sunShade.js)
@@ -316,7 +317,27 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       s += train(p, normalize(wd + wx*.77), .97, B*.32*(.4 + 1.2*g2), ph*1.7 + 5.);
       s += train(p, normalize(wd - wx*1.1), 1.46, B*.18, .7 - ph*2.);
       return s;
-    }`;
+    }
+    // ---- the surf on a beach ----
+    // Waves come in square to the beach whatever the wind (the shallows turn them), shoaling (taller, closer together,
+    // their fronts steepening) until they break at a line further out the bigger the swell, then run on up the sand
+    // as a bore of white water that thins and drains back. sd: metres out from the water's edge (the shore map).
+    // x: height, y: how broken the water is here (0 clean, 1 just broken), z: where in the wave (0 its crest, rising
+    // to 1 at the next crest seaward of it; the front, just shoreward of the crest, is near 1)
+    uniform sampler2D uBeachM; uniform float uSurfOn;
+    float surfLine(){ return 7. + 24.*uSwell + 9.*uWind; }
+    vec3 surf(vec2 p, float sd){
+      float bD = surfLine(), k = .27 - .07*uSwell;
+      float wob = (noise(p*.021 + vec2(uTime*.013, 0.)) - .5)*2.4 + (noise(p*.0057) - .5)*4.;
+      float ph = sd*k*(1. + .25*smoothstep(bD + 20., 0., sd)) + uTime*(1.05 + .2*uSwell) + wob;
+      float q = fract(ph/6.2831853);
+      // (a breaking wave's shape: a long back sloping down from the crest, a short steep front rising to the next)
+      float shape = q < .8 ? 1. - smoothstep(0., .8, q) : smoothstep(.8, 1., q);
+      float A = (.1 + .42*uSwell + .16*uWind)*(1. + .7*smoothstep(bD + 28., bD, sd))*(1. - .62*smoothstep(bD, 0., sd))*smoothstep(39., 28., sd);
+      float broken = smoothstep(bD + 1.5, bD - 4., sd + (noise(p*.11 + uTime*.05) - .5)*5.);
+      return vec3(A*(shape*1.3 - .55), broken, q);
+    }
+    float beachK(vec2 p, float hw){ vec2 uv = p/(2.*hw) + .5; if (uSurfOn < .5 || uv.x < 0. || uv.y < 0. || uv.x > 1. || uv.y > 1.) return 0.; return texture2D(uBeachM, uv).r; }`;
   const waterMat = new THREE.ShaderMaterial({
     uniforms: wU, transparent: false, defines: { WQ: LQ.waterDetail, SKYQ: 0, FFT: 0 },
     vertexShader: GLSL_NOISE + "uniform float uTime; uniform vec3 uCam; uniform float uFft, uL0; uniform sampler2D uDisp0; uniform sampler2D uShore, uShoreF; uniform float uShoreOn, uShoreHalf, uShoreFHalf;" + GLSL_WAVES + /* glsl */`
@@ -332,13 +353,18 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 s = seaWaves(w.xz);
         // against a wall a wave comes back off it (clapotis): the surface heaves up to twice as high right at the wall
         // and the water can't move into it, so the crests' horizontal pinch dies out there
-        float wall = 1. - smoothstep(0., 6., shoreDistV(w.xz)); vWall = wall;
+        float sdv = shoreDistV(w.xz), bkv = beachK(w.xz, uShoreHalf);
+        // (on a beach the water's edge is no wall: no wave comes back off it, the surf runs up it instead)
+        float wall = (1. - smoothstep(0., 6., sdv))*(1. - bkv); vWall = wall;
         // in a blow the crests pinch together (water drawn towards each crest), so they look sharp, not smooth
         w.xz += s.yz*(.4 + 2.*uWind)*fade*(1. - wall*.85);
         w.y += s.x*fade*(1. + wall*.45);
+        // the surf on a beach (its shape; the open sea's waves die down in the shallows under it)
+        // (both die down over the last few metres, so the water runs up the sand a little way, not over the beach)
+        if (bkv > .01) { vec3 sf = surf(w.xz, sdv); w.y += (sf.x*(.35 + .65*smoothstep(0., 7., sdv)) - s.x*.85*smoothstep(30., 4., sdv))*bkv*fade; }
         // the spectrum sea's displacement (Ultra): the wind sea's shape, crests drawn together, on top of the swell
         #if FFT
-          if (uFft > .5) { vec3 d = texture2D(uDisp0, vP/uL0).xyz; d.xz *= 1. - wall*.85; d.y *= 1. + wall*.5; w += d*fade; }
+          if (uFft > .5) { vec3 d = texture2D(uDisp0, vP/uL0).xyz; d.xz *= 1. - wall*.85; d.y *= 1. + wall*.5; d *= 1. - .8*bkv*smoothstep(25., 3., sdv); w += d*fade; }
         #endif
         vW = w;
         gl_Position = projectionMatrix*viewMatrix*vec4(w, 1.);
@@ -375,6 +401,28 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         vec3 s = seaWaves(p);
         float h = s.x*(1. + vWall*.45);
         vec2 g = s.yz*(1. + vWall*.45);
+        // ---- the surf on a beach: its slope into the shading, its white water into the foam below ----
+        float sd = shoreDist(p), bkf = beachK(p, uShoreHalf), surfF = 0.;
+        if (bkf > .01 && sd < 39.) {
+          vec3 sf = surf(p, sd);
+          // (the slope across the crests, by the change in the shore distance over half a metre)
+          vec2 e = vec2(.5, 0.); float sdx = shoreDist(p + e.xy), sdz = shoreDist(p + e.yx);
+          vec2 sg = vec2(surf(p + e.xy, sdx).x - sf.x, surf(p + e.yx, sdz).x - sf.x)/.5;
+          g += sg*bkf*(1. - smoothstep(60., 220., dist)); h += sf.x*bkf;
+          // white water: a line of it at each breaking crest, along the stretches of the crest that are breaking (not
+          // its whole length at once); a trail of it left behind each crest, thinning and broken into streaks as it
+          // goes; a little old foam lying over the whole surf zone; a lip where each wave first spills; and the
+          // swash, a thin sheet of bubbles where the water runs up the sand and drains back
+          float fine = smoothstep(.35, .8, noise(p*vec2(3.3, 2.7) + vec2(uTime*.3, -uTime*.2))*.55 + noise(p*9.7 - uTime*.4)*.45);
+          float streaks = smoothstep(.42, .72, noise(p*vec2(.9, .5) + vec2(uTime*.05, uTime*.03)));
+          float breaking = smoothstep(.3, .62, noise(p*.045 + vec2(uTime*.02, -uTime*.015))*.75 + sf.y*.25);
+          float crestL = smoothstep(.9, .985, sf.z) + 1. - smoothstep(.015, .075, sf.z);
+          float trail = (1. - smoothstep(.05, .45, sf.z))*smoothstep(.0, .05, sf.z);
+          float lip = smoothstep(.88, .99, sf.z)*smoothstep(4., 0., abs(sd - surfLine()))*breaking;
+          float swash = (1. - smoothstep(.3, 2.2 + 1.2*uSwell, sd))*(.5 + .5*smoothstep(.55, .9, fract(sf.z + .15)));
+          surfF = (sf.y*(crestL*.85*(.55 + .45*fine)*breaking + trail*.5*fine*(.35 + .65*streaks)*(.4 + .6*breaking) + .1*fine*streaks) + lip*.6 + swash*(.3 + .45*fine))*bkf;
+          surfF *= 1. - smoothstep(150., 600., dist);
+        }
         // ---- the spectrum sea (Ultra): slopes from both cascades (the maps' mip levels average them out with
         // distance, so the far sea goes smooth by itself), its height into the crest light, its folded crests into foam
         float fftJ = 1.;
@@ -472,7 +520,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         float lit = uDay + uDusk*.75 + uNight*.12, dim = 1. - .25*smoothstep(.5, 1., uCloud) - .15*uRain;
         // (under a cloud's shadow, drifting over the sea: no glitter, and the water's own sunlit colour darker. sunShade.js)
         float fdCl = fdCloudA.w > 0. ? fdCloudAt(vec2(dot(fdCamX, vW) - fdCloudB.y, dot(fdCamY, vW) - fdCloudB.z)) : 1.;
-        float sd = shoreDist(p), shallow = 1. - smoothstep(0., 16., sd);
+        float shallow = 1. - smoothstep(0., 16., sd);
         // looking down into it you see the deep colour; at a low angle more of the light scattered back out; the
         // shallows by the land are lighter and greener
         // (looking straight down it's the water's own colour lit through the silt, a murky grey-green you can see into,
@@ -595,10 +643,10 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
           // looking down over the rail the water by the wall read as scattered paper, 16 November)
           clump *= .45 + .55*smoothstep(.3, .75, noise(p*23. + vec2(uTime*.5, -uTime*.4)));
           float eband = 1. - smoothstep(.05, 1.2 + max(pulse, 0.)*.6, sd + (en2 - .5)*.5);
-          edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist));
+          edge = eband*(clump*(.35 + .65*eband)*.8 + eband*.12*en2)*(1. - smoothstep(35., 90., dist))*(1. - bkf);
         }
         if (uDbg > .5) { gl_FragColor = vec4(uDbg < 1.5 ? vec3(fftJ) : uDbg < 2.5 ? vec3(cap) : vec3(n.xz*4. + .5, 0.), 1.); return; }
-        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.62*uShoreOn + churn*.6;
+        float foam = cap*.6 + streak + band*.6 + wash*.75*smoothstep(.35, .65, noise(p*vec2(1.5, 3.) + uTime*.5)) + edge*.62*uShoreOn + churn*.6 + surfF;
         // foam is never paper white: bubbles over water take on its colour, more so thin; the light on it is the day's
         // (a fresh whitecap is the exception: a dense head of bubbles, near white in the day's light)
         foam = max(clamp(foam, 0., .8), capJ*.95);
@@ -814,7 +862,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
   else if (!pano) ground = drawnGround(venue);
 
   // ---- the shore map for the water's foam and shallows (real places from their land; drawn places from their layout) ----
-  if (!pano && venue !== "beach") {
+  if (!pano && (venue !== "beach" || real)) {
     const piersNear = (real?.piers || []).filter((pr) => pr.line);
     const near = (x, z, line, half) => { for (let k = 0; k < line.length - 1; k++) { const [x1, z1] = line[k], [x2, z2] = line[k + 1], dx = x2 - x1, dz = z2 - z1, l2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((x - x1) * dx + (z - z1) * dz) / l2)); if (Math.hypot(x - x1 - dx * t, z - z1 - dz * t) < half) return true; } return false; };
     const isLand = real ? (x, z) => floorAt(x, z) > 0 || piersNear.some((pr) => near(x, z, pr.line, pr.width / 2 + 0.3)) : drawnLand(venue, L);
@@ -824,6 +872,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       const fine = new THREE.DataTexture(shoreBytes(shoreDistances(isLand, SHORE_FINE), SHORE_FINE.cap), SHORE_FINE.n, SHORE_FINE.n, THREE.RedFormat, THREE.UnsignedByteType);
       fine.magFilter = fine.minFilter = THREE.LinearFilter; fine.needsUpdate = true;
       wU.uShore.value = tex; wU.uShoreF.value = fine; wU.uShoreOn.value = 1;
+      // (and where the nearest land is a beach, for the surf)
+      if (real?.beachAt) {
+        const bm = beachNearest(isLand, real.beachAt);
+        if (bm.some((v) => v > 0)) { const bt = new THREE.DataTexture(bm, SHORE.n, SHORE.n, THREE.RedFormat, THREE.UnsignedByteType); bt.magFilter = bt.minFilter = THREE.LinearFilter; bt.needsUpdate = true; wU.uBeachM.value = bt; wU.uSurfOn.value = 1; }
+      }
     }
   }
 

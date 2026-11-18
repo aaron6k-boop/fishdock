@@ -83,7 +83,7 @@ export const LOCAL = {
   },
   // Cromer Pier (photographs on Wikimedia Commons, 2008 to 2025: the pier from the beach and the cliff, along its deck,
   // its Pavilion Theatre and lifeboat station, and the town from the pier; their authors are listed in
-  // docs/ASSET_LICENCES.md). The pier (1901, Grade II listed) is "a short structure, on iron girders, with a small
+  // docs/REFERENCE-PHOTOS.md). The pier (1901, Grade II listed) is "a short structure, on iron girders, with a small
   // pavilion with shaped roof at the sea end ... a modern lifeboat house immediately behind the pavilion" (its listing,
   // Historic England 1049005); the lifeboat station of 1999 at its end (Wikipedia, Cromer Lifeboat Station)
   "cromer-pier": {
@@ -109,6 +109,21 @@ export const LOCAL = {
     // (estimated: no survey heights)
     hill: cromerHill,
     note: "Cromer Pier's iron legs, its deck, railings and lamps, the Pavilion Theatre, the lifeboat station and its slipway, the Hotel de Paris and the church tower are modelled from photographs and descriptions; their sizes, the deck's height and the cliff's are estimates. The other buildings of the town are drawn in a general style from their outlines on the map.",
+  },
+  // Great Yarmouth's beach north of Britannia Pier (added 18 November 2026; photographs on Wikimedia Commons, 2005 to
+  // 2026, their authors listed in docs/REFERENCE-PHOTOS.md). The pier (1901, about 250 m: Wikipedia) stands open on short
+  // legs over a wide beach, only its far end reaching the sea at high water (the photographs), its outline OSM way
+  // 37588977; the anglers on the sand 150 m north of it, by the water's edge
+  "great-yarmouth-beach": {
+    pier: { open: true, id: 37588977 },
+    // its buildings, each on its own outline: the Britannia Theatre (1958), the amusement sheds along the deck, the
+    // entrance on Marine Parade and the fair's stalls at the end (landmarksYarmouth.js)
+    landmarks: { 175867380: "britanniaTheatre", 175867379: "britanniaShed", 175867381: "britanniaShed", 207940131: "britanniaEntrance", 638488925: "fairStall", 638488926: "fairStall", 638488927: "fairStall", 638488928: "fairStall", 638488932: "fairStall", 638488933: "fairStall", 638488939: "fairStall" },
+    // a wide sandy beach, rising gently from the water to the promenade (realPlace.js beach): its sand a pale gold
+    beach: { slope: 0.03, tint: [0.56, 0.46, 0.31] },
+    // the town behind: Marine Parade's hotels and arcades, most of them painted white or cream (the photographs)
+    town: { render: 0.65 },
+    note: "Britannia Pier, its theatre, sheds and entrance are modelled from photographs and OpenStreetMap's outlines; their sizes and the beach's slope are estimates. The rest of the town is drawn from the map, not modelled building by building.",
   },
 };
 export const localFor = (id) => LOCAL[id] || null;

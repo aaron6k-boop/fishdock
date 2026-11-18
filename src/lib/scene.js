@@ -15,10 +15,13 @@ export const placeKey = (place) => (place?.id && place.id !== "custom" ? place.i
  *  FishDock has one, otherwise from the water kind and the name. */
 export const VENUES = ["beach", "pier", "estuary", "river", "lake"];
 export function venueOf(place) {
-  const t = place?.type || place?.venue;
+  // (a documented mark's own type, its subtype, before its name: "Great Yarmouth beach, by Britannia Pier" is a beach,
+  // and Rossall Point's or Penbryn's beaches were opening as piers for want of the word "beach" in their names)
+  const t = place?.type || place?.venue || place?.subtype;
   if (VENUES.includes(t)) return t;
   if (t === "breakwater" || t === "rocks" || t === "harbour") return "pier";
   if (t === "reservoir" || t === "still" || t === "fishery") return "lake";
+  if (t === "canal") return "river";
   const k = place?.kind, n = String(place?.name || place?.label || "").toLowerCase();
   if (k === "estuary") return "estuary";
   if (k === "river" || k === "canal") return "river";

@@ -57,10 +57,14 @@ function loadGLB(name, quiet = false) {
 // takes its place when it has arrived. (Waiting for it, the loading screen stayed up until it gave up waiting: on Aaron's
 // PC on 18 November the fisherman's detailed file, 8.4 MB, took 21 s to arrive on a first visit, and the place was
 // shown after 34 s, at the loading screen's 25 s limit; everything else was in by 10 s)
+// (and not asked for until the place is shown, holdDetail: asked for once the lighter file was in, the fisherman's 8.4 MB
+// came in alongside the place's last files and slowed them, 20 Mbit/s on the PC)
 export let PEOPLE_HD = false;
 export function setPeopleDetail(on) { PEOPLE_HD = !!on; }
+let hdHold = false, hdWait = [];
+export function holdDetail(hold) { hdHold = !!hold; if (!hdHold) { const w = hdWait; hdWait = []; for (const go of w) go(); } }
 const personGLB = (name) => loadGLB(name);
-const personHD = (name) => (PEOPLE_HD ? loadGLB(name + "_hd", true) : Promise.reject(new Error("not wanted")));
+const personHD = (name) => (PEOPLE_HD ? (hdHold ? new Promise((go) => hdWait.push(go)) : Promise.resolve()).then(() => loadGLB(name + "_hd", true)) : Promise.reject(new Error("not wanted")));
 // the walks' own speeds where a clip carries no travel of its own (measured from the feet), m/s at the model's size
 const LOCO = ["walk_slow", "walk", "walk_fast", "run", "sprint"];
 // (where a walk becomes a run, m/s at the model's size: the brisk walk up to the first, the run from the second; and
@@ -1338,4 +1342,15 @@ function mergeByMaterial(list, gltf) {
 }
 
 /** Load a person's model ahead of time (the picker, a party member who just joined). */
+// ---- the people's files, asked for before the world is built (world.js prefetch) ----
+// (asked for only once the world was built, 6 s into a first visit, they took another 6 to 7 s to arrive and the
+// loading screen waited on them: Aaron's PC, 18 November, Cromer and Gorleston live. Asked for before the world is
+// built, they come in while it is. Asked for any earlier, as the place itself was fetched, they held up the place's
+// data and the code that lays it out, on a slower line (20 Mbit/s), and it came out the same)
+export function prefetchPeople(list) {
+  if (typeof document === "undefined") return;
+  const seen = new Set();
+  for (const a of list || []) { const f = lookFor(a.id, a.look || null).file || "gardener"; if (!seen.has(f)) { seen.add(f); personGLB(f).catch(() => {}); } }
+  clipSet().catch(() => {});
+}
 export function preloadPerson(file) { if (typeof document === "undefined") return Promise.resolve(); return Promise.all([personGLB(file), clipSet()]).catch(() => {}); }

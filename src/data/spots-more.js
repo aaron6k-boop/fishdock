@@ -51,6 +51,67 @@ export const MORE_SPOTS = [
     verification: "partial",
     checked: "2026-10-31"
   },
+  // (added 18 November 2026 for the UK expansion: the beach north of Britannia Pier, its position on OpenStreetMap's
+  // high-water line 150 m north of the pier. The sources found speak of the town's beaches and of Caister's, just to
+  // the north, not of this stretch alone, so each species says so and the record is partial)
+  {
+    id: "great-yarmouth-beach",
+    name: "Great Yarmouth beach, by Britannia Pier",
+    region: "Norfolk (Great Yarmouth), East of England",
+    nation: "England",
+    kind: "sea",
+    subtype: "beach",
+    lat: 52.6097,
+    lon: 1.74,
+    coordsVerified: false,
+    species: [
+      {
+        id: "whiting",
+        name: "Whiting",
+        level: "seasonal",
+        note: "Autumn and winter: the Great Yarmouth Mercury's sea fishing column reports whiting in good numbers around Yarmouth and Lowestoft, and plenty from Hopton, Gorleston and Yarmouth"
+      },
+      {
+        id: "cod",
+        name: "Cod",
+        level: "seasonal",
+        note: "Winter, mostly when the sea is rough (British Sea Fishing, of the beaches at Caister just to the north); the Mercury reports occasional codling from Yarmouth to Lowestoft"
+      },
+      {
+        id: "dab",
+        name: "Dab",
+        level: "seasonal",
+        note: "Winter, with whiting, when the sea is calmer (British Sea Fishing, of Caister's beaches); the Mercury reports a few flatfish from Yarmouth"
+      },
+      {
+        id: "bass",
+        name: "Bass",
+        level: "seasonal",
+        note: "Summer, some big ones (British Sea Fishing, of Caister's beaches)"
+      },
+      {
+        id: "smoothhound",
+        name: "Smoothhound",
+        level: "occasional",
+        note: "Summer, a chance of one (British Sea Fishing, of Caister's beaches)"
+      }
+    ],
+    best: "Cod come mostly when the sea is rough in winter; whiting and dab make up the catch when it's calmer. Sources found give no tide timings for this beach, so check locally.",
+    tidePref: null,
+    baits: [],
+    access: "A sandy beach running north from Britannia Pier along Marine Parade. The council's beaches page gives no rules for fishing; in summer the beaches are busy and the RNLI's lifeguards cover Central beach, so fish well away from swimmers and check locally.",
+    safety: "Keep clear of swimmers and of the pier, and watch your back cast on a busy beach.",
+    sources: [
+      "https://britishseafishing.co.uk/east-of-england/",
+      "https://www.greatyarmouthmercury.co.uk/news/21088306.sea-fishing-whiting-guaranteed-provide-good-sport/",
+      "https://www.greatyarmouthmercury.co.uk/news/21087808.sea-fishing---conditions-give-anglers-boost-beaches/",
+      "https://www.greatyarmouthmercury.co.uk/news/21086242.sea-fishing-sun-sees-anglers-hit-beaches/",
+      "https://www.great-yarmouth.gov.uk/beaches",
+      "https://en.wikipedia.org/wiki/Britannia_Pier"
+    ],
+    verification: "partial",
+    checked: "2026-11-18"
+  },
   {
     id: "roker-pier",
     name: "Roker Pier, Sunderland",
