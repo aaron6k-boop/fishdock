@@ -1157,7 +1157,7 @@ function calibrate(mixer, act, B, clips) {
 function measure(skinned, root, k) {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), v = V();
-  const pts = { head: [], chest: [], waist: [], calfL: [], calfR: [], footL: [], footR: [] };
+  const pts = { head: [], skin: [], hair: [], chest: [], waist: [], calfL: [], calfR: [], footL: [], footR: [] };
   let top = 0;
   const sk = skinned[0]?.skeleton; if (!sk) return null;
   const idx = (n) => sk.bones.findIndex((b) => b.name === "Bip01_" + n);
@@ -1173,7 +1173,7 @@ function measure(skinned, root, k) {
       m.getVertexPosition(i, v); v.applyMatrix4(m.matrixWorld).applyMatrix4(inv).multiplyScalar(k);
       v.x = v.x; // (root has only the scale k; the inner's half turn is already in matrixWorld)
       if (v.y > top) top = v.y;
-      if (best === bi.head || (hair && best === bi.neck)) pts.head.push(v.clone());
+      if (best === bi.head || (hair && best === bi.neck)) { pts.head.push(v.clone()); (hair ? pts.hair : pts.skin).push(v.clone()); }
       else if ((best === bi.sp2 || best === bi.sp1) && !hair) pts.chest.push(v.clone());
       else if (best === bi.sp || best === bi.pel) pts.waist.push(v.clone());
       else if (best === bi.cL) pts.calfL.push(v.clone()); else if (best === bi.cR) pts.calfR.push(v.clone());
@@ -1184,8 +1184,15 @@ function measure(skinned, root, k) {
   // the head: its middle and size above the eyes (hair included)
   const eye = bi.eye >= 0 ? at(bi.eye).y : 0;
   const hb = box(pts.head), eyesY = eye || hb.min.y + (hb.max.y - hb.min.y) * 0.55;
-  const hb2 = box(pts.head.filter((p) => p.y > eyesY));
-  const head = { cx: (hb2.min.x + hb2.max.x) / 2, cz: (hb2.min.z + hb2.max.z) / 2, rx: (hb2.max.x - hb2.min.x) / 2, rz: (hb2.max.z - hb2.min.z) / 2, eye: eyesY, top: hb.max.y };
+  // (the skull's own size, with the hair over it allowed for up to 1.5 cm: a ponytail or a bun reaching back made a
+  // cap or a beanie twice as deep as the head under it)
+  const above = (a) => a.filter((p) => p.y > eyesY), skb = above(pts.skin).length > 20 ? box(above(pts.skin)) : box(above(pts.head)), hr = box(above(pts.head));
+  const ext = (lo, hi, lo2, hi2) => [Math.max(lo2, lo - 0.015), Math.min(hi2, hi + 0.015)];
+  const [x0, x1] = ext(skb.min.x, skb.max.x, hr.min.x, hr.max.x); let [z0, z1] = ext(skb.min.z, skb.max.z, hr.min.z, hr.max.z);
+  // (and no deeper than a head is (front to back about 1.22 times its width), from the face back: hair modelled solid
+  // with the head, a ponytail's tie, reaches further)
+  z1 = Math.min(z1, z0 + (x1 - x0) * 1.22);
+  const head = { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, rx: (x1 - x0) / 2, rz: (z1 - z0) / 2, eye: eyesY, top: hb.max.y };
   // the face at the eyes (for glasses): how far forward it comes there (the brow and the bridge of the nose) and how wide
   // the head is
   { let front = Infinity, side = 0;
