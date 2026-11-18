@@ -123,13 +123,16 @@ export function fitNet(net, scene, kind = "drop") {
 }
 
 // ---- the pier furniture's finishes, aged (pierprops.glb's materials, changed once when it loads) ----
-// The models carry plain colours; on a pier everything has been painted over and weathered. Each finish gets its own
-// wear (textures3d.weather: sampled by position, as the bench and bollard have no uv map): cast iron painted black,
-// chipped to rust at the edges and darker at the foot; timber slats silvered with grain and cracks; the lifebuoy
-// housing's red paint faded and chalky with a little rust; the galvanised post dull and mottled. `wet` (the rain)
-// darkens them and makes them shine.
+// The iron, the galvanised steel and the housing's paint carry plain colours; on a pier everything has been painted
+// over and weathered. Each finish gets its own wear (textures3d.weather: sampled by position, so the paint's chips and
+// rust don't follow the uv map): cast iron painted black, chipped to rust at the edges and darker at the foot; the
+// lifebuoy housing's red paint faded and chalky with a little rust; the galvanised post dull and mottled. The bench's
+// slats are photographed timber (Poly Haven's brown_planks_03 on their own uv map, each slat cut from its own board):
+// only a little mottle on top, and the rain. `wet` (the rain) darkens them all and makes them shine.
+// (bench_wood: the first bench's plain slats, grained here in the shader; kept for a cached copy of that model)
 const PROP_WEAR = {
   cast_iron: { color: [0.05, 0.055, 0.058], roughness: 0.6, metalness: 0.25, o: { scale: 0.25, mottle: 0.45, bump: 0.9, rust: [0.3, 0.14, 0.055, 0.024], grime: [2.2, 2.55, 0.25], rough: [0.8, 1.3] } },
+  bench_slat: { color: [1, 0.97, 0.93], roughness: 1, metalness: 0, o: { scale: 0.6, mottle: 0.14, rough: [0.95, 1.08] } },
   bench_wood: { color: [0.3, 0.26, 0.2], roughness: 0.85, metalness: 0, o: { wood: "x", scale: 1, mottle: 0.2, bump: 0.35, rough: [0.9, 1.1] } },
   housing_red: { color: [0.46, 0.08, 0.06], roughness: 0.6, metalness: 0.05, o: { scale: 0.3, mottle: 0.4, bump: 0.5, rust: [0.18, 0.14, 0.055, 0.024], grime: [2.2, 2.8, 0.2], rough: [0.85, 1.3] } },
   galvanised: { color: [0.5, 0.52, 0.52], roughness: 0.62, metalness: 0.55, o: { scale: 0.5, mottle: 0.35, bump: 0.5, rust: [0.12, 0.16, 0.065, 0.028], grime: [2.2, 2.6, 0.2], rough: [0.8, 1.25] } },

@@ -2277,6 +2277,72 @@
    "use": "the creases in the anglers' jackets and trousers, laid along the arms, body and legs, and where the wellies flex over the ankle (textures.py)",
    "files": [],
    "date": "2026-11-18"
+  },
+  {
+   "id": "polyhaven:brown_planks_03",
+   "name": "Brown Planks 03 (weathered grey-brown boards)",
+   "source": "Poly Haven",
+   "page": "https://polyhaven.com/a/brown_planks_03",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/models/CREDITS.txt)",
+   "type": "PBR texture (1k: colour, normal, AO/roughness/metal)",
+   "resolution": "1024",
+   "use": "the pier benches' slats (public/models/pierprops.glb): four of its boards cut out at 512 x 1024 (the ORM at 256 x 512), each slat mapped along the grain of one board (source-assets/blender/props2/build_pierprops2.py)",
+   "files": [
+    {
+     "file": "downloads/polyhaven/brown_planks_03/textures/brown_planks_03_diff_1k.jpg",
+     "bytes": 570668,
+     "sha256": "8dfae22286fa9bb0ed62ce7326e8bc14c284e567d38fd64b5a453838080ecf19",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_planks_03/brown_planks_03_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/brown_planks_03/textures/brown_planks_03_nor_gl_1k.jpg",
+     "bytes": 516860,
+     "sha256": "868c153165ecaa7dd7259cb58214f06f6f86c80ac71fc92a827dff07708be077",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_planks_03/brown_planks_03_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/brown_planks_03/textures/brown_planks_03_arm_1k.jpg",
+     "bytes": 126038,
+     "sha256": "2be4c94cc58a0f4ea2120a1004aab5ff1baf720809c321f4fa398cdb31fd3756",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_planks_03/brown_planks_03_arm_1k.jpg"
+    },
+    {
+     "file": "textures/props2/bench_slat_diff.jpg",
+     "bytes": 169034,
+     "sha256": "bf500a6461f60de78f1b7d3a4810640c4302389ed4321a0de463698f58865378"
+    },
+    {
+     "file": "textures/props2/bench_slat_nor.jpg",
+     "bytes": 101624,
+     "sha256": "c8604132cb041c2f5f9e7f8e4fd5a2318d9153147cfda099097b2150f3690155"
+    },
+    {
+     "file": "textures/props2/bench_slat_orm.jpg",
+     "bytes": 19517,
+     "sha256": "2e7daad8f85d0be046b9f37eb41f73cafbaedb7832264e7ac7c7dd2b57883530"
+    }
+   ],
+   "date": "2026-11-18"
+  },
+  {
+   "id": "font:inter",
+   "name": "Inter (Bold, SemiBold)",
+   "source": "https://rsms.me/inter/",
+   "author": "Rasmus Andersson",
+   "licence": "SIL Open Font License 1.1",
+   "attribution": "Credited in public/models/CREDITS.txt",
+   "type": "font (letters drawn into a texture, the font itself not shipped)",
+   "use": "the lettering on the pier lifebuoy stations' name board and 999 notice (textures/props2/station_sign.jpg, drawn for FishDock with Pillow; in public/models/pierprops.glb)",
+   "files": [
+    {
+     "file": "textures/props2/station_sign.jpg",
+     "bytes": 102784,
+     "sha256": "84efdea893ec0f3a40fcdac3179153ada4a0c8640190599e3091bd9bd05e1b94"
+    }
+   ],
+   "date": "2026-11-18"
   }
  ]
 }
