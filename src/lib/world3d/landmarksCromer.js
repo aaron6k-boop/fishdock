@@ -12,13 +12,17 @@ function cromerMaterials(base, top) {
   const M = materials(base, top);
   M.white = new THREE.MeshStandardMaterial({ color: 0xf1efe8, roughness: 0.6 });
   weather(M.white, { scale: 0.9, mottle: 0.1, grime: [base, base + 0.8, 0.25], streaks: [top, 2.5, 0.12] });
-  M.timber = new THREE.MeshStandardMaterial({ color: 0xa88b6c, roughness: 0.85, side: THREE.DoubleSide }); // (the lifeboat station's cladding: vertical boards gone brown-grey)
+  M.timber = new THREE.MeshStandardMaterial({ color: 0x9a8a76, roughness: 0.85, side: THREE.DoubleSide }); // (the lifeboat station's cladding: vertical boards gone brown-grey)
   weather(M.timber, { wood: "y", scale: 1, mottle: 0.22, bump: 0.35, rough: [0.85, 1.1] });
   M.zinc = new THREE.MeshStandardMaterial({ color: 0x8e9599, roughness: 0.62, metalness: 0.2, side: THREE.DoubleSide }); // (standing-seam metal roofs, weathered matt)
   weather(M.zinc, { scale: 0.8, mottle: 0.12, streaks: [top + 3, 2, 0.1] });
   M.blue = new THREE.MeshStandardMaterial({ color: 0x1f4f86, roughness: 0.5, metalness: 0.2 }); // (RNLI blue: the station's railings and frames)
   M.buff = new THREE.MeshStandardMaterial({ color: 0xc9b98f, roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide }); // (the gates' ribbed domes, painted stone colour)
   weather(M.buff, { scale: 0.5, mottle: 0.25, streaks: [top + 3, 2, 0.2] });
+  // (clear glazing: the shelters' panes, seen through to the sea and the town)
+  M.pane = new THREE.MeshStandardMaterial({ color: 0xd8e6ea, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.28, depthWrite: false });
+  M.paleRoof = new THREE.MeshStandardMaterial({ color: 0xc9cdcd, roughness: 0.7, metalness: 0.05, side: THREE.DoubleSide }); // (the pavilion's pale sheet roof)
+  weather(M.paleRoof, { scale: 0.8, mottle: 0.15, streaks: [top + 4, 3, 0.12] });
   M.flint = new THREE.MeshStandardMaterial({ color: 0x6f6a62, roughness: 0.82 }); // (knapped flint walls with stone dressings)
   weather(M.flint, { scale: 0.35, mottle: 0.75, bump: 0.6, grime: [base, base + 2, 0.25], streaks: [top, 6, 0.2], rough: [0.75, 1.1] });
   M.dressing = new THREE.MeshStandardMaterial({ color: 0xcfc6b2, roughness: 0.85 });
@@ -48,11 +52,11 @@ function cromerPavilion(group, ring, base) {
   { let A = 0; for (let i = 0; i < pts.length; i++) { const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length]; A += x1 * z2 - x2 * z1; } if (A < 0) pts = pts.reverse(); }
   walls(K, pts, base, y1, { mat: "white", storeys: 1, bay: 2.6, win: [1.1, 1.5], skip: 1.0, trim: "trim" });
   // the roof: low slopes from the eaves to a flat crown, and the clerestory standing in the middle of it
-  mansard(K, pts, y1 + 0.16, 1.7, Math.min(4.5, W * 0.22), { mat: "lead", top: "lead" });
+  mansard(K, pts, y1 + 0.16, 1.7, Math.min(4.5, W * 0.22), { mat: "paleRoof", top: "paleRoof" });
   const cL = L * 0.46, cW = W * 0.36, cy = y1 + 1.86;
   K.box("white", cL, 1.4, cW, bb.c[0], cy + 0.7, bb.c[1], t);
   for (const s of [-1, 1]) { const q = at(0, s * (cW / 2 + 0.03)); K.box("glass", cL - 0.8, 0.75, 0.06, q[0], cy + 0.72, q[1], t); }
-  hipRoof(K, "lead", bb.c, t, cL, cW, cy + 1.4, 1.0, 0.3);
+  hipRoof(K, "paleRoof", bb.c, t, cL, cW, cy + 1.4, 1.0, 0.3);
   // the foyer across its landward end (the end towards the shore, +z), glazed, and the theatre's name over it
   const fW = W * 0.62, fD = 3.2, fy = base + 3.4, fc = at(L / 2 + fD / 2 - 0.2, 0);
   K.box("white", fD, fy - base, fW, fc[0], base + (fy - base) / 2, fc[1], t);
@@ -125,11 +129,13 @@ function pierShelter(group, ring, base) {
     const a = (i / 6) * Math.PI * 2 + Math.PI / 6, x = cx + Math.cos(a) * R, z = cz + Math.sin(a) * R;
     const post = new THREE.BoxGeometry(0.1, H, 0.1); post.translate(x, base + H / 2, z); K.add("white", post);
     const a2 = ((i + 1) / 6) * Math.PI * 2 + Math.PI / 6, x2 = cx + Math.cos(a2) * R, z2 = cz + Math.sin(a2) * R, L = Math.hypot(x2 - x, z2 - z), t = [(x2 - x) / L, (z2 - z) / L];
-    if (i !== 2) K.box("glass", L - 0.1, H - 0.7, 0.04, (x + x2) / 2, base + 0.5 + (H - 0.7) / 2, (z + z2) / 2, t); // (open on the side facing along the pier)
+    if (i !== 2) K.box("pane", L - 0.1, H - 0.7, 0.04, (x + x2) / 2, base + 0.5 + (H - 0.7) / 2, (z + z2) / 2, t); // (open on the side facing along the pier)
     K.box("white", L, 0.18, 0.12, (x + x2) / 2, base + H - 0.09, (z + z2) / 2, t);
   }
   const prof = [[R + 0.3, 0], [R * 0.82, 0.35], [R * 0.5, 0.8], [R * 0.32, 1.15], [R * 0.25, 1.35], [0.1, 1.55], [0, 1.6]].map(([r, y]) => new THREE.Vector2(r, y));
-  const roof = new THREE.LatheGeometry(prof, 6); roof.rotateY(Math.PI / 6); roof.translate(cx, base + H, cz); K.add("lead", roof);
+  const roof = new THREE.LatheGeometry(prof, 6); roof.rotateY(Math.PI / 6); roof.translate(cx, base + H, cz); K.add("paleRoof", roof);
+  // (a bench round the inside)
+  for (let i = 0; i < 6; i++) { if (i === 2) continue; const a = (i / 6) * Math.PI * 2 + Math.PI / 6 + Math.PI / 6, x = cx + Math.cos(a) * R * 0.72, z = cz + Math.sin(a) * R * 0.72; K.box("white", R * 0.95, 0.06, 0.4, x, base + 0.45, z, [-Math.sin(a), Math.cos(a)]); }
   const fin = new THREE.CylinderGeometry(0.02, 0.05, 0.5, 6); fin.translate(cx, base + H + 1.85, cz); K.add("white", fin);
   return finish(group, K, M, { ring: pts, base, top: base + H + 1.6 });
 }
