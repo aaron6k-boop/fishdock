@@ -198,18 +198,28 @@ you at ${d.at ? d.at.join(", ") : "-"} · ${d.phase || "-"}`}</pre> : null}
   );
 }
 
-/** the FPS display: average and 1% low over the last few seconds, frame time, draw calls and the resolution in use */
+/** the FPS display: average and 1% low over the last few seconds, frame time, draw calls and the resolution in use.
+ *  Tap or click it to fold it down to the frame rate alone, and again to open it (remembered on this device) */
+const FPS_SMALL = "fishdock.fpsSmall";
 export function FpsMeter({ world }) {
   const [p, setP] = useState(null);
+  const [small, setSmall] = useState(() => { try { return localStorage.getItem(FPS_SMALL) === "1"; } catch { return false; } });
   useEffect(() => { const t = setInterval(() => setP(world?.perf?.() || null), 500); return () => clearInterval(t); }, [world]);
   if (!p) return null;
+  // (focus let go after a click: Space casts, and on a focused button it would only fold this again)
+  const toggle = (e) => { if (e.detail > 0) e.currentTarget.blur(); setSmall((v) => { try { localStorage.setItem(FPS_SMALL, v ? "0" : "1"); } catch { /* (private window: just for now) */ } return !v; }); };
+  // (its own button, so a tap on it neither casts nor turns the view)
+  const stop = (e) => e.stopPropagation();
   return (
-    <div className="fps-meter" aria-live="off">
-      {p.fps} fps · 1% low {p.low}<br />{p.ms} ms · {p.calls} draws · {Math.round(p.tris / 1000)}k tris · {p.dpr.toFixed(2)}x
-      {/* (the slowest frame of the last few seconds, when it was a stutter, and what the frame before it did: shaders
-          built, textures sent to the card, its own JavaScript; with none of those, the browser's or the GPU's) */}
-      {p.spike && p.spike.ms >= 50 ? <><br />worst {p.spike.ms} ms{p.spike.what ? ` (${p.spike.what})` : ""}: {spikeParts(p.spike).join(", ")}</> : null}
-      <br /><span className="fps-id">{NAME[p.preset] || p.preset}{p.build ? ` · ${p.build}` : ""}</span>
-    </div>
+    <button type="button" className={`fps-meter${small ? " small" : ""}`} aria-live="off" aria-expanded={!small}
+      title={small ? "Show the frame details" : "Show the frame rate only"} onClick={toggle} onPointerDown={stop} onMouseDown={stop} onTouchStart={stop}>
+      {small ? <>{p.fps} fps</> : <>
+        {p.fps} fps · 1% low {p.low}<br />{p.ms} ms · {p.calls} draws · {Math.round(p.tris / 1000)}k tris · {p.dpr.toFixed(2)}x
+        {/* (the slowest frame of the last few seconds, when it was a stutter, and what the frame before it did: shaders
+            built, textures sent to the card, its own JavaScript; with none of those, the browser's or the GPU's) */}
+        {p.spike && p.spike.ms >= 50 ? <><br />worst {p.spike.ms} ms{p.spike.what ? ` (${p.spike.what})` : ""}: {spikeParts(p.spike).join(", ")}</> : null}
+        <br /><span className="fps-id">{NAME[p.preset] || p.preset}{p.build ? ` · ${p.build}` : ""}</span>
+      </>}
+    </button>
   );
 }
