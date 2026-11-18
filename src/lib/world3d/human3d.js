@@ -342,6 +342,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const inner = new THREE.Group(); inner.rotation.y = Math.PI; inner.add(model); // the models face +z; the figure faces -z
   const root = new THREE.Group(); root.name = "human"; root.add(inner);
   const k = 0.97 + ((L.seed >>> 4) & 255) / 255 * 0.06; root.scale.setScalar(k); // a little taller or shorter, per person
+  const swayPh = (((L.seed || 7) >>> 9) & 1023) / 1023 * Math.PI * 2; // (when in its slow waves this person's weight shifts)
   const bone = {}; let skinned = [];
   model.traverse((o) => { if (o.isBone || o.name?.startsWith("Bip01")) bone[o.name] = o; if (o.isSkinnedMesh) skinned.push(o); });
   // fewer draw calls: the model comes as several pieces sharing one set of vertices; joined into one mesh per material
@@ -632,6 +633,34 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   const FINGERS = { L: [], R: [] };
   for (const s of ["L", "R"]) for (const f of [1, 2, 3, 4]) for (const j of ["", "1", "2"]) { const b = B(`${s}_Finger${f}${j}`); if (b) FINGERS[s].push([b, j === "" ? 0.75 : j === "1" ? 1.15 : 0.8]); }
   const THUMB = { L: [B("L_Finger0"), B("L_Finger01"), B("L_Finger02")].filter(Boolean), R: [B("R_Finger0"), B("R_Finger01"), B("R_Finger02")].filter(Boolean) };
+  // ---- fingers wrapped round a handle (a cylinder: a point on its line, its direction, its radius; world space) ----
+  // Each finger's three joints in turn, from the knuckle: the joint bends (about its own z, the way the set curl bends
+  // it) through up to its limit in small steps until the end of its bone comes to the handle's surface, a finger's
+  // half thickness out; a bone that never reaches it takes the bend that brings it nearest. ew eases it on and off.
+  const CHAINS = { L: [1, 2, 3, 4].map((f) => ["", "1", "2"].map((j) => B(`L_Finger${f}${j}`))).filter((c) => c.every(Boolean)), R: [1, 2, 3, 4].map((f) => ["", "1", "2"].map((j) => B(`R_Finger${f}${j}`))).filter((c) => c.every(Boolean)) };
+  const LIMIT = [1.45, 1.75, 1.3], HALF = 0.0085 * k;
+  const wrapV = { j: V(), e: V(), z: V(), x: V(), d: V(), q: new THREE.Quaternion(), wq: new THREE.Quaternion() };
+  const distToLine = (p, o, dir) => { wrapV.d.copy(p).sub(o); const t = wrapV.d.dot(dir); return Math.sqrt(Math.max(0, wrapV.d.lengthSq() - t * t)); };
+  function wrapFingers(s, o, dir, r, ew) {
+    const R = r + HALF;   // (the rod is not scaled with the person; their fingers are)
+    for (const chain of CHAINS[s]) {
+      for (let j = 0; j < 3; j++) {
+        const b = chain[j]; b.updateMatrixWorld(true);
+        b.getWorldPosition(wrapV.j); b.getWorldQuaternion(wrapV.wq);
+        if (j < 2) chain[j + 1].getWorldPosition(wrapV.e);
+        else { const L1 = chain[2].position.length() * b.getWorldScale(wrapV.x).x * 0.85; wrapV.e.copy(wrapV.j).addScaledVector(wrapV.x.set(1, 0, 0).applyQuaternion(wrapV.wq), L1); }
+        wrapV.z.set(0, 0, 1).applyQuaternion(wrapV.wq);
+        const arm = wrapV.e.clone().sub(wrapV.j);
+        let best = 0, bestD = Infinity; const N = 18;
+        for (let n = 0; n <= N; n++) {
+          const th = LIMIT[j] * n / N; const e2 = arm.clone().applyAxisAngle(wrapV.z, th).add(wrapV.j); const d = distToLine(e2, o, dir);
+          if (d <= R) { best = th; bestD = 0; break; }
+          if (d < bestD) { bestD = d; best = th; }
+        }
+        b.quaternion.multiply(wrapV.q.setFromAxisAngle(V(0, 0, 1), best * ew)); b.updateMatrixWorld(true);
+      }
+    }
+  }
   const wq = (b, out = new THREE.Quaternion()) => b.getWorldQuaternion(out);
   const wp = (b, out = V()) => b.getWorldPosition(out);
   const setWQ = (b, q) => { b.parent.getWorldQuaternion(tmp.q2); b.quaternion.copy(tmp.q2.invert().multiply(q)); b.updateMatrixWorld(true); };
@@ -755,6 +784,13 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     const feet = {};
     if (standing) for (const s of ["L", "R"]) feet[s] = { p: wp(B(s + "_Foot")), q: wq(B(s + "_Foot")) };
     if (st.drop > 0.002 || st.brace > 0.01 || st.dip > 0.0005) { inner.position.y = -(st.drop + st.dip) / k; root.updateMatrixWorld(true); }
+    // standing still, the weight shifts from foot to foot: the hips drift a centimetre or so to one side and back over
+    // several seconds (two slow waves, each person's own), the planted feet taking it up in the legs below, the chest
+    // leaning back over them; eased in as they stop walking, out as they kneel, sit or walk
+    const swayOn = standing && !o.walk && (o.kneel || 0) < 0.1 && !o.sit ? 1 : 0;
+    st.swayW = (st.swayW || 0) + (swayOn - (st.swayW || 0)) * (1 - Math.exp(-dt * 1.2));
+    const sway = (Math.sin(t * Math.PI * 2 / 7.7 + swayPh) * 0.011 + Math.sin(t * Math.PI * 2 / 19.3 + swayPh * 2.3) * 0.006) * st.swayW;
+    if (Math.abs(sway) > 1e-4) { inner.position.x += sway / k; root.updateMatrixWorld(true); }
     const right = figDirW(V(1, 0, 0)), up = figDirW(V(0, 1, 0));
     turnW(B("Spine1"), right, -st.lean * 0.45); turnW(B("Spine2"), right, -st.lean * 0.4); turnW(B("Neck"), right, -st.lean * 0.15);
     turnW(B("Spine1"), up, -st.twist * 0.45); turnW(B("Spine2"), up, -st.twist * 0.35);
@@ -764,7 +800,8 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     if (Math.abs(st.lead) > 1e-3) { turnW(B("Spine1"), up, st.lead * 0.35); turnW(B("Spine2"), up, st.lead * 0.25); if (!o.look) turnW(B("Head"), up, st.lead * 0.5); }
     const br = Math.sin((t * Math.PI * 2) / 4.3) * 0.011 * w.idle * (1 - (st.kn || 0));
     if (Math.abs(br) > 1e-4) { turnW(B("Spine1"), right, br * 0.5); turnW(B("Spine2"), right, br * 0.6); turnW(B("Neck"), right, -br * 0.9); }
-    if (standing && (st.drop > 0.002 || st.brace > 0.01)) {
+    if (Math.abs(sway) > 1e-4) { const fw = figDirW(V(0, 0, -1)); turnW(B("Pelvis"), fw, sway * 2.2); turnW(B("Spine1"), fw, -sway * 3.2); turnW(B("Neck"), fw, -sway * 1.2); }
+    if (standing && (st.drop > 0.002 || st.brace > 0.01 || Math.abs(sway) > 2e-4)) {
       for (const [s, sx, fz] of [["L", -1, -0.13], ["R", 1, 0.07]]) {
         const target = feet[s].p.clone().add(figVecW(V(sx * 0.05 * st.brace, 0, fz * st.brace)));
         const hip = wp(B(s + "_Thigh")), knee0 = wp(B(s + "_Calf")), L1 = hip.distanceTo(knee0), L2 = knee0.distanceTo(wp(B(s + "_Foot")));
@@ -981,6 +1018,18 @@ function makeHuman(L, gltf, clips, outfit, venue) {
         if (hs.flip) { X.negate(); Yh.negate(); }
         wrist = at.clone().addScaledVector(Yh, -GRIP.y).addScaledVector(Zh, -GRIP.z);
       }
+      // the shoulder goes with the arm: reaching up (the rod back over the shoulder in a cast, lifting into a fish)
+      // the collarbone lifts; reaching out (the rod held well forward, the net's pole) it comes forward, as a real
+      // shoulder does, instead of the arm swinging from a shoulder fixed in place
+      const clav = B(s + "_Clavicle");
+      if (clav) {
+        const C0 = wp(clav), Sh = wp(B(s + "_UpperArm")), Wt = figW(wrist), armL = Sh.distanceTo(wp(B(s + "_Forearm"))) + wp(B(s + "_Forearm")).distanceTo(wp(B(s + "_Hand")));
+        const to = Wt.clone().sub(Sh), dist = to.length(), upF = figDirW(V(0, 1, 0)), fwdF = figDirW(V(0, 0, -1));
+        const lift = clamp((to.dot(upF) + 0.05) / (armL * 0.9), 0, 1), reachF = clamp((dist - armL * 0.7) / (armL * 0.3), 0, 1);
+        const off = upF.clone().multiplyScalar(0.03 * lift).addScaledVector(fwdF, 0.025 * reachF).addScaledVector(to.normalize(), 0.012 * reachF);
+        const a0 = Sh.clone().sub(C0), a1 = a0.clone().add(off.multiplyScalar(k * ew));
+        if (a0.lengthSq() > 1e-8) { setWQ(clav, new THREE.Quaternion().setFromUnitVectors(a0.normalize(), a1.normalize()).multiply(wq(clav))); }
+      }
       const S0 = wp(B(s + "_UpperArm")), E0 = wp(B(s + "_Forearm")), W0 = wp(B(s + "_Hand"));
       const r = twoBone(S0, figW(wrist), S0.distanceTo(E0), E0.distanceTo(W0), figDirW(use.pole ? use.pole : V(sg * 0.55, -0.45, 0.55)));
       aim(B(s + "_UpperArm"), B(s + "_Forearm"), r.B); aim(B(s + "_Forearm"), B(s + "_Hand"), r.C);
@@ -995,7 +1044,11 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       // fingers resting on it, curving over a little: it was a fist round a handle, the fish hanging off the knuckles)
       const fishHold = use.kind === "fish", cradle = fishHold && use.palm && use.palm.y > 0.5;
       const grip = fishHold ? (cradle ? 0.42 : 0.22) : use.kind === "open" ? 0.12 : use.axis ? (use.kind === "crank" ? 0.75 : 1) : use.kind === "wave" || use.kind === "cheer" || use.kind === "clap" ? -0.1 : 0.15;
-      for (const [b, f] of FINGERS[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), grip * f * ew));
+      // (round a handle each finger wraps it: every joint, from the knuckle out, bends until the end of its bone meets
+      // the handle's surface (a finger's half thickness out from it), so the rod or the reel's knob is held in the
+      // fingers, not beside a fist; elsewhere the fingers take their set curl)
+      if (use.axis && hs.w > 0.05 && lodNow <= 0) wrapFingers(s, figW(at), figDirW(use.axis), (use.r || (use.kind === "crank" ? 0.008 : 0.0135)), ew);
+      else for (const [b, f] of FINGERS[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), grip * f * ew));
       for (const b of THUMB[s]) b.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), (fishHold ? 0.12 : use.axis ? 0.35 : 0) * ew));
       B(s + "_UpperArm").updateMatrixWorld(true);
     }

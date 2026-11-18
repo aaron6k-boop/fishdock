@@ -45,14 +45,25 @@ def shot(ws, label, scale=1.0):
   d = ws.call("Page.captureScreenshot", {"format": "jpeg", "quality": 88, "clip": {"x": 0, "y": 0, "width": 1920, "height": 1080, "scale": scale}}).get("result", {}).get("data")
   if d: frames.append((f"{len(frames):05d}_{label}.jpg", base64.b64decode(d)))
 # the camera from the angler: (yaw from the way he faces, degrees; height above his eyes; distance; aim height
-# relative to his eyes), or at his hands (dist, side)
-CAM = """((yawDeg, dy, dist, ly) => { const W = window.__fdWorld, p = window.__fdProbe; const [ex, ey, ez] = p.head, [fx, , fz] = p.feet, t = p.tip || p.seat;
-  let ax = t[0] - fx, az = t[2] - fz; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l; const a = yawDeg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
-  const bx = ax * c - az * s, bz = ax * s + az * c; W.at(ex + bx * dist, ey + dy, ez + bz * dist, [ex, ey + ly, ez]); W.step(60); return 1; })(%s)"""
-HANDS = """((dist, side) => { const W = window.__fdWorld, p = window.__fdProbe; const hs = (p.hands || []).filter(Boolean); if (!hs.length) return 0;
+# relative to his eyes), or at his hands (dist, side). Either way the camera is first checked for a clear view: a ray
+# from what it looks at to where it would stand must not pass through anything (the rod rest's legs, the chair, the
+# angler's own body: on 18 November the hands' camera stood behind the tripod and once inside the jacket), so it is
+# swung round in steps either way until it has one
+CLEAR = """window.__fdClear = window.__fdClear || ((W, look, cands, skipNear) => { const T = W.THREE, rc = new W.Raycaster(); const meshes = [];
+  W.scene.traverse((o) => { if (!o.isMesh || !o.visible || o.isSkinnedMesh && !o.parent) return; if (o.material && (o.material.transparent && o.material.opacity < 0.5)) return; if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    const c = o.geometry.boundingSphere.center.clone().applyMatrix4(o.matrixWorld), r = o.geometry.boundingSphere.radius * o.getWorldScale(new T.Vector3()).x; if (c.distanceTo(look) - r < 4 && r < 40) meshes.push(o); });
+  for (const c of cands) { const d = c.clone().sub(look), L = d.length(); d.normalize(); rc.set(look.clone().addScaledVector(d, skipNear), d); rc.far = L - skipNear; const hit = rc.intersectObjects(meshes, false).find((h) => !/line|Line|fdLine|water|sea/i.test(h.object.name || '') && h.object.type !== 'Line' && h.object.type !== 'LineSegments'); if (!hit) return c; }
+  return null; });"""
+CAM = CLEAR + """((yawDeg, dy, dist, ly) => { const W = window.__fdWorld, p = window.__fdProbe, T = W.THREE; const [ex, ey, ez] = p.head, [fx, , fz] = p.feet, t = p.tip || p.seat;
+  let ax = t[0] - fx, az = t[2] - fz; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l; const look = new T.Vector3(ex, ey + ly, ez), cands = [];
+  for (const dd of [0, 12, -12, 25, -25, 40, -40, 60, -60]) { const a = (yawDeg + dd) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); cands.push(new T.Vector3(ex + (ax * c - az * s) * dist, ey + dy, ez + (ax * s + az * c) * dist)); }
+  const pick = window.__fdClear(W, look, cands, 0.25) || cands[0]; W.at(pick.x, pick.y, pick.z, [look.x, look.y, look.z]); W.step(60); return pick === cands[0] ? 0 : 1; })(%s)"""
+HANDS = CLEAR + """((dist, side) => { const W = window.__fdWorld, p = window.__fdProbe, T = W.THREE; const hs = (p.hands || []).filter(Boolean); if (!hs.length) return -1;
   const m = hs.reduce((a, h) => [a[0] + h[0] / hs.length, a[1] + h[1] / hs.length, a[2] + h[2] / hs.length], [0, 0, 0]); const [fx, , fz] = p.feet;
-  let ax = m[0] - fx, az = m[2] - fz; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l; const rx = -az, rz = ax;
-  W.at(m[0] + ax * dist * 0.6 + rx * side, m[1] + 0.12, m[2] + az * dist * 0.6 + rz * side, m); W.step(60); return 1; })(%s)"""
+  let ax = m[0] - fx, az = m[2] - fz; const l = Math.hypot(ax, az) || 1; ax /= l; az /= l; const look = new T.Vector3(m[0], m[1], m[2]), cands = [];
+  for (const yd of [0, 30, -30, 60, -60, 90, -90, 120, -120]) { const a = Math.atan2(side, dist * 0.6) + yd * Math.PI / 180, r = Math.hypot(side, dist * 0.6), c = Math.cos(a), s = Math.sin(a);
+    const ox = ax * c - az * s, oz = ax * s + az * c; for (const up of [0.12, 0.3]) cands.push(new T.Vector3(m[0] + ox * r, m[1] + up, m[2] + oz * r)); }
+  const pick = window.__fdClear(W, look, cands, 0.09); if (!pick) return -2; W.at(pick.x, pick.y, pick.z, m); W.step(60); return 1; })(%s)"""
 SEQ = "W.play([['cast', -0.05], ['hooked', 6], ['catch', 24, { species: 'bass', lengthCm: 58 }]], { species: 'bass', lengthCm: 58 })"
 def env(ws):
   ws.ev("(() => { const W = window.__fdWorld; W.env({ sunAlt: 30, sunAz: 205 }, { cloudPct: 35, windKph: 14, precipMm: 0, waveM: 0.7 }); return 1; })()"); time.sleep(2)
@@ -68,11 +79,13 @@ for name, look in LOOKS.items():
       # the catch, stepped and stopped: the cast's wind-up and release, playing the fish, the net, holding it up
       ws.ev("(() => { const W = window.__fdWorld; %s; return 1; })()" % SEQ)
       t = 0.0
-      for label, at in (("cast_windup", 0.35), ("cast_release", 0.9), ("reel", 3.5), ("fight", 8.5), ("fight2", 11.0), ("net", 17.0), ("hold", 26.0), ("hold2", 29.0)):
+      for label, at in (("cast_windup", 0.35), ("cast_release", 0.9), ("reel", 3.5), ("strike", 6.2), ("fight", 8.5), ("fight2", 11.0), ("net", 17.0), ("pick", 21.0), ("hold", 26.0), ("hold2", 29.0)):
         n = int((at - t) * 60); t = at
         ws.ev("(() => { const W = window.__fdWorld; for (let i = 0; i < %d; i++) W.step(1000 / 60, true); return 1; })()" % n)
         ws.ev(CAM % "60, -0.3, 3.0, -0.6"); time.sleep(0.8); shot(ws, f"{name}_{label}_body", 0.75)
-        if ws.ev(HANDS % "0.9, 0.25"): time.sleep(0.8); shot(ws, f"{name}_{label}_hands", 0.75)
+        hv = ws.ev(HANDS % "0.75, 0.25")
+        if hv == 1: time.sleep(0.8); shot(ws, f"{name}_{label}_hands", 0.75)
+        else: print(label, "hands: no clear view" if hv == -2 else "hands: none", flush=True)
         print(label, "stage", ws.ev("window.__fdProbe && window.__fdProbe.stage"), flush=True)
   except Exception:
     import traceback; print(name, "stopped:", traceback.format_exc()[-800:], flush=True)
@@ -98,17 +111,27 @@ for lname in (globals().get("LIVE") or [next(iter(LOOKS), None)]):
     import traceback; print("live stopped:", traceback.format_exc()[-800:], flush=True)
   finally:
     close(proc, ws)
-# first person
-proc, ws = page(first, cam="first")
-try:
-  env(ws); ws.ev("(() => { const W = window.__fdWorld; W.freeze(); %s; return 1; })()" % SEQ); t = 0.0
-  for label, at in (("cast", 0.4), ("cast2", 0.9), ("reel", 3.5), ("fight", 9.0), ("net", 17.0), ("hold", 26.0)):
-    n = int((at - t) * 60); t = at
-    ws.ev("(() => { const W = window.__fdWorld; for (let i = 0; i < %d; i++) W.step(1000 / 60, true); return 1; })()" % n); time.sleep(0.8); shot(ws, f"fp_{label}", 0.75)
-except Exception:
-  import traceback; print("first person stopped:", traceback.format_exc()[-800:], flush=True)
-finally:
-  close(proc, ws)
+# first person (for each look named in FP, or the first): walking about, then the catch stepped and stopped
+for lname in (globals().get("FP") or [next(iter(LOOKS), None)]):
+  proc, ws = page(LOOKS.get(lname, first), cam="first")
+  try:
+    env(ws)
+    ok = ws.ev("(() => { const b = [...document.querySelectorAll('button')].find((x) => /Walk about/.test(x.getAttribute('aria-label') || x.textContent || '')); if (!b) return 'no walk button'; b.click(); return 'walking'; })()")
+    print("first person walk:", ok, flush=True); time.sleep(1.5); t3 = time.time()
+    while time.time() - t3 < 6: ws.ev("(window.__fdWorld.walkInput(0, 1), 1)"); shot(ws, f"fp_{lname}_walk", 0.5); time.sleep(0.25)
+    ws.ev("(window.__fdWorld.walkInput(0, 0), 1)"); time.sleep(1)
+    for typ in ("keyDown", "keyUp"): ws.call("Input.dispatchKeyEvent", {"type": typ, "key": "e", "code": "KeyE", "windowsVirtualKeyCode": 69, "text": "e" if typ == "keyDown" else ""})
+    time.sleep(3)
+    ws.ev("(() => { const W = window.__fdWorld; W.freeze(); %s; return 1; })()" % SEQ); t = 0.0
+    for label, at in (("cast", 0.4), ("cast2", 0.9), ("reel", 3.5), ("strike", 6.2), ("fight", 9.0), ("fight2", 12.0), ("net", 17.0), ("pick", 21.0), ("hold", 26.0), ("hold2", 29.0)):
+      if at < t: continue
+      n = int((at - t) * 60); t = at
+      ws.ev("(() => { const W = window.__fdWorld; for (let i = 0; i < %d; i++) W.step(1000 / 60, true); return 1; })()" % n); time.sleep(0.8); shot(ws, f"fp_{lname}_{label}", 0.75)
+      print("first person", label, "stage", ws.ev("window.__fdProbe && window.__fdProbe.stage"), flush=True)
+  except Exception:
+    import traceback; print("first person stopped:", traceback.format_exc()[-800:], flush=True)
+  finally:
+    close(proc, ws)
 zp = f"{A}/renders/footage_{LABEL}.zip"
 with zipfile.ZipFile(zp, "w", zipfile.ZIP_STORED) as z:
   for n, d in frames: z.writestr(n, d)

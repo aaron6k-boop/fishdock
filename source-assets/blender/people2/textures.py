@@ -383,6 +383,9 @@ def boots(size=1024):
   tread = np.where(ff > 0.095, chev, np.where(ff < 0.005, bars, 0.0))
   Hh[underside] += tread[underside] * 0.0018
   ml = groove(z - (zmin + 0.026), 0.0012); Hh += ml * 0.0008
+  # the top band: the last 4 cm of the shaft a moulded band standing a little proud, a crisp step at its lower edge
+  ztop = float(Z["P"][:, 2].max()); bandm = np.clip((z - (ztop - 0.04)) / 0.0015, 0, 1) * (z < ztop - 0.002)
+  Hh += bandm * 0.0011 + groove(z - (ztop - 0.0405), 0.001) * 0.0005
   # moulding lines up the sides of the shaft, and a band of texture round the ankle
   # (the mould's parting line: a fine raised ridge up each side of the shaft, the rubber dipping a little either side)
   pl = rel @ fwd

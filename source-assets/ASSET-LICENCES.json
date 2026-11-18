@@ -2263,6 +2263,20 @@
     "public/people/angler3.webp"
    ],
    "date": "2026-11-18"
+  },
+  {
+   "id": "polyhaven:fabric_leather_02",
+   "name": "Fabric Leather 02 (creased faux leather)",
+   "source": "Poly Haven",
+   "page": "https://polyhaven.com/a/fabric_leather_02",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/people/CREDITS.txt)",
+   "type": "PBR texture (2k; its height map used)",
+   "resolution": "2048",
+   "use": "the creases in the anglers' jackets and trousers, laid along the arms, body and legs, and where the wellies flex over the ankle (textures.py)",
+   "files": [],
+   "date": "2026-11-18"
   }
  ]
 }

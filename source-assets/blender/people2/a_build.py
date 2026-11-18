@@ -650,14 +650,22 @@ try:
     ic = int(np.argmax(R.mean(1)[: max(1, nz - 2)]))
     for iz in range(ic + 1, nz): R[iz] = np.maximum(R[iz], R[iz - 1] * 0.995)
     R += 0.002
-    for v, pw, th3, iz0 in pol:
+    def set_out(v, R=R, nz=nz, z0=z0, centre=centre):
+      pw = world(v); c = centre(pw[2]); q = pw[:2] - c; r = math.hypot(*q)
+      if r < 1e-6: return
+      th3 = math.atan2(q[1], q[0])
       fz = (pw[2] - z0) / DZ - 0.5; i0 = int(min(nz - 1, max(0, math.floor(fz)))); i1 = min(nz - 1, i0 + 1); tz = min(1.0, max(0.0, fz - i0))
       fa = (th3 + math.pi) / (2 * math.pi) * NA - 0.5; j0 = int(math.floor(fa)) % NA; j1 = (j0 + 1) % NA; ta = fa - math.floor(fa)
       Rt = (R[i0, j0] * (1 - ta) + R[i0, j1] * ta) * (1 - tz) + (R[i1, j0] * (1 - ta) + R[i1, j1] * ta) * tz
-      c = centre(pw[2]); q = pw[:2] - c; r = math.hypot(*q)
-      if r < 1e-6: continue
       e = min(1.0, max(0.0, (pw[2] - z0) / 0.06)); e = e * e * (3 - 2 * e)
       r2 = r + (Rt - r) * e; pw2 = pw.copy(); pw2[:2] = c + q / r * r2; v.co = mwi @ Vector(pw2)
+    for v, pw, th3, iz0 in pol: set_out(v)
+    # (then relaxed over its surface and set out again, a few times: points that lay close together round the calf
+    # could come out of order once all set to one surface, folding small triangles over each other in a ragged ring)
+    sv = [v for v, pw, th3, iz0 in pol if not v.is_boundary and pw[2] > z0 + 0.03]
+    for _ in range(6):
+      bmesh.ops.smooth_vert(bm, verts=sv, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+      for v in sv: set_out(v)
     L("boot", S2, "shaft moulded:", len(pol), "points; widest", round(float(R.max()), 3), "m from the leg's line")
   bm.normal_update()
   # the sole: everything near the ground pushed down to a flat, slightly wider sole 2 cm thick
@@ -683,7 +691,9 @@ try:
   bm.to_mesh(bt.data); bm.free(); made["boots"] = bt
   # the top band, raised 2 mm, 4 cm deep
   topZ = zmin + BOOT * H
-  parts["band"] = cut_part(bt, "fd2_boots_band", slab(UP, topZ - 0.04, topZ - 0.004), lambda c, n: abs(n[2]) < 0.6, 0.002, 0.002)
+  # (no raised band at the top: cut from the shaft and turned under, its edge threw a row of small spikes round the
+  # rim; the band is drawn in the textures instead)
+  parts["band"] = None
   # the rand: the sole's moulded edge, a band of rubber 2.8 cm high round the foot standing 3 mm proud of the upper
   parts["sole"] = cut_part(bt, "fd2_boots_sole", slab(UP, -0.02, 0.028, np.array([cx, cy, zmin])), lambda c, n: n[2] > -0.45, 0.003, 0.003)
   # a buckle on each boot's outer side under the band

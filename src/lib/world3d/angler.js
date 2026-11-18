@@ -1635,6 +1635,9 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           hands[0] = { at: net0.clone().addScaledVector(sideL, -rr * 0.8).add(V3(0, 0.03, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
           hands[1] = { at: net0.clone().addScaledVector(sideL, rr * 0.8).add(V3(0, 0.03, 0)), axis: V3(0, 0, 1), palm: V3(0, -1, 0), kind: "hoop" };
           crouch = clamp(0.9 - net0.y * 0.7, 0, 0.75); lean = 0.25 * crouch; brace = 0;
+          // (watching the net in your hands as you pick it up, not the fish still in the water: in first person the
+          // hands on the hoop were out of the picture below it, 18 November film)
+          lookAtW = netAt ? netAt.clone() : lookAtW;
         } else if (landStage === "lower" || landStage === "lead" || landStage === "haul") {
           // both hands on the rope just behind the top rail, leaning over a little to watch the net. Letting it down,
           // the rope runs through loose hands; hauling, one hand pulls down and back while the other reaches up for the
