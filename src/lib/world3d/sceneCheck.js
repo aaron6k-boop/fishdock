@@ -68,7 +68,9 @@ export function checkScene(place, targets) {
     if (hit(eye, new THREE.Vector3(0, 1, 0), SCENE_CHECK.above)) why.push(`${sp.name}: something overhead`);
     let blocked = 0, n = 0; const by = new Set();
     // across a river: past the bank (from a 2.2 m bank the water right below it is out of sight), short of the far bank
-    const dists = place.venue === "river" ? [8, 11, 14] : place.venue === "lake" ? [8, 14, 20] : SCENE_CHECK.view;
+    // (and over a solid parapet, as at Lowestoft, the water close under the wall is out of sight from behind it, as it
+    // is in the photographs: looked at from 14 m out)
+    const dists = place.venue === "river" ? [8, 11, 14] : place.venue === "lake" ? [8, 14, 20] : place.parapet ? [14, 20, 26, 32] : SCENE_CHECK.view;
     for (const m of dists) for (const s of SCENE_CHECK.spread) {
       const dir = f.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), s), target = new THREE.Vector3(x + dir.x * m, 0.05, z + dir.z * m), v = target.clone().sub(eye), L = v.length();
       n++; const h = hit(eye, v.normalize(), L - 0.4); if (h) { blocked++; by.add(h.object.userData.kind || "something"); }

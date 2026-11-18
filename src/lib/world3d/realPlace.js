@@ -458,6 +458,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
   };
   if (BP) for (const sp of spots) sp.at[1] = Math.round(hGrid(sp.at[0], sp.at[2]) * 100) / 100;
+  // (behind a solid parapet, localDetail.js concrete: the anglers stand its thickness further back, so their tripods and
+  // chairs stand clear of it, and the edge in front of them is that much further)
+  if (local?.concrete) place.parapet = true;
+  if (local?.concrete) for (const sp of spots) { const c = local.concrete(sp.at[0], sp.at[2]); if (!c) continue; const th = c.t ?? 0.45; sp.at[0] = Math.round((sp.at[0] - Math.sin(sp.face) * th) * 10) / 10; sp.at[2] = Math.round((sp.at[2] + Math.cos(sp.face) * th) * 10) / 10; sp.edge = Math.round(((sp.edge ?? 1) + th) * 10) / 10; }
   // a dune (localDetail.js): a beach the photographs show grown over with marram grass rises gently from the water
   const dune = new Float32Array(n * n), duneH = new Float32Array(n * n);
   if (local?.dunes) {
@@ -581,6 +585,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   g.addGroup(0, idxDeck.length, 0); g.addGroup(idxDeck.length, idxSoft.length, 1);
   g.computeVertexNormals();
   const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
+  let concSide = null; // (a mark's concrete pier sides and parapets: localDetail.js concrete)
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
   // the pier's own direction (its longest run of wall near the fishing spots), for the deck's slab joints: square across
   // it, not across the map's north and south
@@ -839,17 +844,21 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // face the water: (b - a) turned left is the face's normal; swap the ends if that points at the land
     if ((-(z2 - z1)) * nx + (x2 - x1) * nz < 0) { [x1, z1, x2, z2] = [x2, z2, x1, z1]; }
     const o = wp.length / 3, u0 = run / 2.4, u1 = (run + len) / 2.4; run += len;
-    // (behind the rock armour the sea wall is pale concrete, not steel piling: the white wall in the pier-head photograph)
-    if (local?.rocks && local.rocks((x1 + x2) / 2, (z1 + z2) / 2)) {
+    // (behind the rock armour the sea wall is pale concrete, not steel piling: the white wall in the pier-head photograph;
+    // and wherever a mark's photographs show concrete walls, localDetail.js concrete: Lowestoft's South Pier)
+    const conc = local?.concrete?.((x1 + x2) / 2, (z1 + z2) / 2) || null;
+    if ((local?.rocks && local.rocks((x1 + x2) / 2, (z1 + z2) / 2)) || conc) {
       const c0 = cp.length / 3, T = 2.4, U0 = run / T - len / T, U1 = run / T, vb = (LAND - WALL_BOTTOM) / T;
       cp.push(x1, WALL_BOTTOM, z1, x2, WALL_BOTTOM, z2, x2, LAND + 0.03, z2, x1, LAND + 0.03, z1);
       cuv.push(U0, 0, U1, 0, U1, vb, U0, vb); ccol.push(0.62, 0.62, 0.6, 0.62, 0.62, 0.6, 1.02, 1.02, 1, 1.02, 1.02, 1);
       ci.push(c0, c0 + 1, c0 + 2, c0, c0 + 2, c0 + 3);
-      // and a low white parapet along its top
-      const pc = cp.length / 3, px = nx * 0.1, pz = nz * 0.1;
-      cp.push(x1 + px, LAND, z1 + pz, x2 + px, LAND, z2 + pz, x2 + px, LAND + 0.9, z2 + pz, x1 + px, LAND + 0.9, z1 + pz, x1 - px * 2, LAND + 0.9, z1 - pz * 2, x2 - px * 2, LAND + 0.9, z2 - pz * 2);
-      cuv.push(U0, 0.4, U1, 0.4, U1, 0.4 + 0.9 / T, U0, 0.4 + 0.9 / T, U0, 0.8, U1, 0.8); ccol.push(1.05, 1.05, 1.03, 1.05, 1.05, 1.03, 1.12, 1.12, 1.1, 1.12, 1.12, 1.1, 1.08, 1.08, 1.06, 1.08, 1.08, 1.06);
+      // and a low white parapet along its top (or the mark's own: a solid wall of plain concrete, its height, thickness
+      // and tint, its inner face and its top too)
+      const pc = cp.length / 3, PH = conc?.h ?? 0.9, th = conc?.t ?? 0.3, px = nx * 0.1, pz = nz * 0.1, ix = -nx * (th - 0.1), iz = -nz * (th - 0.1), tn = conc?.tint ?? 1.08;
+      cp.push(x1 + px, LAND, z1 + pz, x2 + px, LAND, z2 + pz, x2 + px, LAND + PH, z2 + pz, x1 + px, LAND + PH, z1 + pz, x1 + ix, LAND + PH, z1 + iz, x2 + ix, LAND + PH, z2 + iz);
+      cuv.push(U0, 0.4, U1, 0.4, U1, 0.4 + PH / T, U0, 0.4 + PH / T, U0, 0.8, U1, 0.8); ccol.push(tn - 0.03, tn - 0.03, tn - 0.05, tn - 0.03, tn - 0.03, tn - 0.05, tn + 0.04, tn + 0.04, tn + 0.02, tn + 0.04, tn + 0.04, tn + 0.02, tn, tn, tn - 0.02, tn, tn, tn - 0.02);
       ci.push(pc, pc + 1, pc + 2, pc, pc + 2, pc + 3, pc + 3, pc + 2, pc + 5, pc + 3, pc + 5, pc + 4);
+      if (conc) { const q = cp.length / 3; cp.push(x2 + ix, LAND, z2 + iz, x1 + ix, LAND, z1 + iz, x1 + ix, LAND + PH, z1 + iz, x2 + ix, LAND + PH, z2 + iz); cuv.push(U1, 0.4, U0, 0.4, U0, 0.4 + PH / T, U1, 0.4 + PH / T); for (let r = 0; r < 4; r++) ccol.push(tn - 0.1, tn - 0.1, tn - 0.12); ci.push(q, q + 1, q + 2, q, q + 2, q + 3); }
       continue;
     }
     // in rows up the wall, so the tide line shows: dark weed and wet piling up to about a metre above the water, then
@@ -926,6 +935,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const ix = -nx * RAIL.inset, iz = -nz * RAIL.inset, a = [x1 + ix, z1 + iz], b = [x2 + ix, z2 + iz];
     if (!landAt([(a[0] + b[0]) / 2 - nx * 0.6, (a[1] + b[1]) / 2 - nz * 0.6])) continue;
     const kind = fenceKind((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, nx, nz);
+    if (kind === "none") continue; // (a solid parapet instead: localDetail.js concrete)
     if (kind !== "rail") { (kind === "timber" ? timberRuns : barRuns).push([a, b, LAND]); continue; }
     const nPost = Math.max(1, Math.round(len / RAIL.post));
     for (let q = 0; q < nPost; q++) { const f = q / nPost; posts.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, nx, nz]); }
@@ -1151,6 +1161,19 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (let k = 0; k < c.ring.length; k++) { const [x1, z1] = c.ring[k], [x2, z2] = c.ring[(k + 1) % c.ring.length], o = cbp.length / 3; cbp.push(x1, c.base, z1, x2, c.base, z2, x2, c.top, z2, x1, c.top, z1); cbi.push(o, o + 2, o + 1, o, o + 3, o + 2); }
     solids.push(collider(cbp, cbi));
   }
+  // (and what a mark's photographs show that the map has no outline for: a pier head's light tower, localDetail.js extras)
+  for (const ex of local?.extras || []) {
+    if (!LANDMARK_BUILDERS[ex.kind]) continue;
+    const r = ex.r || 1.5, ring = [[ex.at[0] - r, ex.at[1] - r], [ex.at[0] + r, ex.at[1] - r], [ex.at[0] + r, ex.at[1] + r], [ex.at[0] - r, ex.at[1] + r]];
+    const od = openDeckAt(ex.at), base = ex.base ?? (od != null ? od : groundAt(ex.at[0], ex.at[1]) || LAND);
+    const lm = LANDMARK_BUILDERS[ex.kind](group, ring, base, ex);
+    for (const m of lm.meshes) { m.userData.kind = "a building"; targets.push(m); }
+    place.buildingGlow = [...(place.buildingGlow || []), ...lm.glow];
+    if (lm.flash) beacons.push(lm.flash);
+    const c = lm.collider, cbp = [], cbi = []; aoRings.push(c.ring);
+    for (let k = 0; k < c.ring.length; k++) { const [x1, z1] = c.ring[k], [x2, z2] = c.ring[(k + 1) % c.ring.length], o = cbp.length / 3; cbp.push(x1, c.base, z1, x2, c.base, z2, x2, c.top, z2, x1, c.top, z1); cbi.push(o, o + 2, o + 1, o, o + 3, o + 2); }
+    solids.push(collider(cbp, cbi));
+  }
   if (beacons.length) place.beacons = beacons;
   setTownStyle(local?.town || null);
   // (a far shore shown by a photograph of it (backdrop3d.js): the map's buildings behind that sheet aren't built too)
@@ -1219,7 +1242,27 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const ring = p.ring.slice(); if (THREE.ShapeUtils.isClockWise(ring.map(([x, z]) => new THREE.Vector2(x, z)))) ring.reverse();
       const sh = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
       const geo = new THREE.ExtrudeGeometry(sh, { depth: p.h - WALL_BOTTOM, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, WALL_BOTTOM, 0);
-      const m = new THREE.Mesh(geo, [deckSlab, new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 })]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      // (its sides: steel sheet piling, or plain concrete where the mark's photographs show it, localDetail.js concrete)
+      const sideMat = local?.concrete ? (concSide ||= weather(new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb9b5ad, roughness: 0.95 }), { scale: 0.7, mottle: 0.3, grime: [WALL_BOTTOM, 0.6, 0.45], streaks: [p.h, 2.5, 0.2], rough: [0.9, 1.1] })) : new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 });
+      const m = new THREE.Mesh(geo, [deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      // a solid concrete parapet along its edges over the water, where the mark's photographs show one (Lowestoft's South
+      // Pier: both sides and round its head), its outer face flush with the pier's side
+      if (local?.concrete) {
+        const pg = [];
+        for (let k = 0; k < ring.length; k++) {
+          const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
+          let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
+          if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) { nx = -nx; nz = -nz; }
+          if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) continue;
+          const c = local.concrete(mid[0], mid[1]); if (!c) continue;
+          const PH = c.h ?? 1.1, th = c.t ?? 0.45, g2 = new THREE.BoxGeometry(len + 0.06, PH, th);
+          g2.rotateY(-Math.atan2(z2 - z1, x2 - x1)); g2.translate(mid[0] - nx * th / 2, p.h + PH / 2, mid[1] - nz * th / 2); pg.push(g2);
+        }
+        if (pg.length) {
+          const pm = new THREE.Mesh(mergeGeometries(pg), concSide); pg.forEach((q) => q.dispose());
+          pm.castShadow = pm.receiveShadow = true; pm.userData.kind = "the parapet"; group.add(pm); targets.push(pm); solids.push(pm);
+        }
+      }
       // railings round its edge where it meets the water, near the anglers
       if (p.kind === "pier" || p.kind === "quay") {
         const rp = [], rr = [];

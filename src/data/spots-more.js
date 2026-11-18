@@ -112,6 +112,45 @@ export const MORE_SPOTS = [
     verification: "partial",
     checked: "2026-11-18"
   },
+  // (added 18 November 2026 for the UK expansion: Lowestoft's South Pier, the harbour's southern arm, its position on
+  // OpenStreetMap's outline of the pier halfway along it)
+  {
+    id: "lowestoft-south-pier",
+    name: "Lowestoft South Pier",
+    region: "Suffolk (Lowestoft), East of England",
+    nation: "England",
+    kind: "sea",
+    subtype: "pier",
+    lat: 52.4715,
+    lon: 1.755,
+    coordsVerified: false,
+    species: [
+      { id: "cod", name: "Cod", level: "seasonal", note: "October to January, and codling in spring (March and April)" },
+      { id: "whiting", name: "Whiting", level: "seasonal", note: "October to January" },
+      { id: "dab", name: "Dab", level: "seasonal", note: "October to January; British Sea Fishing reports some very good dab" },
+      { id: "sole", name: "Sole", level: "seasonal", note: "July to September" },
+      { id: "flounder", name: "Flounder", level: "seasonal", note: "Summer; a flounder won the junior section of the first match after the pier reopened" },
+      { id: "bass", name: "Bass", level: "seasonal", note: "Summer, school bass and some bigger ones, on ragworm, sandeel and peeler crab" },
+      { id: "eel", name: "Eel", level: "seasonal", note: "Summer (silver eels)" },
+      { id: "lesser-spotted-dogfish", name: "Lesser spotted dogfish", level: "seasonal", note: "Summer; listed as dogfish" },
+      { id: "mackerel", name: "Mackerel", level: "seasonal", note: "Summer, on spinners and feathers" },
+      { id: "pouting", name: "Pouting", level: "occasional", note: "Listed by British Sea Fishing for the pier and harbour" }
+    ],
+    best: "Sources found give no tide timings for the pier, so check locally. Cod, whiting and dab from October to January; bass, eels, flounder and dogfish in summer; sole from July to September.",
+    tidePref: null,
+    baits: ["lugworm", "peeler crab", "ragworm", "mackerel"],
+    access: "A solid pier about 300 yards long at the harbour mouth; parking nearby. Associated British Ports closed it to the public in 2013 and it reopened in 2015: check it is open before you go. Busy with visitors in summer.",
+    safety: "A working harbour entrance: keep clear of shipping and back from the edge.",
+    sources: [
+      "https://www.seaangler.co.uk/spot/lowestoft-south-pier-sea-fishing-mark/",
+      "https://britishseafishing.co.uk/east-of-england/",
+      "https://en.wikipedia.org/wiki/South_Pier,_Lowestoft",
+      "https://www.anglersnet.co.uk/news/lowestoft_south_pier_closed_fishing/",
+      "https://www.lowestoftjournal.co.uk/news/south-pier-in-lowestoft-hosts-first-fishing-match-since-reopening-316136"
+    ],
+    verification: "partial",
+    checked: "2026-11-18"
+  },
   {
     id: "roker-pier",
     name: "Roker Pier, Sunderland",

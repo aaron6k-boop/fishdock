@@ -125,6 +125,27 @@ export const LOCAL = {
     town: { render: 0.65 },
     note: "Britannia Pier, its theatre, sheds and entrance are modelled from photographs and OpenStreetMap's outlines; their sizes and the beach's slope are estimates. The rest of the town is drawn from the map, not modelled building by building.",
   },
+  // Lowestoft's South Pier (added 18 November 2026): the solid southern arm of the harbour mouth, about 400 m from the
+  // beach out to its rounded head (OSM way 798430532, Wikipedia), the outer harbour to its north and the open sea and
+  // the South Beach to its south. Anglers fish from both sides of its outer half
+  // (photographs on Wikimedia Commons, 2005 to 2026, listed in docs/REFERENCE-PHOTOS.md: the pier along its length,
+  // its head and light, the plaza at its root, the yacht club, the pavilion, the beach and its groynes)
+  "lowestoft-south-pier": {
+    pier: { fishFrom: [[0, -3], [12, 14]] },
+    // its sides: plain concrete walls with a solid concrete parapet along both edges, not railings (the photographs
+    // along the pier and from the beach)
+    concrete: () => ({ h: 1.1, t: 0.45, tint: 0.92 }),
+    fence: () => "none",
+    // and rock armour in the sea along its south side by the root (the photographs from the beach)
+    rocks: (x, z) => z > 8 && x < -40 && x > -240,
+    // the buildings at its root, each on its own outline: the South Pier Family Entertainment Centre, the Royal Norfolk
+    // and Suffolk Yacht Club and the East Point Pavilion (landmarksLowestoft.js)
+    landmarks: { 211742397: "southPierFEC", 1473914181: "yachtClub", 1065924544: "eastPointPavilion" },
+    // the light towers on the two pier heads, which the map has no outline for: where the photographs put them, the
+    // North Pier's lit green (the South Pier's is listed as discontinued)
+    extras: [{ kind: "harbourLight", at: [72, 2] }, { kind: "harbourLight", at: [99, -62], lit: "green" }],
+    note: "The South Pier's walls and parapets, its light, the North Pier's light, the entertainment centre, the yacht club and the East Point Pavilion are modelled from photographs and descriptions on OpenStreetMap's outlines; their sizes are estimates. The rest of the town is drawn from the map, not modelled building by building.",
+  },
 };
 export const localFor = (id) => LOCAL[id] || null;
 
