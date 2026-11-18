@@ -50,7 +50,7 @@ export const FP_FIGHT = { de: 0.82, sw: -0.12 };
 // camera; with the view tipped down to 79 degrees to see the net the sleeves filled the bottom half of the picture and
 // were cut into dark shards by the edge of the view, Aaron's review footage of 18 November. Out over the rail you hold
 // the rope at arm's length with the rope running down from your hands to the net, as you would)
-export const FP_ROPE_OUT = 0.58, FP_ROPE_REACH = 0, FP_ROPE_STEEP = 1.01, FP_ROPE_UP = 0.2;
+export const FP_ROPE_OUT = 0.58, FP_ROPE_REACH = 0, FP_ROPE_STEEP = 1.01, FP_ROPE_UP = 0.13; // (13 cm up the rope: at 20 the hand pulling came up to 30 cm from your eye, a hand filling the middle of the picture)
 const ropeReach = (E, sight) => { const h = new THREE.Vector3(sight.x, 0, sight.z); if (h.lengthSq() > 1e-8) h.normalize(); else h.set(0, 0, -1);
   const down = Math.min(FP_ROPE_STEEP, Math.asin(Math.max(-1, Math.min(1, -sight.y)))), s = h.clone().multiplyScalar(Math.cos(down)).add(new THREE.Vector3(0, -Math.sin(down), 0));
   return E.clone().addScaledVector(s, FP_ROPE_OUT).addScaledVector(h, FP_ROPE_REACH); };
@@ -1570,11 +1570,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const C = base.clone().addScaledVector(rd, -FP_ROPE_UP).addScaledVector(back, 0.05).addScaledVector(vw.vr, 0.05);
       if (!pull) return { at: [far, C], loose: [slack, slack] };
       const u = pull.u, e = ease(clamp((u - 0.12) / 0.78, 0, 1)), r = ease(clamp(u / 0.85, 0, 1));
-      // (the free hand goes down the rope beside the one pulling, out to its own side and a little towards you, and
-      // takes hold again below it: straight down the rope the two met half way and went through each other, the wrists
-      // wringing round as they passed, 18 November)
+      // (the free hand goes down the rope beside the one pulling, out to its own side, and takes hold again below it:
+      // straight down the rope the two met half way and went through each other, the wrists wringing round as they
+      // passed, 18 November)
       const by = Math.sin(r * Math.PI), side = pull.hand ? -1 : 1;
-      const puller = far.clone().lerp(C, e), reacher = C.clone().lerp(far, r).addScaledVector(vw.vr, side * 0.1 * by).addScaledVector(back, 0.05 * by);
+      const puller = far.clone().lerp(C, e), reacher = C.clone().lerp(far, r).addScaledVector(vw.vr, side * 0.08 * by);
       const loose = clamp(Math.sin(clamp(u / 0.9, 0, 1) * Math.PI) * 1.6, 0, 1);
       return pull.hand ? { at: [reacher, puller], loose: [loose, 0] } : { at: [puller, reacher], loose: [0, loose] };
     };

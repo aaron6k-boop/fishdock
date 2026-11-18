@@ -113,3 +113,10 @@ test("water running out of a net lifted from the sea falls from under it, small 
   let n2 = 0; for (let i = 0; i < SPRAY.max; i++) if (p2[i * 3 + 1] > -40) n2++;
   assert.ok(n2 < live.length && n2 >= 1);
 });
+
+test("a fish splashing throws drops and leaves white on the water, not puffs like smoke; only a big one crashing back hangs a little spray", async () => {
+  const THREE = await import("three"); const { createRockSpray } = await import("../src/lib/world3d/rockSpray.js");
+  const count = (size) => { const sp = createRockSpray(new THREE.Scene()), g = sp.points.geometry; sp.splash(0, 0, 0, size); const s = g.attributes.aSeed.array, p = g.attributes.position.array; let mist = 0, drops = 0; for (let i = 0; i < s.length; i++) { if (p[i * 3 + 1] < -40) continue; if (s[i] < 2) mist++; else drops++; } const foam = sp.foamLive; sp.dispose(); return { mist, drops, foam }; };
+  for (const s of [0.35, 0.6, 0.9]) { const c = count(s); assert.equal(c.mist, 0, `size ${s}`); assert.ok(c.drops > 10 && c.foam >= 1, JSON.stringify(c)); }
+  assert.ok(count(1.4).mist > 0);
+});

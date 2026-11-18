@@ -256,10 +256,15 @@ export function createRockSpray(scene, edge = []) {
     for (let q = 0; q < P.jet; q++) put(DROP, x + (Math.random() - 0.5) * 0.06, y0, z + (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.35, P.speed * (1.15 + 0.5 * Math.random()), (Math.random() - 0.5) * 0.35, (0.035 + 0.04 * Math.random()) * k, 3, 0, 0.05);
     // the crown's wall itself: short sheets going up and out round the hole, for anything bigger than a lead
     if (s > 0.5) for (let q = 0; q < Math.round(3 + 4 * s); q++) { const a = (q / (3 + 4 * s) + Math.random() * 0.1) * Math.PI * 2, sp = P.speed * R(0.5, 0.8); put(SHEET, x + Math.cos(a) * 0.12 * s, y0, z + Math.sin(a) * 0.12 * s, Math.cos(a) * sp * 0.35, sp, Math.sin(a) * sp * 0.35, 0.12 + 0.12 * s, 0.25 + 0.15 * s, 0.3); }
-    // the fine spray inside the crown: going up and a little out, hanging a moment
-    for (let q = 0; q < P.mist; q++) { const a = Math.random() * Math.PI * 2, sp = 0.4 + 0.8 * Math.random(); put(MIST, x + Math.cos(a) * 0.1 * s, y0 + 0.05, z + Math.sin(a) * 0.1 * s, Math.cos(a) * sp, (1.2 + 2.2 * Math.random()) * Math.sqrt(s), Math.sin(a) * sp, (0.16 + 0.18 * Math.random()) * Math.sqrt(s), 0.35 + 0.3 * Math.random(), 1.2 * s, 0.04); }
+    // the fine spray inside the crown: going up and a little out, hanging a moment; only from a big fish crashing back
+    // (from every splash, a fish thrashing at the foot of the wall stood in white puffs like smoke, Aaron's footage of
+    // 18 November: the water it throws is drops and the white it leaves is on the water, below)
+    if (s >= 1.1) for (let q = 0; q < Math.round(P.mist * 0.5); q++) { const a = Math.random() * Math.PI * 2, sp = 0.4 + 0.8 * Math.random(); put(MIST, x + Math.cos(a) * 0.1 * s, y0 + 0.05, z + Math.sin(a) * 0.1 * s, Math.cos(a) * sp, (1.2 + 2.2 * Math.random()) * Math.sqrt(s), Math.sin(a) * sp, (0.16 + 0.18 * Math.random()) * Math.sqrt(s), 0.35 + 0.3 * Math.random(), 1.2 * s, 0.04); }
     // the white it leaves: a patch of foam spreading out from where it went in, lasting a few seconds
     for (let q = 0; q < P.foam; q++) putFoam(x, z, 0.12 + 0.22 * s, R(2.5, 4) * (0.6 + 0.4 * s), 0.25 * s, 0, 0, Math.min(1, 0.5 + 0.4 * s), 0.12);
+    // (and the churned water round it: a second, fainter patch broken off to one side, so the white on the water has a
+    // ragged shape rather than a disc)
+    if (P.foam && s > 0.3) { const a = Math.random() * Math.PI * 2, d = 0.12 + 0.18 * s; putFoam(x + Math.cos(a) * d, z + Math.sin(a) * d, 0.08 + 0.16 * s, R(1.8, 3) * (0.6 + 0.4 * s), 0.2 * s, 0, 0, Math.min(1, 0.35 + 0.3 * s), 0.2); }
   }
   /** Water running out of a net lifted out of the sea: drops falling from under its mesh and a thin stream or two from
    * its lowest point. (x, y, z) the middle of the net's bottom, r its radius (m), amount 0 to 1 (1 just out of the
