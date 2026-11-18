@@ -547,8 +547,30 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     if (palm0.lengthSq() < 1e-6) palm0.set(0, -1, 0).addScaledVector(axis, -axis.y); palm0.normalize();
     const dH = flat ? loc[S].along.clone() : A3(g.d), pH = flat ? loc[S].palm.clone() : A3(g.pn), cH = flat ? A3(RIG.flat[S].c) : A3(g.c);
     // (each way of holding it judged with the elbow where it is now, turned as the arm last chose)
-    const shW = A.U.getWorldPosition(V()), pole = A.pole.clone().applyQuaternion(bodyQ); if (h.turn) pole.applyAxisAngle(at.clone().sub(shW).normalize(), h.turn);
+    const shW = A.U.getWorldPosition(V()), pole = A.pole.clone().applyQuaternion(bodyQ), pole1 = pole.clone(); if (h.turn) pole.applyAxisAngle(at.clone().sub(shW).normalize(), h.turn);
     let best = null, cur = null;
+    // (a rope: a hand round it can turn about it any way, so the way round it and the elbow are chosen together, the
+    // elbow turned from where an arm reaching out and down has it only as far as a comfortable wrist and the rail need.
+    // Each fitted to the other in turn, frame by frame, hauling the drop net the elbows swung right round the
+    // shoulder-to-hand line, the left one 120 to 340 degrees from where it hangs, a full turn every few pulls: winged up,
+    // the sleeves seen end on round the wrists as dark flaps (the PC's haul filmed with its arms measured, 18 November))
+    if (spec.kind === "rope") {
+      const ax = at.clone().sub(shW).normalize();
+      for (const a of TURNS) { if (Math.abs(a) > 2.1) continue; const pa = pole1.clone().applyAxisAngle(ax, a); // (never further round than 120 degrees: past that the elbow is up beside your ear)
+        for (const sg of [1, -1]) for (let k = -6; k < 6; k++) {
+          const q = pairRotation(dH, pH, axis.clone().multiplyScalar(sg), palm0.clone().applyAxisAngle(axis, (k * Math.PI) / 6)), pos = at.clone().sub(cH.clone().applyQuaternion(q));
+          const ik = twoBone(shW, pos, A.L1, A.L2, pa), w = wristAngles(shW, ik.elbow, ik.wrist, q, loc[S], S), key = `${sg}|${k}|${a.toFixed(2)}`;
+          const c = limitsPen(w) * 4 + (Math.abs(w.flex) + Math.abs(w.rad)) * 0.02 + ik.short * 400 + Math.abs(a) * 0.5 + railCost(shW, ik, spec.rail || null) + (h.cyl && h.cyl !== key ? 0.6 : 0);
+          if (!best || c < best.c) best = { c, pos, quat: q, key, short: ik.short, a };
+          if (key === h.cyl) cur = { c, pos, quat: q, key, short: ik.short, a };
+        } }
+      const same = h.kind === spec.kind;
+      if (same && cur && best.key !== h.cyl && h.cylHold > 0) best = cur;
+      if (same && h.cyl && best.key !== h.cyl) { h.cylHold = CYL_HOLD; h.cylSwap = true; }
+      h.cyl = best.key; h.ropeTurn = best.a;
+      return { pos: best.pos, quat: best.quat, grip: cylName, free: true };
+    }
+    h.ropeTurn = null;
     // (a rod's butt may be held anywhere along its first 25 cm: the hand goes as far up it as it needs to be reached)
     const slides = spec.kind === "butt" ? [0, 0.06, 0.12, 0.18, 0.25] : [0];
     for (const sl of slides) {
@@ -585,18 +607,22 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   /** the elbow's turn about the shoulder-to-hand line with the most comfortable wrist for this hand (radians), as
    * Gate 3 chooses it: near the turn it had, and near none */
   const MgInv = new THREE.Matrix4();
+  // (a hand out past the rail, on the drop net's rope: the forearm comes over the top rail, never through it)
+  // (and the upper arm and the elbow kept off the rail too: they went 7 cm into it in the railing test)
+  function railCost(shW, ik, rail) {
+    if (!rail) return 0; let c = 0; const sh = shW.clone().applyMatrix4(MgInv), e = ik.elbow.clone().applyMatrix4(MgInv), wr = ik.wrist.clone().applyMatrix4(MgInv);
+    for (const [a0, b0, r] of [[wr, e, 0.045], [e, sh, 0.055]]) {
+      if (a0.z < rail.z + 0.04 && b0.z > rail.z) { const t = (rail.z - a0.z) / (b0.z - a0.z), y = a0.y + (b0.y - a0.y) * t; if (y < rail.y + 0.08) c += (rail.y + 0.08 - y) * 60; }
+      const dy = b0.y - a0.y, dz = b0.z - a0.z, l2 = dy * dy + dz * dz, u = l2 ? clamp(((rail.y - a0.y) * dy + (rail.z - a0.z) * dz) / l2, 0, 1) : 0, d = Math.hypot(a0.y + dy * u - rail.y, a0.z + dz * u - rail.z);
+      if (d < r + 0.04) c += (r + 0.04 - d) * 80; }
+    return c;
+  }
   function bestTurn(A, S, h, shW, target, pole, rail) {
     const ax = target.pos.clone().sub(shW).normalize(); let best = null;
+    if (target.free && h.ropeTurn != null) return h.ropeTurn; // (on a rope: chosen with the grip, wrapTarget)
     for (const a of TURNS) {
       const ik = twoBone(shW, target.pos, A.L1, A.L2, pole.clone().applyAxisAngle(ax, a)), w = wristAngles(shW, ik.elbow, ik.wrist, target.quat, loc[S], S);
-      let c = limitsPen(w) * 4 + (Math.abs(w.flex) + Math.abs(w.rad)) * 0.02 + Math.abs(a) * 0.25 + angDiff(a, h.turnTo ?? 0) * 0.6;
-      // (a hand out past the rail, on the drop net's rope: the forearm comes over the top rail, never through it)
-      // (and the upper arm and the elbow kept off the rail too: they went 7 cm into it in the railing test)
-      if (rail) { const sh = shW.clone().applyMatrix4(MgInv), e = ik.elbow.clone().applyMatrix4(MgInv), wr = ik.wrist.clone().applyMatrix4(MgInv);
-        for (const [a0, b0, r] of [[wr, e, 0.045], [e, sh, 0.055]]) {
-          if (a0.z < rail.z + 0.04 && b0.z > rail.z) { const t = (rail.z - a0.z) / (b0.z - a0.z), y = a0.y + (b0.y - a0.y) * t; if (y < rail.y + 0.08) c += (rail.y + 0.08 - y) * 60; }
-          const dy = b0.y - a0.y, dz = b0.z - a0.z, l2 = dy * dy + dz * dz, u = l2 ? clamp(((rail.y - a0.y) * dy + (rail.z - a0.z) * dz) / l2, 0, 1) : 0, d = Math.hypot(a0.y + dy * u - rail.y, a0.z + dz * u - rail.z);
-          if (d < r + 0.04) c += (r + 0.04 - d) * 80; } }
+      const c = limitsPen(w) * 4 + (Math.abs(w.flex) + Math.abs(w.rad)) * 0.02 + Math.abs(a) * 0.25 + angDiff(a, h.turnTo ?? 0) * 0.6 + railCost(shW, ik, rail);
       if (!best || c < best.c) best = { c, a };
     }
     return best.a;
@@ -618,7 +644,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
     // went straight to where Blender had it, and at the start of a landing 8 cm in a frame). Winding, the elbow's own
     // small circle is well inside that, and followed exactly)
     { const inv = bodyQ.clone().invert(), d = pole0.clone().normalize().applyQuaternion(inv);
-      if (h.poleL && dt > 0) { const ang = h.poleL.angleTo(d), max = (casting ? 8 + Math.max(0, castT - 0.3) * 60 : POLE_MAX) * dt; if (ang > max) d.copy(h.poleL).applyQuaternion(new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(h.poleL, d), max / ang)).normalize(); }
+      if (h.poleL && dt > 0) { const ang = h.poleL.angleTo(d), max = (casting ? 8 + Math.max(0, castT - 0.3) * 60 : POLE_MAX) * dt; if (ang > max) { const q = new THREE.Quaternion().slerp(new THREE.Quaternion().setFromUnitVectors(h.poleL, d), max / ang); d.copy(h.poleL).applyQuaternion(q).normalize(); } } // (the turn worked out before d is overwritten: worked out after, from d already set back to where it was, it was no turn at all, and an elbow whose pointing jumped further than a frame's worth stayed where it was for good)
       h.poleL = d.clone(); pole0 = d.applyQuaternion(bodyQ).multiplyScalar(pole0.length()); }
     // (where the grip was made in Blender with its arm, the hold and the knob, the elbow is where Blender's IK put
     // it; anywhere else, through a cast or on a rope, it goes where the wrist is most comfortable, moving there
@@ -758,7 +784,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
           h.fingFrom = h.fing ? new Map([...h.fing].map(([n, q]) => [n, q.clone()])) : null;
         }
         h.u = Math.min(1, h.u + dt / (h.blendT || BLEND)); const e = ease(h.u);
-        const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e), elbow: want.elbow || null } : want;
+        const tgt = h.from ? { pos: h.from.pos.clone().lerp(want.pos, e), quat: h.from.quat.clone().slerp(want.quat, e), elbow: want.elbow || null, free: want.free } : want;
         h.cur = { pos: tgt.pos.clone(), quat: tgt.quat.clone() };
         { const shW = A.U.getWorldPosition(V()); h.short = solveArm(A, S, tgt, bodyQ, h, o.castT != null || !(want.kind === "seat" || want.kind === "crank"), dt, spec?.rail || null, o.castT ?? null).short;
           if (spec && h.short > 0.002) { const arm = shW.clone().sub(camW), ax = arm.clone().cross(tgt.pos.clone().sub(shW)); if (ax.lengthSq() > 1e-10) leanAdd.addScaledVector(ax.normalize(), h.short / Math.max(0.1, arm.length())); }

@@ -1674,7 +1674,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const base = fp ? (() => { const E = fpEye(), nt = netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
             // (once the net is past the rail, on your line of sight down to it, as when letting a fish go: out at eye height
             // the upper arms came in from the top corner of the screen while you looked down)
-            if (nt && (nt.y < -0.3 || nt.z < railZ)) return ropeReach(E, nt.clone().sub(E).normalize()).add(V3(-0.07, 0, 0.03)); // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
+            // (and no further left than 10 cm or so from under your eye: on the line to the net, which lies off to your
+            // left, and 7 cm left of that, the rope was 20 cm to the left and your right arm reached across you for it,
+            // its elbow winged up (the PC's haul, 18 November). The rope runs on down to the net a few degrees off plumb)
+            if (nt && (nt.y < -0.3 || nt.z < railZ)) { const b = ropeReach(E, nt.clone().sub(E).normalize()).add(V3(-0.07, 0, 0.03)); b.x += (E.x - 0.04 - b.x) * 0.6; return b; } // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
             // (before that, from the view itself: low and to the left of wherever you look. Fixed below and ahead of the
             // eye, looking steeply down at the net on the deck put the hands at the top edge of the picture, the forearms
             // coming up into it from below: the 8 November recording)
