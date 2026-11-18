@@ -373,6 +373,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // where your fish sits on screen while you look at it (normalised: 0 the middle, 1 the top), above the card that
   // tells you about it along the bottom (Stage3D FishLook, its height capped in livefishing.css)
   const FISH_NDC_Y = 0.32;
+  // where the camera stands to look at your fish in third person: to your left (m), back from the fish, and up from the deck
+  const INSPECT = { side: 1.75, back: 0.45, up: 1.45 };
   // walking about (walker.js): the walker, the stick, a jump waiting, whether you can fish where you stand
   // auto-walk (keeps walking where you look until you touch the stick) and tap-to-move (walks to a point you tapped)
   let autoWalk = false, walkTarget = null, walkStuck = 0, modeSince = -10, lastMode = "first";
@@ -468,7 +470,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       // your right, looking down across the mat at the fish)
       // (off to your left: the rod lies on its rest on your right and crossed the picture. At a steady height over the
       // deck or the bank, so it doesn't bob as the fish goes from the net to your hands to the mat)
-      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * 1.75 - fx * 0.45, 0, -sz * 1.75 - fz * 0.45)); at0.y = mk.at.y + 1.45; // (a little back from it, so the railing is behind the fish, not across it)
+      const io = (FILM && typeof window !== "undefined" && window.__fdInspect) || INSPECT; // (film only: another place to try)
+      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * io.side - fx * io.back, 0, -sz * io.side - fz * io.back)); at0.y = mk.at.y + io.up; // (a little back from it, so the railing is behind the fish, not across it)
       { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
       camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);

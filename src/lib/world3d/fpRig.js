@@ -316,13 +316,17 @@ export function dropLining(mesh) {
 // more below your eye and past the cut, were left as scraps of navy along the bottom of the picture looking down over
 // the rail at the drop net. 15 November)
 const TORSO_BONE = /^DEF-(spine|breast|pelvis|shoulder|thigh|shin|foot|toe)/;
+// (and the upper arms, shoulder to elbow: looking steeply down they lie right under your eye, and cut by the edge of
+// what's drawn there they showed as dark shards along the bottom of the picture, hauling the drop net in Aaron's
+// review footage of 18 November. Looking down, only your forearms and hands are drawn, coming in from the bottom)
+const UPPER_BONE = /^DEF-upper_arm/;
 export function markTorso(mesh) {
   const g = mesh.geometry, si = g?.attributes?.skinIndex, sw = g?.attributes?.skinWeight, sk = mesh.skeleton;
   if (!si || !sw || !sk) return 0;
-  const torso = sk.bones.map((b) => TORSO_BONE.test(b.name)), a = new Float32Array(si.count); let n = 0;
-  for (let i = 0; i < si.count; i++) { let w = 0; for (let k = 0; k < 4; k++) if (torso[si.getComponent(i, k)]) w += sw.getComponent(i, k); a[i] = w; if (w > 0.5) n++; }
+  const torso = sk.bones.map((b) => TORSO_BONE.test(b.name)), upper = sk.bones.map((b) => UPPER_BONE.test(b.name)), a = new Float32Array(si.count), u = new Float32Array(si.count); let n = 0;
+  for (let i = 0; i < si.count; i++) { let w = 0, wu = 0; for (let k = 0; k < 4; k++) { const b = si.getComponent(i, k), x = sw.getComponent(i, k); if (torso[b]) w += x; if (upper[b]) wu += x; } a[i] = w; u[i] = wu; if (w > 0.5) n++; }
   if (!mesh.userData.ownGeometry && !g.userData.fpOwn) { mesh.geometry = g.clone(); mesh.geometry.userData.fpOwn = true; }
-  mesh.geometry.setAttribute("fpTorso", new THREE.BufferAttribute(a, 1));
+  mesh.geometry.setAttribute("fpTorso", new THREE.BufferAttribute(a, 1)); mesh.geometry.setAttribute("fpUpper", new THREE.BufferAttribute(u, 1));
   return n / si.count;
 }
 
@@ -366,11 +370,11 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   const lookDown = { value: 0 };
   coatMat.onBeforeCompile = (sh) => {
     sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown; sh.uniforms.fpCutSoft = cutSoft;
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nvarying float vTorso;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso;");
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nattribute float fpUpper;\nvarying float vTorso;\nvarying float vUpper;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso; vUpper = fpUpper;");
     // (the cut's edge softened by a fine ordered dither over 1.2 cm. It was 5 cm, against a sawtooth seen through the
     // cast that turned out to be the cuff's own edge (dropLining, fixed 15 November); looking down at the drop net the
     // upper sleeve lies almost wholly inside a 5 cm band, and showed as a screen of dots)
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nuniform float fpCutSoft;\nvarying float vTorso;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * fpCutSoft || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3)) discard;\n#include <opaque_fragment>");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nuniform float fpCutSoft;\nvarying float vTorso;\nvarying float vUpper;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * fpCutSoft || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3) || (vUpper > 0.5 && fpDown > 0.6)) discard;\n#include <opaque_fragment>");
   };
   clothe(coatMat);
   { const prev = coatMat.onBeforeCompile; coatMat.onBeforeCompile = (sh, r) => { prev.call(coatMat, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(0.9, 0.025, 10, 0.75)); }; }
