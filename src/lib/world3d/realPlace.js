@@ -210,7 +210,7 @@ function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRu
     const t = rnd() * 6.28, d = 0.8 + rnd() * 2.5, x = sp.at[0] + Math.cos(t) * d, z = sp.at[2] + Math.sin(t) * d, r = 0.2 + rnd() * 0.35, a = rnd() * 6.28;
     quad([x, y, z], [Math.cos(a) * r, 0, Math.sin(a) * r], [-Math.sin(a) * r * 0.8, 0, Math.cos(a) * r * 0.8], DECAL.stain, true);
   }
-  for (const [x, , z] of props.bench) quad([x, y, z], [0.9, 0, 0], [0, 0, 0.7], DECAL.damp, true);
+  for (const [x, by, z] of props.bench) quad([x, by + 0.004, z], [0.9, 0, 0], [0, 0, 0.7], DECAL.damp, true); // (at the bench's own deck: a quay's stands a little above the land's)
   for (const [x, z] of grates) quad([x, y, z], [0.45, 0, 0], [0, 0, 0.45], DECAL.damp, true);
   void capRuns;
   if (I.length) {
@@ -972,6 +972,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // what stands out from it: the stair, the balcony's slab, a mast)
   const bldgBoxes = (place.buildings || []).map((b) => ({ ...bb(b.ring), pad: local?.landmarks?.[b.id] ? 2.4 : 0.6 }));
   const clearOfBuildings = (q, r) => bldgBoxes.every((b) => q[0] < b.x0 - b.pad - r || q[0] > b.x1 + b.pad + r || q[1] < b.z0 - b.pad - r || q[1] > b.z1 + b.pad + r);
+  // (and standing on the deck that's there: inside a pier, quay or breakwater's outline that's its own deck (osmPlace's
+  // p.h), raised over the land's. Each piece stood at the land's height wherever it was, so at Whitby the lifebuoy
+  // stations stood a metre and more down inside the breakwater, only their name boards showing above its deck. A quay a
+  // little higher than the land: on it at its height; a raised breakwater or pier, or a spot where the piece would reach
+  // over a step between the two: nothing)
+  const deckRings = (place.piers || []).filter((p) => p.ring).map((p) => ({ ...bb(p.ring), h: p.h }));
+  const deckAt = (q) => deckRings.reduce((y, b) => (inB(q, b) ? Math.max(y, b.h) : y), LAND);
+  const standY = (q, r) => { const y = deckAt(q); if (Math.abs(y - LAND) > 0.5) return null; for (const [a, b] of [[r, 0], [-r, 0], [0, r], [0, -r]]) if (Math.abs(deckAt([q[0] + a, q[1] + b]) - y) > 0.05) return null; return y; };
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
     if (Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > 200) { acc += len; continue; }
@@ -982,20 +990,22 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (Math.floor(d / 28) !== Math.floor((d - 1) / 28)) {
         const q = inAt(0.75); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps === "column" && apart(columns, q)) {
           columns.push([q[0], q[1], ry, nx, nz]); { const L = lanternAt(); perches.push([q[0] - nx * L.z, LAND + L.top, q[1] - nz * L.z]); } // (a gull's place: on the lantern)
-        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps !== "column" && apart(props.lamp, q, 2) && clearOfBuildings(q, 0.45)) {
-          addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], LAND + 2.5, q[1]);
-          const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, LAND + 4.95, q[1] - nz * 0.35, ry);
-          addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, LAND + 4.85, q[1] - nz * 0.7, ry); void arm;
-          props.lamp.push([q[0], LAND, q[1], ry]);
-          perches.push([q[0], LAND + 3.9, q[1]]); // somewhere for a gull to sit (the lamp's top)
+        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps !== "column" && apart(props.lamp, q, 2) && clearOfBuildings(q, 0.45) && standY(q, 0.3) != null) {
+          const Y = standY(q, 0.3);
+          addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], Y + 2.5, q[1]);
+          const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, Y + 4.95, q[1] - nz * 0.35, ry);
+          addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, Y + 4.85, q[1] - nz * 0.7, ry); void arm;
+          props.lamp.push([q[0], Y, q[1], ry]);
+          perches.push([q[0], Y + 3.9, q[1]]); // somewhere for a gull to sit (the lamp's top)
         }
       }
       if (Math.floor((d + 14) / 55) !== Math.floor((d + 13) / 55)) {
-        const q = inAt(0.6); if (landAt(q) && clearOfSpots(q) && apart(props.station, q, 2) && clearOfBuildings(q, 0.5)) {
-          addAt(new THREE.BoxGeometry(0.62, 0.95, 0.22), mBox, q[0], LAND + 0.9, q[1], ry);
-          const buoy = addAt(new THREE.TorusGeometry(0.27, 0.07, 8, 18), mBuoy, q[0] + nx * 0.13, LAND + 0.95, q[1] + nz * 0.13, ry); void buoy;
-          addAt(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mPost, q[0], LAND + 0.25, q[1]);
-          props.station.push([q[0], LAND, q[1], Math.atan2(-nx, -nz)]); // facing the deck
+        const q = inAt(0.6); if (landAt(q) && clearOfSpots(q) && apart(props.station, q, 2) && clearOfBuildings(q, 0.5) && standY(q, 0.5) != null) {
+          const Y = standY(q, 0.5);
+          addAt(new THREE.BoxGeometry(0.62, 0.95, 0.22), mBox, q[0], Y + 0.9, q[1], ry);
+          const buoy = addAt(new THREE.TorusGeometry(0.27, 0.07, 8, 18), mBuoy, q[0] + nx * 0.13, Y + 0.95, q[1] + nz * 0.13, ry); void buoy;
+          addAt(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mPost, q[0], Y + 0.25, q[1]);
+          props.station.push([q[0], Y, q[1], Math.atan2(-nx, -nz)]); // facing the deck
         }
       }
       // the small things a working wall has: a drain grate in the deck now and then, mooring rings on the cap's face,
@@ -1005,14 +1015,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (Math.floor((d + 31) / 71) !== Math.floor((d + 30) / 71) && clearOfSpots(inAt(0.5)) && apart(ladders, [ex, ez])) ladders.push([ex + nx * 0.19, ez + nz * 0.19, ry]);
       // mooring bollards just inside the railing, every 30 m or so
       if (Math.floor((d + 7) / 30) !== Math.floor((d + 6) / 30)) {
-        const q = inAt(0.55); if (landAt(q) && clearOfSpots(q) && apart(props.bollard, q, 2) && clearOfBuildings(q, 0.25)) props.bollard.push([q[0], LAND, q[1], ry]);
+        const q = inAt(0.55); if (landAt(q) && clearOfSpots(q) && apart(props.bollard, q, 2) && clearOfBuildings(q, 0.25) && standY(q, 0.25) != null) props.bollard.push([q[0], standY(q, 0.25), q[1], ry]);
       }
       if (Math.floor((d + 20) / 40) !== Math.floor((d + 19) / 40)) {
-        const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q) && apart(props.bench, q, 2) && clearOfBuildings(q, 1.0)) {
-          const ax = -nz, az = nx; // along the edge
-          for (const [h, back, th] of [[0.45, 0, 0.42], [0.8, -0.2, 0.08]]) addAt(new THREE.BoxGeometry(1.8, th === 0.42 ? 0.06 : 0.36, th === 0.42 ? 0.42 : 0.05), mWood, q[0] - nx * back, LAND + h, q[1] - nz * back, ry);
-          for (const s2 of [-0.8, 0.8]) addAt(new THREE.BoxGeometry(0.06, 0.45, 0.42), mPost, q[0] + ax * s2, LAND + 0.22, q[1] + az * s2, ry);
-          props.bench.push([q[0], LAND, q[1], ry]); // facing the water
+        const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q) && apart(props.bench, q, 2) && clearOfBuildings(q, 1.0) && standY(q, 1.0) != null) {
+          const ax = -nz, az = nx, Y = standY(q, 1.0); // along the edge
+          for (const [h, back, th] of [[0.45, 0, 0.42], [0.8, -0.2, 0.08]]) addAt(new THREE.BoxGeometry(1.8, th === 0.42 ? 0.06 : 0.36, th === 0.42 ? 0.42 : 0.05), mWood, q[0] - nx * back, Y + h, q[1] - nz * back, ry);
+          for (const s2 of [-0.8, 0.8]) addAt(new THREE.BoxGeometry(0.06, 0.45, 0.42), mPost, q[0] + ax * s2, Y + 0.22, q[1] + az * s2, ry);
+          props.bench.push([q[0], Y, q[1], ry]); // facing the water
         }
       }
     }
