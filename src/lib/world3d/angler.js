@@ -1836,7 +1836,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         hands[0] = { at: a0, axis: V3(0, 1, 0), palm: V3(0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } };
         hands[1] = { at: a1, axis: V3(0, 1, 0), palm: V3(-0.3, 0, 1), kind: "rope", rail: { y: 1.12, z: rz } }; }
       if (fp) { const R2 = ropeFp(base, rd, E, relStep === "haul" ? ropePull : null, 0.08);
-        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true; }
+        hands.forEach((hh, i) => { hh.at = R2.at[i]; hh.loose = R2.loose[i]; }); ropeClear(hands); armClear(hands); ropeSocks(hands, netTop || base.clone().add(rd), rd); fpRope = true;
+        // (lowering it and watching it swim off: the rope in your left hand, your right hand on the top rail a little to
+        // the right of it. With both on the rope off to your left, your right arm crossed in front of you under your eye,
+        // its sleeve a big dark shape across the picture (the PC's film, 18 November); hauling the empty net back up
+        // takes both hands again)
+        if (relStep !== "haul") {
+          const rz = -Math.max(0.3, edge - 0.22), rx = clamp(hands[0].at.x + 0.4, -0.02, 0.32), X = V3(1, 0, 0), Y = V3(0, 0, 1), at = V3(rx, 1.12 + 0.045, rz);
+          hands[1] = { at, axis: X.clone(), palm: V3(0, -1, 0), kind: "rope", rail: { y: 1.12, z: rz }, sock: { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, X.clone().cross(Y))) } };
+        } }
       lean = 0.22; crouch = 0.06; brace = relStep === "haul" ? 0.2 : 0; lookAtW = releaseInfo?.fish || (netAt ? netAt.clone() : lookAtW);
     }
     if (kept?.state === "release" && relStep === "haul" && releaseInfo?.over && netAt) {
