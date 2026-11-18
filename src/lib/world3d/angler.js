@@ -1918,7 +1918,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // the bank, on its side on the mesh, never through the boards (it stood upright, half under the deck)
       const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]);
       const bend = clamp((fishLen - 0.6 * netScale * 0.7) / fishLen, 0, 0.6);
-      const hangC = netAt.clone().add(new THREE.Vector3(0, -0.22 * netScale, 0)), lieC = netAt.clone().setY(toWorld(new THREE.Vector3(0, 0, 0)).y + halfThick() + 0.035);
+      // (lying in the bag as it comes flat: at the net's own height, never below the deck. It was always at the deck's
+      // height, so as the net swung up over the rail and levelled out the fish stayed behind a metre under it, in the
+      // air beside the rail: the PC film of 18 November, 0.98 m from the net)
+      const lieY = Math.max(toWorld(new THREE.Vector3(0, 0, 0)).y, netAt.y - 0.012 - (net.userData.restDrop ?? 0.18) * netScale) + halfThick() + 0.035;
+      const hangC = netAt.clone().add(new THREE.Vector3(0, -0.22 * netScale, 0)), lieC = netAt.clone().setY(lieY);
       const c = hangC.lerp(lieC, netRest), mouth = c.clone().addScaledVector(side, fishLen * 0.5 * (1 - bend * 0.5));
       poseFish(mouth, side.clone().negate().add(new THREE.Vector3(0, -0.08 * (1 - netRest), 0)).normalize(), t, { beat: lerp(0.5, 0.1, netRest), curl: (0.35 + bend) * (1 - 0.75 * netRest) + Math.sin(t * 2.6) * 0.12 * (1 - 0.7 * netRest), roll: lerp(-1.0, -Math.PI / 2, netRest) });
     } else if (showFish && fishPose) poseFish(fishPose.mouth, fishPose.dir, t, fishPose);
