@@ -163,9 +163,12 @@ export function setHandsDim(k) { DIM = clamp(k, 0.2, 1); for (const m of liveMat
 // (with the temporal antialiasing on, the coat's cut near your eye looking down may dissolve over a wider band: the
 // dither is smoothed into a fade there, where without it a wide band showed as a screen of dots (15 November). Looking
 // down at the drop net the cut's hard edge left the sleeve a torn blue ribbon, in the 17 November film on Aaron's PC)
+// (since 18 November the cut is crisp whatever the antialiasing, and only right by your eye: see pose below. Kept, so
+// Settings → Graphics can still say whether the temporal antialiasing is on)
 let SOFT = false;
 /** the temporal antialiasing on or off (world.js, with Settings → Graphics) */
 export function setSoftCut(on) { SOFT = !!on; }
+export const softCut = () => SOFT;
 // ---- your arms in the rain ----
 // Wet skin and a wet nylon coat are glossier and a little darker: water fills the skin's fine grain and soaks the
 // coat's weave. They wet through in about a minute of rain and dry over a few once it stops, rather than with the
@@ -723,7 +726,11 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       if (!group.visible || !R) return;
       { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0, ct = o.castT, wind = ct == null ? 0 : clamp((ct - 0.12) / 0.15, 0, 1) * (1 - clamp((ct - 0.8) / 0.15, 0, 1));
         const fc = FILM && typeof window !== "undefined" ? window.__fdFpCut || null : null; // (film only: other ways of cutting your sleeves near the eye, to compare)
-        nearCut.value += (Math.max(0.16 + (fc?.nearDown ?? 0.17) * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.012 + Math.max(0.06 * wind, (fc?.soft ?? SOFT) ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; upperOn.value = fc?.upper === false ? 0 : 1; }
+        // (looking down, your upper arms are drawn whole and your sleeves cut only right by your eye, crisply: faded out
+        // over the elbow and dissolving into dots near the eye, the sleeves looked as if they were melting away, hauling
+        // the drop net; kept whole they come in from the bottom corners of the picture as your own arms do. Chosen from
+        // four ways of drawing it, filmed on Aaron's PC on 18 November)
+        nearCut.value += (Math.max(0.16 + (fc?.nearDown ?? 0.04) * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.006 + Math.max(0.06 * wind, (fc?.soft ?? false) ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; upperOn.value = fc?.upper === true ? 1 : 0; }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)

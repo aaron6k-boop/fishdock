@@ -516,9 +516,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         pos.copy(tgt).add(new THREE.Vector3(0, 0.07 + (reduceMotion ? 0 : Math.abs(Math.sin(ph)) * 0.035 * sp - 0.015 * sp), 0));
         // (at your eyes as they lean ahead of your feet into a stride: at the feet's line, the camera was up to 26 cm
         // behind your eyes, and the top of your own collar showed at the bottom of the view; eased, so a step doesn't jolt)
-        { const ld = anglers.get(localId)?.out?.lead, kl = 1 - Math.exp(-dt * 10); W.lead ||= [0, 0];
-          if (ld) { const m = Math.hypot(ld[0], ld[1]), c = m > 0.35 ? 0.35 / m : 1; W.lead[0] += (ld[0] * c - W.lead[0]) * kl; W.lead[1] += (ld[1] * c - W.lead[1]) * kl; }
-          pos.x += W.lead[0]; pos.z += W.lead[1]; }
+        // (and at the height of your own eyes, eased: the camera stood at the same height for everyone, 8 cm above the
+        // woman's eyes)
+        { const ld = anglers.get(localId)?.out?.lead, kl = 1 - Math.exp(-dt * 10); W.lead ||= [0, 0, 0];
+          if (ld) { const m = Math.hypot(ld[0], ld[1]), c = m > 0.35 ? 0.35 / m : 1; W.lead[0] += (ld[0] * c - W.lead[0]) * kl; W.lead[1] += (ld[1] * c - W.lead[1]) * kl;
+            const dy = ld[2] > 1.2 && ld[2] < 2 ? ld[2] - 1.62 : 0; W.lead[2] += (dy - W.lead[2]) * (1 - Math.exp(-dt * 3)); }
+          pos.x += W.lead[0]; pos.z += W.lead[1]; pos.y += W.lead[2]; }
         if (!reduceMotion) { const sx = Math.cos(yaw), sz = Math.sin(yaw), w = Math.sin(ph * 0.5) * 0.02 * sp; pos.x += sx * w; pos.z += sz * w; }
         anglers.get(localId)?.a.setFirstPerson(true);
       }
