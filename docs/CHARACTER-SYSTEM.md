@@ -53,3 +53,56 @@ body types, the levels of detail) is made in Blender for FishDock, original, and
 ## Progress
 
 Stage 1 started 17 November, 23:15.
+
+**The main angler (`angler2`), 18 November, 00:05.** Built by three scripts in `source-assets/blender/people2`:
+
+- `a_build.py` (Blender, on Aaron's PC): the Rocketbox man with short hair (`m05`), his texture seams joined and one
+  level of Catmull-Clark subdivision applied under the skeleton (about 5,000 points to 23,000, so the head, hands and
+  every garment are round, not faceted). The garments are cut from his own surface and shaped into cloth: the jacket
+  stands 1.6 cm off the body (2.8 at the hem, 1.4 to 2.1 down the sleeves), the trousers 1.6 (1.2 where they go into
+  the boots), the boots 1.2 at the foot and 2.7 round the calf, outside the trousers. Folds are displaced into the cloth
+  inside the elbows, at the armpits, round the waist and at the knees and boot tops. Every edge is cut by a plane once
+  the cloth has its shape (the hem, a neckline lower at the front, the sleeves 3 cm short of the wrist, the boot tops),
+  so it runs straight. Parts are cut from the garments by planes and stand off them with a thickness: the storm flap,
+  two chest and two hand-warmer pockets, the cuffs, the hem band, the trousers' cargo pockets, the boots' top band.
+  The collar is a band built round the neckline (7 cm at the back, 5 at the front, open at the zip); the hood is
+  rolled behind it; press studs down the flap, toggles on the hem, a buckle on each boot. The beard is a shell lifted
+  1.5 to 5 mm off his jaw, chin, cheeks and upper lip, with only the lips left bare (an oval measured from the lip and
+  mouth-corner bones). Everything carries his own bone weights.
+- `textures.py`: each garment's texture drawn on its own surface (every texel found on the garment in 3D): coated
+  nylon with a ripstop grid, seams with stitching, stitched part edges, creases, salt marks, dirt at the hem and cuffs,
+  worn edges; the trousers rougher with knee darts and mud; rubber with moulding lines, a tread and mud for the boots;
+  short strands for the beard. Colour (in grey, so the game colours it as the kit), normal and roughness maps.
+- `b_finish.py`: materials, the body taken away under the clothes where it can never show, three levels of detail
+  (about 60,000 to 74,000, 23,000 and 7,000 triangles), exported as `angler2_hd.glb` (7.6 MB, 2048 maps, all three
+  levels) and `angler2.glb` (3.1 MB, 1024 maps, the two lighter levels), and rendered to check.
+
+In the game (`human3d.js`): the levels of detail switch by distance from the camera (13 and 36 m, with a margin);
+the clothes take the kit's colours ("as they come": black jacket, charcoal trousers, green wellies); the beard takes
+the colour chosen in the picker, thinned to stubble or left off.
+
+**Body types (Slim, Medium, Broad) for every person**, 18 November: one morph worked out in the browser from each
+mesh's own bind pose (`buildMorph`), the same for the body and everything worn because each garment point carries the
+bones of the body under it: wider at the chest and sides, fuller at the belly, thicker arms, legs and neck, the arms
+and legs a little out with them; the head, hands and feet unchanged. Tested: a garment 2 cm outside the body stays
+outside it at every build (`tests/bodyBuild.test.js`).
+
+**Glasses and a head torch** for every person (thin frames with clear lenses, or sunglasses; a band round the head or
+over the hat with a lamp at the front), placed from the face measured at the eyes.
+
+**Animation and IK carried over.** Every walk, the cast, playing a fish (the body braced, leaning back and crouching
+with the line's tension, pumping and giving to surges), the landing net, holding the catch, foot planting, the head
+watching the rod tip or the fish, the hands on the rod, reel handle, net or fish: all on the shared skeleton, so the new
+people use them unchanged. No new motion-captured animation has been made.
+
+## Not done (so far), and why
+
+- **Faces and bodies are still Rocketbox's** (2015 game quality, made smoother by one level of subdivision). Replacing
+  them with the Blender Studio base meshes or MakeHuman would mean new faces, skin textures, eyes, hair and a new rig
+  fitted to the shared skeleton for every person: not attempted in this pass.
+- **Hairstyles are not modular**: each person's hair is part of their head's texture and mesh. The hair colour chosen
+  colours the main angler's beard; hats, the hood and the head torch go over any head.
+- **Face presets** (separate from choosing a person) are not made.
+- **Jackets**: one cut (the waterproof), in any of the kit's colours; no hoodie, gilet or patterned jackets yet.
+- **No new motion capture or keyframed animation**: the existing moves and IK carry over (above). The reference
+  sheet's poses are what the game already does with them; nothing was matched pose by pose.

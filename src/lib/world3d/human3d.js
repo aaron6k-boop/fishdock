@@ -1016,8 +1016,16 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   }
 
   let fp = false;
+  // (far off, at the lightest level of detail, the pose is worked out every other frame, the time carried over: a
+  // person 40 m away moves as smoothly to the eye, for half the work)
+  let skip = 0, owed = 0;
+  const poseAtDistance = (o) => {
+    if (lodNow === 2 && lodSets[2].length) { skip ^= 1; if (skip) { owed += o.dt || 0; return; } if (owed) { o = { ...o, dt: (o.dt || 0) + owed }; owed = 0; } }
+    else owed = 0;
+    pose(o);
+  };
   return {
-    root, pose,
+    root, pose: poseAtDistance,
     get top() { return wFigSafe(B("Head")).y + (top0 - headY0) * k; },
     get headAt() { return wFigSafe(B("Head")); },
     get eyeAt() { const a = B("LEye"), b = B("REye"); if (!a || !b) return wFigSafe(B("Head")).add(V(0, 0.1, -0.08)); return wFigSafe(a).add(wFigSafe(b)).multiplyScalar(0.5).add(V(0, 0, -0.02)); },

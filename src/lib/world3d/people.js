@@ -56,6 +56,9 @@ export const PEOPLE = [
   // pockets, waterproof trousers and green wellies, each with its own colour, normal and roughness maps, and lighter
   // versions of everything for further off. Coloured as your kit like the others; "as they come" is his own black)
   { file: "angler2", sex: "m", name: "Angler, waterproofs and beard", skin: 0, hair: 1, beard: 2, hem: 0.475, clothes: true, v2: true, own: { coat: 0x26292c, legs: 0x2a2b2c, boots: 0x2c4a28 } },
+  // (the woman angler, the same kit made on her own body (Rocketbox's woman with dark hair tied back, f07): a navy
+  // waterproof jacket, charcoal trousers and black wellies as she comes)
+  { file: "angler3", sex: "f", name: "Angler, waterproofs, hair tied back", skin: 1, hair: 1, beard: 0, hem: 0.475, clothes: true, v2: true, own: { coat: 0x26303c, legs: 0x2a2b2c, boots: 0x1d2023 } },
 ];
 // who your own angler is until you choose: the angler in their fishing clothes, so the jacket you see on your arms in
 // first person is the one you see them wearing from behind
