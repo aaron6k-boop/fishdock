@@ -410,6 +410,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     r.cur = { x: nx, y: c.y + (r.pose.y - c.y) * k, z: nz, face: c.face + Math.atan2(Math.sin(r.pose.face - c.face), Math.cos(r.pose.face - c.face)) * k, speed: moved / dt, air: r.pose.air, phase: (c.phase + moved * 2.2) % (Math.PI * 2) };
     x.a.setWalk(r.cur);
   }
+  const tmpMe = new THREE.Vector3();
   let camPos = new THREE.Vector3(0, L.deck + 1.65, 0), camTarget = null, cineShot = null, cineSince = 0, lastPhaseKey = "";
   // following jumps (optional, on to start): the camera turns to a leap just before it happens and closes in a little
   // so it reads on a phone, then eases back. Never while you're turning the view yourself, never in Free look, and not
@@ -697,6 +698,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
     if (camOverride) camPos.copy(camOverride); // test hook only: a fixed viewpoint for visual checks
     camera.position.copy(camPos);
+    // (your own name over your head only once the camera is well away from you: close behind you, walking or fishing,
+    // "You" sat in the middle of the picture in a pill the size of your head, Aaron's recording of 18 November)
+    { const me = anglers.get(localId); if (me && !landShot) { me.a.root.getWorldPosition(tmpMe); me.a.showTag(camPos.distanceTo(tmpMe) > 12); } }
     // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
     camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? FP_TALL : 1) * jumpZoom; camera.updateProjectionMatrix();
     setRigView(look.fov * (camera.aspect < 0.8 ? FP_TALL : 1)); // (your own arms framed for the picture's height: fpRig.js)
