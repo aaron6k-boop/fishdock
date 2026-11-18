@@ -1870,7 +1870,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // (but bringing it in over the rail, never: you step back as it comes over and lift it on its rope, your hands
         // out on the rope towards it. Let go, the net rose up the wall and swung over the rail by itself, no hands on it,
         // and an arm came out after it at full stretch (the PC's first-person landing, 18 November))
-        const lifting = landStage === "in" || releaseInfo?.stage === "in";
+        const lifting = landStage === "in" || releaseInfo?.stage === "in" || releaseInfo?.stage === "haul"; // (and the empty net brought back in over the rail, having let a fish go)
         if (toH.length() > reach + 0.3 && !lifting) { hoopPrev[hands.indexOf(hh)] = null; hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
         at.copy(sh).addScaledVector(toH.normalize(), reach);
         hoopPace(hh, at);
