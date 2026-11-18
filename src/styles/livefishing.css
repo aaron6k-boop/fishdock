@@ -426,7 +426,9 @@ html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(saf
 .gfx-pre { margin: 0; padding: 8px 10px; border-radius: 8px; background: #000a; font: 11.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; color: #d6e4ec; }
 .gfx-panel .ft-pill.on { background: color-mix(in srgb, var(--action) 35%, #0a141b); border-color: var(--action); } /* (the chosen setting, clearly marked) */
 .gfx-label { font-size: 13px; font-weight: 600; }
-.fps-meter { position: absolute; z-index: 6; left: max(10px, env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); padding: 5px 8px; border-radius: 8px; background: #000a; color: #fff; font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; pointer-events: none; }
+.fps-meter { position: absolute; z-index: 6; left: max(10px, env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); margin: 0; padding: 3px 6px; border: 0; border-radius: 6px; background: #0008; color: #fff; font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: left; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
+.fps-meter.small { padding: 2px 6px; border-radius: 999px; font-weight: 600; }
+.fps-meter:focus-visible { outline: 2px solid #8ee6c9; outline-offset: 1px; }
 /* controls on the right (for a right thumb): Cast, Strike and Reel bottom right, the camera tools bottom left */
 html:not([data-hand="left"]) .fs-bottom { align-self: flex-end; align-items: flex-end; }
 html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
