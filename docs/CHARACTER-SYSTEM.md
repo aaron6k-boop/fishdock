@@ -104,11 +104,14 @@ people use them unchanged. No new motion-captured animation has been made.
   sleeve stacked in three or four rings above each cuff; long soft folds hanging down the back from the shoulder
   blades and down the front below the chest pockets; behind and across the knees, down the shins, stacked above the
   boots.
-- *Wellies moulded.* The shaft is set out to one smooth surface round each leg (the widest the boot reaches in 2 cm
-  slices and 10-degree sectors, kept to its first four harmonics round the leg and smoothed up it, never narrower above
-  the calf than at it), relaxed and set out again so no triangles fold over; an arch lifts the sole 7 mm under the
-  instep; a moulded rand stands 3 mm proud round the sole; the top band is drawn in the textures (cut from the shaft it
-  threw spikes round the rim).
+- *Wellies moulded.* The shaft follows one smooth surface round each leg (the widest the boot reaches in 2 cm slices
+  and 10-degree sectors, kept to its first four harmonics round the leg and smoothed up it, never narrower above the
+  calf than at it, and always clear of the body and of the trousers inside). The man's own points are set out to it and
+  relaxed so no triangles fold over; the woman's shaft is built as one clean tube from the ankle up, a ring a
+  centimetre (her body's own boots end at mid-calf with her jeans going in, two layers that showed as a broken line
+  round the calf whatever was done to them). Both are weighted from the nearest body point, so the shaft moves with the
+  calf. An arch lifts the sole 7 mm under the instep; a moulded rand stands 3 mm proud round the sole; the top band is
+  drawn in the textures (cut from the shaft it threw spikes round the rim).
 - *Textures.* Creases from the height of Poly Haven's Fabric Leather 02 (CC0), laid along the body as cloth creases:
   rings round the sleeves and legs (deepest at the elbows, above the cuffs, at the knees and above the boots), upright
   down the body; the seam allowance raised either side of every seam; the stitching round each pocket, flap and band
@@ -118,7 +121,8 @@ people use them unchanged. No new motion-captured animation has been made.
   distant mipmaps don't pull lines into the islands' edges.
 - *In the game.* The man's skeleton is restructured to the Rocketbox layout after export (`fix_rig.py`; he had stood
   89 m up, then 0.9 m up, in the moves). Hats, caps, glasses and head torches were drawn metres wide and floating:
-  the head was measured with its bones applied twice (`measure()`); fixed. The new people's bare hands keep their own
+  the head was measured with its bones applied twice (`measure()`); fixed, and sized from the skull, no deeper than a
+  head (the woman's ponytail had made her cap twice as deep). The new people's bare hands keep their own
   skin texture (they were flat orange next to the face). The jacket and trousers have a cloth sheen so folds show on
   a black jacket. Round a handle each finger now wraps it (every joint bends until its bone meets the handle's
   surface), so the rod and the reel's knob are held in the fingers, not beside a fist. The collarbone follows the arm
