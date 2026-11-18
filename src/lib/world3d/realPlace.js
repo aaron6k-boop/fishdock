@@ -21,6 +21,7 @@ import { buildTrees } from "./trees3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
 import { columnGeometry, lanternAt, lampPools, shadeFromOwnLantern, COLUMN } from "./lamps3d.js";
 import { buildOpenPier } from "./openPier.js";
+import { terrainHill } from "./terrain3d.js";
 import { deckHeight } from "./pierDeck.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
@@ -28,6 +29,42 @@ const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
 // beach's wet slope under the water carry their own colour over a neutral detail map
 const COL_OF = [[0.42, 0.44, 0.4], [1, 1, 1], [0.62, 0.54, 0.4], [0.26, 0.38, 0.17]];
 const WALL_BOTTOM = GROUND.water - 0.8;
+
+// ---- a stone pier's battered walls (Whitby's): each wall leans back as it rises, its foot pushed out ----
+// geo: the pier's outline extruded from WALL_BOTTOM up to h (ring anticlockwise in x and -z, as built below); every
+// vertex below the top moves out along its corner's outward direction by k metres for each metre below the top
+function batter(geo, ring, h, k) {
+  const n = ring.length, out = ring.map((q, i) => {
+    const a = ring[(i - 1 + n) % n], b = ring[(i + 1) % n];
+    const e1 = [q[0] - a[0], q[1] - a[1]], e2 = [b[0] - q[0], b[1] - q[1]], l1 = Math.hypot(...e1) || 1, l2 = Math.hypot(...e2) || 1;
+    const n1 = [e1[1] / l1, -e1[0] / l1], n2 = [e2[1] / l2, -e2[0] / l2]; let m = [n1[0] + n2[0], n1[1] + n2[1]]; const ml = Math.hypot(...m) || 1; m = [m[0] / ml, m[1] / ml];
+    const cosH = Math.max(0.5, m[0] * n2[0] + m[1] * n2[1]); // (a mitre, no more than twice as far at a sharp corner)
+    const t = [q[0] + m[0] * 0.5, q[1] + m[1] * 0.5], sgn = inside(t, ring) ? -1 : 1;
+    return [(m[0] * sgn) / cosH, (m[1] * sgn) / cosH];
+  });
+  const key = (x, z) => `${Math.round(x * 100)},${Math.round(z * 100)}`, at = new Map(ring.map((q, i) => [key(q[0], q[1]), i]));
+  const pos = geo.attributes.position;
+  for (let v = 0; v < pos.count; v++) {
+    const y = pos.getY(v); if (y > h - 0.01) continue;
+    const i = at.get(key(pos.getX(v), pos.getZ(v))); if (i == null) continue;
+    const d = (h - y) * k; pos.setX(v, pos.getX(v) + out[i][0] * d); pos.setZ(v, pos.getZ(v) + out[i][1] * d);
+  }
+  pos.needsUpdate = true; geo.computeVertexNormals();
+}
+
+// a hill function that is 0 on the solid piers' decks
+function offPiers(hill, piers) {
+  if (!hill) return null;
+  const rs = (piers || []).filter((p) => p.ring && !p.open).map((p) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of p.ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } return { r: p.ring, x0: x0 - 1, x1: x1 + 1, z0: z0 - 1, z1: z1 + 1 }; });
+  return (x, z) => (rs.some((b) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && inside([x, z], b.r)) ? 0 : hill(x, z));
+}
+
+// ---- sandstone ashlar (Whitby's piers): the photographed blocks, honey-brown, darker and weedy towards the sea ----
+function stoneWall(st, h) {
+  const tile = st.tile ?? 0.4, d = photoTex("sandstone_wall_diff", { repeat: tile }), nn = d && photoTex("sandstone_wall_nor", { srgb: false, repeat: tile });
+  const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1.2, 1.2), color: st.tint ?? 0xf0d8ac, roughness: 0.93 });
+  return weather(m, { scale: 0.55, mottle: 0.35, grime: [WALL_BOTTOM, 1.1, 0.75], streaks: [h, 3.5, 0.3], rough: [0.9, 1.1] });
+}
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
 const RAIL = { within: 260, inset: 0.22, h: 1.1, post: 2.0 };
@@ -394,7 +431,10 @@ export function contactShade({ cx, cz, size = 140, mpp = 0.1, rings = [], discs 
 }
 
 export function buildRealPlace(group, place, M, solids = [], quality = 1) {
-  const local = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
+  const local0 = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
+  // (and a survey's heights for its ground, where a mark has them (terrain3d.js): never under a pier's deck, which a
+  // survey of the bare ground can take for ground)
+  const local = local0?.terrain ? { ...local0, hill: offPiers(terrainHill(local0.terrain), place.piers) } : local0;
   const fenceKind = (x, z, nx, nz) => (local?.fence ? local.fence(x, z, nx, nz) : "rail");
   const spots = place.spots || [], nearSpot = (x, z, r = NEAR_SOLID) => spots.some((sp) => Math.hypot(x - sp.at[0], z - sp.at[2]) < r);
   const xs = place.grid.xs, n = xs.length, cls = unrle(place.grid.cls, n * n);
@@ -495,7 +535,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     if (cls[k] !== 1 && cls[k] !== 3) continue;
     const up = hill(X[k], Z[k]); if (up <= 0) continue;
     h[k] += up;
-    if (Math.abs(hill(X[k] - 2, Z[k]) - hill(X[k] + 2, Z[k])) > 0.3) bank[k] = 1;
+    const dx = Math.abs(hill(X[k] - 2, Z[k]) - hill(X[k] + 2, Z[k])), dz = Math.abs(hill(X[k], Z[k] - 2) - hill(X[k], Z[k] + 2));
+    if (Math.max(dx, dz) > 0.3) bank[k] = Math.max(dx, dz) > 3.4 ? 2 : 1; // (2: a cliff's face, steeper than 40°: bare rock and earth)
   }
   // ---- the town's ground: the map's unmarked land away from the water, the piers and the streets is not the pier's
   // concrete (it was drawn so, slab joints and all, out to the horizon) but yards, gardens, verges and waste ground:
@@ -549,7 +590,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     }
     if (bank[k]) { // (the cliff's face: rough grass, darker clumps of scrub and paler worn patches, not a lawn)
       const s1 = noise2(X[k] / 9, Z[k] / 9, 1e6, 11), s2 = noise2(X[k] / 3, Z[k] / 3, 1e6, 12), sc = Math.max(0, Math.min(1, (s1 - 0.55) * 4)), pale = Math.max(0, Math.min(1, (0.35 - s1) * 4)) * 0.5;
-      const r = 0.29 - sc * 0.1 + pale * 0.12, gg = 0.36 - sc * 0.1 + pale * 0.08, b = 0.19 - sc * 0.05 + pale * 0.07, f = 0.9 + s2 * 0.18;
+      let r = 0.29 - sc * 0.1 + pale * 0.12, gg = 0.36 - sc * 0.1 + pale * 0.08, b = 0.19 - sc * 0.05 + pale * 0.07; const f = 0.9 + s2 * 0.18;
+      if (bank[k] === 2) { const t = 0.75 - sc * 0.4; r += (0.27 - r) * t; gg += (0.23 - gg) * t; b += (0.18 - b) * t; } // (the steepest: grey-brown shale and sandstone showing through)
       pos.set([X[k], h[k], Z[k]], k * 3); col.set([r * f, gg * f, b * f], k * 3); uv.set([X[k] / 8, Z[k] / 8], k * 2); continue;
     }
     pos.set([X[k], h[k], Z[k]], k * 3); col.set([(c[0] + (GR[0] - c[0]) * g2) * v, (c[1] + (GR[1] - c[1]) * g2) * v, (c[2] + (GR[2] - c[2]) * g2) * v], k * 3);
@@ -586,6 +628,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   g.computeVertexNormals();
   const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
   let concSide = null; // (a mark's concrete pier sides and parapets: localDetail.js concrete)
+  let stoneSide = null, stoneTop = null; // (a mark's sandstone pier walls and decks: localDetail.js stone)
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
   // the pier's own direction (its longest run of wall near the fishing spots), for the deck's slab joints: square across
   // it, not across the map's north and south
@@ -924,16 +967,21 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // galvanised steel: dull, mottled zinc gone grey with weather, darker towards the deck where the spray and the dirt
   // reach, not polished chrome. The fittings (caps, ball joints, base plates, the sleeves where rails join, the bolts)
   // are where the zinc wears through first: rust in their crevices and a run of it down from each joint
-  const railMat = thinTubes(weather(new THREE.MeshStandardMaterial({ color: 0xaeb2b1, metalness: 0.6, roughness: 0.62 }), { scale: 0.7, mottle: 0.35, bump: 0.6, rust: [0.32, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.5, 0.26], rough: [0.8, 1.25], wet: place.deckWet })); // (rustier: a North Sea pier's railings are brown along their joints and streaked below them)
+  // (or gloss white paint where a mark's photographs show it, localDetail.js railPaint: Whitby's piers)
+  const railMat = local?.railPaint
+    ? thinTubes(weather(new THREE.MeshStandardMaterial({ color: local.railPaint, metalness: 0.1, roughness: 0.42 }), { scale: 0.7, mottle: 0.1, rust: [0.12, 0.4, 0.25, 0.1], grime: [LAND, LAND + 0.4, 0.15], rough: [0.85, 1.15], wet: place.deckWet }))
+    : thinTubes(weather(new THREE.MeshStandardMaterial({ color: 0xaeb2b1, metalness: 0.6, roughness: 0.62 }), { scale: 0.7, mottle: 0.35, bump: 0.6, rust: [0.32, 0.16, 0.065, 0.028], grime: [LAND, LAND + 0.5, 0.26], rough: [0.8, 1.25], wet: place.deckWet })); // (rustier: a North Sea pier's railings are brown along their joints and streaked below them)
   // (the jetties' handrails: thin tubes of dull galvanising)
   const jRailMat = thinTubes(new THREE.MeshStandardMaterial({ color: 0x8a8e8c, metalness: 0.3, roughness: 0.8 })); // (no weathering: on tubes this thin it shaded them past white, a row of glowing bars)
   const jointMat = thinTubes(weather(new THREE.MeshStandardMaterial({ color: 0xa2a6a5, metalness: 0.55, roughness: 0.66 }), { scale: 0.35, mottle: 0.4, bump: 0.8, rust: [0.85, 0.15, 0.06, 0.025], grime: [LAND, LAND + 0.4, 0.25], rough: [0.8, 1.2], wet: place.deckWet }));
   const posts = [], rails = [], timberRuns = [], barRuns = [];
+  const raisedRings = (place.piers || []).filter((p) => p.ring && !p.open && p.h > LAND + 1).map((p) => p.ring), raisedPierAt = (q) => raisedRings.some((r) => inside(q, r));
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
     if (len < 0.5 || Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > RAIL.within) continue;
     const ix = -nx * RAIL.inset, iz = -nz * RAIL.inset, a = [x1 + ix, z1 + iz], b = [x2 + ix, z2 + iz];
     if (!landAt([(a[0] + b[0]) / 2 - nx * 0.6, (a[1] + b[1]) / 2 - nz * 0.6])) continue;
+    if (raisedPierAt([(a[0] + b[0]) / 2 - nx * 0.6, (a[1] + b[1]) / 2 - nz * 0.6])) continue; // (inside a pier built higher than the land: its own railings, below)
     const kind = fenceKind((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, nx, nz);
     if (kind === "none") continue; // (a solid parapet instead: localDetail.js concrete)
     if (kind !== "rail") { (kind === "timber" ? timberRuns : barRuns).push([a, b, LAND]); continue; }
@@ -1162,11 +1210,16 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     solids.push(collider(cbp, cbi));
   }
   // (and what a mark's photographs show that the map has no outline for: a pier head's light tower, localDetail.js extras)
+  const bridges = []; // (the footbridges among them, walked over like a jetty: below)
   for (const ex of local?.extras || []) {
     if (!LANDMARK_BUILDERS[ex.kind]) continue;
-    const r = ex.r || 1.5, ring = [[ex.at[0] - r, ex.at[1] - r], [ex.at[0] + r, ex.at[1] - r], [ex.at[0] + r, ex.at[1] + r], [ex.at[0] - r, ex.at[1] + r]];
-    const od = openDeckAt(ex.at), base = ex.base ?? (od != null ? od : groundAt(ex.at[0], ex.at[1]) || LAND);
+    // (its outline: a square round its point, or its own outline where the photographs show its plan, as the Abbey's)
+    const r = ex.r || 1.5, ring = ex.ring || [[ex.at[0] - r, ex.at[1] - r], [ex.at[0] + r, ex.at[1] - r], [ex.at[0] + r, ex.at[1] + r], [ex.at[0] - r, ex.at[1] + r]];
+    // (on an open deck, on a solid pier's deck (not the ground under it: the pier stands higher), or on the ground)
+    const od = openDeckAt(ex.at), onPier = (place.piers || []).find((p) => p.ring && !p.open && inside(ex.at, p.ring));
+    const base = ex.base ?? (od != null ? od : onPier ? onPier.h : groundAt(ex.at[0], ex.at[1]) || LAND);
     const lm = LANDMARK_BUILDERS[ex.kind](group, ring, base, ex);
+    if (ex.walk && ex.a && ex.b) { const d = Math.hypot(ex.b[0] - ex.a[0], ex.b[1] - ex.a[1]), u = [(ex.b[0] - ex.a[0]) / d, (ex.b[1] - ex.a[1]) / d]; bridges.push({ a: [ex.a[0] - u[0] * 0.6, ex.a[1] - u[1] * 0.6], b: [ex.b[0] + u[0] * 0.6, ex.b[1] + u[1] * 0.6], w: ex.w || 2.4, y: base }); }
     for (const m of lm.meshes) { m.userData.kind = "a building"; targets.push(m); }
     place.buildingGlow = [...(place.buildingGlow || []), ...lm.glow];
     if (lm.flash) beacons.push(lm.flash);
@@ -1196,7 +1249,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     solids.push(collider(cbp, cbi));
   }
 
-  const jetties = [], fishEdges = []; // for walking about and fishing from anywhere (below)
+  const jetties = [...bridges], fishEdges = []; // for walking about and fishing from anywhere (below)
   // ---- piers drawn as a line (jetties on piles), outlines (breakwaters), groynes ----
   const pileMat = new THREE.MeshStandardMaterial({ color: 0x4a443c, roughness: 0.95 });
   const deckSlab = new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, roughness: 0.95, color: 0xdedad2 });
@@ -1210,6 +1263,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const op = buildOpenPier(group, p.ring, p.h, {
         ramps: p.ramps, slip: local?.pier?.slip || null, keepOff: (x, z) => onDeck.some((r) => nearRing(r, x, z) < 0.9),
         landAt: (x, z) => landAt([x, z]), landY: LAND, bedAt: () => GROUND.water - 0.2, waterY: -0.25, spots, quality, wet: place.deckWet,
+        ...(p.style === "trestle" ? { style: "trestle", benches: false, lamps: false } : {}),
       });
       for (const m of op.meshes) { if (!m.userData.kind) m.userData.kind = "the pier"; }
       targets.push(...op.solids); solids.push(...op.solids); fishEdges.push(...op.fishEdges);
@@ -1243,8 +1297,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const sh = new THREE.Shape(ring.map(([x, z]) => new THREE.Vector2(x, -z)));
       const geo = new THREE.ExtrudeGeometry(sh, { depth: p.h - WALL_BOTTOM, bevelEnabled: false }); geo.rotateX(-Math.PI / 2); geo.translate(0, WALL_BOTTOM, 0);
       // (its sides: steel sheet piling, or plain concrete where the mark's photographs show it, localDetail.js concrete)
-      const sideMat = local?.concrete ? (concSide ||= weather(new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb9b5ad, roughness: 0.95 }), { scale: 0.7, mottle: 0.3, grime: [WALL_BOTTOM, 0.6, 0.45], streaks: [p.h, 2.5, 0.2], rough: [0.9, 1.1] })) : new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 });
-      const m = new THREE.Mesh(geo, [deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      // (or sandstone blocks, localDetail.js stone: Whitby's piers, their walls battered, leaning back as they rise)
+      if (local?.stone) batter(geo, ring, p.h, local.stone.batter ?? 0.14);
+      const sideMat = local?.stone ? (stoneSide ||= stoneWall(local.stone, p.h)) : local?.concrete ? (concSide ||= weather(new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb9b5ad, roughness: 0.95 }), { scale: 0.7, mottle: 0.3, grime: [WALL_BOTTOM, 0.6, 0.45], streaks: [p.h, 2.5, 0.2], rough: [0.9, 1.1] })) : new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 });
+      // (and its top: sandstone flags where the walls are sandstone)
+      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall({ ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h)) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
       // a solid concrete parapet along its edges over the water, where the mark's photographs show one (Lowestoft's South
       // Pier: both sides and round its head), its outer face flush with the pier's side
       if (local?.concrete) {
@@ -1264,17 +1321,18 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         }
       }
       // railings round its edge where it meets the water, near the anglers
-      if (p.kind === "pier" || p.kind === "quay") {
-        const rp = [], rr = [];
+      if (p.kind === "pier" || p.kind === "quay" || (local?.stone && p.kind === "breakwater")) {
+        const rp = [], rr = [], own = p.kind === "pier" || p.kind === "quay"; // (a breakwater's edges are fished from as the shore's walls)
         for (let k = 0; k < p.ring.length; k++) {
           const [x1, z1] = p.ring[k], [x2, z2] = p.ring[(k + 1) % p.ring.length], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.5) continue;
           if (Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > RAIL.within) continue;
           let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
           if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], p.ring)) { nx = -nx; nz = -nz; } // outward
           if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], p.ring)) continue; // land, not water, outside
-          fishEdges.push([x1, z1, x2, z2, nx, nz, "pier", p.h]);
+          if (own) fishEdges.push([x1, z1, x2, z2, nx, nz, "pier", p.h]);
           const a2 = [x1 - nx * RAIL.inset, z1 - nz * RAIL.inset], b2 = [x2 - nx * RAIL.inset, z2 - nz * RAIL.inset], np = Math.max(1, Math.round(len / RAIL.post));
           const kind = fenceKind((a2[0] + b2[0]) / 2, (a2[1] + b2[1]) / 2, nx, nz);
+          if (kind === "none") continue; // (an open edge: nothing along it, localDetail.js fence)
           if (kind !== "rail") { (kind === "timber" ? timberRuns : barRuns).push([a2, b2, p.h]); continue; }
           for (let q = 0; q < np; q++) rp.push([a2[0] + (b2[0] - a2[0]) * q / np, a2[1] + (b2[1] - a2[1]) * q / np]);
           for (const y of [RAIL.h, RAIL.h * 0.5]) rr.push({ a: [a2[0], p.h + y, a2[1]], b: [b2[0], p.h + y, b2[1]], r: y === RAIL.h ? 0.026 : 0.018 });

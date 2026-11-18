@@ -147,6 +147,55 @@ export const LOCAL = {
     extras: [{ kind: "harbourLight", at: [72, 2] }, { kind: "harbourLight", at: [99, -62], lit: "green" }],
     note: "The South Pier's walls and parapets, its light, the North Pier's light, the entertainment centre, the yacht club and the East Point Pavilion are modelled from photographs and descriptions on OpenStreetMap's outlines; their sizes are estimates. The rest of the town is drawn from the map, not modelled building by building.",
   },
+  // Whitby's piers (added 18 November 2026; photographs on Wikimedia Commons listed in docs/REFERENCE-PHOTOS.md). Two
+  // sandstone piers guard the mouth of the Esk, the West Pier (1814, its lighthouse 1831) and the East Pier (1854, its
+  // lighthouse 1855), each carried on another 150 m by an extension of 1912 to 1914: a timber deck on a timber frame over
+  // a concrete base, with a beacon at its end, green on the west, red on the east (Wikipedia, Piers of Whitby). Casting
+  // into the harbour entrance between the piers is banned, so the anglers here stand on the East Pier's seaward side
+  // facing out to sea over the rocky ground under the East Cliff (the mark's sources)
+  "whitby-piers": {
+    pier: {
+      fishFrom: [44, -32],
+      // the extensions (OSM ways 288861504, west, and 162295173, east): open timber decks on their frames, not solid arms
+      open: "trestle", id: [288861504, 162295173],
+      // the decks' heights over the sea at mid-tide: the stone piers stand about 9 to 10 m above low water (Wikipedia),
+      // so about 5 m at mid-tide (estimated); the extensions level with them (the photographs)
+      heights: { 288861500: 5, 288861502: 5, 288861504: 4.8, 162295173: 4.8 },
+    },
+    // the stone piers: honey-coloured sandstone blocks, their walls leaning back as they rise, dark and weedy towards
+    // the sea, white-painted railings along both sides (the photographs)
+    stone: { batter: 0.14 },
+    railPaint: 0xf0efe8,
+    // the East Pier has no railing along its seaward side, only the edge of its flags (where the anglers stand), and a
+    // railing along its harbour side; the West Pier has them along both (the photographs)
+    fence: (x, z, nx, nz) => (x > -80 && nx > 0.3 ? "none" : "rail"),
+    // and rock armour heaped either side of the East Pier's root, where it meets the foot of the East Cliff
+    rocks: (x, z) => x > 75 && z > 15 && z < 100,
+    // the two lighthouses on the stone piers' heads and the beacons at the extensions' ends, on the map's points for
+    // them; the Abbey's ruins on the map's outline of them (OSM way 98740802), up on the East Cliff (landmarksWhitby.js)
+    extras: [
+      { kind: "westPierLight", at: [-114.9, -192.4], r: 2.4 },
+      { kind: "eastPierLight", at: [-46.9, -192.0], r: 2.2 },
+      { kind: "pierBeacon", at: [-138.0, -348.3], colour: "green" },
+      { kind: "pierBeacon", at: [-78.0, -334.0], colour: "red" },
+      // (and the footbridges from the stone piers' heads to the extensions, walked over: the West Pier's timber one, the
+      // East Pier Bridge of steel, 2020; OSM ways 288861501 and 840870516)
+      { kind: "footbridge", at: [-139.2, -206.4], a: [-135.6, -204.1], b: [-142.8, -208.6], w: 2.4, deck: "timber", base: 4.9, walk: true },
+      { kind: "footbridge", at: [-32.1, -202.4], a: [-44.5, -198.4], b: [-19.6, -206.3], w: 2.6, deck: "steel", base: 4.9, walk: true },
+      // (the West Pier's lamps: a line down it 3 m in from its harbour side, from its root to the lighthouse)
+      { kind: "lampRow", at: [-165, -40], base: 5, r: 0.5, line: [[-198.8, 56.8], [-163.1, -32.5], [-124.6, -125.5], [-105.2, -174.3]], inset: 3, every: 24, from: 12, side: -1 },
+      { kind: "whitbyAbbey", at: [233, 308], ring: [[188.3, 312.3], [190.4, 293.5], [231.5, 299.8], [233.0, 288.0], [247.6, 289.9], [246.4, 302.0], [277.7, 304.7], [276.1, 324.7], [242.7, 320.9], [242.1, 327.5], [226.9, 326.0], [227.7, 317.2]] },
+    ],
+    // the ground: the East Cliff and the West Cliff at their surveyed heights (terrain3d.js: the Environment Agency's
+    // LIDAR survey of the bare ground, Open Government Licence)
+    terrain: "whitby",
+    // St Mary's Church on its outline, at the top of the 199 Steps
+    landmarks: { 158276579: "stMarys" },
+    // the old town under the cliffs: brick, stone and painted render under red pantile roofs (the photographs from the
+    // cliffs and the piers)
+    town: { render: 0.4, clay: 0.75 },
+    note: "Whitby's piers, their lighthouses and beacons, the timber extensions, the Abbey's ruins and St Mary's Church are modelled from photographs and descriptions on OpenStreetMap's outlines; their sizes and the decks' heights are estimates. The cliffs stand at their surveyed heights (Environment Agency LIDAR, Open Government Licence). The rest of the town is drawn from the map, not modelled building by building.",
+  },
 };
 export const localFor = (id) => LOCAL[id] || null;
 

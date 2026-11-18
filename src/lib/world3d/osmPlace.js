@@ -206,9 +206,13 @@ export function buildPlace(osm, lat0, lon0, venue = "pier", { box = PLACE3D.box,
       // a closed outline of any size worth standing on (simple rectangles have only four corners)
       const area = isClosed && (t.area === "yes" || Math.abs(area2(ring.slice(0, -1))) > 400);
       // (open: a seaside pier on iron legs, its deck over the water and the beach, not a solid arm: localDetail.js says so
-      // for the mark's own pier)
-      const open = !!(local?.pier?.open && kind === "pier" && area && (local.pier.id == null || local.pier.id === w.id));
-      out.piers.push({ kind, width, area, line: area ? null : ring, ring: area ? ring.slice(0, -1) : null, h: kind === "groyne" ? 1.2 : kind === "quay" ? 2.4 : kind === "breakwater" ? 3.5 : 4.2, ...(open ? { open: true, id: w.id } : {}) });
+      // for the mark's own pier. A breakwater is open only when it's named there by its id, as Whitby's timber
+      // extensions are; open: "trestle" is a timber frame on a concrete base, not iron legs)
+      const ids = local?.pier?.id == null ? null : [].concat(local.pier.id), named = !!ids?.includes(w.id);
+      const open = !!(local?.pier?.open && area && ((kind === "pier" && (!ids || named)) || (kind === "breakwater" && named)));
+      // (and a deck's height where the photographs show it higher or lower than the usual, by its id: localDetail.js)
+      const hSet = local?.pier?.heights?.[w.id];
+      out.piers.push({ kind, width, area, line: area ? null : ring, ring: area ? ring.slice(0, -1) : null, h: hSet ?? (kind === "groyne" ? 1.2 : kind === "quay" ? 2.4 : kind === "breakwater" ? 3.5 : 4.2), ...(open ? { open: true, id: w.id, ...(local.pier.open === "trestle" ? { style: "trestle" } : {}) } : {}) });
     } else if (isClosed && (t.natural === "beach" || t.natural === "sand" || t.natural === "shingle")) out.beaches.push(ring.slice(0, -1));
     else if (isClosed && (t.leisure === "park" || t.landuse === "grass" || t.leisure === "pitch" || t.landuse === "recreation_ground" || t.leisure === "golf_course" || t.landuse === "meadow")) out.green.push(ring.slice(0, -1));
     else if (isClosed && t.building) {
