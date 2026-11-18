@@ -20,13 +20,17 @@ def page(look, cam="third"):
   proc, ws = launch(1920, 1080, port=9500 + random.randint(0, 300), profile=f"{A}/edge-film/pp-{int(time.time())}-{random.randint(0, 999)}")
   ws.call("Page.enable"); ws.call("Runtime.enable"); ws.call("Network.setBypassServiceWorker", {"bypass": True})
   init = "window.__fdFilm = true; window.__errs = []; addEventListener('error', (e) => window.__errs.push(String(e.message))); addEventListener('unhandledrejection', (e) => window.__errs.push('rejection: ' + String(e.reason && e.reason.message || e.reason)));"
-  init += "try{localStorage.setItem('fishdock.playerName','Aaron');localStorage.setItem('fishdock.view3d.v1',JSON.stringify({gfx:'ultra',fishCam:'%s'}));localStorage.setItem('fishdock.look',%s);}catch(e){}" % (cam, json.dumps(json.dumps(look)))
+  init += "try{localStorage.setItem('fishdock.playerName','Aaron');localStorage.setItem('fishdock.view3d.v1',JSON.stringify({gfx:'ultra',fishCam:'%s'}));localStorage.setItem('fishdock.look',%s);}catch(e){}" % (cam, json.dumps(json.dumps({k: v for k, v in look.items() if not k.startswith("_")})))
   ws.call("Page.addScriptToEvaluateOnNewDocument", {"source": init})
-  ws.call("Page.navigate", {"url": URL}); t1 = time.time()
-  while time.time() - t1 < 240:
-    time.sleep(3); s2 = ws.ev("!!(window.__fdWorld && window.__fdWorld.play && window.__fdProbe && window.__fdProbe.head)")
+  ws.call("Page.navigate", {"url": URL}); t1 = time.time(); tries = 0; t2 = time.time()
+  while time.time() - t1 < 300:
+    time.sleep(3); s2 = ws.ev("!!(window.__fdWorld && window.__fdWorld.play && window.__fdProbe && window.__fdProbe.head) && /Hold Cast|Cast/.test(document.body.innerText)")
     if s2 is True: break
-  time.sleep(8)
+    # (a part of the game that failed to load (it happened once, on a fresh copy of the build): load the page again)
+    bad = ws.ev("(window.__errs || []).some((e) => /Failed to fetch|Importing a module/.test(e))")
+    if (bad is True or time.time() - t2 > 100) and tries < 2:
+      tries += 1; t2 = time.time(); print("reloading the page:", ws.ev("JSON.stringify(window.__errs || [])"), flush=True); ws.call("Page.navigate", {"url": URL})
+  time.sleep(14)
   for typ in ("keyDown", "keyUp"): ws.call("Input.dispatchKeyEvent", {"type": typ, "key": "f", "code": "KeyF", "windowsVirtualKeyCode": 70, "text": "f" if typ == "keyDown" else ""})
   time.sleep(5); print("loaded in", round(time.time() - t1), "s | build:", ws.ev("fetch('/build.json').then(r=>r.text())"), flush=True)
   return proc, ws

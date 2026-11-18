@@ -208,7 +208,20 @@ def jacket(size=2048):
     cr = np.sin(s / 0.012 + 3 * fbm(pos, 0.04, 2, 7)) * (1 - np.abs(s) / 0.1)
     Hh[near] += cr[near] * 0.0005
   wz = (z > hem) & (z < hem + 0.12); cr = np.sin((z - hem) / 0.01 + 4 * fbm(pos, 0.05, 2, 9)) * (1 - np.abs(z - hem - 0.06) / 0.06)
-  Hh[wz] += cr[wz] * 0.0004
+  Hh[wz] += cr[wz] * 0.0002
+  # creases where the cloth bunches, from a photographed creased fabric (Poly Haven's denmin_fabric_02, CC0) laid on
+  # at its real size: inside the elbows and down the forearms to the cuffs, under the arms, round the waist above the
+  # hem band; and a faint crinkle all over, as a coated shell has
+  ch, _, _ = detail("denmin_fabric_02", pos, nor, 0.42, m); ch2, _, _ = detail("denmin_fabric_02", pos + 0.37, nor, 0.19, m)
+  cmask = np.full(m.shape, 0.22, np.float32)
+  for S2 in arms:
+    t, r, rad, ax, a, w = arms[S2]; e = bone(f"{S2}_Forearm"); s0 = (pos - e) @ ax
+    cmask = np.maximum(cmask, np.clip(1 - np.abs(s0) / 0.15, 0, 1) * (r < 0.11))
+    cmask = np.maximum(cmask, np.clip((t - 0.55) / 0.25, 0, 1) * (r < 0.11) * 0.8)
+    ap = a - np.array([0, 0, 0.08]); cmask = np.maximum(cmask, np.clip(1 - np.linalg.norm(pos - ap, axis=2) / 0.13, 0, 1) * 0.8)
+  cmask = np.maximum(cmask, np.clip(1 - np.abs(z - hem - 0.07) / 0.08, 0, 1) * 0.85)
+  cmask = cmask * (0.7 + 0.6 * fbm(pos, 0.12, 2, 71))
+  Hh += ch * 0.0011 * cmask + ch2 * 0.00022
   nrm = normal_from_height(Hh, du, dv, 1.0, m)
   # colour (grey, coloured in the game): the cloth a little uneven; the seams darker in their groove; the stitching a
   # touch lighter; salt in pale tide marks; dirt towards the hem and cuffs; the coating worn paler on edges
@@ -257,6 +270,17 @@ def trousers(size=2048):
     on = (np.abs(dist - 0.004) < 0.0006) & (pm > 0); along = pos @ np.array([0.31, 0.53, 0.79])
     stitch[on] = np.maximum(stitch[on], ((np.modf(along[on] / 0.0035)[0] % 1.0) < 0.62).astype(np.float32)); edge[pm > 0] = np.maximum(edge[pm > 0], np.clip(1 - dist[pm > 0] / 0.003, 0, 1))
   Hh += stitch * 0.00025 - edge * 0.0003
+  # creases (the same photographed creased fabric): behind and across the knees, the crotch, the front of the hips,
+  # stacked above the boots; faint everywhere else
+  ch, _, _ = detail("denmin_fabric_02", pos + 1.3, nor, 0.4, m)
+  cmask = np.full(m.shape, 0.2, np.float32)
+  for S2 in ("L", "R"):
+    kn, th = bone(f"{S2}_Calf"), bone(f"{S2}_Thigh")
+    cmask = np.maximum(cmask, np.clip(1 - np.linalg.norm(pos - kn, axis=2) / 0.14, 0, 1))
+    cr = np.array([cx, cy, th[2] - 0.06]); cmask = np.maximum(cmask, np.clip(1 - np.linalg.norm(pos - cr, axis=2) / 0.18, 0, 1) * 0.8)
+  cmask = np.maximum(cmask, np.clip((zmin + 0.27 * H + 0.14 - z) / 0.14, 0, 1))
+  cmask = cmask * (0.7 + 0.6 * fbm(pos, 0.12, 2, 73))
+  Hh += ch * 0.001 * cmask
   nrm = normal_from_height(Hh, du, dv, 1.0, m)
   low = np.clip((zmin + 0.42 - z) / 0.25, 0, 1)
   mud = np.clip((fbm(pos, 0.015, 4, 33) - 0.55) * 5, 0, 1) * low
@@ -283,6 +307,10 @@ def boots(size=1024):
   # moulding lines up the sides of the shaft, and a band of texture round the ankle
   side_line = groove(rel @ fwd, 0.001) * (z > zmin + 0.03); Hh += side_line * 0.0004
   rib = (np.sin(z / 0.0025) * 0.5 + 0.5) * ((z > zmin + 0.035) & (z < zmin + 0.06)); Hh += rib * 0.0003
+  # (fine creases where the rubber flexes over the ankle and the top of the foot, from a photographed wrinkled leather
+  # (Poly Haven's fabric_leather_02, CC0) at a small scale)
+  fl, _, _ = detail("fabric_leather_02", pos, nor, 0.22, m)
+  Hh += fl * 0.00025 * np.clip(1 - np.abs(z - (zmin + 0.1)) / 0.06, 0, 1)
   nrm = normal_from_height(Hh, du, dv, 1.0, m)
   base = 0.82 + (fbm(pos, 0.05, 3, 43) - 0.5) * 0.05 + gc_ * 0.05
   # (the sole and heel a darker, browner rubber than the boot; the sole's top edge a crisp line)

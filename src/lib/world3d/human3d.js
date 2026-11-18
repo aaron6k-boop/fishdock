@@ -406,6 +406,9 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     }
     { const w = /^fd_(jacket|trousers|boots)/.exec(mat.name || "");
       if (w) { const c = mat.clone(); c.map = null; c.color = new THREE.Color(wornHex[w[1]]); if (w[1] === "boots") { c.roughness = 0.38; c.metalness = 0; } else if (weave()) { c.normalMap = weave(); c.normalScale = new THREE.Vector2(0.5, 0.5); } m.castShadow = true; m.frustumCulled = false; m.material = c; mats.push(c); continue; } }
+    // (hair and eyelashes: for the new people cut out with alpha to coverage, so the strands' edges stay soft and they
+    // sort themselves, a ponytail no longer drawn through the head behind it)
+    if (/opacity/.test(mat.name) && L.v2) { const h = mat.clone(); h.transparent = false; h.alphaTest = 0.3; h.alphaToCoverage = true; h.depthWrite = true; h.side = THREE.DoubleSide; m.material = h; mats.push(h); continue; }
     if (/opacity/.test(mat.name)) { const h = mat.clone(); h.transparent = true; h.alphaTest = 0.04; h.depthWrite = false; m.material = h; mats.push(h); m.renderOrder = 1; continue; }
     // the new people's skin: a faint, warm sheen at grazing angles (the light skin scatters back), over its own
     // roughness map (oilier forehead and nose, wet eyes)

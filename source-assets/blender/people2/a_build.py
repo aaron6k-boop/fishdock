@@ -21,7 +21,8 @@ from mathutils.kdtree import KDTree
 OUT = "C:/Users/aaron/Documents/FishDock-assets"
 WHO = globals().get("WHO", "m05")
 SRC = f"{OUT}/source/people/{WHO}_hd.glb"
-TAG = globals().get("TAG", "p2a"); SUBDIV = globals().get("SUBDIV", True); BEARD = globals().get("BEARD", True)
+TAG = globals().get("TAG", "p2a"); SUBDIV = globals().get("SUBDIV", True); BEARD = globals().get("BEARD", True); SIM = globals().get("SIM", True)
+CT = globals().get("CT", 0.004); CD = globals().get("CD", 0.005); SLACK = globals().get("SLACK", 1.0)   # (the collider's thickness, the cloth's collision distance, how much of the slack to use)
 DST = f"{OUT}/people2"; os.makedirs(DST, exist_ok=True); os.makedirs(f"{OUT}/renders/people2", exist_ok=True)
 log = []
 def L(*a):
@@ -165,6 +166,50 @@ try:
         o, n, off = orig[v.index]; d = (v.co - o).dot(n)
         if d < off: v.co += n * (off - d)
     bm.normal_update()
+  # ---- cloth: a garment let settle on the body under gravity in Blender's cloth simulation, pinned where it is held
+  # (shoulders and collar, the hem band, the cuffs; the waistband and inside the boots), its cloth a few per cent longer
+  # than the body under it so the slack falls into real folds where it gathers: above the hem band, down the sleeves
+  # to the cuffs (gravity along the arm, as the arms hang), above the boots. The body is the collider. ----
+  def cloth_settle(ob, pin_fn, gravity, frames=36, slack=0.04, label="", bending=0.6, mass=0.18):
+    if not SIM: return 0
+    sc0 = bpy.context.scene
+    # (the body the collider for this settle only: copies made from it later must not carry it)
+    col_m = body.modifiers.new("fd_collision", "COLLISION"); body.collision.thickness_outer = CT; body.collision.cloth_friction = 8.0
+    # (both sides: the file's faces may wind either way in the world, and one-sided let the cloth fall through)
+    for k3, v3 in (("use_culling", False), ("use_normal", False)):
+      try: setattr(body.collision, k3, v3)
+      except Exception: pass
+    for m in [m for m in ob.modifiers if m.type == "COLLISION"]: ob.modifiers.remove(m)
+    vg = ob.vertex_groups.get("fd_pin") or ob.vertex_groups.new(name="fd_pin")
+    npin = 0
+    for v in ob.data.vertices:
+      w = float(pin_fn(np.array(tuple(mw @ v.co))))
+      if w > 0.001: vg.add([v.index], min(1.0, w), "REPLACE"); npin += 1
+    arms_m = [m for m in ob.modifiers if m.type == "ARMATURE"]
+    for m in arms_m: m.show_viewport = False; m.show_render = False
+    cl = ob.modifiers.new("cloth", "CLOTH"); st2 = cl.settings
+    st2.quality = 7; st2.mass = mass; st2.air_damping = 2.0
+    st2.tension_stiffness = 15; st2.compression_stiffness = 15; st2.shear_stiffness = 8; st2.bending_stiffness = bending
+    st2.tension_damping = 5; st2.compression_damping = 5; st2.shear_damping = 5
+    st2.vertex_group_mass = "fd_pin"; st2.pin_stiffness = 1.0
+    st2.shrink_min = -slack * SLACK
+    cs2 = cl.collision_settings; cs2.use_collision = True; cs2.distance_min = CD; cs2.collision_quality = 8; cs2.use_self_collision = False
+    cl.point_cache.frame_start = 1; cl.point_cache.frame_end = frames
+    sc0.gravity = tuple(gravity); sc0.frame_start = 1; sc0.frame_end = frames
+    for f in range(1, frames + 1): sc0.frame_set(f)
+    bpy.ops.object.select_all(action="DESELECT"); ob.select_set(True); bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.modifier_move_to_index(modifier="cloth", index=0); bpy.ops.object.modifier_apply(modifier="cloth")
+    for m in arms_m: m.show_viewport = True; m.show_render = True
+    g0 = ob.vertex_groups.get("fd_pin")
+    if g0 is not None: ob.vertex_groups.remove(g0)
+    sc0.frame_set(1); sc0.gravity = (0, 0, -9.81)
+    body.modifiers.remove(body.modifiers["fd_collision"])
+    inside = 0
+    for v in ob.data.vertices:
+      pw3 = mw @ v.co; _, i3, d3 = kd.find(pw3)
+      if (np.array(tuple(pw3)) - P[i3]) @ N0[i3] < 0.002: inside += 1
+    L("cloth", label, "settled over", frames, "frames,", npin, "points pinned of", len(ob.data.vertices), "| within 2 mm of the skin or under it:", inside)
+    return npin
   def thicken_edges(bm, depth):
     bnd = [e for e in bm.edges if e.is_boundary]
     if not bnd: return
@@ -301,7 +346,37 @@ try:
     if fro(p) < 0 and zh + 0.12 < p[2] < zh + 0.30:
       d += 0.002 * fold((p[2] - zh) / 0.07, 23) * (1 - abs(lat(p)) / 0.2 if abs(lat(p)) < 0.2 else 0.0)
     return d
-  displace(bm, jk_folds)
+  if SIM:
+    # (with the simulation the drawn folds stay only as faint hints where the arms bend, which a body standing with
+    # its arms out never makes)
+    def jk_hint(p, n): return jk_folds(p, n) * 0.35
+    displace(bm, jk_hint)
+  else:
+    displace(bm, jk_folds)
+  bm.to_mesh(jk.data); bm.free()
+  def on_arm(p, S2):
+    t, r = seg_param(p, sh[S2], wr[S2]); return t, r < 0.105
+  zh0 = zmin + HEM * H
+  def pin_torso(p):
+    # held at the shoulders, yoke and collar, and round the hem band; the sleeves held still while the body settles
+    for S2 in ("L", "R"):
+      t, on = on_arm(p, S2)
+      if on and t > 0.08: return 1.0
+    if p[2] > zN0 - 0.13: return 1.0
+    if p[2] > zN0 - 0.2: return (p[2] - (zN0 - 0.2)) / 0.07
+    if p[2] < zh0 + 0.025: return 1.0
+    return 0.0
+  cloth_settle(jk, pin_torso, (0, 0, -9.81), label="jacket body", slack=0.035)
+  for S2, sgn in (("L", 1), ("R", -1)):
+    a_, w_ = sh[S2], wr[S2]; axv = (w_ - a_) / np.linalg.norm(w_ - a_)
+    def pin_sleeve(p, S2=S2):
+      t, on = on_arm(p, S2)
+      if not on or t < 0.12: return 1.0          # (everything but this sleeve held)
+      if t > 0.9: return 1.0                     # (the cuff and the wrist end)
+      if t < 0.2: return (0.2 - t) / 0.08        # (eased in from the shoulder)
+      return 0.0
+    cloth_settle(jk, pin_sleeve, tuple(axv * 9.81 * 0.9 + np.array([0, 0, -9.81 * 0.25])), label=f"sleeve {S2}", slack=0.05)
+  bm = bmesh.new(); bm.from_mesh(jk.data); bm.normal_update()
   jk_cuts(bm)
   thicken_edges(bm, 0.006)
   bm.to_mesh(jk.data); bm.free(); made["jacket"] = jk
@@ -333,6 +408,10 @@ try:
   for S2, sg in (("L", 1), ("R", -1)):
     parts["chest_" + S2] = cut_part(jk, f"fd2_jacket_pocket_chest_{S2}", slab(side * sg, 0.055, 0.165) + slab(UP, zN - 0.235, zN - 0.13), lambda c, n: n @ fwd > 0.35, 0.0035, 0.0025)
     parts["low_" + S2] = cut_part(jk, f"fd2_jacket_pocket_low_{S2}", slab(side * sg, 0.07, 0.185) + slab(UP, zmin + (HEM + 0.03) * H, zmin + (HEM + 0.1) * H), lambda c, n: n @ fwd > 0.15, 0.003, 0.0025)
+    # the pockets' flaps: a little wider than the pocket, over its top, standing further off (a flap over a pocket,
+    # not a printed panel)
+    parts["chestflap_" + S2] = cut_part(jk, f"fd2_jacket_pocket_chestflap_{S2}", slab(side * sg, 0.05, 0.17) + slab(UP, zN - 0.168, zN - 0.124), lambda c, n: n @ fwd > 0.3, 0.0068, 0.003)
+    parts["lowflap_" + S2] = cut_part(jk, f"fd2_jacket_pocket_lowflap_{S2}", slab(side * sg, 0.065, 0.19) + slab(UP, zmin + (HEM + 0.1) * H - 0.042, zmin + (HEM + 0.1) * H + 0.005), lambda c, n: n @ fwd > 0.12, 0.006, 0.003)
   for S2 in ("L", "R"):
     a, w = el[S2], wr[S2]; ax = (w - a) / np.linalg.norm(w - a); cend = w - ax * 0.03
     parts["cuff_" + S2] = cut_part(jk, f"fd2_jacket_cuff_{S2}", [(cend + ax * 0.01, ax), (cend - ax * 0.055, -ax)], lambda c, n, a=a, w=w: seg_param(c, a, w)[1] < 0.09, 0.0025, 0.002)
@@ -407,6 +486,23 @@ try:
   hemZ = zmin + (HEM + 0.012) * H
   tog = [on_surface(np.array([cx, cy, hemZ]) + sgn * side * 0.2, 0.035) for sgn in (1, -1)]
   parts["toggles"] = small("fd2_jacket_toggles", tog, 0.006, 0.022, lambda c: (0, 0, 1))
+  # the cuffs' adjusting tabs: a strap 5 cm long and 2.2 wide across the back of each wrist, 3 mm thick, rounded
+  def tabs(name, specs):
+    bms = bmesh.new()
+    for c, along, nrm, (ln, wd, th2) in specs:
+      m3 = bmesh.ops.create_cube(bms, size=1.0)
+      a3 = along / np.linalg.norm(along); n3 = nrm - a3 * (nrm @ a3); n3 /= np.linalg.norm(n3); b3 = np.cross(n3, a3)
+      R = np.stack([a3 * ln, b3 * wd, n3 * th2], 1)
+      for v in m3["verts"]:
+        q3 = R @ np.array(tuple(v.co)) + c; v.co = mwi @ Vector(q3)
+    bmesh.ops.bevel(bms, geom=bms.edges[:], offset=0.0012 / S, segments=2, affect="EDGES")
+    me3 = bpy.data.meshes.new(name); bms.to_mesh(me3); bms.free(); ob3 = bpy.data.objects.new(name, me3); bpy.context.collection.objects.link(ob3); ob3.matrix_world = mw_obj; return ob3
+  tspecs = []
+  for S2 in ("L", "R"):
+    a, w = el[S2], wr[S2]; ax = (w - a) / np.linalg.norm(w - a); cmid = w - ax * 0.055
+    top = on_surface(cmid + np.array([0, 0, 0.06]), 0.0) ; nrm = N0[kd.find(Vector(top))[1]]
+    tspecs.append((top + nrm * 0.021, ax, nrm, (0.05, 0.022, 0.003)))
+  parts["cufftabs"] = tabs("fd2_jacket_cufftabs", tspecs)
   L("jacket parts", {k: (len(v.data.vertices) if v else 0) for k, v in parts.items()})
 
   # ======== the trousers ========
@@ -441,7 +537,20 @@ try:
       u = max(0.0, (p[2] - zb + 0.05) / 0.17); ang = math.atan2(lat(p), fro(p))
       d += 0.0052 * (1 - u) * fold((p[2] + 0.012 * math.sin(ang * 4)) / 0.03, 31)
     return d
-  displace(bm, tr_folds)
+  if SIM:
+    def tr_hint(p, n): return tr_folds(p, n) * 0.4
+    displace(bm, tr_hint)
+  else:
+    displace(bm, tr_folds)
+  bm.to_mesh(tr.data); bm.free()
+  zb0 = zmin + BOOT * H
+  def pin_trousers(p):
+    if p[2] > zmin + (HEM - 0.03) * H: return 1.0            # (the waistband, under the jacket)
+    if p[2] < zb0 + 0.01: return 1.0                         # (tucked into the boots)
+    if p[2] > zmin + (HEM - 0.07) * H: return (p[2] - (zmin + (HEM - 0.07) * H)) / (0.04 * H)
+    return 0.0
+  cloth_settle(tr, pin_trousers, (0, 0, -9.81), label="trousers", slack=0.045, bending=0.5)
+  bm = bmesh.new(); bm.from_mesh(tr.data); bm.normal_update()
   cut_level(bm, BOOT - 0.03, keep_below=False)
   thicken_edges(bm, 0.005)
   bm.to_mesh(tr.data); bm.free(); made["trousers"] = tr
@@ -472,6 +581,10 @@ try:
   subdivide(bm)
   cut_level(bm, BOOT, keep_below=True)
   L("boots after the cut", len(bm.faces))
+  # (the shaft's top 8 cm smoothed round: moulded rubber, not the calf's every bump; the rim held where it was cut)
+  topz = zmin + BOOT * H
+  shaft = [v for v in bm.verts if not v.is_boundary and world(v)[2] > topz - 0.08]
+  for _ in range(4): bmesh.ops.smooth_vert(bm, verts=shaft, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=False)
   bm.normal_update()
   # the sole: everything near the ground pushed down to a flat, slightly wider sole 2 cm thick
   bm.normal_update()
@@ -610,7 +723,7 @@ try:
   for v in body.data.vertices: kdd.insert(v.co, v.index)
   kdd.balance()
   for ob in allp:
-    if ob.name in ("fd2_jacket_collar", "fd2_jacket_hood", "fd2_jacket_studs", "fd2_jacket_toggles", "fd2_boots_buckles"):
+    if ob.name in ("fd2_jacket_collar", "fd2_jacket_hood", "fd2_jacket_studs", "fd2_jacket_toggles", "fd2_boots_buckles", "fd2_jacket_cufftabs"):
       # (each point takes the weights of the body's nearest point, both in the mesh's own numbers)
       gs = [ob.vertex_groups.new(name=g.name) for g in body.vertex_groups]
       for v in ob.data.vertices:
