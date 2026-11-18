@@ -37,19 +37,28 @@ const rngOf = (seed) => { let a = seed || 1; return () => { a = (a + 0x6d2b79f5)
 
 // ---- loading: each file once, shared ----
 export const PEOPLE_BASE = ((typeof window !== "undefined" && window.__fdAssetBase) || "") + "/people/";
-let loader = null;
+let loader = null, quietLoader = null;
 const files = new Map();
-function loadGLB(name) {
-  if (!files.has(name)) { loader ||= new GLTFLoader(); const p = loader.loadAsync(PEOPLE_BASE + name + ".glb"); p.catch(() => files.delete(name)); files.set(name, p); }
+// (quiet: fetched on a loading manager of its own, so the loading screen doesn't count it or wait for it)
+function loadGLB(name, quiet = false) {
+  if (!files.has(name)) {
+    if (quiet) quietLoader ||= new GLTFLoader(new THREE.LoadingManager()); else loader ||= new GLTFLoader();
+    const p = (quiet ? quietLoader : loader).loadAsync(PEOPLE_BASE + name + ".glb"); p.catch(() => files.delete(name)); files.set(name, p);
+  }
   return files.get(name);
 }
 // ---- the detail of the people's clothes and faces ----
 // Each person comes in two files: name.glb (their textures at 1024 px, about a megabyte, for a phone) and
 // name_hd.glb (the Rocketbox library's own 2048 px colour and finer normal maps, two to three megabytes), which the
-// High quality and Ultra settings load (world.js setPeopleDetail), falling back to the lighter file if it can't
+// High quality and Ultra settings load (world.js setPeopleDetail), falling back to the lighter file if it can't.
+// The lighter file comes first, always, and the place is shown with it; the detailed one follows in the background and
+// takes its place when it has arrived. (Waiting for it, the loading screen stayed up until it gave up waiting: on Aaron's
+// PC on 18 November the fisherman's detailed file, 8.4 MB, took 21 s to arrive on a first visit, and the place was
+// shown after 34 s, at the loading screen's 25 s limit; everything else was in by 10 s)
 export let PEOPLE_HD = false;
 export function setPeopleDetail(on) { PEOPLE_HD = !!on; }
-const personGLB = (name) => (PEOPLE_HD ? loadGLB(name + "_hd").catch(() => loadGLB(name)) : loadGLB(name));
+const personGLB = (name) => loadGLB(name);
+const personHD = (name) => (PEOPLE_HD ? loadGLB(name + "_hd", true) : Promise.reject(new Error("not wanted")));
 // the walks' own speeds where a clip carries no travel of its own (measured from the feet), m/s at the model's size
 const LOCO = ["walk_slow", "walk", "walk_fast", "run", "sprint"];
 // (where a walk becomes a run, m/s at the model's size: the brisk walk up to the first, the run from the second; and
@@ -309,14 +318,20 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
   // body's arm, sleeve and shoulder that close to the eye fills the screen); dressed in your jacket colour and gloves
   const standOutfit = { ...(outfit || {}), jacket: COATS[L.coat]?.hex ?? outfit?.jacket };
   const stand = createFigure({ id, look: L.gloves ? { ...L, skinHex: 0x23262a } : L, outfit: standOutfit, venue }); group.add(stand.group);
-  let H = null, fp = false, gone = false;
+  let H = null, fp = false, gone = false, version = 0; // (version: one more each time a model is put in, so the scene readies its new textures)
   // (in first person none of the body is drawn: your arms and hands are drawn on their own, fpRig.js)
   const show = () => { if (H) H.root.visible = !fp; stand.group.visible = !H && !fp; };
   if (realistic && typeof document !== "undefined") {
-    Promise.all([personGLB(L.file || "gardener"), clipSet()]).then(([g, clips]) => {
+    const file = L.file || "gardener", put = (g, clips, hd = false) => {
+      try { performance.mark(`fd:person-${file}${hd ? "-hd" : ""}`); } catch { /* (loading checks only) */ }
+      const next = makeHuman(L, g, clips[L.sex === "f" ? "f" : "m"], outfit, venue), old = H;
+      H = next; group.add(H.root); H.setFirstPerson(fp); old?.dispose(); version++; show();
+    };
+    Promise.all([personGLB(file), clipSet()]).then(([g, clips]) => {
       if (gone) return;
-      H = makeHuman(L, g, clips[L.sex === "f" ? "f" : "m"], outfit, venue);
-      group.add(H.root); H.setFirstPerson(fp); show();
+      put(g, clips);
+      // (then the detailed file, in the background: swapped in whole when it's here, the same skeleton and pose)
+      personHD(file).then((g2) => { if (!gone && H) put(g2, clips, true); }).catch(() => {});
     }).catch((e) => { if (typeof console !== "undefined") console.warn("person model:", e?.message || e); });
   }
   const who = () => H || stand;
@@ -325,6 +340,7 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
     // (the model is posed every frame even while hidden, so it's ready the moment it shows)
     pose(o) { if (H) H.pose(o); else stand.pose(o); },
     get ready() { return !!H; },
+    get version() { return version; },
     get top() { return (H || stand).top; },
     get headAt() { return who().headAt; },
     get eyeAt() { return who().eyeAt; },

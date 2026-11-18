@@ -289,7 +289,7 @@ function genericFishGeometry() {
 }
 
 export function createAngler(world, { id, name = "", spot, venue = "pier", outfit = 0, look = null, local = false, real = false, rail = false, fineHands = false, onSound, onFeel } = {}) {
-  let assetsN = 0; // (new shapes or materials made: see `assets` below)
+  let assetsN = 0, figVer = 0; // (new shapes or materials made: see `assets` below)
   const root = new THREE.Group(); world.add(root);
   const O = OUTFITS[((outfit % OUTFITS.length) + OUTFITS.length) % OUTFITS.length];
   // the person (human3d.js: a realistic person, with the simple figure3d.js figure standing in while it loads): their
@@ -812,6 +812,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   function frame(t, now, dt, env) {
     easeFishBox(dt);
     if (fpv && !fpvCounted && fpv.ready) { fpvCounted = true; assetsN++; } // (your arms loaded: their shaders built with the rest)
+    if ((fig.version || 0) !== figVer) { figVer = fig.version || 0; assetsN++; } // (a person's model in, or its detailed one swapped in: its textures readied too)
     root.updateMatrixWorld(true); tNow = t;
     reel.userData.slipping = false;
     const info = phaseAt(events, now);
