@@ -22,6 +22,10 @@ OUT = "C:/Users/aaron/Documents/FishDock-assets"
 WHO = globals().get("WHO", "m05")
 SRC = f"{OUT}/source/people/{WHO}_hd.glb"
 TAG = globals().get("TAG", "p2a"); SUBDIV = globals().get("SUBDIV", True); BEARD = globals().get("BEARD", True); SIM = globals().get("SIM", False)
+# (TUBE: the welly shafts built as one clean tube from the ankle up, for a body whose own boots end below the knee with
+# its trousers going in (the woman, f07): moulding her own points left two layers there that showed as a broken line.
+# The man's are moulded from his own points, which joined cleanly)
+TUBE = globals().get("TUBE", False)
 # (SIM: Blender's cloth simulation, tried four times (h035 to h038): run headless here the cloth fell through the body
 # wherever it wasn't pinned, whatever the collider's thickness, so the folds are modelled instead)
 CT = globals().get("CT", 0.004); CD = globals().get("CD", 0.005); SLACK = globals().get("SLACK", 1.0)   # (the collider's thickness, the cloth's collision distance, how much of the slack to use)
@@ -624,8 +628,8 @@ try:
   L("boots after the cut", len(bm.faces))
   # the shaft moulded: a welly's shaft is one smooth rubber surface, not the calf's every bump. Round each leg, in
   # slices 2 cm deep and 10-degree sectors, the widest the boot reaches; that kept smooth round the leg (its first
-  # four harmonics) and up it, and never narrower above the calf than at it (a welly stands open under the knee as
-  # its mouth); every point of the shaft then set out to it, eased in over the ankle so the foot keeps its shape
+  # four harmonics) and up it, never narrower above the calf than at it (a welly stands open under the knee as its
+  # mouth) and always clear of the body and the trousers inside; the foot eased out to it, the shaft built on it
   topz = zmin + BOOT * H; NA, DZ = 36, 0.02
   for S2 in ("L", "R"):
     k_, a_ = kn[S2], an[S2]
@@ -650,34 +654,74 @@ try:
     ic = int(np.argmax(R.mean(1)[: max(1, nz - 2)]))
     for iz in range(ic + 1, nz): R[iz] = np.maximum(R[iz], R[iz - 1] * 0.995)
     R += 0.002
-    def set_out(v, R=R, nz=nz, z0=z0, centre=centre):
+    # (never inside the body under it: smoothing took the shaft in below sharp ridges of the body's own clothes (the
+    # woman's own boot tops at mid-calf), which then showed through it as a broken grey line)
+    Rb = np.zeros((nz, NA)); c0 = centre
+    for i in range(len(P)):
+      pz = P[i][2]
+      if pz < z0 - 0.01 or pz > topz + 0.01 or (lat(P[i]) > 0) != (S2 == "L"): continue
+      q = P[i][:2] - c0(pz); r = math.hypot(*q)
+      if r > 0.16: continue
+      iz = min(nz - 1, max(0, int((pz - z0) / DZ))); ia = int((math.atan2(q[1], q[0]) + math.pi) / (2 * math.pi) * NA) % NA
+      Rb[iz, ia] = max(Rb[iz, ia], r)
+    Rb = np.maximum(Rb, np.maximum(np.roll(Rb, 1, 1), np.roll(Rb, -1, 1)))
+    # (5 mm clear of the body; where the trousers go down inside the boot, clear of them too: their 11 mm and folds)
+    zr = z0 + (np.arange(nz) + 0.5) * DZ; marg = np.where(zr > zmin + (BOOT - 0.035) * H, 0.018, 0.005)[:, None]
+    R = np.maximum(R, np.where(Rb > 0, Rb + marg, 0))
+    def set_out(v, R=R, nz=nz, z0=z0, centre=centre, ease=True):
       pw = world(v); c = centre(pw[2]); q = pw[:2] - c; r = math.hypot(*q)
       if r < 1e-6: return
       th3 = math.atan2(q[1], q[0])
       fz = (pw[2] - z0) / DZ - 0.5; i0 = int(min(nz - 1, max(0, math.floor(fz)))); i1 = min(nz - 1, i0 + 1); tz = min(1.0, max(0.0, fz - i0))
       fa = (th3 + math.pi) / (2 * math.pi) * NA - 0.5; j0 = int(math.floor(fa)) % NA; j1 = (j0 + 1) % NA; ta = fa - math.floor(fa)
       Rt = (R[i0, j0] * (1 - ta) + R[i0, j1] * ta) * (1 - tz) + (R[i1, j0] * (1 - ta) + R[i1, j1] * ta) * tz
-      e = min(1.0, max(0.0, (pw[2] - z0) / 0.06)); e = e * e * (3 - 2 * e)
+      e = min(1.0, max(0.0, (pw[2] - z0) / 0.06)) if ease else 1.0; e = e * e * (3 - 2 * e)
       r2 = r + (Rt - r) * e; pw2 = pw.copy(); pw2[:2] = c + q / r * r2; v.co = mwi @ Vector(pw2)
-    for v, pw, th3, iz0 in pol: set_out(v)
-    # (then relaxed over its surface and set out again, a few times: points that lay close together round the calf
-    # could come out of order once all set to one surface, folding small triangles over each other in a ragged ring)
-    sv = [v for v, pw, th3, iz0 in pol if not v.is_boundary and pw[2] > z0 + 0.03]
-    for _ in range(6):
-      bmesh.ops.smooth_vert(bm, verts=sv, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
-      for v in sv: set_out(v)
-    # (and any face of the shaft now facing in towards the leg taken away: a body whose own boots had a turned rim (the
-    # woman's) left an inner layer folded under the outer one, which showed as a ragged ring round the calf)
-    svs = set(sv); bm.normal_update(); bad = []
-    for f in bm.faces:
-      if not all(v in svs for v in f.verts): continue
-      cw = np.array(tuple(mw @ f.calc_center_median())); nw = np.array(tuple((mw.to_3x3() @ f.normal).normalized()))
-      q = cw[:2] - centre(cw[2]); rq = np.linalg.norm(q)
-      if rq > 1e-6 and (nw[:2] @ (q / rq)) < -0.2: bad.append(f)
-    if bad:
-      bmesh.ops.delete(bm, geom=bad, context="FACES"); bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
-    L("boot", S2, "faces facing in, taken away:", len(bad))
+    if not TUBE:
+      # (the body's own points set out to the moulded surface, relaxed and set out again so no triangles fold over)
+      for v, pw, th3, iz0 in pol: set_out(v)
+      sv = [v for v, pw, th3, iz0 in pol if not v.is_boundary and pw[2] > z0 + 0.03]
+      for _ in range(6):
+        bmesh.ops.smooth_vert(bm, verts=sv, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+        for v in sv: set_out(v)
+      L("boot", S2, "shaft moulded:", len(pol), "points; widest", round(float(R.max()), 3), "m from the leg's line")
+      continue
+    # the shaft built as one clean tube: the body's own surface above the ankle taken away, and the foot's open top
+    # extruded upwards a centimetre at a time to the boot's top, each new ring set out to the moulded surface. (Setting
+    # the body's own points out to it left a seam round the woman's calf where her own boots ended and her jeans went
+    # in, two layers that no smoothing could join: a broken line in every render)
+    zc = z0 + 0.035
+    for v, pw, th3, iz0 in pol:
+      if pw[2] < zc + 0.03: set_out(v)
+    def fc(f): return np.array(tuple(mw @ f.calc_center_median()))
+    gone = [f for f in bm.faces if fc(f)[2] > zc and (lat(fc(f)) > 0) == (S2 == "L") and np.linalg.norm(fc(f)[:2] - centre(fc(f)[2])) < 0.2]
+    bmesh.ops.delete(bm, geom=gone, context="FACES"); bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    # (the open top: the longest loop of open edges there, the boot's outside; anything inside it is hidden)
+    bnd = [e for e in bm.edges if e.is_boundary and all(world(v)[2] > zc - 0.03 for v in e.verts) and (lat(world(e.verts[0])) > 0) == (S2 == "L")]
+    par = {}
+    def fnd(x):
+      while par.get(x, x) != x: x = par.get(x, x)
+      return x
+    for e in bnd:
+      a1, b1 = fnd(e.verts[0].index), fnd(e.verts[1].index)
+      if a1 != b1: par[a1] = b1
+    groups = {}
+    for e in bnd: groups.setdefault(fnd(e.verts[0].index), []).append(e)
+    loop = max(groups.values(), key=lambda g: sum(e.calc_length() for e in g)) if groups else []
+    lv = {v for e in loop for v in e.verts}
+    for v in lv:
+      pw = world(v); pw[2] = zc; v.co = mwi @ Vector(pw); set_out(v, ease=False)
+    nring = max(1, int(round((topz - zc) / 0.01))); cur = loop
+    for k3 in range(1, nring + 1):
+      ret = bmesh.ops.extrude_edge_only(bm, edges=cur)
+      nv = [g for g in ret["geom"] if isinstance(g, bmesh.types.BMVert)]; nvs = set(nv)
+      zk = zc + (topz - zc) * k3 / nring
+      for v in nv:
+        pw = world(v); pw[2] = zk; v.co = mwi @ Vector(pw); set_out(v, ease=False)
+      cur = [g for g in ret["geom"] if isinstance(g, bmesh.types.BMEdge) and all(x in nvs for x in g.verts)]
+    L("boot", S2, "shaft built:", nring, "rings of", len(lv), "points from the foot's top (", len(groups), "open loops there)")
     L("boot", S2, "shaft moulded:", len(pol), "points; widest", round(float(R.max()), 3), "m from the leg's line")
+  bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
   bm.normal_update()
   # the sole: everything near the ground pushed down to a flat, slightly wider sole 2 cm thick
   bm.normal_update()
@@ -828,15 +872,17 @@ try:
   for v in body.data.vertices: kdd.insert(v.co, v.index)
   kdd.balance()
   for ob in allp:
-    if ob.name in ("fd2_jacket_collar", "fd2_jacket_hood", "fd2_jacket_studs", "fd2_jacket_toggles", "fd2_boots_buckles", "fd2_jacket_cufftabs"):
-      # (each point takes the weights of the body's nearest point, both in the mesh's own numbers)
+    if ob.name in ("fd2_jacket_collar", "fd2_jacket_hood", "fd2_jacket_studs", "fd2_jacket_toggles", "fd2_boots_buckles", "fd2_jacket_cufftabs", "fd2_boots", "fd2_boots_sole"):
+      # (each point takes the weights of the body's nearest point, both in the mesh's own numbers; the boots too, their
+      # shaft built ring by ring from the ankle, so it moves with the calf, not the foot)
+      ob.vertex_groups.clear()
       gs = [ob.vertex_groups.new(name=g.name) for g in body.vertex_groups]
       for v in ob.data.vertices:
         _, bi, _ = kdd.find(v.co)
         for g in body.data.vertices[bi].groups:
           if g.weight > 0: gs[g.group].add([v.index], g.weight, "REPLACE")
       if not any(m.type == "ARMATURE" for m in ob.modifiers): am = ob.modifiers.new("Armature", "ARMATURE"); am.object = arm
-      ob.parent = arm; ob.matrix_parent_inverse = arm.matrix_world.inverted()   # (kept where it is)
+      if ob.parent != arm: ob.parent = arm; ob.matrix_parent_inverse = arm.matrix_world.inverted()   # (kept where it is; a copy of the body is already under it, as the body is)
   # unwrap each garment family into its own texture: the main pieces and their parts together (smart projection)
   fam = {"jacket": [o for o in allp if "jacket" in o.name], "trousers": [o for o in allp if "trousers" in o.name], "boots": [o for o in allp if "boots" in o.name], "beard": [o for o in allp if "beard" in o.name]}
   for key in list(fam):
