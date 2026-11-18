@@ -421,7 +421,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // as a table of sand with a step down into the sea.) toWater: metres from the water's edge, on the beach ----
   const BP = local?.beach || (place.venue === "beach" ? {} : null), toWater = new Float32Array(n * n).fill(-1);
   if (BP) {
-    const slope = BP.slope ?? 0.032, top = BP.top ?? LAND, foot = BP.foot ?? 0.12;
+    // (steeper for the first few metres, where the waves run up and back, then the beach's own slope: laid at one slope
+    // all the way, the last few centimetres above the sea were metres wide and the waves ran over them, and over the anglers)
+    const slope = BP.slope ?? 0.032, top = BP.top ?? LAND, foot = BP.foot ?? 0.12, swash = BP.swash ?? 0.075;
     const src = new Int32Array(n * n).fill(-1), queue = [];
     for (let k = 0; k < n * n; k++) if (cls[k] === 0) { src[k] = k; queue.push(k); }
     for (let qi = 0; qi < queue.length; qi++) {
@@ -431,7 +433,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (let k = 0; k < n * n; k++) {
       if (cls[k] !== 2 || src[k] < 0) continue;
       const s0 = src[k], d = Math.hypot(xs[k % n] - xs[s0 % n], xs[Math.floor(k / n)] - xs[Math.floor(s0 / n)]);
-      toWater[k] = d; h[k] = Math.min(top, foot + d * slope);
+      toWater[k] = d; h[k] = Math.min(top, foot + Math.min(d, 5) * swash + Math.max(0, d - 5) * slope);
     }
   }
   // beaches slope gently into the water (walls stay upright)
@@ -447,15 +449,15 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     }
     h.set(nh);
   }
-  // (the anglers stand on the beach as it is now drawn: its height where each stands, from the grid's four corners)
-  if (BP) {
-    const cellOf = (v) => { let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m; else hi = m; } return lo; };
-    for (const sp of spots) {
-      const i = cellOf(sp.at[0]), j = cellOf(sp.at[2]), fx = (sp.at[0] - xs[i]) / (xs[i + 1] - xs[i] || 1), fz = (sp.at[2] - xs[j]) / (xs[j + 1] - xs[j] || 1);
-      const a = h[j * n + i], b = h[j * n + i + 1], c = h[(j + 1) * n + i], d = h[(j + 1) * n + i + 1];
-      sp.at[1] = Math.round(((a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz) * 100) / 100;
-    }
-  }
+  // (the anglers stand on the beach as it is now drawn: its height where each stands, from the grid's four corners;
+  // and whoever walks on it, groundAt below)
+  const cellOf = (v) => { let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m; else hi = m; } return lo; };
+  const hGrid = (x, z) => {
+    const i = cellOf(x), j = cellOf(z), fx = Math.max(0, Math.min(1, (x - xs[i]) / (xs[i + 1] - xs[i] || 1))), fz = Math.max(0, Math.min(1, (z - xs[j]) / (xs[j + 1] - xs[j] || 1)));
+    const a = h[j * n + i], b = h[j * n + i + 1], c = h[(j + 1) * n + i], d = h[(j + 1) * n + i + 1];
+    return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
+  };
+  if (BP) for (const sp of spots) sp.at[1] = Math.round(hGrid(sp.at[0], sp.at[2]) * 100) / 100;
   // a dune (localDetail.js): a beach the photographs show grown over with marram grass rises gently from the water
   const dune = new Float32Array(n * n), duneH = new Float32Array(n * n);
   if (local?.dunes) {
@@ -703,7 +705,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   place.deckMat = deckMat; // world.js darkens it in the rain
 
   const hillAt = (x, z, c) => (hill && (c === 1 || c === 3) ? hill(x, z) : 0);
-  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : H_OF[c] + hillAt(x, z, c); };
+  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : BP && c === 2 ? Math.max(0.05, hGrid(x, z)) : H_OF[c] + hillAt(x, z, c); };
   // ---- streets: tarmac with a pale pavement and kerb either side (from the map's roads) ----
   {
     const T = { p: [], uv: [], i: [] }, Pv = { p: [], uv: [], i: [] };

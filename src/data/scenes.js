@@ -18,6 +18,7 @@ const C = "2026-11-04";     // when the checks below were run on them
 const P = (name, face) => ({ name, face });
 const pier = (a, b, c, d) => [P("On the pier", a), P("Along the pier", b), P("Further along the pier", c), P("Along the other way", d)];
 const bank = (a, b, c, d) => [P("Along the bank, left", a), P("Along the bank, right", b), P("Further along, left", c), P("Further along, right", d)];
+const beach = (a, b, c, d) => [P("On the beach, left", a), P("On the beach, right", b), P("Further along, left", c), P("Further along, right", d)];
 const passed = (venue, points, extra = {}) => ({ result: "passed", venue, points, approx: false, data: SAVED, checked: C, sources: [OSM], verification: "verified", ...extra });
 const failed = (venue, why) => ({ result: "failed", venue, why, points: [], approx: false, data: SAVED, checked: C, sources: [OSM], verification: "verified" });
 
@@ -26,6 +27,9 @@ export const SCENE_CHECKS = {
   // (checked again on 18 November, the pier now open on iron legs and its anglers either side of its main arm,
   // localDetail.js: the layout check in Node and the scene check in Chromium and on Aaron's PC, all four passing)
   "cromer-pier": passed("pier", pier(287, 287, 108, 108), { checked: "2026-11-18" }),
+  // (added 18 November, a beach mark 150 m north of Britannia Pier: the layout check in Node on OpenStreetMap's answer
+  // fetched that day, and the scene check in Chromium and on Aaron's PC; the listed position is approximate)
+  "great-yarmouth-beach": passed("beach", beach(97, 97, 97, 97), { approx: true, data: "2026-11-18", checked: "2026-11-18" }),
   "deal-pier": passed("pier", pier(359, 359, 359, 359)),
   "southend-pier": passed("pier", pier(258, 258, 258, 257)),
   "whitby-piers": passed("pier", pier(232, 232, 232, 232)),

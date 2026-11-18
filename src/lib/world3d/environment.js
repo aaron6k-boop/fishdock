@@ -360,10 +360,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
         w.xz += s.yz*(.4 + 2.*uWind)*fade*(1. - wall*.85);
         w.y += s.x*fade*(1. + wall*.45);
         // the surf on a beach (its shape; the open sea's waves die down in the shallows under it)
-        if (bkv > .01) { vec3 sf = surf(w.xz, sdv); w.y += (sf.x - s.x*.55*smoothstep(30., 6., sdv))*bkv*fade; }
+        // (both die down over the last few metres, so the water runs up the sand a little way, not over the beach)
+        if (bkv > .01) { vec3 sf = surf(w.xz, sdv); w.y += (sf.x*(.35 + .65*smoothstep(0., 7., sdv)) - s.x*.85*smoothstep(30., 4., sdv))*bkv*fade; }
         // the spectrum sea's displacement (Ultra): the wind sea's shape, crests drawn together, on top of the swell
         #if FFT
-          if (uFft > .5) { vec3 d = texture2D(uDisp0, vP/uL0).xyz; d.xz *= 1. - wall*.85; d.y *= 1. + wall*.5; w += d*fade; }
+          if (uFft > .5) { vec3 d = texture2D(uDisp0, vP/uL0).xyz; d.xz *= 1. - wall*.85; d.y *= 1. + wall*.5; d *= 1. - .8*bkv*smoothstep(25., 3., sdv); w += d*fade; }
         #endif
         vW = w;
         gl_Position = projectionMatrix*viewMatrix*vec4(w, 1.);
