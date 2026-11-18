@@ -76,8 +76,8 @@ export function build() {
     out.push(`| ${f} | ${kb(statSync(join(td, f)).size)} | ${sz ? `${sz.w}x${sz.h}` : "?"} | ${sz?.type || "?"} |`);
   }
   out.push("", "## Third-party sources (the licence register)", "", "| Asset | Author | Source | Licence | Attribution | Used for | Original files kept |", "|---|---|---|---|---|---|---|");
-  for (const a of reg.assets) out.push(`| ${a.name} | ${a.author || ""} | ${a.source} | ${a.licence} | ${a.attribution || ""} | ${a.use || ""} | ${(a.files || []).map((x) => `\`${x.file.split("/").pop()}\` (${kb(x.bytes)})`).join(", ")} |`);
-  out.push("", "Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench,", "bollard and lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA", "(the Gorleston photographs) is given in the app and in `public/models/CREDITS.txt`.", "");
+  for (const a of reg.assets) out.push(`| ${a.name} | ${a.author || ""} | ${a.source} | ${a.licence} | ${a.attribution || ""} | ${a.use || ""} | ${(a.files || []).map((x) => (typeof x === "string" ? `\`${x.split("/").pop()}\`` : `\`${x.file.split("/").pop()}\` (${kb(x.bytes)})`)).join(", ")} |`); // (some entries list their files by name only)
+  out.push("", "Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench (its", "slats textured with Poly Haven's Brown Planks 03, above), the bollard and the lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA", "(the Gorleston photographs) is given in the app and in `public/models/CREDITS.txt`.", "");
   return out.join("\n");
 }
 

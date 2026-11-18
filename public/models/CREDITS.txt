@@ -14,8 +14,10 @@ the "Fishing Cast" motion capture on Adobe Mixamo (https://www.mixamo.com), whic
 only that turn, carried onto the rig, is in the file. Credited with thanks to Blender Studio and Adobe.
 
 pierprops.glb (the pier's lamps, lifebuoy stations, bollards and benches): the bollard, bench and lifebuoy housing were
-modelled in Blender for FishDock; the lamp is Poly Haven's "Street Lamp 01" and the buoy Poly Haven's "Lifebuoy"
-(https://polyhaven.com), CC0 1.0. The pier deck's concrete (public/textures/deck_broom_*.jpg, from 17 November 2026)
+modelled in Blender for FishDock (source-assets/blender/props2/build_pierprops2.py, from 18 November 2026); the lamp is
+Poly Haven's "Street Lamp 01" and the buoy Poly Haven's "Lifebuoy" (https://polyhaven.com), CC0 1.0. The bench's slats
+are textured with Poly Haven's "Brown Planks 03" (CC0 1.0), cut to four of its boards. The lifebuoy station's name board
+and 999 notice were drawn for FishDock, lettered in Inter (by Rasmus Andersson, SIL Open Font License 1.1). The pier deck's concrete (public/textures/deck_broom_*.jpg, from 17 November 2026)
 is Poly Haven's "Concrete Floor 03" (broom-finished, by Rob Tuytel and Matterfield), CC0 1.0; before it, "Concrete Floor
 02" (public/textures/pier_concrete_*.jpg). Credited with thanks to Poly Haven and its artists.
 

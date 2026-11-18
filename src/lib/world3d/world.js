@@ -513,7 +513,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       }
       camPos.copy(pos); camera.position.copy(camPos); camera.fov = WALK_FOV * (camera.aspect < 0.8 ? 1.1 : 1); camera.updateProjectionMatrix();
       camera.lookAt(camera.position.clone().add(d));
-      if (camOverride) { camera.position.copy(camOverride); camera.lookAt(tgt.clone().add(new THREE.Vector3(0, -0.6, 0))); } // test hook only
+      if (camOverride) { camera.position.copy(camOverride); camera.lookAt(lookOverride || tgt.clone().add(new THREE.Vector3(0, -0.6, 0))); } // test hook only (looking where it's told, or at you)
       return { yaw, pitch };
     }
     // landing your fish (first or third person): the camera steps back beside you for a moment, so you see the whole

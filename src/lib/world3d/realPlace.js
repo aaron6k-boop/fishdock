@@ -160,17 +160,21 @@ function placeProps(group, stand, props, glowGlass, wet) {
     const mx = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
     for (const [name, list] of Object.entries(props)) {
       const src = scene.getObjectByName(name + "_mesh") || scene.getObjectByName(name); if (!src || !list.length) continue;
-      src.updateWorldMatrix(true, true);
+      // (each piece in its root's frame: where it stands. In the mesh's own frame, as before, every piece came out
+      // displaced by where it had stood in Blender's layout: the benches 2.5 m along their length from their places,
+      // the lifebuoy stations 2 m, the lamps 4 m, so people could be set down inside a bench)
+      const home = scene.getObjectByName(name) || src; home.updateWorldMatrix(true, true);
+      const toHome = new THREE.Matrix4().copy(home.matrixWorld).invert();
       const meshes = []; src.traverse((o) => { if (o.isMesh) meshes.push(o); });
       for (const m of meshes) {
-        const geo = m.geometry.clone().applyMatrix4(new THREE.Matrix4().copy(src.matrixWorld).invert().multiply(m.matrixWorld));
+        const geo = m.geometry.clone().applyMatrix4(toHome.clone().multiply(m.matrixWorld));
         const mats = (Array.isArray(m.material) ? m.material : [m.material]).map((mt) => /glass|bulb/i.test(mt.name) ? glowGlass : mt);
         const im = new THREE.InstancedMesh(geo, mats.length > 1 ? mats : mats[0], list.length);
         list.forEach(([x, y, z, ry], k) => { mx.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, ry), one); im.setMatrixAt(k, mx); });
         im.castShadow = true; im.receiveShadow = true; group.add(im);
       }
       // ---- contact shadows: the dark on the deck right under each one, the size of its footprint ----
-      const bb = new THREE.Box3(); for (const m of meshes) { const g = m.geometry.clone().applyMatrix4(new THREE.Matrix4().copy(src.matrixWorld).invert().multiply(m.matrixWorld)); g.computeBoundingBox(); bb.union(g.boundingBox); g.dispose(); }
+      const bb = new THREE.Box3(); for (const m of meshes) { const g = m.geometry.clone().applyMatrix4(toHome.clone().multiply(m.matrixWorld)); g.computeBoundingBox(); bb.union(g.boundingBox); g.dispose(); }
       if (!bb.isEmpty()) {
         const cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2, w = (bb.max.x - bb.min.x) * 1.3 + 0.25, d = (bb.max.z - bb.min.z) * 1.3 + 0.25;
         group.add(contactShadows(list.map(([x, y, z, ry]) => [x + cx * Math.cos(ry) + cz * Math.sin(ry), y, z - cx * Math.sin(ry) + cz * Math.cos(ry), ry, w, d]), name === "bench" ? 0.65 : 0.55));
@@ -206,7 +210,7 @@ function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRu
     const t = rnd() * 6.28, d = 0.8 + rnd() * 2.5, x = sp.at[0] + Math.cos(t) * d, z = sp.at[2] + Math.sin(t) * d, r = 0.2 + rnd() * 0.35, a = rnd() * 6.28;
     quad([x, y, z], [Math.cos(a) * r, 0, Math.sin(a) * r], [-Math.sin(a) * r * 0.8, 0, Math.cos(a) * r * 0.8], DECAL.stain, true);
   }
-  for (const [x, , z] of props.bench) quad([x, y, z], [0.9, 0, 0], [0, 0, 0.7], DECAL.damp, true);
+  for (const [x, by, z] of props.bench) quad([x, by + 0.004, z], [0.9, 0, 0], [0, 0, 0.7], DECAL.damp, true); // (at the bench's own deck: a quay's stands a little above the land's)
   for (const [x, z] of grates) quad([x, y, z], [0.45, 0, 0], [0, 0, 0.45], DECAL.damp, true);
   void capRuns;
   if (I.length) {
@@ -233,18 +237,33 @@ function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRu
     list.forEach(([x, z, ry], k) => { mx.compose(v.set(x, 0, z), q.setFromAxisAngle(up, ry), one); m.setMatrixAt(k, mx); });
     m.castShadow = true; m.computeBoundingSphere(); group.add(m);
   };
-  // a mooring ring hanging from its staple on the cap's face (local +z faces the water)
-  if (rings.length) place(mergeGeometries([new THREE.TorusGeometry(0.09, 0.012, 5, 14).translate(0, LAND - 0.42, 0.012), new THREE.BoxGeometry(0.07, 0.035, 0.03).translate(0, LAND - 0.32, 0.0)].map((g2) => { g2.deleteAttribute("uv"); return g2.toNonIndexed(); })), rings);
-  // a steel ladder from below the water up over the cap: two stiles, rungs every 30 cm, brackets back to the wall and
-  // the stiles' tops bent over onto the deck as hand holds
+  // a mooring ring hanging from its eye on the cap's face (local +z faces the water): the eye a loop of round bar
+  // standing out from a plate bolted to the wall, the ring (28 mm bar, 200 mm across) hanging through it
+  // (a ring of 5 by 14 sides read as a bent strip; the eye was a block)
+  if (rings.length) {
+    const yc = LAND - 0.3, toYZ = new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1); // (x to y, y to z: the eye's arch out from the wall)
+    const parts = [new THREE.TorusGeometry(0.093, 0.014, 10, 32).translate(0, yc - 0.077, 0.024),
+      new THREE.TorusGeometry(0.026, 0.009, 8, 12, Math.PI).applyMatrix4(toYZ).translate(0, yc, 0.01),
+      new THREE.BoxGeometry(0.1, 0.1, 0.014).translate(0, yc, 0.007)];
+    for (const [bx, by] of [[-0.034, 0.032], [0.034, 0.032], [-0.034, -0.032], [0.034, -0.032]]) parts.push(new THREE.CylinderGeometry(0.009, 0.01, 0.008, 6).rotateX(Math.PI / 2).translate(bx, yc + by, 0.017));
+    place(mergeGeometries(parts.map((g2) => { g2.deleteAttribute("uv"); return g2.toNonIndexed(); })), rings);
+  }
+  // a steel ladder from below the water up over the cap: two flat-bar stiles, round rungs every 30 cm, brackets back to
+  // the wall, and the stiles' tops bent over the cap's edge onto the deck and down into it as hand holds
+  // (bent: before, each top was a flat bar laid straight out along the deck from the corner)
   if (ladders.length) {
-    const parts = [], top = LAND + 0.05;
+    const parts = [], top = LAND + 0.06;
+    // a flat bar (w wide, t thick) along a path in the y-z plane at x: a box along each step, the corners overlapping
+    const bar = (x, path, w, t) => { for (let i = 0; i + 1 < path.length; i++) { const [y0, z0] = path[i], [y1, z1] = path[i + 1], l = Math.hypot(y1 - y0, z1 - z0); parts.push(new THREE.BoxGeometry(w, l + t * 0.9, t).rotateX(Math.atan2(z1 - z0, y1 - y0)).translate(x, (y0 + y1) / 2, (z0 + z1) / 2)); } };
+    const R = 0.07, bend = [];
+    for (let k = 0; k <= 5; k++) { const a = (k / 5) * Math.PI / 2; bend.push([top - R + Math.sin(a) * R, -R + Math.cos(a) * R]); } // over the edge: up, then back over the deck
     for (const sx of [-0.2, 0.2]) {
-      parts.push(new THREE.BoxGeometry(0.05, top - WALL_BOTTOM, 0.012).translate(sx, (top + WALL_BOTTOM) / 2, 0));
-      parts.push(new THREE.BoxGeometry(0.05, 0.012, 0.42).translate(sx, top, -0.2));
+      bar(sx, [[WALL_BOTTOM, 0], [top - R, 0]], 0.05, 0.012);
+      bar(sx, bend, 0.05, 0.012);
+      bar(sx, [[top, -R], [top, -0.34], [top - 0.03, -0.39], [LAND - 0.02, -0.4]], 0.05, 0.012); // along the deck and down into it
       for (const by of [WALL_BOTTOM + 0.4, 0.9, LAND - 0.6]) parts.push(new THREE.BoxGeometry(0.03, 0.03, 0.2).translate(sx, by, -0.1));
     }
-    for (let ry2 = WALL_BOTTOM + 0.2; ry2 < LAND - 0.1; ry2 += 0.3) parts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.4, 10, 1, true).rotateZ(Math.PI / 2).translate(0, ry2, 0)); // (round bar: six-sided, up close each rung read as a flat strip)
+    for (let ry2 = WALL_BOTTOM + 0.2; ry2 < LAND - 0.1; ry2 += 0.3) parts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.4, 12, 1, true).rotateZ(Math.PI / 2).translate(0, ry2, 0)); // (round bar: six-sided, up close each rung read as a flat strip)
     place(mergeGeometries(parts.map((g2) => { g2.deleteAttribute("uv"); return g2.toNonIndexed(); })), ladders);
   }
   void railH;
@@ -948,6 +967,18 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // apart, double lanterns lighting each other's poles; two mooring rings and two bollards were doubled the same way.
   // A second try is still made, as the first may have found no room)
   const apart = (list, q, iz = 1) => farFromAll(list, q[0], q[1], iz);
+  // (and clear of the buildings, r metres being the piece's own reach from where it stands: a bench stood under the
+  // Gorleston lighthouse's spiral stair. A building modelled from photographs keeps more room round its outline, for
+  // what stands out from it: the stair, the balcony's slab, a mast)
+  const bldgBoxes = (place.buildings || []).map((b) => ({ ...bb(b.ring), pad: local?.landmarks?.[b.id] ? 2.4 : 0.6 }));
+  const clearOfBuildings = (q, r) => bldgBoxes.every((b) => q[0] < b.x0 - b.pad - r || q[0] > b.x1 + b.pad + r || q[1] < b.z0 - b.pad - r || q[1] > b.z1 + b.pad + r);
+  // (and standing on the deck that's there: inside a pier, quay or breakwater's outline that's its own deck (osmPlace's
+  // p.h), raised over the land's. Each piece stood at the land's height wherever it was, so at Whitby the lifebuoy
+  // stations stood a metre and more down inside the raised piers, only their name boards showing above the deck. Now
+  // each stands on the deck under it; where the piece would reach over the step between two levels, nothing)
+  const deckRings = (place.piers || []).filter((p) => p.ring).map((p) => ({ ...bb(p.ring), h: p.h }));
+  const deckAt = (q) => deckRings.reduce((y, b) => (inB(q, b) ? Math.max(y, b.h) : y), LAND);
+  const standY = (q, r) => { const y = deckAt(q); for (const [a, b] of [[r, 0], [-r, 0], [0, r], [0, -r]]) if (Math.abs(deckAt([q[0] + a, q[1] + b]) - y) > 0.05) return null; return y; };
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
     if (Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > 200) { acc += len; continue; }
@@ -958,20 +989,22 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (Math.floor(d / 28) !== Math.floor((d - 1) / 28)) {
         const q = inAt(0.75); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps === "column" && apart(columns, q)) {
           columns.push([q[0], q[1], ry, nx, nz]); { const L = lanternAt(); perches.push([q[0] - nx * L.z, LAND + L.top, q[1] - nz * L.z]); } // (a gull's place: on the lantern)
-        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps !== "column" && apart(props.lamp, q, 2)) {
-          addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], LAND + 2.5, q[1]);
-          const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, LAND + 4.95, q[1] - nz * 0.35, ry);
-          addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, LAND + 4.85, q[1] - nz * 0.7, ry); void arm;
-          props.lamp.push([q[0], LAND, q[1], ry]);
-          perches.push([q[0], LAND + 3.9, q[1]]); // somewhere for a gull to sit (the lamp's top)
+        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps !== "column" && apart(props.lamp, q, 2) && clearOfBuildings(q, 0.45) && standY(q, 0.3) != null) {
+          const Y = standY(q, 0.3);
+          addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], Y + 2.5, q[1]);
+          const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, Y + 4.95, q[1] - nz * 0.35, ry);
+          addAt(new THREE.BoxGeometry(0.34, 0.22, 0.5), glowLamp, q[0] - nx * 0.7, Y + 4.85, q[1] - nz * 0.7, ry); void arm;
+          props.lamp.push([q[0], Y, q[1], ry]);
+          perches.push([q[0], Y + 3.9, q[1]]); // somewhere for a gull to sit (the lamp's top)
         }
       }
       if (Math.floor((d + 14) / 55) !== Math.floor((d + 13) / 55)) {
-        const q = inAt(0.6); if (landAt(q) && clearOfSpots(q) && apart(props.station, q, 2)) {
-          addAt(new THREE.BoxGeometry(0.62, 0.95, 0.22), mBox, q[0], LAND + 0.9, q[1], ry);
-          const buoy = addAt(new THREE.TorusGeometry(0.27, 0.07, 8, 18), mBuoy, q[0] + nx * 0.13, LAND + 0.95, q[1] + nz * 0.13, ry); void buoy;
-          addAt(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mPost, q[0], LAND + 0.25, q[1]);
-          props.station.push([q[0], LAND, q[1], Math.atan2(-nx, -nz)]); // facing the deck
+        const q = inAt(0.6); if (landAt(q) && clearOfSpots(q) && apart(props.station, q, 2) && clearOfBuildings(q, 0.5) && standY(q, 0.5) != null) {
+          const Y = standY(q, 0.5);
+          addAt(new THREE.BoxGeometry(0.62, 0.95, 0.22), mBox, q[0], Y + 0.9, q[1], ry);
+          const buoy = addAt(new THREE.TorusGeometry(0.27, 0.07, 8, 18), mBuoy, q[0] + nx * 0.13, Y + 0.95, q[1] + nz * 0.13, ry); void buoy;
+          addAt(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), mPost, q[0], Y + 0.25, q[1]);
+          props.station.push([q[0], Y, q[1], Math.atan2(-nx, -nz)]); // facing the deck
         }
       }
       // the small things a working wall has: a drain grate in the deck now and then, mooring rings on the cap's face,
@@ -981,14 +1014,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (Math.floor((d + 31) / 71) !== Math.floor((d + 30) / 71) && clearOfSpots(inAt(0.5)) && apart(ladders, [ex, ez])) ladders.push([ex + nx * 0.19, ez + nz * 0.19, ry]);
       // mooring bollards just inside the railing, every 30 m or so
       if (Math.floor((d + 7) / 30) !== Math.floor((d + 6) / 30)) {
-        const q = inAt(0.55); if (landAt(q) && clearOfSpots(q) && apart(props.bollard, q, 2)) props.bollard.push([q[0], LAND, q[1], ry]);
+        const q = inAt(0.55); if (landAt(q) && clearOfSpots(q) && apart(props.bollard, q, 2) && clearOfBuildings(q, 0.25) && standY(q, 0.25) != null) props.bollard.push([q[0], standY(q, 0.25), q[1], ry]);
       }
       if (Math.floor((d + 20) / 40) !== Math.floor((d + 19) / 40)) {
-        const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q) && apart(props.bench, q, 2)) {
-          const ax = -nz, az = nx; // along the edge
-          for (const [h, back, th] of [[0.45, 0, 0.42], [0.8, -0.2, 0.08]]) addAt(new THREE.BoxGeometry(1.8, th === 0.42 ? 0.06 : 0.36, th === 0.42 ? 0.42 : 0.05), mWood, q[0] - nx * back, LAND + h, q[1] - nz * back, ry);
-          for (const s2 of [-0.8, 0.8]) addAt(new THREE.BoxGeometry(0.06, 0.45, 0.42), mPost, q[0] + ax * s2, LAND + 0.22, q[1] + az * s2, ry);
-          props.bench.push([q[0], LAND, q[1], ry]); // facing the water
+        const q = inAt(2.6); if (landAt(q) && landAt(inAt(3.4)) && clearOfSpots(q) && apart(props.bench, q, 2) && clearOfBuildings(q, 1.0) && standY(q, 1.0) != null) {
+          const ax = -nz, az = nx, Y = standY(q, 1.0); // along the edge
+          for (const [h, back, th] of [[0.45, 0, 0.42], [0.8, -0.2, 0.08]]) addAt(new THREE.BoxGeometry(1.8, th === 0.42 ? 0.06 : 0.36, th === 0.42 ? 0.42 : 0.05), mWood, q[0] - nx * back, Y + h, q[1] - nz * back, ry);
+          for (const s2 of [-0.8, 0.8]) addAt(new THREE.BoxGeometry(0.06, 0.45, 0.42), mPost, q[0] + ax * s2, Y + 0.22, q[1] + az * s2, ry);
+          props.bench.push([q[0], Y, q[1], ry]); // facing the water
         }
       }
     }
