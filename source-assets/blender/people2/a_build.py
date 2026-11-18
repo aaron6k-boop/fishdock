@@ -189,7 +189,8 @@ try:
     if not bm2.faces: L("  part", name, "empty"); bm2.free(); bpy.data.objects.remove(ob); return None
     bm2.normal_update()
     for v in bm2.verts: v.co += v.normal * (lift / S)
-    bmesh.ops.solidify(bm2, geom=bm2.faces[:], thickness=-thick / S); bm2.normal_update(); bm2.to_mesh(ob.data); bm2.free(); return ob
+    # (its thickness shown by the edge turned back under it: a solidify threw points of thin folds half a metre off)
+    bm2.normal_update(); thicken_edges(bm2, thick + lift * 0.8); bm2.to_mesh(ob.data); bm2.free(); return ob
   def slab(axis, lo, hi, at=None):
     # two planes keeping what lies between lo and hi along axis (measured from at, the pelvis's foot by default)
     o = np.array([cx, cy, 0.0]) if at is None else at; axis = np.asarray(axis, float)
@@ -208,6 +209,11 @@ try:
   # (fold patterns: rings of soft ridges round a limb near a joint, broken by noise so no two are alike)
   rng = np.random.default_rng(11)
   PH = rng.uniform(0, 6.28, 64)
+  def fold(x, k=0.0):
+    # one fold's profile along x (in wavelengths): wide soft crests and tight creases, each fold its own size
+    ph = x + 0.18 * math.sin(x * 2.3 + k) + PH[int(k) % 64]
+    v = abs(math.sin(math.pi * ph)) ** 0.55 - 0.62
+    return v * (0.7 + 0.3 * math.sin(ph * 1.7 + 2 * k))
   def ridges(s, lam, k=0.0):
     return np.sin(2 * math.pi * s / lam + PH[int(k) % 64] + 0.8 * math.sin(s * 23.0 + k)) * (0.6 + 0.4 * math.sin(s * 7.3 + 2 * k))
 
@@ -222,7 +228,7 @@ try:
     if k in ("upperarm", "forearm"): return True
     return HEM - 0.04 <= h[i] <= neckZ + 0.03 and k not in ("calf", "foot")   # (the tops of the thighs too: the hem is cut below the seat)
   jk, bm = from_body("fd2_jacket", jacket_region, body_slot)
-  nk0 = bone("Neck")
+  nk0 = bone("Neck"); zN0 = zmin + neckZ * H
   def jk_cuts(bm):
     # (cut once the cloth has its shape: cut first, the thin slivers a cut leaves at the body's edge were pushed out
     # along their own wild normals into spikes)
@@ -234,33 +240,66 @@ try:
     for S2 in ("L", "R"):
       a = el[S2]; b = wr[S2]; d = (b - a) / np.linalg.norm(b - a); cut_plane(bm, tuple(b - d * 0.03), tuple(d), keep_neg=True)
   def jk_off(p):
-    z = (p[2] - zmin) / H; o = 0.016
-    # (looser at the waist and hem, a little standing off the hips; close over the shoulders: a shell, not a puffer)
-    if z < HEM + 0.08: o += 0.012 * (1 - (z - HEM) / 0.08)
-    if z > neckZ - 0.06: o -= 0.005
+    z = (p[2] - zmin) / H; o = 0.011
+    # (a little looser at the hem; close over the shoulders; the hang from the chest is added after)
+    if z < HEM + 0.06: o += 0.006 * (1 - (z - HEM) / 0.06)
+    if z > neckZ - 0.06: o -= 0.003
     for S2 in ("L", "R"):
       t, d = seg_param(p, sh[S2], wr[S2])
-      if d < 0.09: o = 0.014 + 0.007 * t   # (the sleeve: wider towards the cuff)
+      if d < 0.09: o = 0.010 + 0.006 * t   # (the sleeve: a little wider towards the cuff)
     return o
-  inflate(bm, jk_off, 16)
+  inflate(bm, jk_off, 10)
+  # the hang: below the chest the cloth falls straight from the widest part above it (the chest in front, the shoulder
+  # blades behind, the ribs at the sides), over the waist and the small of the back, as a shell jacket does, instead
+  # of following every curve of the body under it
+  def hang(bm, top_lo, top_hi, below, amount=1.0, arms_clear=0.11):
+    pts = [(v, world(v)) for v in bm.verts]
+    def is_arm(p): return min(seg_param(p, sh[S2], wr[S2])[1] for S2 in ("L", "R")) < arms_clear
+    NB = 72; rmax = np.zeros(NB)
+    tor = [(v, p) for v, p in pts if not is_arm(p)]
+    for v, p in tor:
+      q = p - np.array([cx, cy, p[2]]); a = int(((math.atan2(q @ side, q @ fwd) + math.pi) / (2 * math.pi)) * NB) % NB
+      if top_lo < p[2] < top_hi: rmax[a] = max(rmax[a], math.hypot(q[0], q[1]))
+    rmax = np.maximum(rmax, np.roll(rmax, 1) * 0.985); rmax = np.maximum(rmax, np.roll(rmax, -1) * 0.985)
+    moved = 0
+    for v, p in tor:
+      if p[2] >= below: continue
+      q = p - np.array([cx, cy, p[2]]); r = math.hypot(q[0], q[1]); a = int(((math.atan2(q @ side, q @ fwd) + math.pi) / (2 * math.pi)) * NB) % NB
+      w = amount * min(1.0, (below - p[2]) / 0.08)
+      want = rmax[a] * 0.97
+      if r < want and r > 1e-6:
+        r2 = r + (want - r) * w; d = (q / r) * (r2 - r); d[2] = 0
+        v.co += mwi.to_3x3() @ Vector(d); moved += 1
+    for _ in range(2): bmesh.ops.smooth_vert(bm, verts=[v for v in bm.verts if not v.is_boundary], factor=0.4, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.normal_update(); return moved
+  L("jacket hang moved", hang(bm, zN0 - 0.30, zN0 - 0.13, zN0 - 0.22), "points")
   subdivide(bm)
   def jk_folds(p, n):
     z = (p[2] - zmin) / H; d = 0.0
     for k2, S2 in enumerate(("L", "R")):
-      # inside the elbow: rings of folds over 12 cm either side, strongest on the inside of the bend
+      # inside the elbow: compression folds, set at an angle round the sleeve (they zigzag as cloth does), deepest on
+      # the inside of the bend, a few long ones over the forearm
       a, e, w = sh[S2], el[S2], wr[S2]; ax = (w - a) / np.linalg.norm(w - a)
-      s = (p - e) @ ax; t, r = seg_param(p, a, w)
-      if r < 0.1 and abs(s) < 0.13:
-        rad = (p - e) - ax * s; rad = rad / (np.linalg.norm(rad) or 1); inside = max(0.0, rad @ fwd)   # (the inside of the bend faces forward as the arms hang)
-        d += 0.0045 * (1 - abs(s) / 0.13) * ridges(s, 0.045, 3 + k2) * (0.5 + 0.5 * inside)
-      # the armpit: folds fanning down from it
-      ap = sh[S2] - np.array([0, 0, 0.08])
-      dd = np.linalg.norm(p - ap)
-      if dd < 0.12: d += 0.003 * (1 - dd / 0.12) * ridges(math.atan2(p[2] - ap[2], (p - ap) @ fwd) * 0.08, 0.03, 9 + k2)
-    # round the waist above the hem: horizontal folds, deeper at the sides and back
-    if HEM + 0.01 < z < HEM + 0.12:
-      ang = math.atan2(lat(p), fro(p)); sideish = abs(math.sin(ang))
-      d += 0.0035 * (1 - abs(z - HEM - 0.06) / 0.06) * ridges(p[2] + 0.02 * math.sin(ang * 3), 0.05, 17) * (0.5 + 0.5 * sideish)
+      s0 = (p - e) @ ax; t, r = seg_param(p, a, w)
+      if r < 0.1 and -0.12 < s0 < 0.16:
+        rad = (p - e) - ax * s0; rad = rad / (np.linalg.norm(rad) or 1); inside = max(0.0, rad @ fwd); ang = math.atan2(rad @ fwd, rad[2])
+        env = (1 - abs(s0 - 0.02) / 0.14) if abs(s0 - 0.02) < 0.14 else 0.0
+        d += 0.0042 * env * fold((s0 + 0.012 * math.sin(ang * 2 + k2)) / 0.038, 3 + k2) * (0.35 + 0.65 * inside)
+      # drag lines from the armpit, down and across the side of the chest
+      ap = sh[S2] - np.array([0, 0, 0.09]); q = p - ap; dd = np.linalg.norm(q)
+      if dd < 0.16 and q[2] < 0.02:
+        across = (q @ fwd) * 0.8 + q[2] * 0.6
+        d += 0.0024 * (1 - dd / 0.16) * fold(across / 0.035, 9 + k2)
+    # gathered above the hem band by its drawcord: soft horizontal folds over the waist, and short upright pleats
+    # pulled in at the band itself
+    zh = zmin + HEM * H
+    if zh < p[2] < zh + 0.16:
+      ang = math.atan2(lat(p), fro(p)); u = (p[2] - zh)
+      d += 0.0026 * (1 - u / 0.16) * fold((p[2] + 0.015 * math.sin(ang * 3)) / 0.045, 17) * (0.6 + 0.4 * abs(math.sin(ang)))
+      if u < 0.07: d += 0.0024 * (1 - u / 0.07) * fold(ang * 4.0, 19)   # (about 25 round the hem)
+    # the small of the back: one or two long horizontal folds where the jacket hangs from the shoulder blades
+    if fro(p) < 0 and zh + 0.12 < p[2] < zh + 0.30:
+      d += 0.002 * fold((p[2] - zh) / 0.07, 23) * (1 - abs(lat(p)) / 0.2 if abs(lat(p)) < 0.2 else 0.0)
     return d
   displace(bm, jk_folds)
   jk_cuts(bm)
@@ -318,7 +357,7 @@ try:
   bmc = bmesh.new(); rows = []
   for a2, p in ring:
     out = p - nkc2; out[2] = 0; out /= (np.linalg.norm(out) or 1); front = max(0.0, math.cos(a2))
-    hgt = 0.072 - 0.022 * front; lean = 0.008 + 0.008 * front
+    hgt = (0.064 - 0.022 * front) * min(1.0, H / 1.8); lean = 0.01 + 0.012 * front
     prof = [(-0.012, 0.0), (0.0, 0.003), (hgt * 0.55, 0.002 + lean * 0.45), (hgt, lean), (hgt + 0.004, lean - 0.003)]   # (up, out) from the neckline
     outer = [p + np.array([0, 0, u]) + out * (o + 0.003) for u, o in prof]
     inner = [q - out * 0.004 for q in outer]
@@ -374,20 +413,33 @@ try:
   def tr_region(i):
     k = kinds[i]
     if k in ("hand", "head", "upperarm", "forearm"): return False
-    return BOOT - 0.06 <= h[i] <= HEM + 0.09 and k in ("thigh", "calf", "torso", "foot")
+    return BOOT - 0.06 <= h[i] <= HEM + 0.045 and k in ("thigh", "calf", "torso", "foot")   # (their top well inside the jacket)
   tr, bm = from_body("fd2_trousers", tr_region, body_slot)
   def tr_off(p):
-    z = (p[2] - zmin) / H; o = 0.016
-    if z < BOOT + 0.02: o = 0.012  # (gathered in where they go into the boots, inside the boots' shafts)
+    z = (p[2] - zmin) / H; o = 0.013
+    if z < BOOT + 0.02: o = 0.011  # (gathered in where they go into the boots, inside the boots' shafts)
+    if z > HEM - 0.015: o = 0.013 - 0.007 * min(1.0, (z - HEM + 0.015) / 0.03)   # (snug at the waist, under the jacket)
     return o
-  inflate(bm, tr_off, 12)
+  inflate(bm, tr_off, 10)
   subdivide(bm)
   def tr_folds(p, n):
     z = (p[2] - zmin) / H; d = 0.0
     for k2, S2 in enumerate(("L", "R")):
-      k = kn[S2]; s = p[2] - k[2]
-      if abs(s) < 0.12 and np.linalg.norm((p - k)[:2]) < 0.14: d += 0.004 * (1 - abs(s) / 0.12) * ridges(s, 0.05, 21 + k2) * (1.0 if fro(p) - fro(k) < 0 else 0.5)
-    if z < BOOT + 0.07: d += 0.006 * (1 - (z - BOOT + 0.03) / 0.1) * ridges(p[2] + 0.01 * math.sin(math.atan2(lat(p), fro(p)) * 4), 0.032, 31)
+      k = kn[S2]; s0 = p[2] - k[2]; behind = fro(p) - fro(k) < 0; rr = np.linalg.norm((p - k)[:2])
+      # behind the knee: cloth bunched into deep creases; in front, a few soft ones across the kneecap
+      if abs(s0) < 0.11 and rr < 0.13: d += (0.0048 if behind else 0.0022) * (1 - abs(s0) / 0.11) * fold((s0 + 0.01 * math.sin(math.atan2(lat(p - k), fro(p - k)) * 2)) / (0.03 if behind else 0.05), 21 + k2)
+      # drag lines from the crotch across the inside of the thigh
+      t0 = th[S2]; cr = np.array([cx, cy, t0[2] - 0.06]); q = p - cr
+      if np.linalg.norm(q) < 0.2 and q[2] < 0.02:
+        d += 0.0022 * (1 - np.linalg.norm(q) / 0.2) * fold(((q @ side) * (1 if S2 == "L" else -1) * 0.7 - q[2] * 0.7) / 0.04, 27 + k2)
+      # the front of the hip: a crease where the leg meets the body
+      hp = t0 + fwd * 0.08; q = p - hp
+      if abs(q[2]) < 0.06 and fro(p) > fro(t0) and abs(lat(p) - lat(t0)) < 0.09: d += 0.0018 * (1 - abs(q[2]) / 0.06) * fold(q[2] / 0.03, 29 + k2)
+    # stacked folds where they go into the boots, settling down onto the boot tops
+    zb = zmin + BOOT * H
+    if p[2] < zb + 0.12:
+      u = max(0.0, (p[2] - zb + 0.05) / 0.17); ang = math.atan2(lat(p), fro(p))
+      d += 0.0052 * (1 - u) * fold((p[2] + 0.012 * math.sin(ang * 4)) / 0.03, 31)
     return d
   displace(bm, tr_folds)
   cut_level(bm, BOOT - 0.03, keep_below=False)
@@ -422,9 +474,13 @@ try:
   L("boots after the cut", len(bm.faces))
   bm.normal_update()
   # the sole: everything near the ground pushed down to a flat, slightly wider sole 2 cm thick
+  bm.normal_update()
   for v in bm.verts:
-    pw = np.array(tuple(mw @ v.co))
-    if pw[2] < zmin + 0.035:
+    pw = np.array(tuple(mw @ v.co)); nz = (mw.to_3x3() @ v.normal).normalized().z
+    if pw[2] < zmin + 0.075 and nz < -0.3:
+      # (the underside: one flat sole on the ground, heel to toe, whatever shoe the body had under it)
+      pw2 = pw.copy(); pw2[2] = zmin - 0.002; v.co = mwi @ Vector(pw2)
+    elif pw[2] < zmin + 0.035:
       pw2 = pw.copy(); pw2[2] = max(zmin - 0.002, pw[2] - 0.018)
       v.co = mwi @ Vector(pw2)
   thicken_edges(bm, 0.006)
@@ -480,12 +536,67 @@ try:
   keep = set(f for f in bmb.faces if f.material_index in head_slot and min(bw[v.index] for v in f.verts) > 0.05)
   bmesh.ops.delete(bmb, geom=[f for f in bmb.faces if f not in keep], context="FACES"); bmesh.ops.delete(bmb, geom=[v for v in bmb.verts if not v.link_faces], context="VERTS")
   bmb.normal_update(); L("beard faces", len(bmb.faces))
-  # (the mouth's opening kept clear: points within 1.2 cm of the lips' line left out)
-  for v in bmb.verts:
-    pw = np.array(tuple(mw @ v.co)); w = beard_w(pw); v.co += v.normal * ((0.0015 + 0.0035 * w) / S)
-  subdivide(bmb)
-  bd = body.copy(); bd.data = body.data.copy(); bd.name = "fd2_beard"; bpy.context.collection.objects.link(bd); bmb.to_mesh(bd.data); bmb.free(); parts["beard"] = bd if BEARD else None
-  if not BEARD: bpy.data.objects.remove(bd, do_unlink=True)
+  # how far each point is in from the beard's edge, along the face (the shortest way over its edges): the hair thins to
+  # nothing over the last centimetre or so, so the beard has no outline
+  import heapq
+  bmb.verts.index_update(); bmb.verts.ensure_lookup_table()
+  vidx = {v.index: v for v in bmb.verts}
+  Edist = {v.index: (0.0 if v.is_boundary else 9.0) for v in bmb.verts}
+  heap = [(0.0, i) for i, d in Edist.items() if d == 0.0]; heapq.heapify(heap)
+  while heap:
+    d0, i = heapq.heappop(heap)
+    if d0 > Edist[i]: continue
+    v = vidx[i]; pv = np.array(tuple(mw @ v.co))
+    for e in v.link_edges:
+      o = e.other_vert(v); d1 = d0 + float(np.linalg.norm(np.array(tuple(mw @ o.co)) - pv))
+      if d1 < Edist[o.index]: Edist[o.index] = d1; heapq.heappush(heap, (d1, o.index))
+  L("beard depth from its edge: most", round(max(Edist.values()), 3), "m")
+  # the body points of the beard (for the stubble drawn on the skin under and round it)
+  beard_pts = np.array([tuple(mw @ v.co) for v in bmb.verts]); beard_E = np.array([Edist[v.index] for v in bmb.verts])
+  # three layers of hair: close to the skin and dense over all of it, then two further out over less of it (in from
+  # the edge 6 and 12 mm), so the beard is thick in the middle and thins out at its edges
+  SHELLS = [("fd2_beard", 0.0007, 0.0, 0.0012), ("fd2_beard_b", 0.0017, 0.006, 0.0016), ("fd2_beard_c", 0.0028, 0.012, 0.0020)]
+  for nm, lift, inset, extra in SHELLS:
+    b2 = bmb.copy(); b2.verts.index_update(); b2.verts.ensure_lookup_table()
+    E2 = [Edist[v.index] for v in bmb.verts]
+    lay = b2.verts.layers.float.new("fd_edge")
+    for k3, v in enumerate(b2.verts): v[lay] = E2[k3]
+    if inset > 0:
+      bad = [f for f in b2.faces if min(v[lay] for v in f.verts) < inset]
+      bmesh.ops.delete(b2, geom=bad, context="FACES"); bmesh.ops.delete(b2, geom=[v for v in b2.verts if not v.link_faces], context="VERTS")
+    if not b2.faces: b2.free(); continue
+    b2.normal_update()
+    for v in b2.verts:
+      pw = np.array(tuple(mw @ v.co)); w = beard_w(pw); ramp = min(1.0, v[lay] / 0.012)
+      v.co += v.normal * ((lift + extra * w * ramp) / S)
+    subdivide(b2)
+    ob = body.copy(); ob.data = body.data.copy(); ob.name = nm; bpy.context.collection.objects.link(ob); b2.to_mesh(ob.data); b2.free()
+    parts["beard_" + nm] = ob if BEARD else None
+    if not BEARD: bpy.data.objects.remove(ob, do_unlink=True)
+  # the head's own surface written out for its textures (the stubble's shadow on the skin, the skin's roughness, finer
+  # detail): every head triangle where he stands, its uvs, and how much beard is over or near each point
+  kbe = KDTree(len(beard_pts))
+  for i3, p3 in enumerate(beard_pts): kbe.insert(Vector(p3), i3)
+  kbe.balance()
+  dgh = bpy.context.evaluated_depsgraph_get(); eh = body.evaluated_get(dgh); mh = eh.to_mesh(); mh.calc_loop_triangles(); uvh = mh.uv_layers.active.data
+  Ph = np.array([tuple(eh.matrix_world @ v.co) for v in mh.vertices]); Nh = np.array([tuple((eh.matrix_world.to_3x3() @ v.normal).normalized()) for v in mh.vertices])
+  Wv = np.zeros(len(Ph))
+  for i3 in range(len(Ph)):
+    if kinds[i3] != "head" or not BEARD: continue
+    _, j3, d3 = kbe.find(Vector(Ph[i3]))
+    if d3 < 0.004: Wv[i3] = min(1.0, 0.45 + beard_E[j3] / 0.012)
+    else: Wv[i3] = max(0.0, 0.45 * (1 - (d3 - 0.004) / 0.016))
+    if in_mouth(Ph[i3]): Wv[i3] = 0.0
+  HP, HN, HU, HW, HT = [], [], [], [], []; base3 = 0
+  for tri in mh.loop_triangles:
+    if mh.polygons[tri.polygon_index].material_index not in head_slot: continue
+    for li, vi in zip(tri.loops, tri.vertices): HP.append(Ph[vi]); HN.append(Nh[vi]); HU.append(tuple(uvh[li].uv)); HW.append(Wv[vi])
+    HT.append([base3, base3 + 1, base3 + 2]); base3 += 3
+  eh.to_mesh_clear()
+  eyes = [bh[n].tolist() for n in bh if n.endswith("LEye") or n.endswith("REye")]
+  np.savez_compressed(f"{DST}/{TAG}_head.npz", P=np.array(HP, np.float32), N=np.array(HN, np.float32), UV=np.array(HU, np.float32), W=np.array(HW, np.float32), T=np.array(HT, np.int32), K=np.zeros(len(HT), np.int16), names=np.array(["head"]),
+                      frame=np.array([cx, cy, zmin, H, *fwd, *side], np.float32), bones=np.array([json.dumps({k: v.tolist() for k, v in bh.items()})]), mouth=np.array([*mc, hw], np.float32), eyes=np.array(eyes, np.float32))
+  L("head written", len(HT), "triangles; beard over", int((np.array(HW) > 0.4).sum() / 3), "of them")
 
   # ---- every part: one material slot, smooth, the body's bone weights from its nearest point, unwrapped ----
   allp = list(made.values()) + [o for o in parts.values() if o]
@@ -544,16 +655,17 @@ try:
     L(key, "unwrapped", [(o.name, len(o.data.polygons)) for o in obs])
   # ---- the surfaces written out for the textures: per family, every triangle's world points, normals, uvs and part ----
   for key, obs in fam.items():
-    Ps, Ns, Us, Ts, Ks, names = [], [], [], [], [], []; base = 0
+    Ps, Ns, Us, Ts, Ks, names, Es = [], [], [], [], [], [], []; base = 0
     for pi, o in enumerate(obs):
       # (as he stands, posed by the skeleton: the frame the textures are drawn in)
       dg = bpy.context.evaluated_depsgraph_get(); eo = o.evaluated_get(dg); me = eo.to_mesh(); me.calc_loop_triangles(); uv = me.uv_layers.active.data
       vw = np.array([tuple(eo.matrix_world @ v.co) for v in me.vertices]); nw = np.array([tuple((eo.matrix_world.to_3x3() @ v.normal).normalized()) for v in me.vertices])
+      ea = me.attributes.get("fd_edge"); ev2 = [a.value for a in ea.data] if ea is not None and len(ea.data) == len(me.vertices) else None
       for tri in me.loop_triangles:
-        for li, vi in zip(tri.loops, tri.vertices): Ps.append(vw[vi]); Ns.append(nw[vi]); Us.append(tuple(uv[li].uv))
+        for li, vi in zip(tri.loops, tri.vertices): Ps.append(vw[vi]); Ns.append(nw[vi]); Us.append(tuple(uv[li].uv)); Es.append(ev2[vi] if ev2 else 1.0)
         Ts.append([base, base + 1, base + 2]); Ks.append(pi); base += 3
       names.append(o.name); eo.to_mesh_clear()
-    np.savez_compressed(f"{DST}/{TAG}_{key}.npz", P=np.array(Ps, np.float32), N=np.array(Ns, np.float32), UV=np.array(Us, np.float32), T=np.array(Ts, np.int32), K=np.array(Ks, np.int16), names=np.array(names),
+    np.savez_compressed(f"{DST}/{TAG}_{key}.npz", P=np.array(Ps, np.float32), N=np.array(Ns, np.float32), UV=np.array(Us, np.float32), T=np.array(Ts, np.int32), K=np.array(Ks, np.int16), names=np.array(names), E=np.array(Es, np.float32),
                         frame=np.array([cx, cy, zmin, H, *fwd, *side], np.float32), bones=np.array([json.dumps({k: v.tolist() for k, v in bh.items()})]))
     L(key, "written", len(Ts), "triangles")
   json.dump({"cx": float(cx), "cy": float(cy), "zmin": float(zmin), "H": float(H), "fwd": fwd.tolist(), "side": side.tolist(), "head": bone("Head").tolist(), "hem": HEM}, open(f"{DST}/{TAG}_frame.json", "w"))

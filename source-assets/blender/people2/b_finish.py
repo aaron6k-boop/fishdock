@@ -35,7 +35,7 @@ try:
   def img(n, colour):
     p = f"{TEX}/{TAG}_{n}.png"
     if not os.path.exists(p): L("missing", p); return None
-    im = bpy.data.images.load(p); im.colorspace_settings.name = "sRGB" if colour else "Non-Color"; return im
+    im = bpy.data.images.load(p, check_existing=True); im.colorspace_settings.name = "sRGB" if colour else "Non-Color"; return im
   def material(name, key, rough=None, alpha=False, metal=0.0):
     m = bpy.data.materials.get(name) or bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree
     for n in list(nt.nodes): nt.nodes.remove(n)
@@ -56,10 +56,25 @@ try:
       t = nt.nodes.new("ShaderNodeTexImage"); t.image = r; nt.links.new(t.outputs["Color"], b.inputs["Roughness"])
     elif rough is not None: b.inputs["Roughness"].default_value = rough
     return m
-  M = {"jacket": material("fd2_jacket", "jacket"), "trousers": material("fd2_trousers", "trousers"), "boots": material("fd2_boots", "boots"), "beard": material("fd2_beard", "beard", rough=0.6, alpha=True)}
+  M = {"jacket": material("fd2_jacket", "jacket"), "trousers": material("fd2_trousers", "trousers"), "boots": material("fd2_boots", "boots"), "beard": material("fd2_beard", "beard", rough=0.62, alpha=True),
+       "beard_b": material("fd2_beard_b", "beard", rough=0.62, alpha=True), "beard_c": material("fd2_beard_c", "beard", rough=0.62, alpha=True)}
+  # the head: its own colour with the stubble's shadow drawn in under and round the beard, a roughness map (oilier
+  # over the nose and forehead, drier on the cheeks, wet eyes) and finer skin detail in its normal map, where made
+  for o in people:
+    for m in o.data.materials:
+      if m and "head" in m.name.lower() and m.use_nodes:
+        nt = m.node_tree; b = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        hc, hr, hn = img("head_c", True), img("head_r", False), img("head_n", False)
+        if b and hc:
+          t = nt.nodes.new("ShaderNodeTexImage"); t.image = hc; nt.links.new(t.outputs["Color"], b.inputs["Base Color"])
+        if b and hr:
+          t = nt.nodes.new("ShaderNodeTexImage"); t.image = hr; nt.links.new(t.outputs["Color"], b.inputs["Roughness"])
+        if b and hn:
+          t = nt.nodes.new("ShaderNodeTexImage"); t.image = hn; nm = nt.nodes.new("ShaderNodeNormalMap"); nt.links.new(t.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
+        L("head material", m.name, "colour" if hc else "-", "roughness" if hr else "-", "normal" if hn else "-")
   trim = bpy.data.materials.new("fd2_trim"); trim.use_nodes = True; tb = trim.node_tree.nodes["Principled BSDF"]; tb.inputs["Base Color"].default_value = (0.03, 0.03, 0.032, 1); tb.inputs["Roughness"].default_value = 0.35; tb.inputs["Metallic"].default_value = 0.3
   for o in clothes:
-    key = "jacket" if "jacket" in o.name else "trousers" if "trousers" in o.name else "boots" if "boots" in o.name else "beard"
+    key = "jacket" if "jacket" in o.name else "trousers" if "trousers" in o.name else "boots" if "boots" in o.name else ("beard_b" if o.name.startswith("fd2_beard_b") else "beard_c" if o.name.startswith("fd2_beard_c") else "beard")
     o.data.materials.clear(); o.data.materials.append(trim if any(k in o.name for k in ("studs", "toggles", "buckles")) else M[key])
   # ---- each garment's pieces joined into one mesh (one draw each): the jacket and its collar, hood, flap, pockets,
   # cuffs and hem band; the trousers and their pockets; the boots and their bands; the studs, toggles and buckles ----
@@ -188,7 +203,7 @@ try:
   for o in [o for o in bpy.data.objects if o.type == "LIGHT"]: bpy.data.objects.remove(o)
   sun = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN")); sun.data.energy = 3.2; sun.rotation_euler = (0.85, 0.15, 0.7); sc.collection.objects.link(sun)
   # (the clothes in the default kit's colours for the check: black jacket, charcoal trousers, green wellies)
-  for key, c in (("jacket", (0.035, 0.037, 0.04)), ("trousers", (0.05, 0.05, 0.05)), ("boots", (0.06, 0.11, 0.05)), ("beard", (0.11, 0.05, 0.027))):
+  for key, c in (("jacket", (0.035, 0.037, 0.04)), ("trousers", (0.05, 0.05, 0.05)), ("boots", (0.06, 0.11, 0.05)), ("beard", (0.11, 0.05, 0.027)), ("beard_b", (0.11, 0.05, 0.027)), ("beard_c", (0.11, 0.05, 0.027))):
     nt = M[key].node_tree; b = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"); t = next((n for n in nt.nodes if n.type == "TEX_IMAGE" and n.image and n.image.name.endswith("_c.png")), None)
     if t:
       mx = nt.nodes.new("ShaderNodeMix"); mx.data_type = "RGBA"; mx.blend_type = "MULTIPLY"; mx.inputs["Factor"].default_value = 1.0

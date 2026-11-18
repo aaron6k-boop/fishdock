@@ -2177,7 +2177,7 @@
    "name": "The main angler (people v2): clothes, beard and levels of detail made for FishDock on a Rocketbox body",
    "source": "source-assets/blender/people2 (a_build.py, textures.py, b_finish.py), run in Blender 5.2 on Aaron's PC",
    "author": "FishDock; body and face Microsoft Rocketbox (Male_Adult_05, m05)",
-   "licence": "Clothes, beard, textures and levels of detail made for FishDock (no outside image or model); the body and face MIT (Microsoft Rocketbox, Copyright (c) 2020 Microsoft)",
+   "licence": "Clothes, beard, textures and levels of detail made for FishDock (with the CC0 cloth and rubber textures polyhaven:bi_stretch, polyhaven:terlenka and ambientcg:Rubber004); the body and face MIT (Microsoft Rocketbox, Copyright (c) 2020 Microsoft)",
    "attribution": "public/people/CREDITS.txt (the Rocketbox MIT notice and the angler2 paragraph)",
    "type": "rigged 3D person",
    "resolution": "about 74,000, 23,000 and 7,000 triangles; clothes' maps 2048 (angler2_hd.glb) and 1024 (angler2.glb)",
@@ -2187,6 +2187,82 @@
     "public/people/angler2_hd.glb",
     "public/people/angler2.webp"
    ]
+  },
+  {
+   "id": "polyhaven:bi_stretch",
+   "name": "Bi Stretch (woven polyester)",
+   "source": "Poly Haven",
+   "page": "https://polyhaven.com/a/bi_stretch",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/people/CREDITS.txt)",
+   "type": "PBR texture (2k: colour, normal, roughness, displacement)",
+   "resolution": "2048, 26 cm across",
+   "use": "the anglers' waterproof jackets: its height and roughness laid on the jacket at its real size and drawn into the jacket's maps by source-assets/blender/people2/textures.py",
+   "files": [],
+   "date": "2026-11-18"
+  },
+  {
+   "id": "polyhaven:terlenka",
+   "name": "Terlenka (synthetic weave)",
+   "source": "Poly Haven",
+   "page": "https://polyhaven.com/a/terlenka",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/people/CREDITS.txt)",
+   "type": "PBR texture (2k)",
+   "resolution": "2048, 27 cm across",
+   "use": "the anglers' waterproof trousers (textures.py)",
+   "files": [],
+   "date": "2026-11-18"
+  },
+  {
+   "id": "ambientcg:Rubber004",
+   "name": "Rubber 004",
+   "source": "ambientCG",
+   "page": "https://ambientcg.com/view?id=Rubber004",
+   "author": "ambientCG (Lennart Demes)",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/people/CREDITS.txt)",
+   "type": "PBR texture (2K)",
+   "resolution": "2048",
+   "use": "the anglers' wellies: the rubber's fine grain and roughness (textures.py)",
+   "files": [],
+   "date": "2026-11-18"
+  },
+  {
+   "id": "polyhaven:knitted_fleece",
+   "name": "Knitted Fleece",
+   "source": "Poly Haven",
+   "page": "https://polyhaven.com/a/knitted_fleece",
+   "author": "Poly Haven",
+   "licence": "CC0 1.0",
+   "attribution": "None needed (credited in public/people/CREDITS.txt)",
+   "type": "PBR texture (colour and normal)",
+   "resolution": "colour 512 (grey), normal 1024, from the 2k set",
+   "use": "the beanie worn by the new people (public/people/knit_c.jpg, knit_n.jpg)",
+   "files": [
+    "public/people/knit_c.jpg",
+    "public/people/knit_n.jpg"
+   ],
+   "date": "2026-11-18"
+  },
+  {
+   "id": "fishdock:angler3",
+   "name": "The woman angler (people v2): clothes and levels of detail made for FishDock on a Rocketbox body",
+   "source": "source-assets/blender/people2 (a_build.py, textures.py, b_finish.py), run in Blender 5.2 on Aaron's PC",
+   "author": "FishDock; body and face Microsoft Rocketbox (Female_Adult_07, f07)",
+   "licence": "Clothes, textures and levels of detail made for FishDock (with the CC0 cloth and rubber above); the body and face MIT (Microsoft Rocketbox, Copyright (c) 2020 Microsoft)",
+   "attribution": "public/people/CREDITS.txt (the Rocketbox MIT notice and the angler3 paragraph)",
+   "type": "rigged 3D person",
+   "resolution": "about 60,000, 22,000 and 7,000 triangles",
+   "use": "the woman angler in the 3D view and the look picker (public/people/angler3.glb, angler3_hd.glb, angler3.webp)",
+   "files": [
+    "public/people/angler3.glb",
+    "public/people/angler3_hd.glb",
+    "public/people/angler3.webp"
+   ],
+   "date": "2026-11-18"
   }
  ]
 }

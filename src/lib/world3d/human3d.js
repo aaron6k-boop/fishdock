@@ -278,6 +278,15 @@ const tint = (hex, on = 1) => (hex == null ? new THREE.Vector4(0, 0, 0, 0) : (()
 
 // ---- small knitted / waxed textures for the add-ons ----
 let knitTex = null;
+// (the beanie's knit, from Poly Haven's knitted_fleece (CC0): its colour in grey, coloured as the hat, and its normal
+// map, at its real size: the 26 cm tile about twice round a head)
+let knitMaps = null;
+function knitPBR() {
+  if (knitMaps || typeof document === "undefined") return knitMaps;
+  const ld = new THREE.TextureLoader(), set = (t, srgb) => { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2.2, 0.62); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+  knitMaps = { map: set(ld.load(PEOPLE_BASE + "knit_c.jpg"), true), normalMap: set(ld.load(PEOPLE_BASE + "knit_n.jpg"), false) };
+  return knitMaps;
+}
 function knit() {
   if (knitTex) return knitTex;
   const c = document.createElement("canvas"); c.width = 64; c.height = 64; const g = c.getContext("2d");
@@ -383,11 +392,13 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       if (w2) {
         const c = mat.clone();
         if (w2[1] === "beard") {
-          // (the beard in the colour chosen for the hair; stubble is the same beard thinned to its densest strands,
-          // none hides it)
-          c.transparent = false; c.alphaTest = L.beard === 1 ? 0.78 : 0.4; c.depthWrite = true; c.side = THREE.DoubleSide; c.roughness = 0.65; c.metalness = 0;
-          if (L.hairHex != null) c.color = new THREE.Color(L.hairHex).multiplyScalar(1.6);
-          if (L.beard === 0) m.userData.off = true;
+          // (the beard's three layers of hair, in the colour chosen for the hair: close to the skin and dense, then
+          // two further out over less of the face; the strands' soft edges kept with alpha to coverage. Stubble is the
+          // inner layer alone, thinned; none hides them all)
+          const layer = /_c$|_c_/.test(mat.name) ? 2 : /_b$|_b_/.test(mat.name) ? 1 : 0;
+          c.transparent = false; c.alphaTest = L.beard === 1 ? 0.62 : [0.3, 0.4, 0.46][layer]; c.alphaToCoverage = true; c.depthWrite = true; c.side = THREE.DoubleSide; c.roughness = 0.62; c.metalness = 0;
+          if (L.hairHex != null) c.color = new THREE.Color(L.hairHex).multiplyScalar([1.35, 1.5, 1.65][layer]);
+          if (L.beard === 0 || (L.beard === 1 && layer > 0)) m.userData.off = true;
         }
         else if (w2[1] !== "trim") { c.color = new THREE.Color(wornHex[w2[1]]); c.metalness = 0; c.roughness = 1; if (c.normalMap) c.normalScale = new THREE.Vector2(1, 1); }
         m.material = c; mats.push(c); continue;
@@ -396,6 +407,14 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     { const w = /^fd_(jacket|trousers|boots)/.exec(mat.name || "");
       if (w) { const c = mat.clone(); c.map = null; c.color = new THREE.Color(wornHex[w[1]]); if (w[1] === "boots") { c.roughness = 0.38; c.metalness = 0; } else if (weave()) { c.normalMap = weave(); c.normalScale = new THREE.Vector2(0.5, 0.5); } m.castShadow = true; m.frustumCulled = false; m.material = c; mats.push(c); continue; } }
     if (/opacity/.test(mat.name)) { const h = mat.clone(); h.transparent = true; h.alphaTest = 0.04; h.depthWrite = false; m.material = h; mats.push(h); m.renderOrder = 1; continue; }
+    // the new people's skin: a faint, warm sheen at grazing angles (the light skin scatters back), over its own
+    // roughness map (oilier forehead and nose, wet eyes)
+    if (L.v2 && /head/.test(mat.name)) {
+      const hm = new THREE.MeshPhysicalMaterial(); THREE.MeshStandardMaterial.prototype.copy.call(hm, mat); hm.defines = { STANDARD: "", PHYSICAL: "" };
+      hm.sheen = 0.35; hm.sheenRoughness = 0.55; hm.sheenColor = new THREE.Color(0.95, 0.62, 0.52); hm.specularIntensity = 0.55;
+      if (hm.roughnessMap) hm.roughness = 1;
+      m.material = hm; mats.push(hm); continue;
+    }
     if (/body/.test(mat.name)) {
       const info = prepGeometry(m.geometry, m.skeleton.bones);
       if (!m.geometry.attributes.fdRegion) { const { reg, flut } = info.make(L.hem || 0.5); m.geometry.setAttribute("fdRegion", new THREE.BufferAttribute(reg, 4)); m.geometry.setAttribute("fdFlutter", new THREE.BufferAttribute(flut, 1)); m.geometry.userData.means = regionMeans(mat.map, m.geometry.attributes.uv, reg); }
@@ -449,7 +468,8 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     b.add(obj); return obj;
   };
   const hatCol = new THREE.Color(outfit?.hat ?? 0x8a2f2a), coatHex = COATS[L.coat]?.hex ?? outfit?.jacket ?? 0x1f3a5f;
-  const knitMat = new THREE.MeshStandardMaterial({ color: hatCol, map: knit(), roughness: 1 }); extraMats.push(knitMat);
+  const kp = L.v2 ? knitPBR() : null;
+  const knitMat = kp ? new THREE.MeshStandardMaterial({ color: hatCol, map: kp.map, normalMap: kp.normalMap, normalScale: new THREE.Vector2(1.1, 1.1), roughness: 0.95 }) : new THREE.MeshStandardMaterial({ color: hatCol, map: knit(), roughness: 1 }); extraMats.push(knitMat);
   const capMat = new THREE.MeshStandardMaterial({ color: hatCol.clone().multiplyScalar(0.8), roughness: 0.85 }); extraMats.push(capMat);
   const hoodMat = new THREE.MeshStandardMaterial({ color: coatHex, roughness: 0.8 }); extraMats.push(hoodMat);
   const hd = bounds.head; // { cx, cz, rx, rz (the head with its hair, above the eyes), eye (eye height), top }
