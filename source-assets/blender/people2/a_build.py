@@ -666,6 +666,17 @@ try:
     for _ in range(6):
       bmesh.ops.smooth_vert(bm, verts=sv, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
       for v in sv: set_out(v)
+    # (and any face of the shaft now facing in towards the leg taken away: a body whose own boots had a turned rim (the
+    # woman's) left an inner layer folded under the outer one, which showed as a ragged ring round the calf)
+    svs = set(sv); bm.normal_update(); bad = []
+    for f in bm.faces:
+      if not all(v in svs for v in f.verts): continue
+      cw = np.array(tuple(mw @ f.calc_center_median())); nw = np.array(tuple((mw.to_3x3() @ f.normal).normalized()))
+      q = cw[:2] - centre(cw[2]); rq = np.linalg.norm(q)
+      if rq > 1e-6 and (nw[:2] @ (q / rq)) < -0.2: bad.append(f)
+    if bad:
+      bmesh.ops.delete(bm, geom=bad, context="FACES"); bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    L("boot", S2, "faces facing in, taken away:", len(bad))
     L("boot", S2, "shaft moulded:", len(pol), "points; widest", round(float(R.max()), 3), "m from the leg's line")
   bm.normal_update()
   # the sole: everything near the ground pushed down to a flat, slightly wider sole 2 cm thick
