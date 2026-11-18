@@ -66,6 +66,13 @@ const STYLE = {
   "thornback-ray": { strike: [0.6, 1.5], runs: [2, 4], gap: [6, 11], turn: 0.08, shake: [0.8, 0.2], dive: 1.0, tire: 0.9, size: 60 },
   conger: { strike: [1.1, 2.0], runs: [1.5, 3.5], gap: [3, 6], turn: 0.3, shake: [1.6, 0.7], dive: 1.0, tire: 0.7, size: 120 },
   tope: { strike: [1.5, 5.0], runs: [2.5, 6], gap: [6, 12], turn: 0.25, shake: [1.2, 0.3], dive: 0.5, tire: 0.6, size: 120 },
+  // the take is a run: line pulled off the reel; then long, powerful runs along the bottom, kiting off to one side, hardly
+  // a head-shake, slow to tire (a big one keeps going a long time)
+  smoothhound: { strike: [1.45, 4.5], runs: [2.4, 5.5], gap: [4.5, 8.5], turn: 0.35, shake: [1.1, 0.2], dive: 0.75, tire: 0.75, size: 85 },
+  // twisting and rolling on the line rather than running: weak, short pulls, a lot of writhing, dogged to the end
+  "lesser-spotted-dogfish": { strike: [0.6, 1.0], runs: [0.6, 1.4], gap: [2.5, 5], turn: 0.5, shake: [1.8, 0.65], dive: 0.8, tire: 1.1, size: 60 },
+  // a rattle and then it's on: small, quick, turns about, soon in (as whiting)
+  pouting: { strike: [0.5, 0.6], runs: [0.3, 0.8], gap: [1.5, 3], turn: 1.0, shake: [6, 0.5], dive: 0.6, tire: 1.3, size: 25 },
 };
 /** A species' fighting style: its own above, otherwise worked out from its fightProfile (pace, darting, strength). */
 export function fightStyleOf(species) {
@@ -134,8 +141,10 @@ export function fightStep(s0, dt, input = {}) {
   const pullN = Math.min(1.2, pull / 1.4);
   // the drag: set by you in Advanced mode, otherwise set to give before the line could part
   s.drag = s.mode === "advanced" ? Math.max(DRAG.min, Math.min(DRAG.max, input.drag ?? s.drag)) : DRAG.standard;
-  // tension: the fish's pull, plus your winding against it (more so against a run)
-  let tension = 0.2 * e + 0.62 * pullN + (running ? 0.22 * e : 0);
+  // tension: the fish's pull, plus your winding against it (more so against a run). A strong fish's run loads the line
+  // past the drag on its own, wound or not, so the drag gives and it takes line (a smooth-hound's long runs strip it off
+  // the reel; a bass's first run takes some; a whiting never gets near it)
+  let tension = 0.2 * e + 0.62 * pullN + (running ? 0.22 * e + 0.12 * pullN : 0);
   s.slipping = tension > s.drag;
   if (s.slipping) tension = s.drag + (tension - s.drag) * (s.mode === "advanced" ? 0.35 : 0.12); // the drag gives
   s.tension = tension;

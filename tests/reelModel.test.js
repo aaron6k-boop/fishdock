@@ -2,7 +2,7 @@
 // Standard mode never breaks the line, Advanced mode can, and a slack line can lose the fish.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { tapRate, effort, rhythm, createFight, fightStep, timeToLand, REEL, DRAG } from "../src/lib/reelModel.js";
+import { tapRate, effort, rhythm, createFight, fightStep, fishPull, timeToLand, REEL, DRAG } from "../src/lib/reelModel.js";
 
 // tapping steadily at `rate` taps a second: the taps that fall in each step
 const tapper = (rate) => { let acc = 0; return (dt) => { acc += rate * dt; const n = Math.floor(acc); acc -= n; return { taps: n, rate }; }; };
@@ -168,4 +168,21 @@ test("a pause in winding costs line, not the fish: a fish swimming off keeps the
   for (let t = 0; t < 8 && !s.out; t += 0.05) s = fightStep(s, 0.05, { rate: 0 });
   assert.equal(s.out, null, "still on");
   assert.ok(s.progress < won, "it took line back");
+});
+
+test("a whiting, a bass and a smooth-hound each feel different on the line: how long, how hard, and the drag", () => {
+  // played as a person would: the reel held, let go while the fish runs
+  const play = (species, lengthCm) => {
+    let s = createFight({ species, lengthCm, startM: 60, seed: 7 }), t = 0, slip = 0, maxPull = 0;
+    for (; t < 300 && !s.near && !s.out; t += 0.05) { const p = fishPull(s); maxPull = Math.max(maxPull, p.pull); s = fightStep(s, 0.05, { hold: !p.running }); if (s.slipping) slip += 0.05; }
+    return { t, slip, maxPull, out: s.out };
+  };
+  const w = play("whiting", 27), b = play("bass", 58), h = play("smoothhound", 95);
+  for (const r of [w, b, h]) assert.equal(r.out, null);
+  // in quickly, a little; a proper fight; a long one
+  assert.ok(w.t < 20 && b.t > 2 * w.t && h.t > 1.5 * b.t, `whiting ${w.t.toFixed(1)} s, bass ${b.t.toFixed(1)} s, smooth-hound ${h.t.toFixed(1)} s`);
+  // a whiting never gets near the drag; a bass's runs take some line off it; a smooth-hound's long runs take more
+  assert.equal(w.slip, 0);
+  assert.ok(b.slip > 0.5 && h.slip > 2 * b.slip, `drag slipping: bass ${b.slip.toFixed(1)} s, smooth-hound ${h.slip.toFixed(1)} s`);
+  assert.ok(w.maxPull < 0.6 && h.maxPull > b.maxPull && h.maxPull > 2, `pull: whiting ${w.maxPull.toFixed(2)}, bass ${b.maxPull.toFixed(2)}, smooth-hound ${h.maxPull.toFixed(2)}`);
 });
