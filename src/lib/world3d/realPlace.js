@@ -974,12 +974,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const clearOfBuildings = (q, r) => bldgBoxes.every((b) => q[0] < b.x0 - b.pad - r || q[0] > b.x1 + b.pad + r || q[1] < b.z0 - b.pad - r || q[1] > b.z1 + b.pad + r);
   // (and standing on the deck that's there: inside a pier, quay or breakwater's outline that's its own deck (osmPlace's
   // p.h), raised over the land's. Each piece stood at the land's height wherever it was, so at Whitby the lifebuoy
-  // stations stood a metre and more down inside the breakwater, only their name boards showing above its deck. A quay a
-  // little higher than the land: on it at its height; a raised breakwater or pier, or a spot where the piece would reach
-  // over a step between the two: nothing)
+  // stations stood a metre and more down inside the raised piers, only their name boards showing above the deck. Now
+  // each stands on the deck under it; where the piece would reach over the step between two levels, nothing)
   const deckRings = (place.piers || []).filter((p) => p.ring).map((p) => ({ ...bb(p.ring), h: p.h }));
   const deckAt = (q) => deckRings.reduce((y, b) => (inB(q, b) ? Math.max(y, b.h) : y), LAND);
-  const standY = (q, r) => { const y = deckAt(q); if (Math.abs(y - LAND) > 0.5) return null; for (const [a, b] of [[r, 0], [-r, 0], [0, r], [0, -r]]) if (Math.abs(deckAt([q[0] + a, q[1] + b]) - y) > 0.05) return null; return y; };
+  const standY = (q, r) => { const y = deckAt(q); for (const [a, b] of [[r, 0], [-r, 0], [0, r], [0, -r]]) if (Math.abs(deckAt([q[0] + a, q[1] + b]) - y) > 0.05) return null; return y; };
   for (const e of walls) {
     const [x1, z1, x2, z2, nx, nz] = e, len = Math.hypot(x2 - x1, z2 - z1);
     if (Math.hypot((x1 + x2) / 2, (z1 + z2) / 2) > 200) { acc += len; continue; }
