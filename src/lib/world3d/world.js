@@ -391,14 +391,18 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // they do of your own, and more of the pier shows either side)
   const FP_TALL = 1.27;
   /** Glide the camera from where it is now to wherever the next frames put it, over `sec` seconds. */
-  function blendCamera(sec = 0.7) { camBlend = reduceMotion ? null : { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov, t0: clockT, sec }; }
+  // (pos false: the view turns and widens as a glide, but the camera stays at your eyes as you move: walking off in first
+  // person, a camera gliding from where you stood was left behind you as you stepped off, looking at the back of your own
+  // jacket for half a second; the PC's live check, 18 November)
+  function blendCamera(sec = 0.7, { pos = true } = {}) { camBlend = reduceMotion ? null : { pos: pos ? camera.position.clone() : null, quat: camera.quaternion.clone(), fov: camera.fov, t0: clockT, sec }; }
   // (a long way round takes a little longer: the glide back to your spot turns at most about 150° a second)
   const blendFor = (yawTo, far = 0) => blendCamera(0.65 + Math.min(0.6, Math.abs(wrap(yawTo - look.yaw)) / 2.6) + Math.min(0.45, far / 20));
   function applyBlend() {
     if (!camBlend) return 1;
     const u = (clockT - camBlend.t0) / camBlend.sec; if (u >= 1) { camBlend = null; return 1; }
     const k = easeBlend(u), q = camera.quaternion.clone();
-    camera.position.lerpVectors(camBlend.pos, camera.position.clone(), k); camera.quaternion.copy(camBlend.quat).slerp(q, k);
+    if (camBlend.pos) camera.position.lerpVectors(camBlend.pos, camera.position.clone(), k);
+    camera.quaternion.copy(camBlend.quat).slerp(q, k);
     camera.fov = camBlend.fov + (camera.fov - camBlend.fov) * k; camera.updateProjectionMatrix();
     return k;
   }
@@ -510,6 +514,11 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         // first person: a subtle bob and sway with your steps (none with reduced motion)
         const sp = Math.min(1, (W.speed || 0) / 4), ph = (W.phase || 0) * 2;
         pos.copy(tgt).add(new THREE.Vector3(0, 0.07 + (reduceMotion ? 0 : Math.abs(Math.sin(ph)) * 0.035 * sp - 0.015 * sp), 0));
+        // (at your eyes as they lean ahead of your feet into a stride: at the feet's line, the camera was up to 26 cm
+        // behind your eyes, and the top of your own collar showed at the bottom of the view; eased, so a step doesn't jolt)
+        { const ld = anglers.get(localId)?.out?.lead, kl = 1 - Math.exp(-dt * 10); W.lead ||= [0, 0];
+          if (ld) { const m = Math.hypot(ld[0], ld[1]), c = m > 0.35 ? 0.35 / m : 1; W.lead[0] += (ld[0] * c - W.lead[0]) * kl; W.lead[1] += (ld[1] * c - W.lead[1]) * kl; }
+          pos.x += W.lead[0]; pos.z += W.lead[1]; }
         if (!reduceMotion) { const sx = Math.cos(yaw), sz = Math.sin(yaw), w = Math.sin(ph * 0.5) * 0.02 * sp; pos.x += sx * w; pos.z += sz * w; }
         anglers.get(localId)?.a.setFirstPerson(true);
       }
@@ -1100,7 +1109,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         W = walker(p.x, p.z, me.out?.face ?? 0, p.y); W.floor = (x, z) => env.ground.heightAt(x, z); modeBeforeWalk = mode === "walk" ? "first" : mode; mode = "walk";
         fovBeforeWalk = look.fov; look.setFov?.({ near: 40, far: 56, eyes: 28 }[dist] || 47); // (eyes: zoomed right in, the walking camera at your eyes: first person) look.aim(W.face, FOLLOW.pitch); canFish = !!env.ground.fishHere(W.x, W.z);
         // (from your eyes out to behind you as a glide; a drag turns the view by what the walking camera shows)
-        followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8);
+        followAt = 0; pivotY = null; pivotXZ = null; gait = { d: 0 }; look.setDragFov(WALK_FOV * 1.1); blendCamera(0.8, { pos: dist !== "eyes" });
         // (a comfortable range to look up and down while walking, no vertical flick; a double tap recentres behind you at
         // this distance rather than at the fishing view's)
         look.setPitchRange(WALK_PITCH.min, WALK_PITCH.max, false); look.setBaseFov(look.fov); look.setHome(W.face, WALK_PITCH.level);

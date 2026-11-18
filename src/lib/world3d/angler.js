@@ -1461,15 +1461,18 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         railTilt += (tilt - railTilt) * (1 - Math.exp(-dt * 10));
         if (railTilt > 1e-4) { const el = Math.atan2(dir.y, h) + railTilt; dir.set(dir.x / h * Math.cos(el), Math.sin(el), dir.z / h * Math.cos(el)); }
       }
-      // walking about in first person: the rod carried in your right hand down by your side, its tip leading up and
-      // forwards and a little out to the right, carried with your body rather than your eyes (look down and you see your
-      // hand on it; look up and it stays by your side), so the way ahead is clear. Held in front of you as when fishing, it
-      // stood up the middle of the view with no hand on it (the PC's first-person walk, 18 November)
+      // walking about in first person: the rod carried upright in your right hand down by your side at the reel, the
+      // tip leaning back over your shoulder and a little out to the right (more as you hurry), carried with your body
+      // rather than your eyes: none of it is in view as you walk and look about, so no rod without a hand. Held in front
+      // of you as when fishing, it stood up the middle of the view with no hand on it; carried tip first, it still came up
+      // from the bottom of the view with your hand out of sight below; carried flat, tip trailing, its butt and reel
+      // showed at the bottom edge looking down, the hand just under it (the PC's first-person walks and the film here,
+      // 18 November)
       if (walking) {
         const fh = new THREE.Vector3(Math.sin(vy), 0, -Math.cos(vy)), rh = new THREE.Vector3(Math.cos(vy), 0, Math.sin(vy)), up = new THREE.Vector3(0, 1, 0);
-        const run = carry.run || 0, el = 0.85 + 0.35 * run + (carry.lift || 0) * 0.2, az = 0.22 + (carry.trail || 0);
-        dir = fh.clone().multiplyScalar(Math.cos(el) * Math.cos(az)).addScaledVector(rh, Math.cos(el) * Math.sin(az)).addScaledVector(up, Math.sin(el)).normalize();
-        reelAt.copy(fpEye()).addScaledVector(rh, 0.22).addScaledVector(up, -0.52 + 0.08 * run).addScaledVector(fh, 0.2 + 0.06 * run).add(carry.d || V3(0, 0, 0));
+        const run = carry.run || 0, el = 1.12 - 0.15 * run - (carry.lift || 0) * 0.1, az = 0.12 - (carry.trail || 0);
+        dir = fh.clone().multiplyScalar(-Math.cos(el) * Math.cos(az)).addScaledVector(rh, Math.cos(el) * Math.sin(az)).addScaledVector(up, Math.sin(el)).normalize();
+        reelAt.copy(fpEye()).addScaledVector(rh, 0.22).addScaledVector(up, -0.7 + 0.06 * run).addScaledVector(fh, 0.12 + 0.05 * run).add(carry.d || V3(0, 0, 0)); // (the arm hanging, the elbow a little bent)
         // (your arms are still posed from the view itself, as when fishing: posed from the level view, looking down showed
         // the inside of your own jacket, cut ragged round the eye)
       }
@@ -2136,7 +2139,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // your head torch, seen from outside you (third person): on your forehead, shining where your face points and
     // tipped down a little, as a head torch is worn. In first person the world uses the camera, which is your eye
     const torchAt = local && !fp ? headTorchAt() : null;
-    return { torchAt, phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater, to: tech === "lift" && age >= LT.swingIn - 0.3 ? toWorld(fp ? SWING_FP.clone() : SWING_TP.clone()) : null /* (where a fish swung in is coming to, as it swings down out of the air in under a second: world.js keeps it and the fish in the picture) */ } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
+    return { torchAt, phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater, to: tech === "lift" && age >= LT.swingIn - 0.3 ? toWorld(fp ? SWING_FP.clone() : SWING_TP.clone()) : null /* (where a fish swung in is coming to, as it swings down out of the air in under a second: world.js keeps it and the fish in the picture) */ } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, lead: walking && fp && fig.eyeAt ? (() => { const e = fig.group.localToWorld(fig.eyeAt.clone()); return [e.x - root.position.x, e.z - root.position.z]; })() : null /* (walking in first person: how far your eyes are ahead of your feet, leaning into a stride: world.js puts the camera there) */, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
   // shoulders and your arms together, and your hands still reach the rod
