@@ -179,6 +179,21 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     }
     scene.traverseVisible((o) => { if (o.geometry) sentGeo.add(o.geometry); });
   }
+  // ---- while the place loads: every shader handed to the graphics driver together, and nothing drawn until they are built ----
+  // Measured on Aaron's PC (RTX 3090, Edge, 18 November): loading Gorleston for the first time, the page stood still for
+  // 30 seconds in all, 21 of them waiting for 192 shader programs to be built, one after another, as each was first used
+  // (three.js builds a shader the first time something drawn needs it, and its first use waits for it). Handed over
+  // together (renderer.compile), the driver builds them side by side where the browser can (the parallel-compile
+  // extension: Chrome and Edge on a PC); and until they are built, nothing that needs them is drawn, so the page stays
+  // free to take in the files still arriving and to move the loading bar. What arrives later is handed over as it comes.
+  let loading = true, loadPend = null, loadN = 0;
+  const pendingNow = () => { if (!loadPend) return 0; for (const m of loadPend) { const pr = renderer.properties.get(m).currentProgram; if (!pr || pr.isReady?.() !== false) loadPend.delete(m); } return loadPend.size; };
+  function submitShaders() {
+    const hidden = []; scene.traverse((o) => { if (!o.visible && !o.isLight) { hidden.push(o); o.visible = true; } });
+    const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
+    try { const mats = renderer.compile(scene, camera); loadPend ||= new Set(); for (const m of mats) loadPend.add(m); } catch { /* (built as they are met instead) */ }
+    finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
+  }
   let warmMs = 0, warmCalls = 0; // (film checks only: how often the scene was readied, and the time it took on the page)
   function warm(root = scene, late = false) {
     const t0w = performance.now(); warmCalls++;
@@ -253,9 +268,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   env.onThunder = (delay, far) => onSound?.("thunder", null, localId, { delay, far }); // (a storm's lightning: its thunder, as late as it's far)
   const buildMs = Math.round(performance.now() - tBuild);
   if (Q.sea) env.setFftSea(true, renderer);
-  // (every material's shader compiled now, in parallel where the driver allows, rather than the first time its object
-  // comes into view: the first look round used to stall on each new shader)
-  warm(); // (see warm below: for the target the scene is really drawn into)
+  // (every material's shader handed over now, to be built in parallel where the driver allows, rather than the first
+  // time its object comes into view: the first look round used to stall on each new shader. Not waited for here: see
+  // submitShaders above. The rest of warm (every model's vertices and textures sent) follows once they are built)
+  submitShaders();
   // the real place as built: fit to stand in? (sceneCheck.js; World3D shows the representative place if not)
   let realCheck = real && real.targets ? checkScene(real, real.targets) : null;
   if (realCheck && !realCheck.ok) console.warn("FishDock 3D: the real place failed its scene check", realCheck.why);
@@ -984,6 +1000,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera); simT = t; setThinPixel(camera, renderer.domElement.height); // (thinAA.js: the railings never drawn thinner than a pixel and a half)
     adapt();
+    if (loading && draw) { if (++loadN % 8 === 0) submitShaders(); if (pendingNow() > 0) draw = false; else if (loadPend) { loadPend = null; if (performance.mark) try { performance.mark("fd:shaders-built", { detail: String(renderer.info.programs?.length || 0) }); } catch { /* (loading checks only) */ } warm(scene); } }
     if (draw) drawFrame();
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
@@ -1189,6 +1206,8 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     tapFrames(cb) { frameTap = cb || null; },
     /** Frame pacing on or off (off while the loading screen is up). */
     setPacing(on) { pacing = !!on; late = 0; easyFor = 0; },
+    /** the place is still loading (World3D, until its loading screen goes): shaders built together, nothing drawn until they are */
+    setLoading(on) { loading = !!on; if (!loading) loadPend = null; },
     /** What the graphics card holds so far: while these still change from frame to frame, the place is still arriving. */
     loadInfo() { return { programs: renderer.info.programs?.length || 0, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries }; },
     /** The rod-tip lights: "auto" (green in the dark), "on" or "off". */
