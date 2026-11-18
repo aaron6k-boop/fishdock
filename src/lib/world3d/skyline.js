@@ -26,6 +26,10 @@ export const LANDMARKS = [
   // approximate, and said so where the place is credited.
   { id: "great-yarmouth-power", lat: 52.583884, lon: 1.733255, kind: "powerstation", approx: true },
   { id: "scroby-sands", lat: 52.6489, lon: 1.7903, kind: "windfarm", n: 30, rows: 3, hub: 68, rotor: 80, bearing: 18 },
+  // "Gulliver", the wind turbine at Ness Point, Lowestoft: a NEG Micon NM92 (a 92 m rotor), 2.75 MW, 126 m to the tip,
+  // working since 2005 (Thrive Renewables, "Ness Point wind farm"; Wikipedia, "Ness Point"); position from OpenStreetMap
+  // (node 745796699). Hub height from the tip less the rotor's radius
+  { id: "gulliver", lat: 52.4800661, lon: 1.7614042, kind: "windfarm", n: 1, rows: 1, hub: 80, rotor: 92, bearing: 0 },
 ];
 export const SKYLINE_NOTE = "Landmarks beyond the mapped area are placed from published positions (the power station's size is approximate); the distant town is indicative, not mapped buildings.";
 

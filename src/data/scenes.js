@@ -30,6 +30,10 @@ export const SCENE_CHECKS = {
   // (added 18 November, a beach mark 150 m north of Britannia Pier: the layout check in Node on OpenStreetMap's answer
   // fetched that day, and the scene check in Chromium and on Aaron's PC; the listed position is approximate)
   "great-yarmouth-beach": passed("beach", beach(97, 97, 97, 97), { approx: true, data: "2026-11-18", checked: "2026-11-18" }),
+  // (added 18 November, the solid southern arm of the harbour mouth, two anglers each side of its outer half behind the
+  // parapet: the layout check in Node on OpenStreetMap's answer fetched that day, the scene check in Chromium and on
+  // Aaron's PC; the listed position is approximate)
+  "lowestoft-south-pier": passed("pier", pier(5, 5, 184, 184), { approx: true, data: "2026-11-18", checked: "2026-11-18" }),
   "deal-pier": passed("pier", pier(359, 359, 359, 359)),
   "southend-pier": passed("pier", pier(258, 258, 258, 257)),
   "whitby-piers": passed("pier", pier(232, 232, 232, 232)),
