@@ -42,8 +42,15 @@ const n1 = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
 // lifted until the line from its shoulder cleared the rail. It kept the arms off the rail, but brought the hands back
 // up towards your face, and with them the sleeves cut open in front of you: kept as it is, the elbow is turned clear
 // of the rail instead, fpRig.js)
-export const FP_ROPE_OUT = 0.58, FP_ROPE_REACH = 0, FP_ROPE_NEAR = [0.14, 0.1];
-const ropeReach = (E, sight) => { const h = new THREE.Vector3(sight.x, 0, sight.z); if (h.lengthSq() > 1e-8) h.normalize(); return E.clone().addScaledVector(sight, FP_ROPE_OUT).addScaledVector(h, FP_ROPE_REACH); };
+// (and never more than 58 degrees below level, out over the rail: from a pier a few metres up, the net is almost
+// straight below you, and along that line your hands were under your chin, the arms hanging straight down under the
+// camera; with the view tipped down to 79 degrees to see the net the sleeves filled the bottom half of the picture and
+// were cut into dark shards by the edge of the view, Aaron's review footage of 18 November. Out over the rail you hold
+// the rope at arm's length with the rope running down from your hands to the net, as you would)
+export const FP_ROPE_OUT = 0.58, FP_ROPE_REACH = 0, FP_ROPE_NEAR = [0.14, 0.1], FP_ROPE_STEEP = 1.01;
+const ropeReach = (E, sight) => { const h = new THREE.Vector3(sight.x, 0, sight.z); if (h.lengthSq() > 1e-8) h.normalize(); else h.set(0, 0, -1);
+  const down = Math.min(FP_ROPE_STEEP, Math.asin(Math.max(-1, Math.min(1, -sight.y)))), s = h.clone().multiplyScalar(Math.cos(down)).add(new THREE.Vector3(0, -Math.sin(down), 0));
+  return E.clone().addScaledVector(s, FP_ROPE_OUT).addScaledVector(h, FP_ROPE_REACH); };
 
 /** Clothes: a jacket, trousers and hat for each angler (chosen, or from their id). */
 export const OUTFITS = [
@@ -748,7 +755,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const spring = (key, vkey, target, w, z, dt) => { const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n; for (let i = 0; i < n; i++) { const a = w * w * (target - spr[key]) - 2 * z * w * spr[vkey]; spr[vkey] += a * h; spr[key] += spr[vkey] * h; } };
 
   let fishHead = NaN, fishPrev = null, keptFrom = null, lastKept = null; // (the fish's heading as it swims, where it was a frame ago, where it lay when you chose to put it back)
-  let lastKey = "", P = {}, seed = rng(1), splashCb = null, rippleCb = null, prevAge = 0, fightPos = null, landStart = null, hintFish = null;
+  let lastKey = "", P = {}, seed = rng(1), splashCb = null, rippleCb = null, dripCb = null, prevAge = 0, fightPos = null, landStart = null, hintFish = null;
   // the fish you've landed, until you decide: lying in the net (deck), held up for a look (inspect), going back in
   // (release), or kept (gone: the catch card shows it)
   let kept = null, matOut = false;
@@ -1074,7 +1081,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
             if (k !== P.lastPull) { P.lastPull = k; onSound?.("rope", hangAt(ropeOut)); } // (each pull: the rope through the hands)
             actNow = { key: "pull_rope", t: 3 + ((age - T4) * 1.1) % 5, w: 0.5 * (1 - f) }; // (the body working with each pull)
             ropePull = { hand: k % 2, u }; sway = Math.sin((age - T4) * 2.6) * 0.1 * (1 - f) * (0.6 + 0.4 * Math.sin(u * Math.PI));
-            if (ropeOut < L - sink - 0.1 && f < 0.92 && Math.floor(age / 0.12) !== Math.floor((age - dt) / 0.12)) splashCb?.(hangAt(ropeOut).add(new THREE.Vector3(0, -bridle - 0.3 * ns, 0)), 0.06 + 0.1 * (1 - f)); // (water pouring out of the mesh)
+            if (ropeOut < L - sink - 0.1 && f < 0.92 && Math.floor(age / 0.12) !== Math.floor((age - dt) / 0.12)) dripCb?.(hangAt(ropeOut).add(new THREE.Vector3(0, -bridle - 0.3 * ns, 0)), 0.3 * ns, 1 - f); // (water pouring out of the mesh, falling)
             if (crossed(T4 + 0.25)) onSound?.("drip", hangAt(ropeOut));
           }
           const side = new THREE.Vector3(-dirOf(face)[1], 0, dirOf(face)[0]);
@@ -2162,7 +2169,7 @@ const FPR = { get x() { return filmSet("__fdFpr")?.x ?? holdView().x; }, get y()
     showTag(on) { tagOff = !on; },
     /** sit in the chair while you wait (Settings → Sit while you wait), or stand */
     setSit(on) { sitPref = on !== false; },
-    onSplash(f) { splashCb = f; }, onRipple(f) { rippleCb = f; },
+    onSplash(f) { splashCb = f; }, onRipple(f) { rippleCb = f; }, onDrip(f) { dripCb = f; },
     frame,
     real,
     dispose() { world.remove(root, kit, fLine.mesh, rig, fish, net, pole, mat, ...ropes); fLine.mesh.geometry.dispose(); fLine.mesh.material.dispose(); mat.traverse((o) => o.geometry?.dispose?.()); fig.dispose(); fpv?.dispose(); kit.traverse((o) => o.geometry?.dispose?.()); root.traverse((o) => { o.geometry?.dispose?.(); }); },

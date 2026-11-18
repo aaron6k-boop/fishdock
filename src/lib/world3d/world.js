@@ -291,6 +291,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   /** at: world point; size: how big (a rig .6, a landed fish .9); mult: how many more drops; up: the way back over a
    *  wall, for a crest slapping against one (rockSpray.js slap: a sheet up its face, not a ring) */
   function splash(at, size = 0.6, mult = 1, up = null) { spray.splash(at.x, at.y, at.z, size, mult, up); }
+  const drip = (at, r = 0.3, amount = 1) => spray.drip(at.x, at.y, at.z, r, amount);
   const ripples = [];
   // [x, z, age, strength, life]: a big splash's rings last longer than a fish's swirl; with eight already spreading, the
   // faintest goes (dropping the oldest let a fight's small swirls push out the splash it had just made)
@@ -328,7 +329,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         if (x) x.a.dispose();
         // only your own angler is felt (other people's catches arrive as a party notification instead)
         const made = createAngler(world, { id: a.id, name: a.name, spot, venue, outfit: a.outfit ?? 0, look: a.look || null, local: !!a.local, real: !!a.real, fineHands: Q.q >= 2, rail: !!real && (venue === "pier" || venue === "estuary"), onSound: (n, p, d) => onSound?.(n, p, a.id, d), onFeel: a.local ? (n, d) => onFeel?.(n, d) : null });
-        made.onSplash(splash); made.onRipple(ripple); if (a.local) made.setSit(sitOn);
+        made.onSplash(splash); made.onRipple(ripple); made.onDrip?.(drip); if (a.local) made.setSit(sitOn);
         x = { a: made, spotId: a.spot, outfit: a.outfit, lookKey, name: a.name, out: null };
         anglers.set(a.id, x);
       }
@@ -424,7 +425,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // fought and landed in first or third person, or another angler's catch you chose to watch
     const idle = performance.now() - look.touched > 2500;
     const watched = followId && anglers.get(followId)?.out;
-    let steerTo = null, fpDown = false, fpUp = false;
+    let steerTo = null, fpDown = false, fpUp = false, fpRopeV = false;
     if (watched && t < followUntil) {
       const wo = watched, busy = wo.phase === "hooked" || wo.phase === "landing" || wo.phase === "bite";
       steerTo = busy ? (wo.fishAt || wo.rig || wo.tip) : wo.at.clone().add(new THREE.Vector3(0, 1.2, 0));
@@ -439,6 +440,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         : R2 ? (R2.net || R2.fish || out.keptAt) : out.keptAt;
       if (steerTo) { steerTo = steerTo.clone(); if (L?.water != null && steerTo.y < L.water + 0.3) steerTo.y += 0.25; } // (a little above the net in the water, so the view isn't all dark sea)
       fpDown = true;
+      // (with the drop net's rope in your hands, your eyes no lower than 64 degrees below level: the net still sits in
+      // the lower part of the picture, your hands above it, and the arms come in from the bottom corners. Tipped down to
+      // 79 degrees, straight onto the net, your sleeves filled the picture: Aaron's review footage, 18 November)
+      fpRopeV = L ? L.stage === "lower" || L.stage === "lead" || L.stage === "haul" : !!R2 && (R2.stage === "lower" || R2.stage === "swim" || R2.stage === "swum" || R2.stage === "haul");
       fpUp = !!L && out.tech === "lift" && !out.landed; // (a fish swung up on the line hangs under the tip, above your eye when you're standing: your eyes go up to it, not held down at the rail with the fish over the top of the picture, as 18 of 40 checks a quarter second apart found it. As it swings in, between it and your hand, so both are in the picture as it comes down: following the fish, or going ahead to the hand, lost it for over half a second either way)
     }
     else if (out && focus?.a.local && (mode === "first" || mode === "third") && (out.phase === "hooked" || out.phase === "landing") && !(out.phase === "landing" && out.landed)) {
@@ -682,7 +687,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     const settling = t - modeSince < 0.6;
     if (mode !== "cinematic") { camPos.lerp(pos, (mode === "first" || mode === "free") && !settling ? 1 : 1 - Math.exp(-dt * (mode === "spectator" ? 2.5 : settling ? 9 : 6))); cineShot = null; }
     // (never steered steeply down: a fish close in under the pier would tip the view down into the water)
-    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray()); look.aim(l.yaw, Math.max(fpDown ? -1.38 : -0.5, Math.min(fpDown ? (fpUp ? 0.12 : -0.3) : 0.6, l.pitch)), fpDown ? (out?.kept === "inspect" ? 3 : 1.6) : 0); steering = fpDown ? "down" : true; } // (lifting the fish up to look at it, your eyes follow it up a little quicker: looking down at the net while it came up, it passed up through the view a hand's length away) // (landing it yourself, your head turns at a head's pace, about 90 degrees a second at most)
+    if (steerTo && idle && mode !== "cinematic") { const l = lookAt(camPos.toArray(), steerTo.toArray());
+      // (looking at your fish with its card open, through your own eyes: aimed a little below it, so it sits in the top
+      // half of the picture above the card, as the camera in front of you does. On a phone held upright the card covered
+      // the fish in your hands and on the mat, Aaron's recording of 18 November)
+      if (fpDown && out?.kept === "inspect") l.pitch -= Math.atan(Math.tan((camera.fov * Math.PI) / 360) * FISH_NDC_Y);
+      look.aim(l.yaw, Math.max(fpDown ? (fpRopeV ? -1.12 : -1.38) : -0.5, Math.min(fpDown ? (fpUp ? 0.12 : -0.3) : 0.6, l.pitch)), fpDown ? (out?.kept === "inspect" ? 3 : 1.6) : 0); steering = fpDown ? "down" : true; } // (lifting the fish up to look at it, your eyes follow it up a little quicker: looking down at the net while it came up, it passed up through the view a hand's length away) // (landing it yourself, your head turns at a head's pace, about 90 degrees a second at most)
     else if (steering && idle && !steerTo) { const was = steering; steering = false; const h = look.home; if (mode === "first" || mode === "third") look.aim(h.yaw, h.pitch, was === "down" ? 1.6 : 0); } // (back up from the deck at the same head's pace: it snapped up in a tenth of a second)
     yaw = mode === "cinematic" ? yaw : look.yaw; pitch = mode === "cinematic" ? pitch : look.pitch;
     if (camOverride) camPos.copy(camOverride); // test hook only: a fixed viewpoint for visual checks

@@ -97,3 +97,19 @@ test("a crest against the wall slaps up its face instead of throwing a ring, and
   assert.ok(sp.points.material.fog && sp.foam.material.fog, "in the haze like everything else");
   sp.dispose();
 });
+
+test("water running out of a net lifted from the sea falls from under it, small drops, never thrown up round it", async () => {
+  const THREE = await import("three"); const { createRockSpray } = await import("../src/lib/world3d/rockSpray.js");
+  const sp = createRockSpray(new THREE.Scene()), g = sp.points.geometry, pos = g.attributes.position.array, vel = g.attributes.aVel.array, size = g.attributes.aSize.array;
+  sp.drip(0, 3, 0, 0.3, 1);
+  const live = []; for (let i = 0; i < SPRAY.max; i++) if (pos[i * 3 + 1] > -40) live.push(i);
+  assert.ok(live.length >= 5 && live.length <= 16, `${live.length} drops`);
+  for (const i of live) {
+    assert.ok(vel[i * 3 + 1] < 0, "every drop falls"); assert.ok(pos[i * 3 + 1] <= 3, "from under the net");
+    assert.ok(Math.hypot(pos[i * 3], pos[i * 3 + 2]) <= 0.3, "from under its mesh"); assert.ok(size[i] <= 0.025, "a drop, not a flake");
+  }
+  // (a drained net drips less)
+  const sp2 = createRockSpray(new THREE.Scene()), p2 = sp2.points.geometry.attributes.position.array; sp2.drip(0, 3, 0, 0.3, 0);
+  let n2 = 0; for (let i = 0; i < SPRAY.max; i++) if (p2[i * 3 + 1] > -40) n2++;
+  assert.ok(n2 < live.length && n2 >= 1);
+});
