@@ -555,8 +555,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     h[k] += up;
     const dx = Math.abs(hill(X[k] - 2, Z[k]) - hill(X[k] + 2, Z[k])), dz = Math.abs(hill(X[k], Z[k] - 2) - hill(X[k], Z[k] + 2));
     if (Math.max(dx, dz) > 0.3) bank[k] = Math.max(dx, dz) > 2.6 ? 2 : 1; // (2: a cliff's face, steeper than about 33° on the survey's grid: bare rock and earth)
-    // (how steep, smoothly: from about 24° (none) to 45° and over (all), where bare rock shows through the grass)
-    const t = Math.min(1, Math.max(0, (Math.hypot(dx, dz) / 4 - 0.45) / 0.55)); steep[k] = t * t * (3 - 2 * t);
+    // (how steep, smoothly: from about 32° (none) to 50° and over (all), where bare rock shows through the grass. Taken
+    // across 16 m, two of the survey's steps: across 4 m its slope jumped at every step, and rock and grass ran in
+    // stripes along the contours)
+    const sx = hill(X[k] + 8, Z[k]) - hill(X[k] - 8, Z[k]), sz = hill(X[k], Z[k] + 8) - hill(X[k], Z[k] - 8);
+    const t = Math.min(1, Math.max(0, (Math.hypot(sx, sz) / 16 - 0.62) / 0.58)); steep[k] = t * t * (3 - 2 * t);
   }
   // ---- the town's ground: the map's unmarked land away from the water, the piers and the streets is not the pier's
   // concrete (it was drawn so, slab joints and all, out to the horizon) but yards, gardens, verges and waste ground:
@@ -736,11 +739,24 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               grassC = mix(grassC, grassC * vec3(0.62, 0.6, 0.52), smoothstep(0.6, 0.72, fdDF(wp / 17.0 + 9.0)) * 0.7);
               // the rock: the photograph laid from the three sides, each weighted by how squarely the ground faces it
               vec3 an = pow(abs(vWNrm), vec3(4.0)); an /= (an.x + an.y + an.z); fdTriW = an;
+              // (at two scales, the second turned and three times the size, so the photograph's tile doesn't show as a
+              // chequer across a 50 m face; only its light and dark over its own average are kept, the colour is the
+              // cliff's own)
               vec3 rX = texture2D(uClR, vWPos.zy / uClK.x).rgb, rY = texture2D(uClR, vWPos.xz / uClK.x).rgb, rZ = texture2D(uClR, vWPos.xy / uClK.x).rgb;
-              vec3 rk = rX * an.x + rY * an.y + rZ * an.z; float rl = dot(rk, vec3(0.3, 0.55, 0.15));
-              vec3 rockC = uClRock * clamp(rl / uClK.z, 0.3, 2.0) * (0.9 + 0.2 * fdDN(wp / 31.0));
+              mat2 tw = mat2(0.8, 0.6, -0.6, 0.8); float k2 = uClK.x * 3.3;
+              vec3 sX = texture2D(uClR, tw * vWPos.zy / k2 + 0.37).rgb, sY = texture2D(uClR, tw * vWPos.xz / k2 + 0.37).rgb, sZ = texture2D(uClR, tw * vWPos.xy / k2 + 0.37).rgb;
+              vec3 rk = mix(rX * an.x + rY * an.y + rZ * an.z, sX * an.x + sY * an.y + sZ * an.z, 0.45);
+              float rAvg = dot(texture2D(uClR, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15));
+              float rl = dot(rk, vec3(0.3, 0.55, 0.15)) / max(rAvg, 0.02);
+              // (the beds of a sedimentary cliff: paler and darker layers a metre or two thick, wavering along the face,
+              // and darker streaks where water runs down it)
+              float beds = fdDN(vec2(vWPos.y * 0.62 + fdDN(wp / 40.0) * 3.0, (wp.x + wp.y) * 0.015));
+              float runs = fdDN(vec2((wp.x - wp.y) * 0.35, vWPos.y * 0.04));
+              vec3 rockC = uClRock * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.82 + 0.3 * beds) * (1.0 - 0.18 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
               // (it shows through in ragged outcrops: the slope's steepness, broken up by noise at two scales)
               fdRock = smoothstep(0.4, 0.62, vSteep + (fdDF(wp / 11.0) - 0.5) * 0.6 + (fdDN(wp / 2.7) - 0.5) * 0.12);
+              // (and even on the steep faces, scrub and grass hold on in patches and along the ledges)
+              fdRock *= 1.0 - 0.7 * smoothstep(0.58, 0.7, fdDF(vec2(wp.x + wp.y, vWPos.y * 2.2) / 9.0 + 3.0));
               tinted = mix(grassC, rockC, fdRock);
             }
             if (vFace >= 0.0) {
@@ -1627,7 +1643,9 @@ function buildRocks(group, cls, xs, n, area, quality) {
       const gm = geo(sc.getObjectByName("armour_mid_" + v)) || gf.clone(); // (a file from before the middling stone: the far one)
       const [near, mid, lit, away] = meshes[v];
       for (const m of meshes[v]) m.geometry.dispose();
-      near.geometry = gn; mid.geometry = gm; lit.geometry = gf; away.geometry = gf.clone();
+      // (past the shadows' reach the stones are a few pixels each: their 80-triangle level where the file has one)
+      const ga = geo(sc.getObjectByName("armour_away_" + v)) || gf.clone();
+      near.geometry = gn; mid.geometry = gm; lit.geometry = gf; away.geometry = ga;
       for (const m of [near, mid, lit]) m.computeBoundingSphere();
     }
     if (atlas?.map) { mat.map = atlas.map; mat.normalMap = atlas.normalMap || null; mat.roughnessMap = atlas.roughnessMap || null; mat.normalScale.set(1, 1); mat.needsUpdate = true; }

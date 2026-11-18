@@ -197,6 +197,9 @@ export const LOCAL = {
     // (the cliffs' slopes are open grass and scrub, a few bushes: the usual scattering of trees on a bank read from the
     // piers as lollipops dotted over the East Cliff, which the photographs don't show)
     bankTrees: 0.15,
+    // (the cliffs' own surface, realPlace.js: photoscanned grass on the slopes and photoscanned rock showing through on
+    // the steep faces, laid from three sides)
+    cliff: { grass: "cliff_grass", rock: "cliff_rock", grassTile: 2.5, rockTile: 7, grassLum: 0.08, rockLum: 0.2, rockTint: [0.17, 0.152, 0.125] },
     // St Mary's Church on its outline, at the top of the 199 Steps
     landmarks: { 158276579: "stMarys" },
     // the old town under the cliffs: brick, stone and painted render under red pantile roofs (the photographs from the

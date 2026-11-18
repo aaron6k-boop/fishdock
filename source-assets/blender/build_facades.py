@@ -15,8 +15,10 @@ PX = globals().get("PX", 1024)  # pixels a bay (3 m)
 # (every scan is laid a whole number of times to a bay, 1.5 m, so bays sit side by side and storeys stack with no seam)
 KINDS = {
     "brick": dict(scan=PH + "/red_brick_03", tile=1.5, tint=(1, 1, 1), trim=(0.86, 0.85, 0.81), lintel="arch", door=(0.06, 0.12, 0.22)),
-    "render": dict(scan=PH + "/white_plaster_02", tile=1.5, tint=(0.95, 0.92, 0.85), trim=(0.9, 0.9, 0.87), lintel="stone", door=(0.24, 0.05, 0.06)),
-    "stone": dict(scan=OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01", tile=1.5, tint=(0.82, 0.8, 0.76), trim=(0.88, 0.87, 0.83), lintel="stone", door=(0.07, 0.14, 0.09)),
+    # (render: near white, the house's own colour comes from the game's tint; stone: Whitby's buff sandstone, its lichen
+    # softened)
+    "render": dict(scan=PH + "/white_plaster_02", tile=1.5, tint=(0.8, 0.79, 0.76), norm=0.55, trim=(0.9, 0.9, 0.87), lintel="stone", door=(0.24, 0.05, 0.06)),
+    "stone": dict(scan=OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01", tile=1.5, tint=(0.46, 0.41, 0.32), norm=0.7, trim=(0.88, 0.87, 0.83), lintel="stone", door=(0.07, 0.14, 0.09)),
 }
 def find(base, kind):
     # a Poly Haven map: base is the asset's folder (searched through) or a file prefix; kind a list of names to try
@@ -41,13 +43,26 @@ def principled(name, rgb=(0.8, 0.8, 0.8), rough=0.5, metal=0.0, emit=0.0):
     b.inputs["Base Color"].default_value = (*rgb, 1); b.inputs["Roughness"].default_value = rough; b.inputs["Metallic"].default_value = metal
     b.inputs["Emission Color"].default_value = (1, 1, 1, 1); b.inputs["Emission Strength"].default_value = emit
     return m
-def scanned(name, base, tint):
+def scanned(name, base, tint, norm=None):
+    # the scan's colour times tint; or, with norm (a contrast, 0 to 1), only its light and dark over its own average,
+    # softened by norm, times tint: so a render or stone house takes its colour from the game's tint per house, not the
+    # scan's own grey-brown dirt
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; b = nt.nodes["Principled BSDF"]
     p = find(base, ["diff", "col", "color"])
     if not p: raise FileNotFoundError("no colour map for " + base)
     d = nt.nodes.new("ShaderNodeTexImage"); d.image = bpy.data.images.load(p, check_existing=True)
     mul = nt.nodes.new("ShaderNodeVectorMath"); mul.operation = "MULTIPLY"; mul.inputs[1].default_value = tint
-    nt.links.new(d.outputs["Color"], mul.inputs[0]); nt.links.new(mul.outputs[0], b.inputs["Base Color"])
+    if norm is None: nt.links.new(d.outputs["Color"], mul.inputs[0])
+    else:
+        px = np.empty(len(d.image.pixels), dtype=np.float32); d.image.pixels.foreach_get(px); px = px.reshape(-1, 4)[:, :3]
+        px = np.where(px <= 0.04045, px / 12.92, ((px + 0.055) / 1.055) ** 2.4); mean = float((px @ np.array([0.2126, 0.7152, 0.0722])).mean()) or 0.2
+        bw = nt.nodes.new("ShaderNodeRGBToBW"); nt.links.new(d.outputs["Color"], bw.inputs[0])
+        mr = nt.nodes.new("ShaderNodeMapRange"); mr.clamp = False; mr.inputs["From Min"].default_value = 0; mr.inputs["From Max"].default_value = mean
+        mr.inputs["To Min"].default_value = 1 - norm; mr.inputs["To Max"].default_value = 1.0; nt.links.new(bw.outputs[0], mr.inputs["Value"])
+        cv = nt.nodes.new("ShaderNodeCombineXYZ")
+        for i in range(3): nt.links.new(mr.outputs[0], cv.inputs[i])
+        nt.links.new(cv.outputs[0], mul.inputs[0])
+    nt.links.new(mul.outputs[0], b.inputs["Base Color"])
     for kind, sock in ((["rough"], "Roughness"), (["nor_gl", "nor"], None)):
         p = find(base, kind)
         if not p: continue
@@ -121,7 +136,7 @@ def bay_wide(K, M, x0):
 
 def build(kind):
     K = KINDS[kind]
-    M = {"wall": scanned(kind + "_wall", K["scan"], K["tint"]), "trim": principled(kind + "_trim", K["trim"], 0.4), "sill": scanned(kind + "_sill", OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01", (0.95, 0.94, 0.9)),
+    M = {"wall": scanned(kind + "_wall", K["scan"], K["tint"], K.get("norm")), "trim": principled(kind + "_trim", K["trim"], 0.4), "sill": scanned(kind + "_sill", OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01", (0.95, 0.94, 0.9)),
          "glass": principled("glass", (0.035, 0.045, 0.055), 0.04, 0.0, 1.0), "curtain": principled("curtain", (0.62, 0.58, 0.5), 0.9), "room": principled("room", (0.025, 0.025, 0.028), 0.9),
          "shoproom": principled("shoproom", (0.09, 0.085, 0.08), 0.8), "door": principled(kind + "_door", K["door"], 0.35), "brass": principled("brass", (0.75, 0.55, 0.2), 0.3, 1.0),
          "fascia": principled(kind + "_fascia", (0.1, 0.16, 0.24), 0.4), "archbrick": scanned("archbrick", PH + "/red_brick_03", (0.8, 0.72, 0.68))}
