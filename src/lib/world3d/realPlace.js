@@ -536,7 +536,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const up = hill(X[k], Z[k]); if (up <= 0) continue;
     h[k] += up;
     const dx = Math.abs(hill(X[k] - 2, Z[k]) - hill(X[k] + 2, Z[k])), dz = Math.abs(hill(X[k], Z[k] - 2) - hill(X[k], Z[k] + 2));
-    if (Math.max(dx, dz) > 0.3) bank[k] = Math.max(dx, dz) > 3.4 ? 2 : 1; // (2: a cliff's face, steeper than 40°: bare rock and earth)
+    if (Math.max(dx, dz) > 0.3) bank[k] = Math.max(dx, dz) > 2.6 ? 2 : 1; // (2: a cliff's face, steeper than about 33° on the survey's grid: bare rock and earth)
   }
   // ---- the town's ground: the map's unmarked land away from the water, the piers and the streets is not the pier's
   // concrete (it was drawn so, slab joints and all, out to the horizon) but yards, gardens, verges and waste ground:
@@ -1118,7 +1118,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (Math.floor(d / 28) !== Math.floor((d - 1) / 28)) {
         const q = inAt(0.75); if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps === "column" && apart(columns, q)) {
           columns.push([q[0], q[1], ry, nx, nz]); { const L = lanternAt(); perches.push([q[0] - nx * L.z, LAND + L.top, q[1] - nz * L.z]); } // (a gull's place: on the lantern)
-        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps !== "column" && apart(props.lamp, q, 2) && clearOfBuildings(q, 0.45) && standY(q, 0.3) != null) {
+        } else if (landAt(q) && landAt(inAt(2)) && clearOfSpots(q) && local?.lamps !== "column" && !(local?.pierLamps === false && deckAt(q) > LAND + 1) /* (none on a raised pier whose own lamps the mark models: localDetail.js) */ && apart(props.lamp, q, 2) && clearOfBuildings(q, 0.45) && standY(q, 0.3) != null) {
           const Y = standY(q, 0.3);
           addAt(new THREE.CylinderGeometry(0.06, 0.09, 5, 8), mPost, q[0], Y + 2.5, q[1]);
           const arm = addAt(new THREE.BoxGeometry(0.06, 0.06, 0.8), mPost, q[0] - nx * 0.35, Y + 4.95, q[1] - nz * 0.35, ry);
@@ -1421,7 +1421,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const bankAt = (x, z) => { if (!local?.hill) return 0; const d = Math.abs(local.hill(x - 2, z) - local.hill(x + 2, z)); return d > 0.3 ? Math.min(1, d / 0.8) : 0; };
     const woods = (place.woods || []).map(bb), woodAt = (x, z) => woods.some((b) => inB([x, z], b));
     const backsT = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null;
-    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
+    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || PR.some((b) => inB([x, z], b)) /* (never on a pier: the map's coastline often runs round them, so they count as land) */ || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
     if (trees) { place.trees = trees.count; place.treesBuilt = trees.built; place.treesUpdate = trees.update; }
   }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)

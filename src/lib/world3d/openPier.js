@@ -109,8 +109,11 @@ export function buildOpenPier(group, ring, h, o = {}) {
       const mx = pts.reduce((s, p) => s + p[0], 0) / pts.length, mz = pts.reduce((s, p) => s + p[1], 0) / pts.length, isSlip = slip(mx, mz);
       const list = isSlip ? top.slip : top.deck;
       for (const t of tris) {
-        // (wound upwards whichever way the outline ran)
-        const [i, j, k] = A > 0 ? [t[0], t[2], t[1]] : t;
+        // (wound upwards whichever way the outline ran: the triangulation hands each triangle back turning the same way
+        // in x, z whatever the outline's own direction, so each is turned by its own winding, not the outline's. Turned
+        // by the outline's, a deck mapped the other way round (Whitby's extensions) faced down and drew black)
+        const [a0, b0, c0] = [pts[t[0]], pts[t[1]], pts[t[2]]], up = (b0[0] - a0[0]) * (c0[1] - a0[1]) - (b0[1] - a0[1]) * (c0[0] - a0[0]);
+        const [i, j, k] = up > 0 ? [t[0], t[2], t[1]] : t;
         for (const q of [pts[i], pts[j], pts[k]]) list.push(q[0], deckAt(q[0], q[1]), q[1]);
         for (const q of [pts[i], pts[k], pts[j]]) under.push(q[0], deckAt(q[0], q[1]) - C.deckT, q[1]);
       }

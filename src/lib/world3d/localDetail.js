@@ -164,7 +164,10 @@ export const LOCAL = {
     },
     // the stone piers: honey-coloured sandstone blocks, their walls leaning back as they rise, dark and weedy towards
     // the sea, white-painted railings along both sides (the photographs)
-    stone: { batter: 0.14 },
+    stone: { batter: 0.14, deckTint: 0xddd5c6 },
+    // (the West Pier's own lamps are modelled below; none of the usual ones along the stone piers' edges, and none on the
+    // East Pier, where the photographs show none)
+    pierLamps: false,
     railPaint: 0xf0efe8,
     // the East Pier has no railing along its seaward side, only the edge of its flags (where the anglers stand), and a
     // railing along its harbour side; the West Pier has them along both (the photographs)
@@ -192,8 +195,8 @@ export const LOCAL = {
     // St Mary's Church on its outline, at the top of the 199 Steps
     landmarks: { 158276579: "stMarys" },
     // the old town under the cliffs: brick, stone and painted render under red pantile roofs (the photographs from the
-    // cliffs and the piers)
-    town: { render: 0.4, clay: 0.75 },
+    // cliffs and the piers); up on the Abbey's headland, Cholmley House, the mansion and the farm are stone under slate
+    town: { render: 0.4, clay: 0.75, stoneAt: (x, z) => (x > 100 && z > 280) || (x > 260 && z > 150) },
     note: "Whitby's piers, their lighthouses and beacons, the timber extensions, the Abbey's ruins and St Mary's Church are modelled from photographs and descriptions on OpenStreetMap's outlines; their sizes and the decks' heights are estimates. The cliffs stand at their surveyed heights (Environment Agency LIDAR, Open Government Licence). The rest of the town is drawn from the map, not modelled building by building.",
   },
 };

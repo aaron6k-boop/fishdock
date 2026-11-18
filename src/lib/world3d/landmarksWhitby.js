@@ -185,7 +185,7 @@ function whitbyAbbey(group, ring, base) {
   const pts = ring.slice(), K = kit(), H = 26;
   const M = whitbyMaterials(base, base + H);
   // (the ruins' stone is greyer and darker than the piers', blackened in places by weather)
-  M.stone.color.setHex(0xb9ab95);
+  M.stone.color.setHex(0xd2c8b8);
   const P = (i) => pts[i];
   // the outline's walls in order (OSM way 98740802, west front first round to the nave's south wall)
   const T = 1.6; // (thick: an abbey church's walls)
