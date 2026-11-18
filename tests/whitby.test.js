@@ -36,6 +36,10 @@ test("the extensions are open timber decks on their frames; the stone piers are 
   assert.deepEqual(open.map((p) => p.id).sort(), [162295173, 288861504]);
   for (const p of open) { assert.equal(p.kind, "breakwater"); assert.equal(p.style, "trestle"); assert.equal(p.h, 4.8); }
   assert.equal(place.piers.filter((p) => p.ring && !p.open && p.h === 5).length, 2);
+  // no railing along the East Pier's seaward edge, where the anglers stand (the photographs); railings elsewhere
+  for (const s of place.spots) assert.equal(L.fence(s.at[0], s.at[2]), "none", s.name);
+  assert.equal(L.fence(9.7, -43.5), "rail"); // (its harbour side)
+  assert.equal(L.fence(-163.1, -32.5), "rail"); // (the West Pier)
   // (an open breakwater only when it's named: elsewhere breakwaters stay solid, and an id given as one number still works)
   const cromer = localFor("cromer-pier").pier;
   assert.equal(typeof cromer.id, "number");

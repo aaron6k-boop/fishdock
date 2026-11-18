@@ -171,7 +171,7 @@ export const LOCAL = {
     railPaint: 0xf0efe8,
     // the East Pier has no railing along its seaward side, only the edge of its flags (where the anglers stand), and a
     // railing along its harbour side; the West Pier has them along both (the photographs)
-    fence: (x, z, nx, nz) => (x > -80 && nx > 0.3 ? "none" : "rail"),
+    fence: (x, z) => (nearLine(x, z, WHITBY_EAST_SEAWARD) < 3 ? "none" : "rail"),
     // and rock armour heaped either side of the East Pier's root, where it meets the foot of the East Cliff
     rocks: (x, z) => x > 75 && z > 15 && z < 100,
     // the two lighthouses on the stone piers' heads and the beacons at the extensions' ends, on the map's points for
@@ -201,6 +201,17 @@ export const LOCAL = {
   },
 };
 export const localFor = (id) => LOCAL[id] || null;
+
+// ---- Whitby's East Pier: its seaward edge (OSM way 288861500, the side facing the open sea), left without railings ----
+const WHITBY_EAST_SEAWARD = [[-41.4, -197.1], [-28.2, -125.7], [-21.8, -117.5], [-4.0, -105.4], [61.4, -11.0], [99.6, 36.3]];
+function nearLine(x, z, line) {
+  let best = Infinity;
+  for (let i = 0; i + 1 < line.length; i++) {
+    const [ax, az] = line[i], [bx, bz] = line[i + 1], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+  }
+  return best;
+}
 
 // ---- the cliff behind Cromer's promenade ----
 // The foot of the slope (z for a given x, metres round the pier head), along the retaining walls at the back of the
