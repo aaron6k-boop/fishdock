@@ -1411,7 +1411,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // held in front of you wherever you look (as in a first-person game): the reel and your right hand stay in the
       // lower right of the view, the rod rising from there at its angle for the moment (higher at a cast, lower to
       // land), so turning to watch the fish never loses the reel your hand is winding
-      const vy = viewIn ? Math.atan2(Math.sin(viewIn.yaw - face), Math.cos(viewIn.yaw - face)) : 0, vp = viewIn ? clamp(viewIn.pitch, -0.9, 0.7) : -0.12;
+      // (relative to the way your body faces: walking, that's the way you walk, not your spot's. Measured from the spot,
+      // walking off in first person put the rod straight up the middle of the view)
+      const f0 = walking ? walking.face : face;
+      const vy = viewIn ? Math.atan2(Math.sin(viewIn.yaw - f0), Math.cos(viewIn.yaw - f0)) : 0, vp = viewIn ? clamp(viewIn.pitch, -0.9, 0.7) : -0.12;
       const vf = new THREE.Vector3(Math.sin(vy) * Math.cos(vp), Math.sin(vp), -Math.cos(vy) * Math.cos(vp)), vr = new THREE.Vector3(Math.cos(vy), 0, Math.sin(vy)), vu = new THREE.Vector3().crossVectors(vr, vf);
       // the reel stays put in the view (lower right, from the eye where it is now: leaning over the rail moves it); the
       // rod swings about it, up for a cast, after a running fish, down to land it
@@ -1451,6 +1454,18 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         if (dir.z < -0.05 && h > 1e-3) { const s = (rz - reelAt.z) / (dir.z / h); if (s > 0) { const need = Math.atan2(top + 0.06 - reelAt.y, s), el = Math.atan2(dir.y, h); tilt = Math.max(0, need - el); } }
         railTilt += (tilt - railTilt) * (1 - Math.exp(-dt * 10));
         if (railTilt > 1e-4) { const el = Math.atan2(dir.y, h) + railTilt; dir.set(dir.x / h * Math.cos(el), Math.sin(el), dir.z / h * Math.cos(el)); }
+      }
+      // walking about in first person: the rod carried in your right hand down by your side, its tip leading up and
+      // forwards and a little out to the right, carried with your body rather than your eyes (look down and you see your
+      // hand on it; look up and it stays by your side), so the way ahead is clear. Held in front of you as when fishing, it
+      // stood up the middle of the view with no hand on it (the PC's first-person walk, 18 November)
+      if (walking) {
+        const fh = new THREE.Vector3(Math.sin(vy), 0, -Math.cos(vy)), rh = new THREE.Vector3(Math.cos(vy), 0, Math.sin(vy)), up = new THREE.Vector3(0, 1, 0);
+        const run = carry.run || 0, el = 0.85 + 0.35 * run + (carry.lift || 0) * 0.2, az = 0.22 + (carry.trail || 0);
+        dir = fh.clone().multiplyScalar(Math.cos(el) * Math.cos(az)).addScaledVector(rh, Math.cos(el) * Math.sin(az)).addScaledVector(up, Math.sin(el)).normalize();
+        reelAt.copy(fpEye()).addScaledVector(rh, 0.22).addScaledVector(up, -0.52 + 0.08 * run).addScaledVector(fh, 0.2 + 0.06 * run).add(carry.d || V3(0, 0, 0));
+        // (your arms are still posed from the view itself, as when fishing: posed from the level view, looking down showed
+        // the inside of your own jacket, cut ragged round the eye)
       }
       butt = reelAt.addScaledVector(dir, -R.seat);
     }
@@ -1599,7 +1614,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     reel.updateMatrixWorld(true);
     const kn = reel.userData.knob || V3(0.016, -0.048, 0);
     const knob = toLocal(handle.localToWorld(kn.clone())), knobAx = toLocal(handle.localToWorld(kn.clone().add(V3(-0.026, 0, 0)))).sub(knob);
-    if (walking) hands[1] = rodGrip(R.seat * 0.7, V3(-1, 0, 0.2), "carry");
+    if (walking && !fp) hands[1] = rodGrip(R.seat * 0.7, V3(-1, 0, 0.2), "carry");
     else if (held) {
       // (sock: the grip's frame on the reel itself: its foot on the rod, z to the tip, the reel below. The hands are set
       // from it, so they go wherever the reel goes and can't drift off it)
@@ -1612,6 +1627,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // butt too)
       hands[0] = ph === "cast" && age < 2.4 && !fp ? rodGrip(0.05, V3(1, 0.2, 0), "butt") : !fp && (ph === "cast" || ph === "bite" || ph === "missed" || ph === "waiting" || ph === "idle") ? rodGrip(0.14, V3(1, 0.2, 0), "butt") : ph === "cast" && fp && fpCast?.both ? (() => { const a = along(0.065); return { at: a.p, axis: a.t, palm: V3(1, 0.2, 0), kind: "butt", anat: fpCast.k, sock: { pos: a.p.clone(), quat: frame(a.t) } }; })() /* (first person: the left hand round the butt, the pulling hand of the cast, in the grip made for it: grips.js "butt_l") */ : ph === "hooked" || ph === "landing" || ph === "lost" || fp ? { at: knob, axis: knobAx, palm: dir.clone().negate().add(V3(0, -0.5, 0)), kind: "crank", hub: toLocal(handle.localToWorld(V3(kn.x, 0, 0))), spin: reel.userData.spin || 0, sock: { pos: knob.clone(), quat: reel.quaternion.clone() }, prof: rodKit ? knobProf(R) : null, profAxis: "x" } : null;
     }
+    if (fp && walking) hands[0] = null; // (walking about in first person, the rod in your right hand at the reel, the left one free)
     // (reaching down to the rod in its rest, seen from outside: the knees bend to it, less as it comes up)
     if (!fp && held && !walking && inHand < 1) { const r = along(R.seat).p; crouch = Math.max(crouch, clamp((1.02 - r.y) * 0.9, 0, 0.35)); lean = Math.max(lean, 0.1 * (1 - lift)); lookAtW = toWorld(r); }
     if (ph === "bite" && !held) {
@@ -1889,8 +1905,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (fp && fpv) {
       const vw = fpView || viewVecs();
       const perf = FILM && typeof window !== "undefined" && window.__fdPerfOn ? performance.now() : 0; // (film only: what posing the arms costs each frame)
-      fpv.pose({ hands: walking ? [null, null] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt, castT: ph === "cast" ? age : null });
-      if (FILM) fpSpecs = walking ? [null, null] : hands.map((h) => (h ? h.kind || "?" : null)); // (film checks: what each hand was given to hold)
+      fpv.pose({ hands: walking ? [null, hands[1]] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt, castT: ph === "cast" ? age : null });
+      if (FILM) fpSpecs = walking ? [null, hands[1]?.kind || null] : hands.map((h) => (h ? h.kind || "?" : null)); // (film checks: what each hand was given to hold)
       if (perf) { const P = (window.__fdPerf ||= { n: 0, ms: 0, max: 0 }), d = performance.now() - perf; P.n++; P.ms += d; if (d > P.max) P.max = d; }
     }
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFigP(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
