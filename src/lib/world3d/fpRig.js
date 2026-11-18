@@ -369,14 +369,14 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // (and looking down, the jacket's body isn't drawn at all: its chest and front, right under your eye, were cut by
   // that sphere into ragged dark flaps across the bottom of the picture, looking down at the mat or over the rail. Which
   // parts are its body is marked on each vertex when the rig is built (markTorso); your sleeves still show)
-  const lookDown = { value: 0 };
+  const lookDown = { value: 0 }, upperOn = { value: 1 };
   coatMat.onBeforeCompile = (sh) => {
-    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown; sh.uniforms.fpCutSoft = cutSoft;
+    sh.uniforms.fpNearCut = nearCut; sh.uniforms.fpDown = lookDown; sh.uniforms.fpCutSoft = cutSoft; sh.uniforms.fpUpperOn = upperOn;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float fpTorso;\nattribute float fpUpper;\nvarying float vTorso;\nvarying float vUpper;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvTorso = fpTorso; vUpper = fpUpper;");
     // (the cut's edge softened by a fine ordered dither over 1.2 cm. It was 5 cm, against a sawtooth seen through the
     // cast that turned out to be the cuff's own edge (dropLining, fixed 15 November); looking down at the drop net the
     // upper sleeve lies almost wholly inside a 5 cm band, and showed as a screen of dots)
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nuniform float fpCutSoft;\nvarying float vTorso;\nvarying float vUpper;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * fpCutSoft || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3) || (fpDown > 0.6 && vUpper > 0.12 + 0.6 * fpB4(gl_FragCoord.xy))) discard;\n#include <opaque_fragment>");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform float fpNearCut;\nuniform float fpDown;\nuniform float fpCutSoft;\nuniform float fpUpperOn;\nvarying float vTorso;\nvarying float vUpper;\nfloat fpB2(vec2 a) { a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }\nfloat fpB4(vec2 a) { return fpB2(0.5 * a) * 0.25 + fpB2(a); }").replace("#include <opaque_fragment>", "if (length(vViewPosition) < fpNearCut + (fpB4(gl_FragCoord.xy) - 0.5) * fpCutSoft || (!gl_FrontFacing && length(vViewPosition) < fpNearCut + 0.18) || (vTorso > 0.5 && fpDown > 0.3) || (fpUpperOn > 0.5 && fpDown > 0.6 && vUpper > 0.12 + 0.6 * fpB4(gl_FragCoord.xy))) discard;\n#include <opaque_fragment>");
   };
   clothe(coatMat);
   { const prev = coatMat.onBeforeCompile; coatMat.onBeforeCompile = (sh, r) => { prev.call(coatMat, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <lights_fragment_end>", "#include <lights_fragment_end>\n" + fpKeyLight(0.9, 0.025, 10, 0.75)); }; }
@@ -722,7 +722,8 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       const { hands: specs = [null, null], eye, dt = 0.016 } = o;
       if (!group.visible || !R) return;
       { const down = o.vf ? clamp((-o.vf.y - 0.55) / 0.3, 0, 1) : 0, ct = o.castT, wind = ct == null ? 0 : clamp((ct - 0.12) / 0.15, 0, 1) * (1 - clamp((ct - 0.8) / 0.15, 0, 1));
-        nearCut.value += (Math.max(0.16 + 0.17 * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.012 + Math.max(0.06 * wind, SOFT ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; }
+        const fc = FILM && typeof window !== "undefined" ? window.__fdFpCut || null : null; // (film only: other ways of cutting your sleeves near the eye, to compare)
+        nearCut.value += (Math.max(0.16 + (fc?.nearDown ?? 0.17) * down, 0.16 + 0.08 * wind) - nearCut.value) * Math.min(1, dt * 6); cutSoft.value += (0.012 + Math.max(0.06 * wind, (fc?.soft ?? SOFT) ? 0.07 * down : 0) - cutSoft.value) * Math.min(1, dt * 6); lookDown.value = down; upperOn.value = fc?.upper === false ? 0 : 1; }
       const empty = !specs[0] && !specs[1];
       // (nothing in either hand: the arms put away, as in any first-person game; and until the rod and reel are there to
       // take hold of, nothing to hold)
