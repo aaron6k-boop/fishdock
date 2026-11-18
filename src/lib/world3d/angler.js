@@ -1180,14 +1180,17 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // (well out in front at arm's length, its tail off to your right: held close, a big fish's tail went into your
       // shoulder)
       const holdDir = side.clone().multiplyScalar(0.85).addScaledVector(away, -0.53).normalize();
-      const railIn = -Math.max(0.3, edge - 0.22) + 0.06, holdZ = Math.max(railIn + fishLen * 0.3, -(0.4 + 0.3 * fishLen));
+      // (and within reach as you kneel: 40 cm out and more, both hands came up 8 to 9 cm short of it, the arms straight,
+      // and the fish hovered over open palms (the PC's held bass and whiting, measured, 18 November). 10 cm nearer and
+      // 6 cm higher, the arms bend and the hands are on it)
+      const railIn = -Math.max(0.3, edge - 0.22) + 0.06, holdZ = Math.max(railIn + fishLen * 0.3, -(0.3 + 0.3 * fishLen));
       // (through your own eyes you stand and bring it up to look at it: about 45 cm in front of your face and a little
       // below, elbows bent, so the hands and the fish fill the view and the forearms run short out of the bottom of it.
       // Held at kneeling chest height, nearly a metre below a standing eye, the arms reached straight down the view like
       // two long tubes)
       const fpH = fp ? fpEye() : null;
       const hold = fp ? toWorld(new THREE.Vector3(fpH.x - 0.08 - 0.12 * fishLen, fpH.y - 0.26, Math.max(railIn + fishLen * 0.3, fpH.z - 0.5)))
-        : toWorld(new THREE.Vector3(-0.12 - 0.1 * fishLen, 0.74, holdZ));
+        : toWorld(new THREE.Vector3(-0.12 - 0.1 * fishLen, 0.8, holdZ));
       const poseD = (c, dir, roll, kk) => ({ mouth: c.clone().addScaledVector(dir, -fishLen * 0.5), dir: dir.clone().normalize(), roll, beat: kk.beat ?? 0.1, curl: kk.curl ?? 0, centre: c, lift: !!kk.lift });
       const pose = (c, roll, kk) => poseD(c, side.clone().negate(), roll, kk);
       const LIE = -Math.PI / 2; // (on its side: rolled this way its tail lifts, rather than digging into the mat, as it flaps)
