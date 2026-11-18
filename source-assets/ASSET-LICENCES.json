@@ -2171,6 +2171,22 @@
    "resolution": "1920x1280 and 960x640",
    "use": "the gurnard's, tope's, lesser-spotted dogfish's, conger's and eel's skins in the 3D view (public/fish/skin/): FishDock's own picture of each enlarged four times and sharpened, with drawn fin rays, spots and a normal map",
    "files": []
+  },
+  {
+   "id": "fishdock:angler2",
+   "name": "The main angler (people v2): clothes, beard and levels of detail made for FishDock on a Rocketbox body",
+   "source": "source-assets/blender/people2 (a_build.py, textures.py, b_finish.py), run in Blender 5.2 on Aaron's PC",
+   "author": "FishDock; body and face Microsoft Rocketbox (Male_Adult_05, m05)",
+   "licence": "Clothes, beard, textures and levels of detail made for FishDock (no outside image or model); the body and face MIT (Microsoft Rocketbox, Copyright (c) 2020 Microsoft)",
+   "attribution": "public/people/CREDITS.txt (the Rocketbox MIT notice and the angler2 paragraph)",
+   "type": "rigged 3D person",
+   "resolution": "about 74,000, 23,000 and 7,000 triangles; clothes' maps 2048 (angler2_hd.glb) and 1024 (angler2.glb)",
+   "use": "the main angler in the 3D view and the look picker (public/people/angler2.glb, angler2_hd.glb, angler2.webp)",
+   "files": [
+    "public/people/angler2.glb",
+    "public/people/angler2_hd.glb",
+    "public/people/angler2.webp"
+   ]
   }
  ]
 }

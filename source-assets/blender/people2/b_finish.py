@@ -125,6 +125,14 @@ try:
       if o.name.startswith("fd2_") and tris(o) > 3000:
         r = min(1.0, k * 0.85); c = decimate(o, r, o.name + "_tmp"); bpy.data.objects.remove(o, do_unlink=True); c.name = c.name.replace("_tmp", "")
   lod0 = [o for o in bpy.data.objects if o.type == "MESH" and "_lod" not in o.name]
+  tot0 = sum(tris(o) for o in lod0)
+  # (and the body, smoothed to about 46,000 before, thinned if the total is still well over: the head keeps its shape)
+  if tot0 > want0 * 1.05:
+    bod = [o for o in lod0 if not o.name.startswith("fd2_")]; bt0 = sum(tris(o) for o in bod)
+    r = max(0.55, (want0 - (tot0 - bt0)) / max(1, bt0))
+    for o in bod:
+      c = decimate(o, r, o.name + "_tmp"); nm = o.name; bpy.data.objects.remove(o, do_unlink=True); c.name = nm
+  lod0 = [o for o in bpy.data.objects if o.type == "MESH" and "_lod" not in o.name]
   tot0 = sum(tris(o) for o in lod0); L("lod0", tot0)
   for lev, target in ((1, 25000), (2, 8000)):
     r = target / max(1, tot0)

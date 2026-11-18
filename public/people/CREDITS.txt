@@ -57,3 +57,12 @@ personal, commercial and non-profit projects under Adobe's terms; the files them
 angler1.glb (and angler1_hd.glb): the man with short hair (m05.glb, Microsoft Rocketbox, MIT License, as above) with a
 fishing jacket, trousers and wellies modelled in Blender from his own body (source-assets/blender/make_angler_clothes.py),
 skinned to the same skeleton. The cloth's surface detail is from Poly Haven's fabric_pattern_07 and denim_fabric (CC0).
+
+angler2.glb (and angler2_hd.glb): the main angler, made for FishDock on 17 November 2026
+(source-assets/blender/people2: a_build.py, textures.py, b_finish.py). His body and face are the man with short hair
+(m05, Microsoft Rocketbox, MIT License, as above), made smoother (one level of subdivision). Everything he wears and
+his beard are FishDock's own, modelled in Blender from his body and skinned to the same skeleton: a waterproof jacket
+with a stand-up collar, a storm flap with press studs, chest and hand-warmer pockets, cuffs and a hem band; waterproof
+trousers with cargo pockets; wellington boots with a top band and a strap buckle; a short beard. Their colour, normal
+and roughness maps are drawn by textures.py from the garments' own surfaces (no photographs or outside textures). Three
+levels of detail of each.

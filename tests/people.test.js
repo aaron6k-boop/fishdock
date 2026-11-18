@@ -59,11 +59,15 @@ test("every person's model, portrait and the shared movements are in public/peop
   const dir = new URL("../public/people/", import.meta.url);
   const credits = readFileSync(new URL("CREDITS.txt", dir), "utf8");
   assert.ok(/MIT License/.test(credits) && /Copyright \(c\) 2020 Microsoft/.test(credits));
+  // (the new people, v2, carry their clothes as separate meshes with their own colour, normal and roughness maps and
+  // three levels of detail, so they are allowed more: the light file 4 MB, the fine one 12 MB)
+  const v2 = new Set(PEOPLE.filter((x) => x.v2).map((x) => x.file));
   for (const p of [...PEOPLE.map((x) => x.file), "anims"]) {
-    const f = new URL(`${p}.glb`, dir); assert.ok(existsSync(f), p); const n = statSync(f).size; assert.ok(n > 100000 && n < 1600000, `${p} ${n} bytes`);
+    const lim = v2.has(p) ? [4000000, 12000000] : [1600000, 4500000];
+    const f = new URL(`${p}.glb`, dir); assert.ok(existsSync(f), p); const n = statSync(f).size; assert.ok(n > 100000 && n < lim[0], `${p} ${n} bytes`);
     assert.equal(readFileSync(f).subarray(0, 4).toString(), "glTF");
     if (p !== "anims") { assert.ok(existsSync(new URL(`${p}.webp`, dir)), `${p} portrait`); assert.ok(credits.includes(`${p}.glb`), `${p} credited`); }
     // (and the full-detail version High quality loads: the same person, larger textures)
-    if (p !== "anims") { const hd = new URL(`${p}_hd.glb`, dir); assert.ok(existsSync(hd), `${p}_hd`); const m = statSync(hd).size; assert.ok(m > n && m < 4500000, `${p}_hd ${m} bytes`); assert.equal(readFileSync(hd).subarray(0, 4).toString(), "glTF"); }
+    if (p !== "anims") { const hd = new URL(`${p}_hd.glb`, dir); assert.ok(existsSync(hd), `${p}_hd`); const m = statSync(hd).size; assert.ok(m > n && m < lim[1], `${p}_hd ${m} bytes`); assert.equal(readFileSync(hd).subarray(0, 4).toString(), "glTF"); }
   }
 });

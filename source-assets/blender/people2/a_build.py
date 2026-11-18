@@ -222,13 +222,17 @@ try:
     if k in ("upperarm", "forearm"): return True
     return HEM - 0.04 <= h[i] <= neckZ + 0.03 and k not in ("calf", "foot")   # (the tops of the thighs too: the hem is cut below the seat)
   jk, bm = from_body("fd2_jacket", jacket_region, body_slot)
-  cut_level(bm, HEM, keep_below=False)
-  # the neckline: one clean cut round the neck, lower at the front (the body's own edge there was a zigzag)
-  nk0 = bone("Neck"); tilt = 0.32; nno = np.array([0, 0, 1.0]) * math.cos(tilt) + fwd * math.sin(tilt)
-  cut_plane(bm, tuple(np.array([nk0[0], nk0[1], zmin + (neckZ + 0.012) * H])), tuple(nno), keep_neg=True)
-  # the sleeves end 3 cm short of the wrist joint, square to the forearm
-  for S2 in ("L", "R"):
-    a = el[S2]; b = wr[S2]; d = (b - a) / np.linalg.norm(b - a); cut_plane(bm, tuple(b - d * 0.03), tuple(d), keep_neg=True)
+  nk0 = bone("Neck")
+  def jk_cuts(bm):
+    # (cut once the cloth has its shape: cut first, the thin slivers a cut leaves at the body's edge were pushed out
+    # along their own wild normals into spikes)
+    cut_level(bm, HEM, keep_below=False)
+    # the neckline: one clean cut round the neck, lower at the front
+    tilt = 0.32; nno = np.array([0, 0, 1.0]) * math.cos(tilt) + fwd * math.sin(tilt)
+    cut_plane(bm, tuple(np.array([nk0[0], nk0[1], zmin + (neckZ + 0.012) * H])), tuple(nno), keep_neg=True)
+    # the sleeves end 3 cm short of the wrist joint, square to the forearm
+    for S2 in ("L", "R"):
+      a = el[S2]; b = wr[S2]; d = (b - a) / np.linalg.norm(b - a); cut_plane(bm, tuple(b - d * 0.03), tuple(d), keep_neg=True)
   def jk_off(p):
     z = (p[2] - zmin) / H; o = 0.016
     # (looser at the waist and hem, a little standing off the hips; close over the shoulders: a shell, not a puffer)
@@ -259,6 +263,7 @@ try:
       d += 0.0035 * (1 - abs(z - HEM - 0.06) / 0.06) * ridges(p[2] + 0.02 * math.sin(ang * 3), 0.05, 17) * (0.5 + 0.5 * sideish)
     return d
   displace(bm, jk_folds)
+  jk_cuts(bm)
   thicken_edges(bm, 0.006)
   bm.to_mesh(jk.data); bm.free(); made["jacket"] = jk
   L("jacket", len(jk.data.vertices), "verts", len(jk.data.polygons), "faces")
@@ -293,23 +298,40 @@ try:
     a, w = el[S2], wr[S2]; ax = (w - a) / np.linalg.norm(w - a); cend = w - ax * 0.03
     parts["cuff_" + S2] = cut_part(jk, f"fd2_jacket_cuff_{S2}", [(cend + ax * 0.01, ax), (cend - ax * 0.055, -ax)], lambda c, n, a=a, w=w: seg_param(c, a, w)[1] < 0.09, 0.0025, 0.002)
   parts["hem"] = cut_part(jk, "fd2_jacket_hem", [(np.array([cx, cy, zmin + (HEM + 0.028) * H]), UP)], lambda c, n: n[2] < 0.6, 0.002, 0.002)
-  # the collar: standing up from the neckline, 7 cm, a little open at the front
-  bmc = bmesh.new(); bmc.from_mesh(jk.data); bmc.normal_update()
-  def near_neck(v):
-    p = np.array(tuple(mw @ v.co)); return p[2] > zN - 0.08 and np.linalg.norm((p - bone("Neck"))[:2]) < 0.16
-  top = [e for e in bmc.edges if e.is_boundary and all(near_neck(v) for v in e.verts)]
-  L("collar edges", len(top))
-  ring = list({v for e in top for v in e.verts})
-  bmesh.ops.delete(bmc, geom=[f for f in bmc.faces], context="FACES_ONLY")
-  ret = bmesh.ops.extrude_edge_only(bmc, edges=top)
-  up_l = (mwi.to_3x3() @ Vector((0, 0, 1))).normalized()
-  for v in [g for g in ret["geom"] if isinstance(g, bmesh.types.BMVert)]:
-    pw = np.array(tuple(mw @ v.co)); out = pw - np.array([cx, cy, pw[2]]); out[2] = 0; out /= (np.linalg.norm(out) or 1)
-    frontness = max(0.0, (out @ fwd))
-    v.co += up_l * ((0.07 - 0.025 * frontness) / S) + mwi.to_3x3() @ Vector(out * (0.012 + 0.01 * frontness))   # (mwi already scales to the mesh's units)
-  bmesh.ops.delete(bmc, geom=[v for v in bmc.verts if not v.link_faces], context="VERTS")
-  bmc.normal_update(); ret = bmesh.ops.solidify(bmc, geom=bmc.faces[:], thickness=-0.004 / S)
-  col = jk.copy(); col.data = jk.data.copy(); col.name = "fd2_jacket_collar"; bpy.context.collection.objects.link(col); bmc.to_mesh(col.data); bmc.free(); parts["collar"] = col
+  # the collar: a band built round the neckline (extruding the cut's own edge tore it), standing up 7 cm at the back
+  # and 5 at the front, leaning out a little, open at the front where the zip is; 4 mm thick with a rolled top
+  nkc2 = np.array([nk0[0], nk0[1], 0.0])
+  bmc = bmesh.new(); bmc.from_mesh(jk.data)
+  rim = [np.array(tuple(mw @ v.co)) for v in bmc.verts if v.is_boundary]; bmc.free()
+  rim = [p for p in rim if p[2] > zN - 0.09 and np.linalg.norm((p - nk0)[:2]) < 0.17]
+  ang = lambda p: math.atan2((p - nkc2) @ side, (p - nkc2) @ fwd)   # (0 at the front, round to the left)
+  NA, gap = 72, 0.16; ring = []
+  for k2 in range(NA + 1):
+    a = gap + (2 * math.pi - 2 * gap) * k2 / NA; a2 = a if a <= math.pi else a - 2 * math.pi
+    near = [p for p in rim if abs((ang(p) - a2 + math.pi) % (2 * math.pi) - math.pi) < 0.09]
+    if not near: continue
+    far = max(near, key=lambda p: np.linalg.norm((p - nkc2)[:2]))   # (the outside of the cloth, not its turned-back edge)
+    ring.append((a2, np.array([far[0], far[1], np.mean([q[2] for q in near])])))
+  L("collar ring", len(ring), "of", NA + 1, "from", len(rim), "edge points")
+  # (front: a = 0 at the zip, a = pi at the back; the ring runs from just left of the zip round the back to just right)
+  ring = [(a2, p) for a2, p in sorted(ring, key=lambda t: (t[0] - gap) % (2 * math.pi))]
+  bmc = bmesh.new(); rows = []
+  for a2, p in ring:
+    out = p - nkc2; out[2] = 0; out /= (np.linalg.norm(out) or 1); front = max(0.0, math.cos(a2))
+    hgt = 0.072 - 0.022 * front; lean = 0.008 + 0.008 * front
+    prof = [(-0.012, 0.0), (0.0, 0.003), (hgt * 0.55, 0.002 + lean * 0.45), (hgt, lean), (hgt + 0.004, lean - 0.003)]   # (up, out) from the neckline
+    outer = [p + np.array([0, 0, u]) + out * (o + 0.003) for u, o in prof]
+    inner = [q - out * 0.004 for q in outer]
+    rows.append([bmc.verts.new(mwi @ Vector(q)) for q in outer] + [bmc.verts.new(mwi @ Vector(q)) for q in reversed(inner)])
+  nr = len(rows[0]) if rows else 0
+  for i2 in range(len(rows) - 1):
+    for j2 in range(nr - 1):
+      bmc.faces.new([rows[i2][j2], rows[i2 + 1][j2], rows[i2 + 1][j2 + 1], rows[i2][j2 + 1]])
+  if rows:
+    bmc.faces.new(rows[0]); bmc.faces.new(list(reversed(rows[-1])))   # (the ends at the zip)
+  bmesh.ops.recalc_face_normals(bmc, faces=bmc.faces[:])
+  me = bpy.data.meshes.new("collar"); bmc.to_mesh(me); bmc.free()
+  col = bpy.data.objects.new("fd2_jacket_collar", me); bpy.context.collection.objects.link(col); col.matrix_world = mw_obj; parts["collar"] = col
   # the hood, rolled down behind the collar: a soft tube round the back of the neck, thick at the back, thin at the sides
   nk = bone("Neck"); hd = bone("Head")
   bmh = bmesh.new(); NU, NV = 24, 12; rows = []
@@ -354,7 +376,6 @@ try:
     if k in ("hand", "head", "upperarm", "forearm"): return False
     return BOOT - 0.06 <= h[i] <= HEM + 0.09 and k in ("thigh", "calf", "torso", "foot")
   tr, bm = from_body("fd2_trousers", tr_region, body_slot)
-  cut_level(bm, BOOT - 0.03, keep_below=False)
   def tr_off(p):
     z = (p[2] - zmin) / H; o = 0.016
     if z < BOOT + 0.02: o = 0.012  # (gathered in where they go into the boots, inside the boots' shafts)
@@ -369,6 +390,7 @@ try:
     if z < BOOT + 0.07: d += 0.006 * (1 - (z - BOOT + 0.03) / 0.1) * ridges(p[2] + 0.01 * math.sin(math.atan2(lat(p), fro(p)) * 4), 0.032, 31)
     return d
   displace(bm, tr_folds)
+  cut_level(bm, BOOT - 0.03, keep_below=False)
   thicken_edges(bm, 0.005)
   bm.to_mesh(tr.data); bm.free(); made["trousers"] = tr
   trP = np.array([tuple(mw @ v.co) for v in tr.data.vertices])
@@ -390,14 +412,14 @@ try:
     return k in ("calf", "foot", "thigh") and h[i] <= BOOT + 0.03
   bt, bm = from_body("fd2_boots", bt_region, body_slot)
   L("boots from the body", len(bm.faces), "faces; in the region", sum(1 for i in range(len(P)) if bt_region(i)), "points")
-  cut_level(bm, BOOT, keep_below=True)
-  L("boots after the cut", len(bm.faces))
   def bt_off(p):
     z = (p[2] - zmin) / H; o = 0.012
     if z > 0.07: o += 0.015 * min(1.0, (z - 0.07) / 0.12)   # (the shaft stands off the calf, round the trousers)
     return o
   inflate(bm, bt_off, 10)
   subdivide(bm)
+  cut_level(bm, BOOT, keep_below=True)
+  L("boots after the cut", len(bm.faces))
   bm.normal_update()
   # the sole: everything near the ground pushed down to a flat, slightly wider sole 2 cm thick
   for v in bm.verts:
@@ -477,7 +499,7 @@ try:
   for v in body.data.vertices: kdd.insert(v.co, v.index)
   kdd.balance()
   for ob in allp:
-    if ob.name in ("fd2_jacket_hood", "fd2_jacket_studs", "fd2_jacket_toggles", "fd2_boots_buckles"):
+    if ob.name in ("fd2_jacket_collar", "fd2_jacket_hood", "fd2_jacket_studs", "fd2_jacket_toggles", "fd2_boots_buckles"):
       # (each point takes the weights of the body's nearest point, both in the mesh's own numbers)
       gs = [ob.vertex_groups.new(name=g.name) for g in body.vertex_groups]
       for v in ob.data.vertices:
