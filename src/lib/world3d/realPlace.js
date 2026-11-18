@@ -1264,6 +1264,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }
   void PLACE3D;
   // open sea only (outside the land and outside any mapped river, lake or harbour water), for boats
+  // (whether a point is on a beach's sand or shingle, by the grid: the water's surf breaks along the beaches, environment.js)
+  { const near = (v) => { let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] < v) lo = m; else hi = m; } return v - xs[lo] < xs[hi] - v ? lo : hi; };
+    place.beachAt = (x, z) => cls[near(z) * n + near(x)] === 2; }
   place.waterAt = (x, z) => { const q = [x, z]; return !LR.some((bb) => inB(q, bb)) && !PR.some((bb) => inB(q, bb)) && !WR.some((bb) => inB(q, bb)); };
   place.perches = perches;
   // beyond the mapped square: real landmarks where they are, an indicative low town over the land (skyline.js)

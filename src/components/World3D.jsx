@@ -12,7 +12,7 @@ import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
 import { effectiveGfx } from "./GraphicsPanel.jsx";
 import { localFor } from "../lib/world3d/localDetail.js";
 import { createLoadGate } from "../lib/loadGate.js";
-import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes } from "../lib/sceneAudio.js";
+import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes, holdRecordings } from "../lib/sceneAudio.js";
 import { fretAndStorm } from "../lib/world3d/skyLook.js";
 
 // ---- view choices kept on this phone: follow jumps (the camera turns to a leaping fish), spatial sound (sounds come
@@ -101,11 +101,15 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
   useEffect(() => {
     if (real === undefined) return undefined;
     setPct(6); // (the place itself has arrived: three.js and the world are next)
-    let gone = false, w = null, untrack = null;
+    let gone = false, w = null, untrack = null, release = null;
     (async () => {
       try {
         const mod = await import("../lib/world3d/world.js"); mark("world-code");
         if (gone) return;
+        // (the people's files, the rod and the nets asked for now, to come in while the world is built: world.js prefetch)
+        mod.prefetch(props.current.anglers);
+        // (and nothing that can wait while it loads: the sound's recordings, the people's detailed files)
+        holdRecordings(true); mod.holdDetail(true); release = () => { holdRecordings(false); mod.holdDetail(false); };
         const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
         const q = quality === "auto" ? mod.autoQuality3d() : quality;
         let gate = createLoadGate(); setShown(false); setPct(10); setFiles([0, 0]);
@@ -131,7 +135,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         w.onFrame(({ outs, view, walk: wk, kept, localId }) => {
           if (!frameN++) mark("first-frame");
           { const fl = props.current.fightLive; if (fl && fl.current !== liveWas) { liveWas = fl.current; w.setFight(liveWas); } } // (each new step of the fight, the frame it arrives)
-          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (!warmed && p >= 85) { warmed = true; w.warm(); } /* (the files are in: everything not yet drawn is built now, under the loading screen) */ if (gate.ready) { mark("files-in", gate.counts.join("/")); gate = null; untrack?.(); untrack = null; w.setLoading(false); w.warm(); mark("shown"); /* (and again as the loading screen goes: whatever arrived since 85% is readied under it, not in your first seconds of fishing) */ w.setPacing(true); if (!gone) setShown(true); } }
+          if (gate) { gate.frame(w.loadInfo()); const p = gate.pct; if (p !== pctWas) { pctWas = p; setPct(p); setFiles(gate.counts); } if (!warmed && p >= 85) { warmed = true; w.warm(); } /* (the files are in: everything not yet drawn is built now, under the loading screen) */ if (gate.ready) { mark("files-in", gate.counts.join("/")); gate = null; untrack?.(); untrack = null; w.setLoading(false); w.warm(); mark("shown"); release?.(); /* (and again as the loading screen goes: whatever arrived since 85% is readied under it, not in your first seconds of fishing) */ w.setPacing(true); if (!gone) setShown(true); } }
           // where everyone stands, for proximity chat (a few times a second)
           if (props.current.onHear && performance.now() - heardAt > 250) { heardAt = performance.now(); const others = {}; for (const [id, o] of Object.entries(outs)) if (id !== localId) others[id] = { x: o.at.x, z: o.at.z }; const me = outs[localId]?.at; props.current.onHear({ me: me ? { x: me.x, z: me.z } : null, yaw: view.yaw, others }); }
           const ks = kept?.state || null; if (ks !== keptWas) { keptWas = ks; props.current.onKept?.(ks); }
@@ -151,7 +155,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         setReady(true);
       } catch (e) { console.warn("FishDock 3D view failed", e?.message); setFailed(true); }
     })();
-    return () => { gone = true; untrack?.(); w?.dispose(); W.current = null; setReady(false); setShown(false); };
+    return () => { gone = true; untrack?.(); release?.(); w?.dispose(); W.current = null; setReady(false); setShown(false); };
   }, [venue, quality, real, panoOn, gen]);
 
   // (with a live fight to read, the frame loop below hands it to the world every frame; without one, as it changes)

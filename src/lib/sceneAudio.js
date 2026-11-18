@@ -210,9 +210,14 @@ export function soundOn(conditions = {}) {
   return true;
 }
 // (the recordings are fetched once sound can actually be heard, after your first tap has started it, and a few
-// seconds after that, so their 5 MB never compete with the place's own models while it loads)
+// seconds after that, so their 5 MB never compete with the place's own models while it loads; and never while a place
+// is loading at all (holdRecordings, World3D.jsx): on the PC, 18 November, the browser had sound on from the start and
+// they came in alongside the people's files, 4 MB of the 34 MB a first visit to Gorleston fetched)
+let recHold = false, recWanted = false;
+export function holdRecordings(hold) { recHold = !!hold; if (!recHold && recWanted) { recWanted = false; fetchRecordings(); } }
 function fetchRecordings() {
   if (rec || recLoading || !ac) return;
+  if (recHold) { recWanted = true; return; }
   if (ac.state !== "running") { ac.addEventListener?.("statechange", fetchRecordings, { once: true }); return; }
   recLoading = true;
   setTimeout(() => loadRecordings(ac).then((m) => { rec = m; if (on) apply(); }).catch(() => { /* the drawn sound alone */ }), 3000);

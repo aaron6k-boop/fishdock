@@ -110,6 +110,13 @@ export const LOCAL = {
     hill: cromerHill,
     note: "Cromer Pier's iron legs, its deck, railings and lamps, the Pavilion Theatre, the lifeboat station and its slipway, the Hotel de Paris and the church tower are modelled from photographs and descriptions; their sizes, the deck's height and the cliff's are estimates. The other buildings of the town are drawn in a general style from their outlines on the map.",
   },
+  // Great Yarmouth's beach north of Britannia Pier (added 18 November 2026). The pier (1901, about 250 m: Wikipedia)
+  // stands open on legs over the sand and the sea, its outline OSM way 37588977, the Britannia Theatre (1958) at its
+  // seaward end; the anglers on the sand 150 m north of it, by the water's edge
+  "great-yarmouth-beach": {
+    pier: { open: true, id: 37588977 },
+    note: "Britannia Pier and its theatre are drawn from OpenStreetMap's outlines; their look is estimated.",
+  },
 };
 export const localFor = (id) => LOCAL[id] || null;
 

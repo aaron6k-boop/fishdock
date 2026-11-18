@@ -30,6 +30,34 @@ export function shoreDistances(isLand, { half = SHORE.half, n = SHORE.n, cap = S
   return d;
 }
 
+/** Whether the nearest land to each sample is a beach (`isBeach(x, z)`), as bytes for a texture (255 a beach, 0 a wall,
+ * a bank or open water far from both): the same grid as shoreDistances, the nearest land carried along by the same two
+ * passes. The water's shader breaks the waves on a beach (the surf) and washes foam along a wall. */
+export function beachNearest(isLand, isBeach, { half = SHORE.half, n = SHORE.n } = {}) {
+  const step = (2 * half) / n, d = new Float32Array(n * n), src = new Int32Array(n * n).fill(-1), INF = 1e9;
+  const X = (i) => -half + (i + 0.5) * step;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; if (isLand(X(i), X(j))) { d[k] = 0; src[k] = k; } else d[k] = INF; }
+  const a = step, b = step * Math.SQRT2;
+  const take = (k, q, w) => { if (src[q] >= 0 && d[q] + w < d[k]) { d[k] = d[q] + w; src[k] = src[q]; } };
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const k = j * n + i;
+    if (i > 0) take(k, k - 1, a);
+    if (j > 0) { take(k, k - n, a); if (i > 0) take(k, k - n - 1, b); if (i < n - 1) take(k, k - n + 1, b); }
+  }
+  for (let j = n - 1; j >= 0; j--) for (let i = n - 1; i >= 0; i--) {
+    const k = j * n + i;
+    if (i < n - 1) take(k, k + 1, a);
+    if (j < n - 1) { take(k, k + n, a); if (i < n - 1) take(k, k + n + 1, b); if (i > 0) take(k, k + n - 1, b); }
+  }
+  const out = new Uint8Array(n * n), memo = new Map();
+  for (let k = 0; k < n * n; k++) {
+    const s = src[k]; if (s < 0) continue;
+    let v = memo.get(s); if (v === undefined) { v = isBeach(X(s % n), X(Math.floor(s / n))) ? 255 : 0; memo.set(s, v); }
+    out[k] = v;
+  }
+  return out;
+}
+
 /** The same as bytes for a texture (0 = on the shore, 255 = `cap` metres or more out). */
 export const shoreBytes = (dist, cap = SHORE.cap) => Uint8Array.from(dist, (v) => Math.round((v / cap) * 255));
 
