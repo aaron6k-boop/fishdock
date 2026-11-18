@@ -188,7 +188,7 @@ function placeProps(group, stand, props, glowGlass, wet) {
 // All the stains in one mesh (one draw call, cut from one small texture): a rust ring round each railing post's foot,
 // a rust run down the cap's face below each post, a few old stains on the deck round the fishing spots and damp round
 // each drain. The drain grates in one mesh; the mooring rings and the ladders instanced (a draw call each).
-function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRuns, wet, railH }) {
+function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRuns, wet, railH, deckAt = null }) {
   const LAND = GROUND.land, tex = decalTex(); if (!tex) return;
   const P = [], UV = [], I = [];
   // a quad at c, spanning ±a and ±b (3-vectors), from cell k of the 2 x 2 texture
@@ -206,9 +206,14 @@ function wallDetails(group, { posts, grates, rings, ladders, spots, props, capRu
     // the run down the cap's face, in front of the post (not every post: some have been painted over)
     if (i % 3 !== 1) { const fx = x + nx * (0.22 + 0.12 + 0.004), fz = z + nz * (0.22 + 0.12 + 0.004), w = 0.05 + rnd() * 0.05, h = 0.25 + rnd() * 0.35; quad([fx, LAND + 0.01 - h, fz], [-nz * w, 0, nx * w], [0, h, 0], DECAL.rustRun, true); }
   });
+  // (each on the deck, the whole of it, and on the deck's own level: placed anywhere round the spot, half of them were out
+  // past the wall over the sea, hanging at the deck's height. From the rail they were the dark blotches on the water
+  // below the pier, in every light, that hid from every switch of the sea: Aaron's 18 November recording, found on his
+  // PC by hiding each part of the scene in a still view)
   for (const sp of spots) for (let k = 0; k < 5; k++) {
     const t = rnd() * 6.28, d = 0.8 + rnd() * 2.5, x = sp.at[0] + Math.cos(t) * d, z = sp.at[2] + Math.sin(t) * d, r = 0.2 + rnd() * 0.35, a = rnd() * 6.28;
-    quad([x, y, z], [Math.cos(a) * r, 0, Math.sin(a) * r], [-Math.sin(a) * r * 0.8, 0, Math.cos(a) * r * 0.8], DECAL.stain, true);
+    const dy = deckAt ? deckAt([x, z], r + 0.3) : LAND; if (dy == null) continue;
+    quad([x, dy + 0.004, z], [Math.cos(a) * r, 0, Math.sin(a) * r], [-Math.sin(a) * r * 0.8, 0, Math.cos(a) * r * 0.8], DECAL.stain, true);
   }
   for (const [x, by, z] of props.bench) quad([x, by + 0.004, z], [0.9, 0, 0], [0, 0, 0.7], DECAL.damp, true); // (at the bench's own deck: a quay's stands a little above the land's)
   for (const [x, z] of grates) quad([x, y, z], [0.45, 0, 0], [0, 0, 0.45], DECAL.damp, true);
@@ -1052,7 +1057,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   place.buildingGlow = [glowLamp, glowGlass, lensMat, pool.material];
   if (heads.length) place.lampHeads = heads;
   if (Object.values(props).some((l) => l.length)) placeProps(group, stand, props, glowGlass, place.deckWet);
-  wallDetails(group, { posts, grates, rings, ladders, spots, props, capRuns, wet: place.deckWet, railH: RAIL.h });
+  // (where a stain may lie: wholly on the land or a deck, all of it at one level; its height, or null)
+  const stainDeck = (q, r) => { for (const [a, b] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) if (!landAt([q[0] + a, q[1] + b])) return null; return standY(q, r); };
+  wallDetails(group, { posts, grates, rings, ladders, spots, props, capRuns, wet: place.deckWet, railH: RAIL.h, deckAt: stainDeck });
 
   // ---- buildings ----
 
