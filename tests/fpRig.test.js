@@ -265,6 +265,29 @@ test("a hand out over the railing on the drop net's rope: the arm comes over the
   assert.ok(worst < 0.01, `the left arm ${(worst * 100).toFixed(1)} cm into the top rail`);
 });
 
+test("hauling the drop net hand over hand: the elbows stay down and out, never swung round the arm (the PC's haul, 18 November)", () => {
+  // (as the game has it hauling at Gorleston, measured on Aaron's PC: leaning out past the top rail, looking down 64
+  // degrees, the rope 15 cm out from under your eye and 10 cm to the left; here from the test's eye at 1.6 m. With the
+  // rope 20 cm to the left, as it was, the right arm reached across you and its elbow went up 120 degrees)
+  const P = place(-1.12), rail = { y: 1.215, z: 0.276 }, x = -0.1, z = -0.15, lo = 1.08, hi = 1.25;
+  const turn = { L: [], R: [] }; let up = 0, pen = 0;
+  for (let f = 0; f < 150; f++) {
+    const pull = (f / 30) % 2, hand = Math.floor(f / 30) % 2, u = pull % 1, by = Math.sin(u * Math.PI);
+    const puller = V(x, hi + (lo - hi) * u, z), reacher = V(x + (hand ? -1 : 1) * 0.06 * by, lo + (hi - lo) * u, z);
+    const spec = (p) => ({ at: p, axis: V(0, 1, 0), palm: V(0.3, 0, 1), kind: "rope", rail });
+    pose(P, hand ? [spec(reacher), spec(puller)] : [spec(puller), spec(reacher)], 1);
+    rig.debug.forEach((d, i) => turn[i ? "R" : "L"].push(d.turn));
+    for (const S of "LR") { const A = R.arm[S]; up = Math.max(up, at(A.F).y - at(A.U).y); if (f >= 30) pen = Math.max(pen, limitsPen({ ...wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC[S], S), elbow: 100 })); } // (the wrist only: at the bottom of a pull the arm is straight, out at full reach)
+  }
+  for (const S of "LR") {
+    const t = turn[S].slice(30), span = Math.max(...t) - Math.min(...t), most = Math.max(...t.map((a) => Math.abs(Math.atan2(Math.sin(a), Math.cos(a)))));
+    assert.ok(span < Math.PI / 3, `${S}: the elbow swung ${(span * 57.3).toFixed(0)} degrees round the arm through the haul`);
+    assert.ok(most < (100 * Math.PI) / 180, `${S}: the elbow turned up to ${(most * 57.3).toFixed(0)} degrees from hanging`);
+  }
+  assert.ok(up < 0.05, `an elbow ${(up * 100).toFixed(1)} cm above its shoulder`);
+  assert.ok(pen < 1, `the wrists at most ${pen.toFixed(2)} outside their range (the gates' measure)`);
+});
+
 test("the other grips: each hand reaches what it holds and its fingers take that grip's shape", () => {
   const P = place(-0.5);
   const cases = [["rope", { at: V(-0.12, 1.15, -0.38), axis: V(0, 1, 0), palm: V(0.3, 0, 1), kind: "rope" }], ["hoop", { at: V(-0.18, 1.05, -0.4), axis: V(0, 0, 1), palm: V(0, -1, 0), kind: "hoop" }],

@@ -1674,7 +1674,10 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
           const base = fp ? (() => { const E = fpEye(), nt = netAt ? toLocal(netAt).add(V3(0, 0.72 * net.scale.x, 0)) : null;
             // (once the net is past the rail, on your line of sight down to it, as when letting a fish go: out at eye height
             // the upper arms came in from the top corner of the screen while you looked down)
-            if (nt && (nt.y < -0.3 || nt.z < railZ)) return ropeReach(E, nt.clone().sub(E).normalize()).add(V3(-0.07, 0, 0.03)); // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
+            // (and no further left than 10 cm or so from under your eye: on the line to the net, which lies off to your
+            // left, and 7 cm left of that, the rope was 20 cm to the left and your right arm reached across you for it,
+            // its elbow winged up (the PC's haul, 18 November). The rope runs on down to the net a few degrees off plumb)
+            if (nt && (nt.y < -0.3 || nt.z < railZ)) { const b = ropeReach(E, nt.clone().sub(E).normalize()).add(V3(-0.07, 0, 0.03)); b.x += (E.x - 0.04 - b.x) * 0.6; return b; } // (near the middle of what you see, a little to the left: 24 cm to the left they were half off the edge of a phone held upright)
             // (before that, from the view itself: low and to the left of wherever you look. Fixed below and ahead of the
             // eye, looking steeply down at the net on the deck put the hands at the top edge of the picture, the forearms
             // coming up into it from below: the 8 November recording)
@@ -1861,7 +1864,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         // (so now the hand goes out towards the rim as far as the arm reaches, closed as it will be on it, and takes
         // hold when the hoop comes within reach: closed on a rope that isn't drawn there, the two hands were held up
         // in front of you like claws, on Aaron's review of 12 November)
-        if (toH.length() > reach + 0.3) { hoopPrev[hands.indexOf(hh)] = null; hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
+        // (but bringing it in over the rail, never: you step back as it comes over and lift it on its rope, your hands
+        // out on the rope towards it. Let go, the net rose up the wall and swung over the rail by itself, no hands on it,
+        // and an arm came out after it at full stretch (the PC's first-person landing, 18 November))
+        const lifting = landStage === "in" || releaseInfo?.stage === "in" || releaseInfo?.stage === "haul"; // (and the empty net brought back in over the rail, having let a fish go)
+        if (toH.length() > reach + 0.3 && !lifting) { hoopPrev[hands.indexOf(hh)] = null; hands[hands.indexOf(hh)] = null; continue; } // (well out of reach, as the net swings out over the rail: the hand comes away, it doesn't wave after it)
         at.copy(sh).addScaledVector(toH.normalize(), reach);
         hoopPace(hh, at);
         hh.at = at; hh.kind = "rope"; hh.loose = 0.5; hh.sock = { pos: at.clone(), quat: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(tan, V3(0, 1, 0), z)) };

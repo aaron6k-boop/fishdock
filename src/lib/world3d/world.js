@@ -471,7 +471,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       // (off to your left: the rod lies on its rest on your right and crossed the picture. At a steady height over the
       // deck or the bank, so it doesn't bob as the fish goes from the net to your hands to the mat)
       const io = (FILM && typeof window !== "undefined" && window.__fdInspect) || INSPECT; // (film only: another place to try)
-      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3(-sx * io.side - fx * io.back, 0, -sz * io.side - fz * io.back)); at0.y = mk.at.y + io.up; // (a little back from it, so the railing is behind the fish, not across it)
+      // (and nearer on a wide screen: there the same place showed your fish small in the middle of a wide picture, the
+      // deck and the sea filling the rest; on a phone held upright it fills the top half, as it should)
+      const near = camera.aspect > 1.2 ? 0.72 : 1;
+      const sx = -fz, sz = fx, at0 = c.clone().add(new THREE.Vector3((-sx * io.side - fx * io.back) * near, 0, (-sz * io.side - fz * io.back) * near)); at0.y = mk.at.y + io.up; // (a little back from it, so the railing is behind the fish, not across it)
       { const fl = env.floorAt?.(at0.x, at0.z); if (fl != null && at0.y < fl + 1.0) at0.y = fl + 1.0; }
       const far = camPos.distanceTo(at0), to = at0.clone(); to.y += Math.min(1.2, Math.max(0, far - 0.5) * 0.5); // (over the top on the way, never through you)
       camPos.lerp(to, 1 - Math.exp(-dt * 4)); camera.position.copy(camPos);
