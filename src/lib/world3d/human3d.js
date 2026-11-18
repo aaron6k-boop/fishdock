@@ -43,7 +43,9 @@ const files = new Map();
 function loadGLB(name, quiet = false) {
   if (!files.has(name)) {
     if (quiet) quietLoader ||= new GLTFLoader(new THREE.LoadingManager()); else loader ||= new GLTFLoader();
+    try { performance.mark(`fd:glb-ask-${name}`); } catch { /* (loading checks only) */ }
     const p = (quiet ? quietLoader : loader).loadAsync(PEOPLE_BASE + name + ".glb"); p.catch(() => files.delete(name)); files.set(name, p);
+    p.then(() => { try { performance.mark(`fd:glb-${name}`); } catch { /* (loading checks only) */ } }, () => {});
   }
   return files.get(name);
 }

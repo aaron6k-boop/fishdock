@@ -981,13 +981,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // for 7.2 seconds in the software renderer, mid-landing, as their shaders were built and checked. That renderer
     // can't build them in parallel, and even there the work now falls across frames, the worst 3.6 s; where the browser
     // can, the building is off the page. One at a time: while one is under way, looked at again next frame)
-    { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum && !warmBusy) { warmSum = sum; warm(scene, true); } } // (the whole scene: a fish and a net live in the world, not under their angler)
+    { let sum = 0; for (const [, x] of anglers) sum += x.a.assets || 0; if (sum !== warmSum && !warmBusy && !loading) { warmSum = sum; warm(scene, true); } } // (the whole scene: a fish and a net live in the world, not under their angler)
     // and anything else that turns up after the start (the pier's lifebuoys, benches, signs and lamp posts, someone
     // walking on the pier, a fish model): counted every half second, and readied once it has stopped arriving. Measured
     // on the 14 November build at Medium: 17 shaders and 11 textures were built or sent in the first seconds of fishing,
     // as the cast swung the view round to things never drawn before, and 3 more on the first look round. Those were the
     // stalls in Aaron's recording at the cast and at 16 to 22 s, turning to the lookout
-    if (++growN % 30 === 0 && !(FILM && typeof window !== "undefined" && window.__fdNoGrow)) { let n = 0; scene.traverse((o) => { if (o.material) n++; }); if (n !== warmedN && n === growWas) { warmedN = n; warmCount++; warm(scene, true); } growWas = n; }
+    if (++growN % 30 === 0 && !loading && !(FILM && typeof window !== "undefined" && window.__fdNoGrow)) { let n = 0; scene.traverse((o) => { if (o.material) n++; }); if (n !== warmedN && n === growWas) { warmedN = n; warmCount++; warm(scene, true); } growWas = n; }
     // the rod-tip lights (everyone's) and your head torch (nightKit.js)
     { const c = env.current || {}, dark = Math.min(1, (c.night ?? 0) + (c.dusk ?? 0) * 0.3); tipList.length = 0;
       for (const [id, x] of anglers) if (x.out?.tip && !(id === localId && W)) tipList.push({ id, tip: x.out.tip, phase: x.out.phase });
@@ -1000,7 +1000,15 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     env.setRipples(stepRipples(ripples, dt));
     env.update(t, dt, camera); simT = t; setThinPixel(camera, renderer.domElement.height); // (thinAA.js: the railings never drawn thinner than a pixel and a half)
     adapt();
-    if (loading && draw) { if (++loadN % 8 === 0) submitShaders(); if (pendingNow() > 0) draw = false; else if (loadPend) { loadPend = null; if (performance.mark) try { performance.mark("fd:shaders-built", { detail: String(renderer.info.programs?.length || 0) }); } catch { /* (loading checks only) */ } warm(scene); } }
+    // (every frame while loading: what has arrived since is handed over before anything is drawn. Every eighth frame
+    // was too few: what arrived in between was drawn, and built one at a time, the moment it was; on the PC on 18
+    // November that was most of them, in one 9-second stop. And the scene is readied (warm: its vertices and textures
+    // sent) only once everything handed over is built)
+    if (loading && draw) {
+      const n0 = loadPend?.size || 0; submitShaders(); loadN++;
+      if (pendingNow() > 0) draw = false;
+      else if (loadPend && (n0 || loadN === 1)) { if (performance.mark) try { performance.mark("fd:shaders-built", { detail: String(renderer.info.programs?.length || 0) }); } catch { /* (loading checks only) */ } warm(scene); }
+    }
     if (draw) drawFrame();
     const spent = performance.now() - t0;
     if (!film) slow = slow * 0.97 + (spent > 22 ? 1 : 0) * 0.03;
@@ -1201,7 +1209,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       const r = remote.get(id) || {}; r.pose = pose; remote.set(id, r);
     },
     /** Build every shader and send every texture the scene has, drawn yet or not (the loading screen calls this once the files are in). */
-    warm() { warm(scene); },
+    warm() { if (loading && pendingNow() > 0) return; warm(scene); }, // (while loading, not while shaders handed over are still being built: see tick)
     /** Every frame's time (ms) with what you were doing and the graphics card's running counts, to `cb`; null stops it. For the frame log (frameLog.js). */
     tapFrames(cb) { frameTap = cb || null; },
     /** Frame pacing on or off (off while the loading screen is up). */
