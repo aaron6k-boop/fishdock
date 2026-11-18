@@ -120,3 +120,13 @@ test("a fish splashing throws drops and leaves white on the water, not puffs lik
   for (const s of [0.35, 0.6, 0.9]) { const c = count(s); assert.equal(c.mist, 0, `size ${s}`); assert.ok(c.drops > 10 && c.foam >= 1, JSON.stringify(c)); }
   assert.ok(count(1.4).mist > 0);
 });
+
+test("a crest slapping the wall leaves no mist hanging over the water, even as its sheets burst", async () => {
+  const THREE = await import("three"); const { createRockSpray } = await import("../src/lib/world3d/rockSpray.js");
+  const sp = createRockSpray(new THREE.Scene()), g = sp.points.geometry;
+  sp.slap(0, 0.2, 0, 1, 0, 1);
+  let mist = 0;
+  for (let k = 0; k < 40; k++) { sp.update(k * 0.05, 0.05, { swell: 0.8, wind: 0.5 }, () => 0, null, 800, 60); const s = g.attributes.aSeed.array, f = g.attributes.aFade.array; for (let i = 0; i < s.length; i++) if (s[i] < 2 && f[i] > 0.01) mist++; }
+  assert.equal(mist, 0);
+  sp.dispose();
+});
