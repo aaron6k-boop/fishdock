@@ -95,6 +95,43 @@ with the line's tension, pumping and giving to surges), the landing net, holding
 watching the rod tip or the fish, the hands on the rod, reel handle, net or fish: all on the shared skeleton, so the new
 people use them unchanged. No new motion-captured animation has been made.
 
+**Round 3, 18 November (01:00 to 03:00): the clothes, and the people in play.**
+
+- *Cloth simulation tried and dropped.* Blender's cloth solver was run on the jacket and trousers four times (jobs
+  h035 to h038, colliding with the body, pinned at the shoulders, hem, cuffs, waist and boot tops). Run headless on
+  the PC, the unpinned cloth fell through the body every time, whatever the collider's thickness, so the folds are
+  modelled instead (`SIM` is off in `a_build.py`, the code kept): deeper compression folds inside the elbows; the
+  sleeve stacked in three or four rings above each cuff; long soft folds hanging down the back from the shoulder
+  blades and down the front below the chest pockets; behind and across the knees, down the shins, stacked above the
+  boots.
+- *Wellies moulded.* The shaft is set out to one smooth surface round each leg (the widest the boot reaches in 2 cm
+  slices and 10-degree sectors, kept to its first four harmonics round the leg and smoothed up it, never narrower above
+  the calf than at it), relaxed and set out again so no triangles fold over; an arch lifts the sole 7 mm under the
+  instep; a moulded rand stands 3 mm proud round the sole; the top band is drawn in the textures (cut from the shaft it
+  threw spikes round the rim).
+- *Textures.* Creases from the height of Poly Haven's Fabric Leather 02 (CC0), laid along the body as cloth creases:
+  rings round the sleeves and legs (deepest at the elbows, above the cuffs, at the knees and above the boots), upright
+  down the body; the seam allowance raised either side of every seam; the stitching round each pocket, flap and band
+  measured from the part's real edge over its surface (it used to follow the texture's islands and wandered through
+  the middle of pockets); a reinforced yoke over the shoulders; chevron tread and heel bars, scuffed toes; the pale
+  salt lines taken out (drawn as lines they looked like cracks in marble); the empty texture space a flat average so
+  distant mipmaps don't pull lines into the islands' edges.
+- *In the game.* The man's skeleton is restructured to the Rocketbox layout after export (`fix_rig.py`; he had stood
+  89 m up, then 0.9 m up, in the moves). Hats, caps, glasses and head torches were drawn metres wide and floating:
+  the head was measured with its bones applied twice (`measure()`); fixed. The new people's bare hands keep their own
+  skin texture (they were flat orange next to the face). The jacket and trousers have a cloth sheen so folds show on
+  a black jacket. Round a handle each finger now wraps it (every joint bends until its bone meets the handle's
+  surface), so the rod and the reel's knob are held in the fingers, not beside a fist. The collarbone follows the arm
+  (it lifts when the rod goes back over the shoulder and comes forward when the rod is held out), and standing still
+  the weight shifts slowly from foot to foot. Picking up the drop net, the angler looks at the net in their hands.
+- *Checking.* `film_people.py` films every look on Aaron's PC (Ultra, 1920 by 1080): close stills, the catch
+  stepped and stopped with a close look at the hands, the catch and walking in real time, and first person walking and
+  through the whole catch. Its cameras now check for a clear view first (on 18 November the hands' camera had stood
+  behind the rod rest's legs, and once inside the jacket, which looked like the game's own view being blocked). A local
+  smoke run (`tools/smoke-play.mjs`) steps both anglers through walking and the whole catch in both
+  views before each film; it would have caught the one crash this round (the collarbone's easing read a value before
+  it was set, which stopped every angler's update during the catch in one PC film).
+
 ## Not done (so far), and why
 
 - **Faces and bodies are still Rocketbox's** (2015 game quality, made smoother by one level of subdivision). Replacing
@@ -104,5 +141,8 @@ people use them unchanged. No new motion-captured animation has been made.
   colours the main angler's beard; hats, the hood and the head torch go over any head.
 - **Face presets** (separate from choosing a person) are not made.
 - **Jackets**: one cut (the waterproof), in any of the kit's colours; no hoodie, gilet or patterned jackets yet.
-- **No new motion capture or keyframed animation**: the existing moves and IK carry over (above). The reference
-  sheet's poses are what the game already does with them; nothing was matched pose by pose.
+- **No new motion capture or keyframed animation**: the existing moves and IK carry over (above), with the procedural
+  additions of round 3 (fingers wrapping handles, the collarbone, weight shifts). The reference sheet's poses are what
+  the game already does with them; nothing was matched pose by pose.
+- **No cloth simulation**: the folds are modelled and move with the body by its bones (see round 3); nothing swings or
+  flaps but the hem's wind flutter.
