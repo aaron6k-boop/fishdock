@@ -12,7 +12,7 @@
 //   point); o.spots (no bench in front of an angler); o.quality.
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { weather, fbm, noise2 } from "./textures3d.js";
+import { weather, fbm, noise2, photoTex } from "./textures3d.js";
 
 export const OPEN_PIER = { bay: 6.2, across: 3.6, inset: 0.75, deckT: 0.32, girderH: 0.62, col: 0.15, rail: { h: 1.05, post: 1.9, inset: 0.18 }, lampEvery: 24, plank: 0.16 };
 
@@ -84,8 +84,10 @@ export function buildOpenPier(group, ring, h, o = {}) {
   let u0 = Infinity, u1 = -Infinity; for (const [x, z] of ring) { const u = uOf(x, z); u0 = Math.min(u0, u); u1 = Math.max(u1, u); }
 
   // ---- materials ----
-  const pt = plankTex();
-  const mDeck = new THREE.MeshStandardMaterial({ color: 0xd8d2c8, map: pt, roughness: 0.92 });
+  // (the boards: Poly Haven's Brown Planks 03, CC0, a photograph of weathered grey-brown boards, laid across the pier;
+  // the drawn boards stand in where it can't load)
+  const pd = photoTex("deck_planks_diff"), pn = pd && photoTex("deck_planks_nor", { srgb: false }), pr = pd && photoTex("deck_planks_rough", { srgb: false });
+  const mDeck = pd ? new THREE.MeshStandardMaterial({ color: 0xe4e0d8, map: pd, normalMap: pn, normalScale: new THREE.Vector2(0.8, 0.8), roughnessMap: pr, roughness: 1 }) : new THREE.MeshStandardMaterial({ color: 0xd8d2c8, map: plankTex(), roughness: 0.92 });
   weather(mDeck, { scale: 2.2, mottle: 0.14, rough: [0.85, 1.1], wet: o.wet });
   const mUnder = new THREE.MeshStandardMaterial({ color: 0x5d5850, roughness: 0.95, side: THREE.DoubleSide }); // (the deck's underside and edge: old timber in shade)
   weather(mUnder, { scale: 1.2, mottle: 0.25, grime: [h - 1.5, h, 0.3] });
@@ -131,7 +133,9 @@ export function buildOpenPier(group, ring, h, o = {}) {
     const mk = (list, mat, uv) => {
       if (!list.length) return null;
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(list, 3));
-      if (uv) { const t = []; for (let i = 0; i < list.length; i += 3) { const x = list[i], z = list[i + 2]; t.push(vOf(x, z) / 3.0, uOf(x, z) / (C.plank * 8)); } g.setAttribute("uv", new THREE.Float32BufferAttribute(t, 2)); }
+      // (the photographed boards run up their picture, so its height goes across the pier: 1.7 m a picture, ten boards
+      // about 17 cm wide; the drawn ones run across theirs)
+      if (uv) { const t = []; for (let i = 0; i < list.length; i += 3) { const x = list[i], z = list[i + 2]; if (pd) t.push(uOf(x, z) / 1.7, vOf(x, z) / 1.7); else t.push(vOf(x, z) / 3.0, uOf(x, z) / (C.plank * 8)); } g.setAttribute("uv", new THREE.Float32BufferAttribute(t, 2)); }
       g.computeVertexNormals();
       const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = true; group.add(m); meshes.push(m); return m;
     };

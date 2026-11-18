@@ -12,9 +12,9 @@ function cromerMaterials(base, top) {
   const M = materials(base, top);
   M.white = new THREE.MeshStandardMaterial({ color: 0xf1efe8, roughness: 0.6 });
   weather(M.white, { scale: 0.9, mottle: 0.1, grime: [base, base + 0.8, 0.25], streaks: [top, 2.5, 0.12] });
-  M.timber = new THREE.MeshStandardMaterial({ color: 0x8a6a4e, roughness: 0.85 }); // (the lifeboat station's cladding: vertical boards gone brown-grey)
+  M.timber = new THREE.MeshStandardMaterial({ color: 0xa88b6c, roughness: 0.85, side: THREE.DoubleSide }); // (the lifeboat station's cladding: vertical boards gone brown-grey)
   weather(M.timber, { wood: "y", scale: 1, mottle: 0.22, bump: 0.35, rough: [0.85, 1.1] });
-  M.zinc = new THREE.MeshStandardMaterial({ color: 0x9aa1a3, roughness: 0.45, metalness: 0.35, side: THREE.DoubleSide }); // (standing-seam metal roofs)
+  M.zinc = new THREE.MeshStandardMaterial({ color: 0x8e9599, roughness: 0.62, metalness: 0.2, side: THREE.DoubleSide }); // (standing-seam metal roofs, weathered matt)
   weather(M.zinc, { scale: 0.8, mottle: 0.12, streaks: [top + 3, 2, 0.1] });
   M.blue = new THREE.MeshStandardMaterial({ color: 0x1f4f86, roughness: 0.5, metalness: 0.2 }); // (RNLI blue: the station's railings and frames)
   M.buff = new THREE.MeshStandardMaterial({ color: 0xc9b98f, roughness: 0.7, metalness: 0.1, side: THREE.DoubleSide }); // (the gates' ribbed domes, painted stone colour)
@@ -69,10 +69,15 @@ function cromerPavilion(group, ring, base) {
 function cromerLifeboat(group, ring, base) {
   const pts = prepRing(ring, 0.8), bb = bbox(pts), K = kit(), y1 = base + 7.4, M = cromerMaterials(base, y1 + 2);
   walls(K, pts, base, y1, { mat: "timber", storeys: 2, bay: 3.6, win: [1.2, 1.3], skip: 1.2, trim: "blue", plinth: "plinth", cornice: false });
-  // the roof: a barrel along the building with rounded ends (a squashed half-ellipsoid), standing-seam metal
-  const t = bb.ax, rise = Math.min(3.2, bb.W * 0.28);
-  const g = new THREE.SphereGeometry(1, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2);
-  g.scale(bb.L / 2 + 0.5, rise, bb.W / 2 + 0.5); g.rotateY(-Math.atan2(t[1], t[0])); g.translate(bb.c[0], y1, bb.c[1]); K.add("zinc", g);
+  // the roof: a shallow barrel along the building, its ends filled in timber, standing-seam metal with a little
+  // overhang (as the photographs; a dome over it all read as a flying saucer from the sea, the PC's film, 18 November)
+  const t = bb.ax, c = bb.W + 0.8, rise = Math.min(2.2, bb.W * 0.16), R = (c * c / 4 + rise * rise) / (2 * rise), th = 2 * Math.asin(c / (2 * R)), ang = -Math.atan2(t[1], t[0]);
+  const roof = new THREE.CylinderGeometry(R, R, bb.L + 0.8, 28, 1, true, Math.PI / 2 - th / 2, th);
+  roof.rotateZ(Math.PI / 2); roof.translate(0, y1 - R * Math.cos(th / 2), 0); roof.rotateY(ang); roof.translate(bb.c[0], 0, bb.c[1]); K.add("zinc", roof);
+  for (const s2 of [-1, 1]) {
+    const sh = new THREE.Shape(); for (let i = 0; i <= 16; i++) { const a = -th / 2 + (th * i) / 16; sh[i ? "lineTo" : "moveTo"](R * Math.sin(a), R * Math.cos(a) - R * Math.cos(th / 2)); }
+    const g = new THREE.ShapeGeometry(sh); g.rotateY(Math.PI / 2); g.translate(s2 * (bb.L / 2), y1, 0); g.rotateY(ang); g.translate(bb.c[0], 0, bb.c[1]); K.add("timber", g);
+  }
   // the deck round it at the floor's level: a walkway with RNLI-blue railings (the pier's own white railing stops at it)
   for (const e of edgeInfo(pts)) {
     if (e.L < 2) continue;
@@ -91,7 +96,7 @@ function cromerLifeboat(group, ring, base) {
 // ---- the pier's gates: two white kiosks either side of the way onto the pier, each crowned at its rounded end with a
 // ribbed dome painted stone colour, a small lantern on top (photographs, 2015 to 2019) ----
 function cromerGates(group, ring, base) {
-  const pts = prepRing(ring, 0.35), bb = bbox(pts), K = kit(), y1 = base + 3.6, M = cromerMaterials(base, y1 + 2);
+  const pts = prepRing(ring, 0.35), bb = bbox(pts), K = kit(), y1 = base + 3.2, M = cromerMaterials(base, y1 + 2);
   walls(K, pts, base, y1, { mat: "white", storeys: 1, bay: 2.2, win: [1.4, 1.6], skip: 0.6, trim: "trim" });
   const tris = THREE.ShapeUtils.triangulateShape(pts.map(([x, z]) => new THREE.Vector2(x, z)), []), flat = [];
   for (const [i, j, k] of tris) for (const p of [pts[i], pts[k], pts[j]]) flat.push(p[0], y1 + 0.02, p[1]);
@@ -101,12 +106,12 @@ function cromerGates(group, ring, base) {
   const iL = vs.indexOf(Math.min(...vs)), iR = vs.indexOf(Math.max(...vs));
   for (const i of [iL, iR]) {
     const p = pts[i], c = [p[0] + (bb.c[0] - p[0]) * (2.2 / Math.max(2.2, Math.hypot(bb.c[0] - p[0], bb.c[1] - p[1]))), p[1] + (bb.c[1] - p[1]) * (2.2 / Math.max(2.2, Math.hypot(bb.c[0] - p[0], bb.c[1] - p[1])))];
-    const drum = new THREE.CylinderGeometry(1.9, 1.9, 1.0, 16); drum.translate(c[0], y1 + 0.5, c[1]); K.add("white", drum);
-    const cor = new THREE.CylinderGeometry(2.15, 2.15, 0.22, 16); cor.translate(c[0], y1 + 1.1, c[1]); K.add("trim", cor);
-    dome(K, "buff", c[0], y1 + 1.2, c[1], 1.95, 2.1, 12);
-    const lan = new THREE.CylinderGeometry(0.32, 0.38, 0.6, 8); lan.translate(c[0], y1 + 3.55, c[1]); K.add("white", lan);
-    dome(K, "buff", c[0], y1 + 3.85, c[1], 0.42, 0.45, 8);
-    const fin = new THREE.CylinderGeometry(0.02, 0.04, 0.6, 6); fin.translate(c[0], y1 + 4.55, c[1]); K.add("iron", fin);
+    const drum = new THREE.CylinderGeometry(1.55, 1.55, 0.9, 16); drum.translate(c[0], y1 + 0.5, c[1]); K.add("white", drum);
+    const cor = new THREE.CylinderGeometry(1.75, 1.75, 0.2, 16); cor.translate(c[0], y1 + 1.0, c[1]); K.add("trim", cor);
+    dome(K, "buff", c[0], y1 + 1.1, c[1], 1.6, 1.75, 12);
+    const lan = new THREE.CylinderGeometry(0.28, 0.32, 0.5, 8); lan.translate(c[0], y1 + 3.1, c[1]); K.add("white", lan);
+    dome(K, "buff", c[0], y1 + 3.35, c[1], 0.36, 0.4, 8);
+    const fin = new THREE.CylinderGeometry(0.02, 0.04, 0.5, 6); fin.translate(c[0], y1 + 3.95, c[1]); K.add("iron", fin);
   }
   return finish(group, K, M, { ring: pts, base, top: y1 + 4.5 });
 }

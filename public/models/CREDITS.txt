@@ -135,3 +135,6 @@ skin is offered under its photograph's licence (the CC BY-SA ones under that sam
 The gurnard's, tope's, lesser-spotted dogfish's, conger's and eel's skins are made the same way from FishDock's own
 pictures of them alone, no photograph. The photographs, with their pages and file hashes, are listed in
 source-assets/ASSET-LICENCES.json, and in the app under Settings, 3D fish skin credits.
+
+Cromer Pier's timber deck (public/textures/deck_planks_*.jpg, from 18 November 2026) is "Brown Planks 03" by Rob Tuytel,
+from Poly Haven (https://polyhaven.com/a/brown_planks_03), CC0 1.0. Credited with thanks.
