@@ -7,6 +7,8 @@ import * as THREE from "three";
 import { styleFor, pitchedRoof, obb, footprintArea } from "./architecture.js";
 import { facade, roof, bricks, FACADE_TILE, FACADE_N, photoTex } from "./textures3d.js";
 
+// (the roofs photographed so far, and how many times each repeats across 3 m: none yet)
+const ROOF_SCANS = {};
 const area2 = (ring) => { let a = 0; for (let i = 0; i < ring.length; i++) { const [x1, z1] = ring[i], [x2, z2] = ring[(i + 1) % ring.length]; a += x1 * z2 - x2 * z1; } return a / 2; };
 
 function bucket() { return { p: [], uv: [], c: [], i: [] }; }
@@ -37,6 +39,12 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     tex[k] = { map, normalMap: photoTex(`facade_${k}_nor`, { srgb: false }), roughnessMap: photoTex(`facade_${k}_rough`, { srgb: false }), emissiveMap: photoTex(`facade_${k}_glass`, { srgb: false }), baked: true };
   }
   const roofs = { slate: roof("slate", 11), clay: roof("clay", 12), felt: roof("felt", 13) };
+  // ---- roofs from photoscans where they're published (public/textures/roof_<kind>_*): ROOF_SCANS gives how many times
+  // the photograph repeats across the drawn roof's 3 m tile ----
+  for (const [k, rep] of Object.entries(ROOF_SCANS)) {
+    const map = photoTex(`roof_${k}_diff`, { repeat: rep }); if (!map) continue;
+    roofs[k] = { map, normalMap: photoTex(`roof_${k}_nor`, { srgb: false, repeat: rep }), roughnessMap: photoTex(`roof_${k}_rough`, { srgb: false, repeat: rep }) };
+  }
   const brk = bricks(17);
   const M = {};
   // (the facade's own depth and finish: its normal map gives the reveals, frames, sills and courses their relief under

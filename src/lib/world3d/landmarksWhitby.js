@@ -23,10 +23,11 @@ const lookLight = (base, top) => (mt) => {
 };
 
 function whitbyMaterials(base, top) {
-  // (sandstone: the photographed ashlar of the piers, at about 2.2 m a tile; finish() lays it by world position)
-  const sd = photoTex("sandstone_wall_diff", { repeat: 0.5 }), sn = sd && photoTex("sandstone_wall_nor", { srgb: false, repeat: 0.5 });
+  // (sandstone: the piers' own ashlar baked in Blender (build_whitby_stone.py), a tile every 2.4 m; finish() lays it by
+  // world position, 1.1 m to a unit, so it repeats 1.1 / 2.4 times a unit)
+  const rep = 1.1 / 2.4, sd = photoTex("whitby_ashlar_diff", { repeat: rep }), sn = sd && photoTex("whitby_ashlar_nor", { srgb: false, repeat: rep }), sr = sd && photoTex("whitby_ashlar_rough", { srgb: false, repeat: rep });
   const M = {
-    stone: new THREE.MeshStandardMaterial({ color: 0xe4d6bc, map: sd || null, normalMap: sn || null, roughness: 0.93 }),
+    stone: new THREE.MeshStandardMaterial({ color: 0xe2dacd, map: sd || null, normalMap: sn || null, roughnessMap: sr || null, roughness: 1 }),
     white: new THREE.MeshStandardMaterial({ color: 0xf2f1ec, roughness: 0.45, metalness: 0.1 }),
     lead: new THREE.MeshStandardMaterial({ color: 0x5d6366, roughness: 0.62, metalness: 0.25 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x25282a, roughness: 0.5, metalness: 0.3 }),
@@ -35,7 +36,7 @@ function whitbyMaterials(base, top) {
     // (windows: dark glass, lit warm after dark; finish() hands it back as what glows)
     glass: new THREE.MeshStandardMaterial({ color: 0x5a646a, roughness: 0.1, metalness: 0.7, emissive: 0xffd28a, emissiveIntensity: 0 }),
   };
-  weather(M.stone, { scale: 0.6, mottle: 0.4, grime: [base, base + 1.4, 0.45], streaks: [top, 6, 0.35], rough: [0.9, 1.1] });
+  weather(M.stone, { scale: 0.6, mottle: 0.2, grime: [base, base + 1.4, 0.45], streaks: [top, 6, 0.3], rough: [0.94, 1.06] });
   weather(M.white, { scale: 0.8, mottle: 0.08, rust: [0.1, 0.4, 0.25, 0.1], grime: [base, base + 0.5, 0.15] });
   return M;
 }
