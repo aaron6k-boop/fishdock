@@ -606,7 +606,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   let fishFor = "", fishLen = 0.45, prof = fightProfile(null), load = 1, LT = landingTimes(null, 45, null, venue), tech = "lift";
   // the mesh's own size (in fish lengths): the spine to the back and to the belly, and half its thickness, so it can be
   // laid on a mat, held in the hands or sat at the surface without going into anything
-  let fishBox = { up: 0.12, down: 0.12, thick: 0.05 }, fishBoxWant = null;
+  let fishBox = { up: 0.12, down: 0.12, thick: 0.05 }, fishBoxWant = null, fishBelly = null; // (fishBelly: how deep the belly is at each twelfth of the length, in fish lengths)
   // (eased over about a third of a second when a new shape comes in mid-fight, so the fish doesn't jump: the line and
   // the rod jumped with it, 10 to 13 cm in a frame as a ray's modelled shape, thicker along its spine, replaced the
   // picture's, tools/arm-steady.mjs, 15 November. A fish not yet shown takes its size at once)
@@ -625,10 +625,16 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     const sizeEnd = (geo.userData.thornFrom ?? fishBase.length / 3) * 3;
     for (let i = 0; i < sizeEnd; i += 3) { const u = fishBase[i], y = fishBase[i + 1], z = fishBase[i + 2]; if (u < 0.02 || u > 0.8) continue; up = Math.max(up, y); down = Math.max(down, -y); thick = Math.max(thick, Math.abs(z)); }
     fishBoxWant = { up: up || 0.12, down: down || 0.12, thick: thick || 0.05 }; if (!fish.visible) fishBox = { ...fishBoxWant };
+    // (and the belly's depth along the fish, for the hands under it: the deepest point of the belly, used everywhere,
+    // put the hand behind a bass's head 2 to 5 cm under it, the fish held up over an open palm)
+    { const B = new Array(12).fill(0); for (let i = 0; i < sizeEnd; i += 3) { const u = fishBase[i], y = fishBase[i + 1]; if (u < 0 || u > 1) continue; const b = Math.min(11, Math.floor(u * 12)); B[b] = Math.max(B[b], -y); }
+      fishBelly = B.some((v) => v > 0) ? B : null; }
     fish.material = materials;
   }
   function setMats(next) { for (const m of Object.values(mats)) { if (m.normalMap) m.normalMap.dispose(); m.dispose(); } mats = next; }
   const halfDepth = () => fishBox.down * fishLen, halfThick = () => fishBox.thick * fishLen;
+  // (the belly's depth at k of the way from the mouth (fish lengths, in metres), never deeper than the deepest)
+  const bellyAt = (k) => { if (!fishBelly) return halfDepth(); const x = clamp(k * 12 - 0.5, 0, 11), i = Math.floor(x), f = x - i, a = fishBelly[i], b = fishBelly[Math.min(11, i + 1)]; return Math.min(fishBox.down, a + (b - a) * f) * fishLen; };
   const TIRED_ROLL = 1.15; // (how far over a beaten fish lies at the surface: most of the way onto its side)
 
   function setFish(species, lengthCm, weightKg) {
@@ -1737,8 +1743,8 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // it's turned: they used to sit a few centimetres under the spine, inside a fish of any size)
       // (the hand's point is its palm, and the belly settles into a cupped hand a little: 2 cm below, the mackerel in
       // Aaron's 14 November recording hovered over his palms when he held it up to look at it)
-      const below = restHeight(halfDepth(), halfThick(), keptPose.roll || 0) - 0.006;
-      const under = (k) => toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * k)).add(V3(0, -below, 0));
+      const below = (k) => restHeight(bellyAt(k), halfThick(), keptPose.roll || 0) - 0.006;
+      const under = (k) => toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * k)).add(V3(0, -below(k), 0));
       // (taking a fish that's just come in over the rail: your left hand round it behind the head while the right
       // still has the rod, putting it in its rest)
       if (keptPose.take) hands[0] = { at: toLocal(keptPose.mouth.clone().addScaledVector(keptPose.dir, fishLen * 0.22)), axis: d, palm: V3(0.6, 0, 0.8), kind: "fish" };
