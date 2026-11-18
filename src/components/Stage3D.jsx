@@ -15,6 +15,8 @@ const TORCHES = ["off", "white", "red", "green"], TORCH_NAMES = { off: "Off", wh
 
 const MODES = [["first", "First person"], ["third", "Third person"], ["spectator", "Watch someone"], ["cinematic", "Cinematic"], ["free", "Free look"]];
 
+// (seconds without input before the view goes calm)
+const CALM_AFTER = 4000;
 export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null, placeName = "", feel = null, venue, anglers, light, cond, facing, quality = "auto", sound, now, demo = false, onTap, onReel = null, fightLive = null, tipLight = "auto", toasts = [], catchPhoto, children, onLanded, onPhase, onPose, poseBus, onHear, speaking = null, onEmote, chat = null, chatMode = null, onSay, onChat, fight = null, reelOpts = null, onReelOpts, onDecide = null, rateCatch = null }) {
   const w = useRef(null);
   const [menu, setMenu] = useState(false), [mode, setMode] = useState(() => (loadView().fishCam === "third" ? "third" : "first")), [card, setCard] = useState(null), [watch, setWatch] = useState(null);
@@ -122,6 +124,28 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
   // (several settings at once, from one view: Settings → Graphics)
   const setOpts = (o) => { setView((cur) => { const next = { ...cur, ...o }; saveView(next); return next; }); };
   const [gfxOpen, setGfxOpen] = useState(false);
+  // ---- calm: while you fish and leave the controls alone, what isn't the fishing steps back ----
+  // After a few seconds without a touch, a mouse move or a key (other than the fishing keys), the chips along the top,
+  // the compass, the frame rate, the key guide and the small buttons fade, and the place's credit dims; the one fishing
+  // button and what it says stay. Any touch or move brings them back. Not while walking, in a menu or a panel, or
+  // looking at a fish. (Only real input counts: the keys press the fishing button with made-up pointer events)
+  const [calm, setCalm] = useState(false);
+  const calmBlock = !!walk || menu || chatOpen || gfxOpen || looking || !!card;
+  useEffect(() => {
+    if (calmBlock) { setCalm(false); return undefined; }
+    let t = 0, x0 = -1, y0 = -1;
+    const later = () => { clearTimeout(t); t = setTimeout(() => setCalm(true), CALM_AFTER); };
+    const wake = (e) => {
+      if (!e.isTrusted) return;
+      if (e.type === "keydown" && (e.code === "Space" || e.code === "KeyE" || e.repeat)) return;
+      if (e.type === "pointermove") { if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return; x0 = e.clientX; y0 = e.clientY; }
+      setCalm(false); later();
+    };
+    const evs = ["pointermove", "pointerdown", "wheel", "keydown", "touchstart"];
+    evs.forEach((n) => addEventListener(n, wake, { passive: true }));
+    later();
+    return () => { clearTimeout(t); evs.forEach((n) => removeEventListener(n, wake)); };
+  }, [calmBlock]);
   const setOpt = (k, v) => { const next = { ...view, [k]: v }; setView(next); saveView(next); if (k === "track") w.current?.setTrack(v); if (k === "torch") w.current?.setTorch(v); if (k === "sit") w.current?.setSit(v); if (k === "fishCam") { w.current?.setLandShot(v === "cinematic"); const m = v === "third" ? "third" : "first"; setMode(m); w.current?.setMode(m); } if (k === "look" || k === "smooth") w.current?.setLookFeel(next); if (k === "side") { if (v === "left") document.documentElement.dataset.hand = "left"; else delete document.documentElement.dataset.hand; } };
   // someone who isn't fishing watches from behind an angler rather than standing nowhere
   const watching = !anglers.some((a) => a.local) && anglers.length > 0;
@@ -158,7 +182,7 @@ export default function Stage3D({ onWindIn, menu: pageMenu = null, spotId = null
     setFs(true);
   }
   return (
-    <div ref={stageEl} className={`stage3d${walk ? " walking" : ""}${menu ? " menu-open" : ""}${fs ? " is-fs" : ""}`}>
+    <div ref={stageEl} className={`stage3d${walk ? " walking" : ""}${menu ? " menu-open" : ""}${fs ? " is-fs" : ""}${calm && !calmBlock ? " calm" : ""}`}>
       {/* first person to start, looking out over the line with the rod in your hands (third person and watching others are in the menu) */}
       <World3D ref={w} fight={fight} fightLive={fightLive} startMode={view.fishCam === "third" ? "third" : "first"} feel={feel} onWalk={setWalk} onPose={onPose} onHear={onHear} spotId={spotId} placeName={placeName} onTap={onTap} onReel={onReel} tipLight={tipLight} venue={venue} anglers={anglers} light={light} cond={cond} facing={facing} sound={sound} now={now} quality={view.gfx && view.gfx !== "auto" ? view.gfx : quality}
         onPhase={(id, phase, info) => {

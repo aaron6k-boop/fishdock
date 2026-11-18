@@ -66,6 +66,7 @@ const MIST = 0, DROP = 1, SHEET = 2;
 export function createRockSpray(scene, edge = []) {
   const N = SPRAY.max, pos = new Float32Array(N * 3), vel = new Float32Array(N * 3), age = new Float32Array(N), life = new Float32Array(N), size = new Float32Array(N), fade = new Float32Array(N), seed = new Float32Array(N), kind = new Uint8Array(N), grow = new Float32Array(N);
   const burstAt = new Float32Array(N); // (a sheet: the share of its life at which it bursts into drops; 0 once it has)
+  const quiet = new Uint8Array(N); // (a sheet that leaves no mist when it bursts: one slapped up the wall)
   for (let i = 0; i < N; i++) pos[i * 3 + 1] = -50;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("aSize", new THREE.BufferAttribute(size, 1)); geo.setAttribute("aFade", new THREE.BufferAttribute(fade, 1)); geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 1)); geo.setAttribute("aVel", new THREE.BufferAttribute(vel, 3));
@@ -80,6 +81,9 @@ export function createRockSpray(scene, edge = []) {
         float px = aSize * uScale / max(0.3, -mvPosition.z);
         // (a drop too far off to cover a pixel is drawn as one pixel, fainter by as much: a far splash still glitters)
         vFade = aFade * min(1.0, px / 1.5); vStretch = 1.0; vDir = vec2(0.0, 1.0);
+        // (and nothing within arm's length of your eye: a drop or a sheet thrown up past the camera, looking down over
+        // the rail at the drop net, was drawn as a white flake the size of a hand across the picture, 18 November)
+        vFade *= smoothstep(0.45, 1.3, -mvPosition.z);
         if (aSeed >= 2.0) {
           // drops and sheets moving fast are seen drawn out along their path, as the eye and a camera both see them:
           // how far it goes on the screen in about a fortieth of a second (a sheet: a tenth, it is water pouring out
@@ -189,7 +193,7 @@ export function createRockSpray(scene, edge = []) {
 
   let head = 0;
   // (delay: seconds before it appears; it waits, unseen, where it will start)
-  const put = (k, x, y, z, vx, vy, vz, sz, lf, gr = 0, delay = 0) => { const i = head++ % N; pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z; vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz; age[i] = -delay; life[i] = lf; size[i] = sz; kind[i] = k; grow[i] = gr; seed[i] = Math.random() + k * 2; fade[i] = 0; burstAt[i] = k === SHEET ? 0.45 + 0.3 * Math.random() : 0; return i; };
+  const put = (k, x, y, z, vx, vy, vz, sz, lf, gr = 0, delay = 0) => { const i = head++ % N; pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z; vel[i * 3] = vx; vel[i * 3 + 1] = vy; vel[i * 3 + 2] = vz; age[i] = -delay; life[i] = lf; size[i] = sz; kind[i] = k; grow[i] = gr; seed[i] = Math.random() + k * 2; fade[i] = 0; burstAt[i] = k === SHEET ? 0.45 + 0.3 * Math.random() : 0; quiet[i] = 0; return i; };
   const R = (a, b) => a + (b - a) * Math.random();
 
   /** A crest breaking on the rocks at (x, y, z): strength 0 to 1; (dx, dz) the way the water was going (landward: the
@@ -228,13 +232,15 @@ export function createRockSpray(scene, edge = []) {
     for (let q = 0; q < n; q++) {
       const along = (Math.random() - 0.5) * 2.4, f = R(0.55, 1);
       // (up the face, kept off it: a sheet leans out from a wall as it climbs, and only the biggest go back over)
-      put(SHEET, x + ax * along - bx * 0.15, y0 + R(0, 0.2), z + az * along - bz * 0.15, -bx * R(0.2, 0.7) + bx * 1.6 * Math.max(0, s - 0.6) + ax * (Math.random() - 0.5) * 0.6, up * f, -bz * R(0.2, 0.7) + bz * 1.6 * Math.max(0, s - 0.6) + az * (Math.random() - 0.5) * 0.6, (0.3 + 0.45 * s) * R(0.8, 1.2), 0.45 + 0.4 * s, 0.4, R(0, 0.18));
+      quiet[put(SHEET, x + ax * along - bx * 0.15, y0 + R(0, 0.2), z + az * along - bz * 0.15, -bx * R(0.2, 0.7) + bx * 1.6 * Math.max(0, s - 0.6) + ax * (Math.random() - 0.5) * 0.6, up * f, -bz * R(0.2, 0.7) + bz * 1.6 * Math.max(0, s - 0.6) + az * (Math.random() - 0.5) * 0.6, (0.3 + 0.45 * s) * R(0.8, 1.2), 0.45 + 0.4 * s, 0.4, R(0, 0.18))] = 1;
     }
     for (let q = 0; q < Math.round(8 + 22 * s); q++) {
       const along = (Math.random() - 0.5) * 2.6, a = Math.random() * Math.PI * 2;
       put(DROP, x + ax * along - bx * 0.2, y0 + R(0.3, 1.2) * s, z + az * along - bz * 0.2, -bx * R(0.3, 1.5) + Math.cos(a) * 0.6 + bx * 2.5 * Math.max(0, s - 0.6), up * R(0.6, 1.25), -bz * R(0.3, 1.5) + Math.sin(a) * 0.6 + bz * 2.5 * Math.max(0, s - 0.6), 0.04 + 0.07 * Math.random(), 4, 0, R(0.1, 0.4));
     }
-    for (let q = 0; q < Math.round(1 + 3 * s); q++) put(MIST, x + ax * (Math.random() - 0.5) * 2 - bx * 0.4, y0 + up * up / 19.6 * R(0.4, 0.9), z + az * (Math.random() - 0.5) * 2 - bz * 0.4, bx * 0.3, R(0.1, 0.4), bz * 0.3, (0.5 + 0.9 * s) * R(0.7, 1.2), R(1.2, 2.2), 0.8, R(0.3, 0.6));
+    // (no mist left hanging off the wall: lit from above and seen from the rail against the dark water under it, it
+    // hung over the sea below the pier as dark smoky blotches a metre or two across, wherever a crest had slapped the
+    // wall, in every light: Aaron's recordings of 18 November and the PC review. Its water is the sheets and drops)
     putFoam(x - bx * 0.9, z - bz * 0.9, (0.8 + 0.8 * s), R(4, 7), 0.35, -bx * 0.25, -bz * 0.25, 0.8, R(0.5, 0.8));
   }
   /** A splash on the water at (x, y, z): a crown of drops out and up, a few straight up the middle, fine spray inside,
@@ -246,22 +252,40 @@ export function createRockSpray(scene, edge = []) {
     for (let q = 0; q < P.crown; q++) {
       // (the crown leaves steeply, 55 to 80 degrees up, from a ring a hand's breadth out: not a flat spray of dots)
       const a = Math.random() * Math.PI * 2, el = (55 + 25 * Math.random()) * Math.PI / 180, sp = P.speed * (0.45 + 0.75 * Math.random()), r0 = 0.05 + 0.12 * s * Math.random();
-      put(DROP, x + Math.cos(a) * r0, y0, z + Math.sin(a) * r0, Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp, (0.03 + 0.075 * Math.random() * Math.random()) * k, 3);
+      // (most drops a centimetre or two, a few bigger: at 3 to 10 cm every one, a fish splashing at the foot of the wall
+      // threw a ball of white flakes like confetti, Aaron's footage of 18 November)
+      put(DROP, x + Math.cos(a) * r0, y0, z + Math.sin(a) * r0, Math.cos(a) * Math.cos(el) * sp, Math.sin(el) * sp, Math.sin(a) * Math.cos(el) * sp, (0.016 + 0.06 * Math.pow(Math.random(), 3)) * k, 3);
     }
     for (let q = 0; q < P.jet; q++) put(DROP, x + (Math.random() - 0.5) * 0.06, y0, z + (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.35, P.speed * (1.15 + 0.5 * Math.random()), (Math.random() - 0.5) * 0.35, (0.035 + 0.04 * Math.random()) * k, 3, 0, 0.05);
     // the crown's wall itself: short sheets going up and out round the hole, for anything bigger than a lead
     if (s > 0.5) for (let q = 0; q < Math.round(3 + 4 * s); q++) { const a = (q / (3 + 4 * s) + Math.random() * 0.1) * Math.PI * 2, sp = P.speed * R(0.5, 0.8); put(SHEET, x + Math.cos(a) * 0.12 * s, y0, z + Math.sin(a) * 0.12 * s, Math.cos(a) * sp * 0.35, sp, Math.sin(a) * sp * 0.35, 0.12 + 0.12 * s, 0.25 + 0.15 * s, 0.3); }
-    // the fine spray inside the crown: going up and a little out, hanging a moment
-    for (let q = 0; q < P.mist; q++) { const a = Math.random() * Math.PI * 2, sp = 0.4 + 0.8 * Math.random(); put(MIST, x + Math.cos(a) * 0.1 * s, y0 + 0.05, z + Math.sin(a) * 0.1 * s, Math.cos(a) * sp, (1.2 + 2.2 * Math.random()) * Math.sqrt(s), Math.sin(a) * sp, (0.16 + 0.18 * Math.random()) * Math.sqrt(s), 0.35 + 0.3 * Math.random(), 1.2 * s, 0.04); }
+    // the fine spray inside the crown: going up and a little out, hanging a moment; only from a big fish crashing back
+    // (from every splash, a fish thrashing at the foot of the wall stood in white puffs like smoke, Aaron's footage of
+    // 18 November: the water it throws is drops and the white it leaves is on the water, below)
+    if (s >= 1.1) for (let q = 0; q < Math.round(P.mist * 0.5); q++) { const a = Math.random() * Math.PI * 2, sp = 0.4 + 0.8 * Math.random(); put(MIST, x + Math.cos(a) * 0.1 * s, y0 + 0.05, z + Math.sin(a) * 0.1 * s, Math.cos(a) * sp, (1.2 + 2.2 * Math.random()) * Math.sqrt(s), Math.sin(a) * sp, (0.16 + 0.18 * Math.random()) * Math.sqrt(s), 0.35 + 0.3 * Math.random(), 1.2 * s, 0.04); }
     // the white it leaves: a patch of foam spreading out from where it went in, lasting a few seconds
     for (let q = 0; q < P.foam; q++) putFoam(x, z, 0.12 + 0.22 * s, R(2.5, 4) * (0.6 + 0.4 * s), 0.25 * s, 0, 0, Math.min(1, 0.5 + 0.4 * s), 0.12);
+    // (and the churned water round it: a second, fainter patch broken off to one side, so the white on the water has a
+    // ragged shape rather than a disc)
+    if (P.foam && s > 0.3) { const a = Math.random() * Math.PI * 2, d = 0.12 + 0.18 * s; putFoam(x + Math.cos(a) * d, z + Math.sin(a) * d, 0.08 + 0.16 * s, R(1.8, 3) * (0.6 + 0.4 * s), 0.2 * s, 0, 0, Math.min(1, 0.35 + 0.3 * s), 0.2); }
+  }
+  /** Water running out of a net lifted out of the sea: drops falling from under its mesh and a thin stream or two from
+   * its lowest point. (x, y, z) the middle of the net's bottom, r its radius (m), amount 0 to 1 (1 just out of the
+   * water, 0 drained). Called a few times a second while it comes up. (It was a splash, a crown of drops thrown up
+   * from the net in mid-air every eighth of a second, which hung round the net as it was hauled like a cloud of white
+   * confetti: Aaron's footage of 18 November) */
+  function drip(x, y, z, r = 0.3, amount = 1) {
+    const a0 = Math.max(0, Math.min(1, amount)), n = Math.round(2 + 9 * a0);
+    for (let q = 0; q < n; q++) { const a = Math.random() * Math.PI * 2, d = r * Math.sqrt(Math.random()) * 0.85;
+      put(DROP, x + Math.cos(a) * d, y - R(0, 0.06), z + Math.sin(a) * d, R(-0.08, 0.08), -R(0.1, 0.8), R(-0.08, 0.08), 0.008 + 0.014 * Math.random(), 3); }
+    if (a0 > 0.4) for (let q = 0; q < 2; q++) put(DROP, x + R(-0.04, 0.04), y - 0.04, z + R(-0.04, 0.04), 0, -R(0.9, 1.6), 0, 0.014 + 0.01 * a0, 3);
   }
   let E = [];
   const setEdge = (list) => { E = thinEdge(list || [], SPRAY.gap).map((p) => ({ x: p[0], z: p[1], ox: p[2], oz: p[3], was: 0, last: -9, wait: 2 + Math.random() * 3 })); };
   setEdge(edge);
   const fm = new THREE.Matrix4(), fq = new THREE.Quaternion(), fv = new THREE.Vector3(), fs = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0);
   return {
-    points, foam, burst, slap, splash, setEdge, get count() { return E.length; },
+    points, foam, burst, slap, splash, drip, setEdge, get count() { return E.length; },
     /** how many points are in the air now (checks) */
     get live() { let n = 0; for (let i = 0; i < N; i++) if (life[i] > 0) n++; return n; },
     /** how many patches of foam are on the water now (checks) */
@@ -308,7 +332,7 @@ export function createRockSpray(scene, edge = []) {
           if (burstAt[i] > 0 && u > burstAt[i]) {
             burstAt[i] = 0; const n = 3 + Math.floor(size[i] * 8);
             for (let q = 0; q < n; q++) put(DROP, pos[i * 3] + R(-0.3, 0.3) * size[i], pos[i * 3 + 1] + R(-0.2, 0.3) * size[i], pos[i * 3 + 2] + R(-0.3, 0.3) * size[i], vel[i * 3] + R(-1.2, 1.2), vel[i * 3 + 1] + R(0, 1.8), vel[i * 3 + 2] + R(-1.2, 1.2), 0.04 + 0.08 * Math.random(), 3);
-            if (size[i] > 0.35) put(MIST, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], vel[i * 3] * 0.3, 0.3, vel[i * 3 + 2] * 0.3, size[i] * 1.6, R(0.9, 1.6), 0.8);
+            if (size[i] > 0.35 && !quiet[i]) put(MIST, pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], vel[i * 3] * 0.3, 0.3, vel[i * 3 + 2] * 0.3, size[i] * 1.6, R(0.9, 1.6), 0.8);
           }
           // (in at once, gone over its last third as it breaks up)
           fade[i] = Math.min(1, age[i] * 25) * Math.min(1, (1 - u) * 3);

@@ -177,6 +177,14 @@ details.fold-plain > summary { font-weight: 650; font-size: 14px; color: var(--t
   .watch { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; padding: 16px; height: 100vh; height: 100dvh; }
   .watch-stage .fscene { height: calc(100dvh - 32px); border-radius: var(--r-l); }
   .watch-panel { overflow-y: auto; padding: 0 2px 16px; }
+  /* (the 3D view the full height beside the panel: kept to 4:3.3 and 72% of the height, it left a black band a
+     quarter of the window deep under the game on a PC, the PC film of 18 November) */
+  .watch-stage .stage3d:not(.is-fs):not(:fullscreen) { height: calc(100dvh - 32px); aspect-ratio: auto; max-height: none; }
+}
+/* (a PC's wide screen: the game's view takes the width, not a 1280 px column with black either side; at 1920 px the
+   3D view was 850 px wide, Aaron's review footage of 18 November) */
+@media (min-width: 1400px) and (orientation: landscape) {
+  .watch { max-width: none; grid-template-columns: minmax(0, 1fr) 380px; }
 }
 @media (max-height: 520px) and (orientation: landscape) {
   .watch-stage .fscene { height: 100vh; height: 100dvh; border-radius: 0; }
@@ -429,6 +437,15 @@ html:not([data-hand="left"]) .w3d-walkbtn { right: auto; left: max(14px, env(saf
 .fps-meter { position: absolute; z-index: 6; left: max(10px, env(safe-area-inset-left)); top: calc(96px + env(safe-area-inset-top)); margin: 0; padding: 3px 6px; border: 0; border-radius: 6px; background: #0008; color: #fff; font: 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: left; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
 .fps-meter.small { padding: 2px 6px; border-radius: 999px; font-weight: 600; }
 .fps-meter:focus-visible { outline: 2px solid #8ee6c9; outline-offset: 1px; }
+/* ---- calm (Stage3D): a few seconds without input while you fish, and what isn't the fishing steps back: the chips
+   along the top, the compass and the key guide fade out, the frame rate and the small buttons nearly so, the place's
+   credit dims (it stays readable). The fishing button and what it says stay. Any touch, move or key brings it all back */
+.stage3d .fs-top, .stage3d .w3d-compass, .stage3d .fps-meter, .stage3d .w3d-keys, .stage3d .w3d-walkbtn, .stage3d .w3d-chatbtn, .stage3d .w3d-menuwrap, .stage3d .w3d-label { transition: opacity .6s ease; }
+.stage3d.calm .fs-top, .stage3d.calm .w3d-compass, .stage3d.calm .w3d-keys { opacity: 0; pointer-events: none; }
+.stage3d.calm .fs-top * { pointer-events: none; }
+.stage3d.calm .fps-meter, .stage3d.calm .w3d-walkbtn, .stage3d.calm .w3d-chatbtn, .stage3d.calm .w3d-menuwrap { opacity: .3; }
+.stage3d.calm .w3d-label { opacity: .6; }
+@media (prefers-reduced-motion: reduce) { .stage3d .fs-top, .stage3d .w3d-compass, .stage3d .fps-meter, .stage3d .w3d-keys, .stage3d .w3d-walkbtn, .stage3d .w3d-chatbtn, .stage3d .w3d-menuwrap, .stage3d .w3d-label { transition: none; } }
 /* controls on the right (for a right thumb): Cast, Strike and Reel bottom right, the camera tools bottom left */
 html:not([data-hand="left"]) .fs-bottom { align-self: flex-end; align-items: flex-end; }
 html:not([data-hand="left"]) .w3d-tools { right: auto; left: max(12px, env(safe-area-inset-left)); align-items: flex-start; }
