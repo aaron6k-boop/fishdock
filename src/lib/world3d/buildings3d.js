@@ -14,7 +14,8 @@ const ROOF_SCANS = { clay: 1.2, slate: 1 };
 const area2 = (ring) => { let a = 0; for (let i = 0; i < ring.length; i++) { const [x1, z1] = ring[i], [x2, z2] = ring[(i + 1) % ring.length]; a += x1 * z2 - x2 * z1; } return a / 2; };
 
 function bucket() { return { p: [], uv: [], c: [], i: [] }; }
-function quad(B, a, b, c, d, uv, col) { const o = B.p.length / 3; B.p.push(...a, ...b, ...c, ...d); B.uv.push(...uv); for (let k = 0; k < 4; k++) B.c.push(...col); B.i.push(o, o + 1, o + 2, o, o + 2, o + 3); }
+// (lo, hi: the bottom edge's and the top edge's colour, when they differ from col)
+function quad(B, a, b, c, d, uv, col, lo = col, hi = col) { const o = B.p.length / 3; B.p.push(...a, ...b, ...c, ...d); B.uv.push(...uv); B.c.push(...lo, ...lo, ...hi, ...hi); B.i.push(o, o + 1, o + 2, o, o + 2, o + 3); }
 function tri(B, a, b, c, uv, col) { const o = B.p.length / 3; B.p.push(...a, ...b, ...c); B.uv.push(...uv); for (let k = 0; k < 3; k++) B.c.push(...col); B.i.push(o, o + 1, o + 2); }
 function meshOf(B, mat) {
   if (!B.i.length) return null;
@@ -106,14 +107,22 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     const O = OPENINGS, r = (a) => a.map((v) => (v / 3).toFixed(4));
     m.onBeforeCompile = (sh, rr) => {
       prev?.call(m, sh, rr);
-      sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>", `{
+      sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>", `float fdStreak = 0.0;
+        {
           float fu = vMapUv.x * ${FACADE_N.toFixed(1)}, tt = mod(floor(fu), ${FACADE_N.toFixed(1)}); vec2 bq = vec2(fract(fu), vMapUv.y);
           vec4 o = tt < 0.5 ? vec4(${r(O[0]).join(", ")}) : tt < 1.5 ? vec4(${r(O[1]).join(", ")}) : tt < 2.5 ? vec4(${r(O[2]).join(", ")}) : tt > 3.5 ? vec4(${r(O[4]).join(", ")}) : vec4(2.0);
           if (bq.x > o.x && bq.x < o.y && bq.y > o.z - 0.001 && bq.y < o.w && length(vViewPosition) < ${CUT.toFixed(1)}) discard;
+          // (rain off each sill streaks the wall below it: darker in runs down from the sill's ends and middle, fading
+          // over about 40 cm)
+          if (o.x < 1.5 && bq.x > o.x - 0.01 && bq.x < o.y + 0.01 && bq.y < o.z && bq.y > o.z - 0.14) {
+            float sx = (bq.x - o.x) / max(o.y - o.x, 0.01), run = fract(sin(floor(bq.x * 90.0) * 12.9898) * 43758.55);
+            fdStreak = (1.0 - (o.z - bq.y) / 0.14) * (0.35 + 0.65 * run) * (0.6 + 0.4 * smoothstep(0.35, 0.0, abs(sx - 0.5) - 0.15)) * 0.22;
+          }
         }
-        #include <map_fragment>`);
+        #include <map_fragment>
+        diffuseColor.rgb *= 1.0 - fdStreak;`);
     };
-    m.customProgramCacheKey = () => (key ? key.call(m) : "") + "cut1";
+    m.customProgramCacheKey = () => (key ? key.call(m) : "") + "cut2";
   }
   for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1, vertexColors: true });
   // (the roofs weathered: moss and lichen in patches, greener and darker, thicker towards the eaves and the shaded
@@ -257,7 +266,10 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
           }
           // (which windows are lit after dark: about one in three, the same ones every time for this building)
           const unlit = (t === FACADE_TILE.window || t === FACADE_TILE.window2) && litHash(b.id, k, s, q) > 0.34;
-          quad(wallB, A, Bp, [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], unlit ? tileUV(t).map((v, i) => (i % 2 === 0 ? v + 1 : v)) : tileUV(t), tint);
+          // (the wall's foot darker, splashed and damp, and its head under the eaves a little shaded: an even wall top to
+          // bottom stood on the ground as if pasted there)
+          const lo = s === 0 ? tint.map((v) => v * 0.7) : tint, hi = s === storeys - 1 ? tint.map((v) => v * 0.9) : tint;
+          quad(wallB, A, Bp, [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], unlit ? tileUV(t).map((v, i) => (i % 2 === 0 ? v + 1 : v)) : tileUV(t), tint, lo, hi);
           if (modules && WALLC[st.walls] && t !== FACADE_TILE.plain && st.type !== "warehouse") {
             const bw = Math.hypot(Bp[0] - A[0], Bp[2] - A[2]), wc = WALLC[st.walls];
             mods.push({ t, x: A[0], y: y0, z: A[2], ux: (Bp[0] - A[0]) / bw, uz: (Bp[2] - A[2]) / bw, sx: bw / 3, sy: sh / 3, trim: trimCol, wall: [wc[0] * tint[0], wc[1] * tint[1], wc[2] * tint[2]], door: DOORS[Math.abs(b.id | 0) % DOORS.length] });

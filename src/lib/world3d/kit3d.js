@@ -73,7 +73,7 @@ export function buildKit(group, sets) {
       const at = byV[vi]; if (!at.length) return;
       // (shadows from rocks and wood, and from the taller plants' near level; a small or far plant's is lost in the grass)
       const solid = !PLANTS.test(S.id);
-      const cap = at.length, mk = (parts, near) => parts.map(({ geo, mat }) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.castShadow = solid || (near && SHADE.test(S.id)); m.receiveShadow = true; m.frustumCulled = false; m.name = "fdKit_" + S.id; m.userData.at = at; group.add(m); return m; });
+      const cap = at.length, mk = (parts, near) => parts.map(({ geo, mat }) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.castShadow = solid || (near && SHADE.test(S.id)); m.receiveShadow = true; m.frustumCulled = false; m.name = "fdKit_" + S.id; m.noReflect = true; m.userData.at = at; group.add(m); return m; }); // (not in the water's reflection: small things on the ground, drawn again for nothing)
       // (each one's matrix once: its spot, its turn and size; set into the levels as the camera moves)
       const k = S.flat ? 1 : 1 / Math.max(1e-3, lv.top);
       const mats = at.map(([x, y, z, turn = 0, size = 1, tilt = 0]) => {

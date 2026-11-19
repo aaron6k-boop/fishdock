@@ -90,9 +90,9 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
         // (green blades take the ground's colour where they stand, their own light and dark kept; the flowers and the
         // dried blades, not green, keep their own)
         float fdG = clamp((fdTx.g - max(fdTx.r * 0.92, fdTx.b * 1.1)) * 9.0, 0.0, 1.0);
-        // (the seed heads and dry blades taken halfway to their own grey: at full colour a slope of Yorkshire fog read as
-        // a field of lavender on Aaron's PC)
-        vec3 fdOwn = mix(vec3(fdL), fdTx.rgb, 0.5) * 0.8;
+        // (the seed heads and dry blades taken most of the way to a straw grey: at full colour a slope of Yorkshire fog read
+        // as a field of lavender on Aaron's PC)
+        vec3 fdOwn = mix(vec3(fdL) * vec3(1.18, 1.0, 0.66), fdTx.rgb, 0.25) * 0.85; // (and towards straw: in November the heads are dry)
         diffuseColor.rgb = mix(fdOwn, vTint * (fdL / ${atlas.lum.toFixed(3)}) * 0.8, fdG) * (1.0 + 0.14 * vGust * vUp);
         // (darker towards the root, where the blades shade each other and the soil shows between them: lit evenly to
         // the ground the cards read as pale cut-out combs from a few metres off)
@@ -136,10 +136,13 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
       // (which kind: a mown lawn mostly lawn, some flowers; rough ground rough grass with lawn and flowers; banks rough
       // and meadow grass; a dune's marram, rough and meadow grass in its straw and grey-green)
       const kind = rough > 1.2 ? (kr < 0.6 ? 1 : 2) : rough >= 0.9 ? (kr < 0.45 ? 1 : kr < 0.85 ? 2 : kr < 0.95 ? 3 : 0) : rough >= 0.4 ? (kr < 0.5 ? 1 : kr < 0.8 ? 0 : kr < 0.93 ? 3 : 2) : (kr < 0.9 ? 0 : 3);
-      const w = 0.38 + sw * 0.32, h = (0.75 + shh * 0.5) * (rough >= 0.9 ? 1.1 : 1), y = yAt(x, z);
-      e.set(0, rot * Math.PI * 2, 0); q.setFromEuler(e); m4.compose(pv.set(x, y - 0.035, z), q, sv.set(w, h, w)); m4.toArray(M, n * 16);
+      // (heights and widths over a wider spread, each clump leaning a little its own way, and its green a shade lighter or
+      // darker: alike in size and all upright, the clumps' tops lined up into rows of sawteeth seen from a few metres up)
+      const w = 0.3 + sw * 0.45, h = (0.55 + shh * 0.8) * (rough >= 0.9 ? 1.1 : 1), y = yAt(x, z), lean = (ph - 0.5) * 0.36, lean2 = (rank - 0.5) * 0.3;
+      e.set(lean, rot * Math.PI * 2, lean2); q.setFromEuler(e); m4.compose(pv.set(x, y - 0.035, z), q, sv.set(w, h, w)); m4.toArray(M, n * 16);
       G[n * 2] = yAt(x + 0.5, z) - yAt(x - 0.5, z); G[n * 2 + 1] = yAt(x, z + 0.5) - yAt(x, z - 0.5);
-      T[n * 3] = c[0]; T[n * 3 + 1] = c[1]; T[n * 3 + 2] = c[2];
+      const shade = 0.84 + 0.26 * ((kr * 7.13 + sw * 3.7) % 1);
+      T[n * 3] = c[0] * shade; T[n * 3 + 1] = c[1] * shade; T[n * 3 + 2] = c[2] * shade;
       A[n * 3] = kind; A[n * 3 + 1] = ph * 6.283; A[n * 3 + 2] = rank;
       n++;
     }

@@ -747,6 +747,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       for (let u = 0; u <= L; u += 0.7) for (let v = -hw; v <= hw; v += 0.7) { const f = L ? u / L : 0; stamp(ax + (bx - ax) * f + (-(bz - az) / (L || 1)) * v, az + (bz - az) * f + ((bx - ax) / (L || 1)) * v); }
     }
     for (const b of place.buildings || []) { const B = bb(b.ring); if (B.x1 < X0 || B.x0 > X0 + nx || B.z1 < Z0 || B.z0 > Z0 + nz) continue; for (let z = Math.floor(B.z0) - 1; z <= B.z1 + 1; z++) for (let x = Math.floor(B.x0) - 1; x <= B.x1 + 1; x++) if (inB([x, z], { ...B, x0: B.x0 - 1.5, x1: B.x1 + 1.5, z0: B.z0 - 1.5, z1: B.z1 + 1.5 }) && (inside([x, z], B.r) || B.r.some((q, k) => segDist([x, z], q, B.r[(k + 1) % B.r.length]) < 1.5))) stamp(x, z); }
+    // (the buildings' own footprints, for the shade at their feet: the ground darker within a couple of metres of a wall,
+    // where the sky's light is half shut out; without it every house stood on the slope as if pasted on)
+    const foot = new Uint8Array(NP);
+    for (const b of place.buildings || []) { const B = bb(b.ring); if (B.x1 < X0 || B.x0 > X0 + nx || B.z1 < Z0 || B.z0 > Z0 + nz) continue; for (let z = Math.floor(B.z0); z <= B.z1; z++) for (let x = Math.floor(B.x0); x <= B.x1; x++) if (inside([x, z], B.r)) { const i = Math.round(x - X0), j = Math.round(z - Z0); if (i >= 0 && j >= 0 && i < nx && j < nz) foot[j * nx + i] = 1; } }
+    const dFoot = chamfer(foot);
     const dEdge = chamfer(edge), dFlat = chamfer(flat), sm = (e0, e1, v) => { const tt = Math.min(1, Math.max(0, (v - e0) / (e1 - e0))); return tt * tt * (3 - 2 * tt); };
     // the heights: the coarse ground's own at the edge, the 5 m terrain's smooth surface inside, and the relief on it
     const Y = new Float32Array(NP), base = GROUND.land;
@@ -783,6 +788,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       // stay grassed, as the East Cliff's slopes mostly are: from 24 degrees most of the slope came out bare)
       soilA[v] = Math.min(1, sm(0.78, 1.25, slope) * 0.85 + sm(0.18, 0.55, lap) * 0.55) * w * Math.min(1, at.aRuf[v] * 1.6 + at.aGrass[v] * 0.25);
       soilP[p] = soilA[v]; slopeP[p] = slope * w;
+      // (the light the ground gets from the sky: less in a hollow and at the foot of a wall, a little more on a crest; the
+      // relief read flat in an even light, as if lit from everywhere at once)
+      const ao = (1 - 0.32 * (1 - sm(0.5, 2.6, dFoot[p]))) * (1 - 0.22 * sm(0.06, 0.5, lap) * w) * (1 + 0.06 * sm(0.06, 0.4, -lap) * w);
+      for (let ch = 0; ch < 3; ch++) C3[v * 3 + ch] *= ao;
     }
     const ix = [];
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
