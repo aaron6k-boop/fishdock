@@ -76,11 +76,6 @@ export function installSunShade() {
   done = true;
   C.lights_pars_begin = CLOUD_GLSL + C.lights_pars_begin;
   C.lights_fragment_begin = C.lights_fragment_begin.replace(SHADOW_LINE, NEW_LINES);
-  // (a lamp or a torch that is off, or out of reach of this pixel, is passed over: three.js works its light out in
-  // full all the same, and the lamps now stay in the scene by day, at nothing, so no shader is rebuilt when they come
-  // on (environment.js). Each lit pixel was paying for every lamp at noon)
-  { const at = C.lights_fragment_begin.indexOf("#if ( NUM_DIR_LIGHTS > 0 )"), DIRECT = "\t\tRE_Direct( directLight,";
-    if (at > 0) C.lights_fragment_begin = C.lights_fragment_begin.slice(0, at).split(DIRECT).join("\t\tif ( directLight.visible ) RE_Direct( directLight,") + C.lights_fragment_begin.slice(at); }
   for (const k of ["lambert", "phong", "standard", "physical", "toon", "shadow"]) {
     const S = THREE.ShaderLib[k]; if (!S) continue;
     S.uniforms.fdCloudA = { value: CLOUDS.a }; S.uniforms.fdCloudB = { value: CLOUDS.b };
