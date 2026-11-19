@@ -116,6 +116,25 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     m.customProgramCacheKey = () => (key ? key.call(m) : "") + "cut1";
   }
   for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1, vertexColors: true });
+  // (the roofs weathered: moss and lichen in patches, greener and darker, thicker towards the eaves and the shaded
+  // pitches; soot by the chimneys' stacks not attempted)
+  for (const k of Object.keys(roofs)) {
+    const m = M["roof_" + k];
+    m.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vRfW; varying vec3 vRfN;").replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvRfW = (modelMatrix * vec4(transformed, 1.0)).xyz; vRfN = normalize(mat3(modelMatrix) * objectNormal);");
+      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+        varying vec3 vRfW; varying vec3 vRfN;
+        float rfH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+        float rfN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(rfH(i), rfH(i + vec2(1.0, 0.0)), f.x), mix(rfH(i + vec2(0.0, 1.0)), rfH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+        .replace("#include <map_fragment>", `#include <map_fragment>
+        { float m = rfN(vRfW.xz / 2.3) * 0.6 + rfN(vRfW.xz / 0.7) * 0.3 + rfN(vRfW.xz * 2.1) * 0.1;
+          float north = smoothstep(0.1, -0.6, vRfN.z); // (the pitch facing away from the sun, the north, holds more)
+          float moss = smoothstep(0.55, 0.78, m + north * 0.12) * ${k === "clay" ? "0.5" : "0.38"};
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.62, 0.7, 0.42) + vec3(0.012, 0.018, 0.004), moss);
+          diffuseColor.rgb *= 0.92 + 0.16 * rfN(vRfW.xz / 9.0); }`);
+    };
+    m.customProgramCacheKey = () => "fdroofage1" + k;
+  }
   // (chimneys and brick towers in the photoscanned red brick of the house fronts (Poly Haven Red Brick 03, CC0), at the
   // same 1.5 m a tile, where it's published; else the drawn brick, 1.2 m by 0.6 m a tile)
   const brPh = photoTex("brick_red_diff"), TU = brPh ? 1.5 : 1.2, TV = brPh ? 1.5 : 0.6;
@@ -294,7 +313,9 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     }
 
     // ---- the roof ----
-    const roofB = B["roof_" + (st.roofMat || "slate")] || B.roof_slate, rc = st.roofMat === "clay" ? [1, 0.95, 0.92] : [1, 1, 1];
+    // (each roof its own age: a little lighter or darker, warmer or greyer, as roofs replaced at different times are)
+    const rv = 0.84 + 0.26 * (((b.id | 0) * 2654435761 >>> 0) % 1000) / 1000, rw = (((b.id | 0) * 40503 >>> 0) % 1000) / 1000 - 0.5;
+    const roofB = B["roof_" + (st.roofMat || "slate")] || B.roof_slate, rc = (st.roofMat === "clay" ? [1, 0.95, 0.92] : [1, 1, 1]).map((v, i) => v * rv * (1 + rw * [0.06, 0, -0.06][i]));
     const box = obb(ring);
     const pitched = st.roof === "hip" || st.roof === "gable";
     const R = pitched && box && box.W < 26 ? pitchedRoof(ring, top, { shape: st.roof, pitch: (st.pitch ?? 0.62) + (b.plotOf ? (((b.id * 13) % 7) - 3) * 0.025 : 0), eave: st.type === "small" ? 0.2 : 0.3, axis: b.ridge || null }) : null;

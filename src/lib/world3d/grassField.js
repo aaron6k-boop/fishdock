@@ -116,6 +116,8 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
       const x = (ix + r()) * SQ, z = (iz + r()) * SQ, roll = r(), kr = r(), sw = r(), shh = r(), rot = r(), ph = r(), rank = r();
       const g = grassAt(x, z); if (g <= 0.04 || roll > g) continue;
       if (isBlocked(x, z)) continue;
+      // (thinner next to where nothing grows, so a path's or a wall's edge isn't a straight cut through the grass)
+      { const nb = (isBlocked(x - 1, z) ? 1 : 0) + (isBlocked(x + 1, z) ? 1 : 0) + (isBlocked(x, z - 1) ? 1 : 0) + (isBlocked(x, z + 1) ? 1 : 0); if (nb && roll > 1 - nb * 0.22) continue; }
       const c = colourAt(x, z); if (!c) continue;
       const rough = roughAt(x, z);
       // (which kind: a mown lawn mostly lawn, some flowers; rough ground rough grass with lawn and flowers; banks rough

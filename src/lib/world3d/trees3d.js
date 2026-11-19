@@ -13,6 +13,7 @@
 // town's trees are a handful of draws. (All of it drawn in code: no photographs, no downloaded models.)
 import * as THREE from "three";
 import { mergeGeometries as mergeAttr } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { TEX_BASE } from "./textures3d.js";
 
 // ---- the species: what grows along a British seafront and in its parks ----
 // h: height range (m); crown: [width/height, where the crown's centre sits as a share of height, roundness 0 flat-topped
@@ -257,6 +258,9 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
     woodMat = new THREE.MeshStandardMaterial({ map: bark.map, normalMap: bark.normalMap, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.95, color: 0xffffff, vertexColors: true });
     // (a little light through the leaves: the shaded side of a real crown is not black, light scatters through it)
     const leafMat = windy(new THREE.MeshStandardMaterial({ map: leafTex, alphaTest: 0.5, side: THREE.FrontSide, roughness: 0.8, metalness: 0, color: 0xffffff, emissive: 0x334422, emissiveIntensity: 0.18, emissiveMap: leafTex }), U);
+    // (where it's published, the leaves modelled on their twigs in Blender, build_leaves.py, in place of the drawn ones:
+    // swapped in once it has arrived, the drawn cluster meanwhile)
+    if (typeof document !== "undefined") new THREE.TextureLoader().load(TEX_BASE + "leaf_cluster.webp", (lt) => { lt.colorSpace = THREE.SRGBColorSpace; lt.anisotropy = 8; leafMat.map = lt; leafMat.emissiveMap = lt; leafMat.needsUpdate = true; disposables.push(lt); }, undefined, () => {});
     // (only the near trees' clusters are drawn, packed at the front of the list (packLeaves): every cluster of every tree
     // in the place, 28,000 at Whitby and most of them shrunk to nothing, was 224,000 triangles a frame and as many again
     // in the sun's shadow maps)
