@@ -20,6 +20,7 @@ import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
 import { buildGrassTufts } from "./grassTufts.js";
 import { buildGrassField } from "./grassField.js";
+import { buildScrub } from "./scrub.js";
 import { buildChimneyCaps } from "./chimneys3d.js";
 import { buildWindowModules } from "./windows3d.js";
 import { buildKit } from "./kit3d.js";
@@ -1960,6 +1961,18 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // (the thick layer of grass blades, grassField.js, and the taller clumps among it, grassTufts.js, from the same
     // lookups)
     const field = buildGrassField(group, grassOpts), tufts = buildGrassTufts(group, { ...grassOpts, sparse: !!field });
+    // (and the rough growth that gives the banks and open grass their texture from a distance, out to the edge of the
+    // place: scrub.js)
+    // (its "keep off" is asked a hundred thousand times, where the grass asks a few thousand: the roads one by one, each
+    // against every one of its stretches, and every building's outline, were 40 s of Whitby's loading. So they are
+    // drawn once into a mask of 2 m squares and looked up)
+    const RM = 2, rmN = Math.ceil((xs[n - 1] - xs[0]) / RM) + 1, rmask = new Uint8Array(rmN * rmN), rmI = (v) => Math.round((v - xs[0]) / RM);
+    const rmBox = (x0, x1, z0, z1, hit) => { for (let j = Math.max(0, rmI(z0) - 1), j1 = Math.min(rmN - 1, rmI(z1) + 1); j <= j1; j++) for (let i = Math.max(0, rmI(x0) - 1), i1 = Math.min(rmN - 1, rmI(x1) + 1); i <= i1; i++) if (!rmask[j * rmN + i] && hit([xs[0] + i * RM, xs[0] + j * RM])) rmask[j * rmN + i] = 1; };
+    for (const r of roads) { const rad = r.w / 2 + 2.2 + RM * 0.5; for (let i = 0; i + 1 < r.line.length; i++) { const a = r.line[i], b2 = r.line[i + 1]; rmBox(Math.min(a[0], b2[0]) - rad, Math.max(a[0], b2[0]) + rad, Math.min(a[1], b2[1]) - rad, Math.max(a[1], b2[1]) + rad, (q) => segDist(q, a, b2) < rad); } }
+    for (const b2 of [...lots, ...drawnB]) rmBox(b2.x0, b2.x1, b2.z0, b2.z1, (q) => inside(q, b2.r));
+    for (const b2 of allPiers) rmBox(b2.x0, b2.x1, b2.z0, b2.z1, () => true);
+    const keepOff = (x, z) => { const i = rmI(x), j = rmI(z); return i < 0 || j < 0 || i >= rmN || j >= rmN || rmask[j * rmN + i] === 1 || nearSpot(x, z, 3); };
+    const scrub = buildScrub(group, { ...grassOpts, avoid: keepOff, x0: xs[0] + 2, x1: xs[n - 1] - 2, focus: spots.map((sp) => [sp.at[0], sp.at[2]]) });
     // ---- the ground's clutter from real photoscans (kit3d.js; High and Ultra): along the beaches the tide's wrack, a
     // stray branch of driftwood, stones and pebbles gathered at the back against the walls and the cliff's foot, rocks
     // fallen at the foot of the cliff; on the banks willowherb, docks, grass clumps and ferns, mossy rocks where the soil

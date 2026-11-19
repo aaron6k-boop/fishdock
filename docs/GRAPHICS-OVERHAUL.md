@@ -309,6 +309,63 @@ backwards, not a filmed backwards walk; at the steepest look down the collar of 
 the very bottom of the picture, and the jackets are plainly faceted that close; fifteen of the twenty-one people
 were not filmed in this view.
 
+### Vegetation, first step: scrub on the banks, a tree on the far card, grass that stands in clumps (19 November, night)
+
+The brief's second priority. The same fourteen cameras at Whitby and Gorleston were photographed on the phone setting
+and on Ultra (job h304) to see what is wrong before changing anything:
+
+- Past the reach of the grass blades (12 m on the phone setting, 30 m on Ultra) a hillside was a smooth painted
+  green on both settings. That is nearly all of what you see of it from a pier. Gorleston's cliff read as a golf
+  course.
+- A tree at a distance, and every tree on the phone setting, was a round ball of green dabs on a stick.
+- On the phone setting a lawn close to was rows of little rectangular hedges: each card of grass is a strip cut square
+  at its ends, and they stand thinly there.
+- Half the far trees stood black beside green ones.
+
+What changed:
+
+- **Scrub** (`scrub.js`, `scrubPlan.js`): mounds of bramble and thorn, gorse, and stands of bracken on the banks,
+  cliffs and rough grass within 500 m of where people fish (650 m on Ultra). Each is two crossed cards with its
+  picture from the side and one lying flat with its picture from above, drawn in the page, three instanced meshes for
+  the place. Where they stand comes from the ground: only where grass is drawn, never on a road, a building, a pier
+  or a dune; in thickets, by a slow noise; more on a slope than on the flat. Bracken is russet from October to March
+  and green otherwise; gorse carries a little flower all year and most from March to May. Phone setting and up.
+- **The far tree** (`trees3d.js` cardTexture): a crown in separate masses of leaf, lit from above and dark beneath, on
+  limbs that show between them, with sky through its edge.
+- **Cards lit from above on both sides** (trees and scrub): drawn double-sided, the half seen from behind had their
+  normals turned over and were lit from underneath. Each card is now two front faces.
+- **Grass in clumps** (`grassField.js`): the blades shorten towards each end of a card.
+
+How much there is, and what it costs (jobs h311 to h313; the new build and the live one photographed one after the
+other with the same cameras):
+
+| | Live | This build |
+| --- | --- | --- |
+| Plants placed, phone setting | none | Whitby 1,780, Gorleston 644 (Ultra at Whitby: 4,649) |
+| Whitby, phone setting, at the spot | 150 fps, 6.7 ms, 2,824k triangles | 152 fps, 6.6 ms, 2,278k triangles |
+| Gorleston, phone setting, at the spot | 170 fps, 5.9 ms, 1,039k triangles | 176 fps, 5.7 ms, 1,125k triangles |
+| Whitby loads in (phone setting), two runs each | 19 s, 23 s | 19 s, 19 s |
+| Gorleston loads in (phone setting), two runs each | 18 s, 19 s | 17 s, 19 s |
+| Placing the scrub, on the PC | | 0.07 s |
+
+No cost that these runs can tell on the phone setting. On Ultra the PC's own frame rate swung between 51 and 92 frames
+a second from run to run that night, live build and new alike, with the game's resolution scale at a different step
+each time, so no Ultra figure is given: the scrub and the far trees' second faces add about 60,000 triangles to a frame of 6.4 million at Whitby.
+
+Not done in this step: the bushes are painted cards, and from closer than about 8 m they look it; nothing new grows
+in the joints of paving or at the foot of walls on the phone setting; the grass blades still stop at 12 m there; trees
+close to are unchanged; the hillside's own colour is unchanged; Cromer, Brixham and the other places get the scrub by
+the same rules but were not photographed.
+
+Found on the way, and fixed before anything was published:
+
+- The first version asked the ground "is this a road?" for every candidate, each against every stretch of every
+  road: Whitby's loading went from 19 s to 70 s on the PC. Roads, buildings, car parks and piers are now drawn once
+  into a mask of 2 m squares and looked up; the scrub's placing takes 0.13 s on the PC.
+- The ground's grid runs out for kilometres, so the first version found 242,000 places for a bush and its cap kept
+  3% of them, spread too thin to see. It now tries only the ground within reach of the spots.
+- Tussocks of rough grass were a fourth kind and were taken out: flat on the ground from above they read as starfish.
+
 ## The phases, and where each stands
 
 1. Graphics engine audit: not started as a written audit. Measured so far: Whitby on Ultra 76 to 85 frames a second.
