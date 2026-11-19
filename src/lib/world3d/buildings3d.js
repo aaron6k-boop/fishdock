@@ -254,7 +254,14 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     const R = pitched && box && box.W < 26 ? pitchedRoof(ring, top, { shape: st.roof, pitch: st.pitch ?? 0.62, eave: st.type === "small" ? 0.2 : 0.3 }) : null;
     if (R) {
       for (const f of R.faces) {
-        const uvs = f.pts.flatMap(([x, y, z]) => [(x * box.ax[0] + z * box.ax[1]) / 3, ((x * box.pz[0] + z * box.pz[1]) * 0.8 + (y - top) * 1.3) / 3]);
+        // (each face mapped on its own slope: across it level, and up it by the distance along the slope, one tile of
+        // the photograph to 3 m. Mapped by plan position and height together, the faces sloping one way had the
+        // slates smeared into streaks down the roof, as the two cancelled out)
+        const [p0, p1, p2] = f.pts, e1 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]], e2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
+        let nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0];
+        const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl; if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+        const hl = Math.hypot(nx, nz), hx = hl > 1e-4 ? nx / hl : box.pz[0], hz = hl > 1e-4 ? nz / hl : box.pz[1], cs = Math.max(0.2, ny);
+        const uvs = f.pts.flatMap(([x, , z]) => [(-x * hz + z * hx) / 3, -(x * hx + z * hz) / cs / 3]);
         if (f.gable) { if (f.pts.length === 3) tri(wallB, f.pts[0], f.pts[1], f.pts[2], tileUV(FACADE_TILE.plain, 0, 1, 0, 0.9).slice(0, 6), tint); }
         else if (f.pts.length === 4) quad(roofB, f.pts[0], f.pts[1], f.pts[2], f.pts[3], uvs, rc);
         else tri(roofB, f.pts[0], f.pts[1], f.pts[2], uvs, rc);

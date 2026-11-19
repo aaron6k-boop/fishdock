@@ -449,6 +449,20 @@ export function contactShade({ cx, cz, size = 140, mpp = 0.1, rings = [], discs 
   return { tex, data, n, x0, z0, size };
 }
 
+// ---- the worn, muddy patches in the grass (the soft ground's shader, FD_MUD), and the same worked out here so no tuft
+// of grass stands on them (grassTufts.js): the shader's own noise, fdDH / fdDN / fdDF, in JavaScript ----
+// (lift: how much more of the town's rough ground is worn than a lawn; town, lawn: how far to the mud each goes)
+const MUD = { lift: 0.05, town: 0.75, lawn: 0.35 };
+const fract = (v) => v - Math.floor(v);
+function mudDH(x, y) { let qx = fract(x * 0.1031), qy = fract(y * 0.1031), qz = fract(x * 0.1031); const d = qx * (qy + 33.33) + qy * (qz + 33.33) + qz * (qx + 33.33); qx += d; qy += d; qz += d; return fract((qx + qy) * qz); }
+function mudDN(x, y) { const ix = Math.floor(x), iy = Math.floor(y); let fx = x - ix, fy = y - iy; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); const a = mudDH(ix, iy), b = mudDH(ix + 1, iy), c = mudDH(ix, iy + 1), d = mudDH(ix + 1, iy + 1); return a + (b - a) * fx + (c - a + (d - c - b + a) * fx) * fy; }
+function mudDF(x, y) { let a = 0.5, s = 0; for (let k = 0; k < 4; k++) { s += a * mudDN(x, y); x = x * 2.03 + 17.1; y = y * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }
+/** How worn to the mud the grass is here, 0..1, as the ground's shader draws it (town: the town's rough ground). */
+export function mudAt(x, z, town) {
+  const v = mudDF(x / 9 + 7, z / 9 + 7) + (mudDN(x / 1.7, z / 1.7) - 0.5) * 0.16 + (town ? MUD.lift : 0), t = Math.min(1, Math.max(0, (v - 0.6) / 0.12));
+  return t * t * (3 - 2 * t) * (town ? MUD.town : MUD.lawn);
+}
+
 export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const local0 = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
   // (and a survey's heights for its ground, where a mark has them (terrain3d.js): never under a pier's deck, which a
@@ -757,7 +771,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // (worn to the mud in patches: often on the town's rough ground (its vRuf a little above 0), now and then on a
               // lawn; the photograph's own colour, a little darker, its edge ragged)
               vec2 wm = vWPos.xz; float town = step(0.08, vRuf) * step(vRuf, 0.3);
-              float worn = smoothstep(0.6, 0.72, fdDF(wm / 9.0 + 7.0) + (fdDN(wm / 1.7) - 0.5) * 0.16 + town * 0.1) * mix(0.35, 0.85, town);
+              float worn = smoothstep(0.6, 0.72, fdDF(wm / 9.0 + 7.0) + (fdDN(wm / 1.7) - 0.5) * 0.16 + town * ${MUD.lift.toFixed(3)}) * mix(${MUD.lawn.toFixed(2)}, ${MUD.town.toFixed(2)}, town);
               vec3 mudC = texture2D(uMud, wm / 2.5).rgb * 0.85 * (0.9 + 0.2 * fdDN(wm / 13.0));
               grass = mix(grass, mudC, worn);
             #endif
@@ -1599,8 +1613,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         if (!inGrid(x, z)) return 0;
         const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n;
         if (bank[k]) return 0.85 * (1 - Math.min(1, steep[k] * 1.7)); // (the banks: thinning out to none where the rock shows)
-        return onGrid(grs, 1, 0, x, z);
+        // (not on the worn, muddy patches: the ground's shader draws them, so the tufts keep off them too)
+        return onGrid(grs, 1, 0, x, z) * (1 - Math.min(1, mudAt(x, z, town[k]) * 2.2));
       },
+      roughAt: (x, z) => { if (!inGrid(x, z)) return 0.5; const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n; return bank[k] ? 1 : town[k] ? 0.6 : 0.15; },
       yAt: (x, z) => (inGrid(x, z) ? onGrid(pos, 3, 1, x, z) : LAND),
       colourAt: (x, z) => (inGrid(x, z) ? [0, 1, 2].map((ch) => onGrid(col, 3, ch, x, z) * 0.95) : null),
       avoid: (x, z) => nearSpot(x, z, 3) || onRoad(x, z) || lots.some((b) => inB([x, z], b) && inside([x, z], b.r)) || drawnB.some((b) => inB([x, z], b) && inside([x, z], b.r)) || allPiers.some((b) => inB([x, z], b)),

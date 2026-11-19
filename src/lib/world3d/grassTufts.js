@@ -24,10 +24,11 @@ const SQ = 8;
  * @param {(x:number,z:number)=>number} o.yAt       the ground's height as drawn
  * @param {(x:number,z:number)=>number[]|null} o.colourAt the ground's colour here (linear rgb), or null
  * @param {(x:number,z:number)=>boolean} o.avoid    true where no tuft goes (roads, buildings, piers)
+ * @param {(x:number,z:number)=>number} [o.roughAt] how rough the grass is here, 0 (a mown lawn) to 1 (a bank)
  * @param {number} o.quality  0 Performance (none), 1 Balanced, 2 Ultra
  * @returns {{ mesh, update(t, cam, wind, windDir), dispose } | null}
  */
-export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, quality = 1, seed = 1 } = {}) {
+export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt = () => 0.5, quality = 1, seed = 1 } = {}) {
   if (quality < 1 || typeof document === "undefined") return null;
   const reach = quality >= 2 ? 34 : 22, perSq = quality >= 2 ? 30 : 20, cap = quality >= 2 ? 9000 : 3200;
   // ---- one tuft: three cards crossed at 60 degrees, each 0.6 m wide and tall, its foot at the ground ----
@@ -71,7 +72,11 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, quality 
       float fdTl = dot(fdTx.rgb, vec3(0.3, 0.55, 0.15));
       // (the ground's colour (the instance's) times the blade's own light over the picture's mean, with a little of the
       // blade's own hue: the dry, straw-coloured ones stay so)
-      diffuseColor.rgb *= (fdTl / ${LUM_MEAN.toFixed(3)}) * mix(vec3(1.0), fdTx.rgb / max(vec3(fdTl), vec3(1e-3)) / vec3(${HUE_MEAN.map((v) => v.toFixed(3)).join(", ")}), 0.35);
+      // (a little darker than the ground's own: lit square on from above, the cards read paler than the lawn round them)
+      // (the hue only in red and green, and held within a quarter: the picture has little blue, so its blue over the
+      // mean swung the dry, straw-coloured tufts to pink)
+      vec2 fdHue = clamp(fdTx.rg / max(vec2(fdTl), vec2(1e-3)) / vec2(${HUE_MEAN.slice(0, 2).map((v) => v.toFixed(3)).join(", ")}), 0.8, 1.25);
+      diffuseColor.rgb *= 0.8 * (fdTl / ${LUM_MEAN.toFixed(3)}) * mix(vec3(1.0), vec3(fdHue, 1.0), 0.3);
       // (a blade is a few pixels wide: in the picture's smaller copies, further off, it fades to a thin haze and the alpha
       // test would cut it away, so its alpha is raised with the copy's level)
       vec2 fdDx = dFdx(vMapUv * vec2(2048.0, 512.0)), fdDy = dFdy(vMapUv * vec2(2048.0, 512.0));
@@ -100,8 +105,10 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, quality 
       if (g <= 0.05 || roll > g) continue;
       if (avoid(x, z)) continue;
       const c = colourAt(x, z); if (!c) continue;
-      // (mostly the meadow and lawn tufts; the coarse coastal one on banks, the dry one now and then)
-      const kind = kindR < 0.36 ? 0 : kindR < 0.7 ? 2 : kindR < 0.88 ? 1 : 3;
+      // (on a mown lawn mostly the short lawn tuft; on rough ground and banks the taller meadow and coarse coastal
+      // ones; a dry, straw-coloured one now and then)
+      const rough = roughAt(x, z), pLawn = 0.8 - 0.6 * rough, pCoast = pLawn + 0.06 + 0.3 * rough;
+      const kind = kindR < pLawn ? 2 : kindR < pCoast ? 1 : kindR < 0.95 ? 0 : 3;
       out.push({ x, y: yAt(x, z), z, kind, s: 0.75 + s * 0.6, rot: rot * Math.PI * 2, ph: ph * 6.28, c });
     }
     if (memo.size > 4000) memo.clear();
