@@ -10,13 +10,14 @@ it goes in (an asset site's other assets may be under other terms).
 
 | File | What | Drawn | Size | Triangles | Textures inside | Animations |
 |---|---|---|---|---|---|---|
-| armour.glb |  |  | 1.1 MB | 11,600 | 1024x1024, 1024x1024, 1024x1024 | none |
+| armour.glb | Rock armour: four scanned boulders, near, middling, far and most distant levels (build_armour.py) | all distances, instanced, the level by distance | 1.2 MB | 11,920 | 1024x1024, 1024x1024, 1024x1024 | none |
 | eels.glb | The conger and the eel (from their straightened pictures) | close (in the hand) to mid (in the water) | 206 KB | 10,432 | none | none |
 | fp_rig.glb | Your arms, hands and jacket in first person, skeleton and clips | close (first person), one level | 1.5 MB | 37,414 | none | 4 |
 | nets.glb | Drop net and landing net | close to mid | 491 KB | 6,692 | 512x512, 512x512, 512x512, 512x512 | none |
 | pierprops.glb | Lamps, lifebuoy stations, bollards, benches | all distances, instanced along the pier | 812 KB | 11,926 | 512x1024, 512x1024, 256x512, 512x512, 512x512, 512x512, 512x512, 512x512, 512x512, 1024x1024 | none |
 | reel.glb | The reel, older single model | close | 175 KB | 7,384 | none | none |
 | rodkit.glb | The rod (handle, seat, guides, blank) and the spinning reel | close; the 3D view hides it past a few metres | 609 KB | 27,248 | none | none |
+| whitby_lights.glb | Whitby's West and East Pier lighthouses, modelled (build_whitby_lights.py), three levels each, ambient occlusion in the vertices | all distances, the level by distance (70 m, 220 m) | 2.9 MB | 55,197 | none | none |
 | fish2/*.glb (20 files) | Every sea fish with a cut-out picture, one file each, with its gill covers, mouth, sockets, rayed fins and the jaw and gill shape keys (build_fish3.py) (ballan-wrasse, bass, black-bream, coalfish, cod, dab, flounder, garfish, gurnard, lesser-spotted-dogfish, mackerel, plaice, pollack, pouting, smoothhound, sole, thick-lipped-mullet, thornback-ray, tope, whiting) | close (in the hand) to mid (in the water); only the one hooked is fetched | 6.7 MB in all | 251,968 in all | none | none |
 
 ## Game-ready textures (`public/textures/`)
@@ -33,6 +34,10 @@ it goes in (an asset site's other assets may be under other terms).
 | cap_concrete_diff.jpg | 17 KB | 512x512 | jpeg |
 | cap_concrete_nor.jpg | 33 KB | 512x512 | jpeg |
 | cap_concrete_rough.jpg | 1 KB | 256x256 | jpeg |
+| cliff_grass_diff.jpg | 366 KB | 1024x1024 | jpeg |
+| cliff_grass_nor.jpg | 587 KB | 1024x1024 | jpeg |
+| cliff_rock_diff.jpg | 234 KB | 1024x1024 | jpeg |
+| cliff_rock_nor.jpg | 354 KB | 1024x1024 | jpeg |
 | deck_broom_diff.jpg | 315 KB | 1024x1024 | jpeg |
 | deck_broom_diff_2k.jpg | 1.2 MB | 2048x2048 | jpeg |
 | deck_broom_nor.jpg | 325 KB | 1024x1024 | jpeg |
@@ -43,6 +48,18 @@ it goes in (an asset site's other assets may be under other terms).
 | deck_planks_nor.jpg | 36 KB | 512x512 | jpeg |
 | deck_planks_rough.jpg | 9 KB | 256x256 | jpeg |
 | deck_worn_diff.jpg | 20 KB | 512x512 | jpeg |
+| facade_brick_diff.jpg | 269 KB | 2560x512 | jpeg |
+| facade_brick_glass.jpg | 9 KB | 1280x256 | jpeg |
+| facade_brick_nor.jpg | 269 KB | 2560x512 | jpeg |
+| facade_brick_rough.jpg | 55 KB | 1280x256 | jpeg |
+| facade_render_diff.jpg | 155 KB | 2560x512 | jpeg |
+| facade_render_glass.jpg | 9 KB | 1280x256 | jpeg |
+| facade_render_nor.jpg | 97 KB | 2560x512 | jpeg |
+| facade_render_rough.jpg | 25 KB | 1280x256 | jpeg |
+| facade_stone_diff.jpg | 267 KB | 2560x512 | jpeg |
+| facade_stone_glass.jpg | 9 KB | 1280x256 | jpeg |
+| facade_stone_nor.jpg | 308 KB | 2560x512 | jpeg |
+| facade_stone_rough.jpg | 47 KB | 1280x256 | jpeg |
 | gorleston_northbank.webp | 41 KB | 2260x228 | webp |
 | gorleston_northbank_lights.webp | 3 KB | 2260x228 | webp |
 | gorleston_pierhead.webp | 154 KB | 3800x364 | webp |
@@ -62,6 +79,12 @@ it goes in (an asset site's other assets may be under other terms).
 | rock_granite_diff.jpg | 100 KB | 512x512 | jpeg |
 | rock_granite_nor.jpg | 206 KB | 512x512 | jpeg |
 | rock_granite_rough.jpg | 18 KB | 256x256 | jpeg |
+| roof_clay_diff.jpg | 246 KB | 1024x1024 | jpeg |
+| roof_clay_nor.jpg | 332 KB | 1024x1024 | jpeg |
+| roof_clay_rough.jpg | 20 KB | 512x512 | jpeg |
+| roof_slate_diff.jpg | 192 KB | 1024x1024 | jpeg |
+| roof_slate_nor.jpg | 241 KB | 1024x1024 | jpeg |
+| roof_slate_rough.jpg | 2 KB | 512x512 | jpeg |
 | sandstone_wall_diff.jpg | 255 KB | 1024x1024 | jpeg |
 | sandstone_wall_nor.jpg | 88 KB | 512x512 | jpeg |
 | wall_moss_diff.jpg | 29 KB | 512x512 | jpeg |
@@ -69,6 +92,12 @@ it goes in (an asset site's other assets may be under other terms).
 | wall_rust_nor.jpg | 50 KB | 1024x1024 | jpeg |
 | wall_rust_rough.jpg | 5 KB | 256x256 | jpeg |
 | water_normal.jpg | 66 KB | 512x512 | jpeg |
+| whitby_ashlar_diff.jpg | 186 KB | 1024x1024 | jpeg |
+| whitby_ashlar_nor.jpg | 345 KB | 1024x1024 | jpeg |
+| whitby_ashlar_rough.jpg | 37 KB | 512x512 | jpeg |
+| whitby_flags_diff.jpg | 189 KB | 1024x1024 | jpeg |
+| whitby_flags_nor.jpg | 355 KB | 1024x1024 | jpeg |
+| whitby_flags_rough.jpg | 39 KB | 512x512 | jpeg |
 
 ## Third-party sources (the licence register)
 
@@ -93,7 +122,7 @@ it goes in (an asset site's other assets may be under other terms).
 | Concrete Floor 02 | Rob Tuytel | https://polyhaven.com/a/concrete_floor_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | the pier deck (public/textures/pier_concrete_*.jpg) (until 17 November 2026; replaced by concrete_floor_03) | `concrete_floor_02_1k.gltf` (4 KB), `concrete_floor_02_rough_1k.jpg` (311 KB), `concrete_floor_02_diff_1k.jpg` (758 KB), `concrete_floor_02.bin` (2.3 MB), `concrete_floor_02_nor_gl_1k.jpg` (188 KB) |
 | Concrete Wall 004 | Dario Barresi, Charlotte Baglioni | https://polyhaven.com/a/concrete_wall_004 | CC0 1.0 | Not required (credited anyway in CREDITS) | the harbour wall's concrete cap (public/textures/cap_concrete_*.jpg, 512 px colour and normal, 256 px roughness) | `concrete_wall_004_1k.gltf` (3 KB), `concrete_wall_004_rough_1k.jpg` (228 KB), `concrete_wall_004_nor_gl_1k.jpg` (970 KB), `concrete_wall_004_diff_1k.jpg` (520 KB), `concrete_wall_004.bin` (2.3 MB) |
 | Water normals | three.js authors | https://github.com/mrdoob/three.js/blob/dev/examples/textures/waternormals.jpg | MIT (the three.js repository's licence) | Copyright 2010-2025 three.js authors, MIT licence | the sea's fine ripples (public/textures/water_normal.jpg) | `water_normal.jpg` (NaN KB) |
-| Red Brick 03 | Poly Haven | https://polyhaven.com/a/red_brick_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness) | `red_brick_03_diff_1k.jpg` (678 KB), `red_brick_03_nor_gl_1k.jpg` (933 KB), `red_brick_03_rough_1k.jpg` (280 KB) |
+| Red Brick 03 | Poly Haven | https://polyhaven.com/a/red_brick_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness); and the brick of the baked house fronts (source-assets/blender/build_facades.py: public/textures/facade_brick_*.jpg) | `red_brick_03_diff_1k.jpg` (678 KB), `red_brick_03_nor_gl_1k.jpg` (933 KB), `red_brick_03_rough_1k.jpg` (280 KB) |
 | Painted Plaster Wall | Poly Haven | https://polyhaven.com/a/painted_plaster_wall | CC0 1.0 | Not required (credited anyway in CREDITS) | the coastwatch building's white paint and render (public/textures/plaster_*.jpg) | `painted_plaster_wall_diff_1k.jpg` (671 KB), `painted_plaster_wall_nor_gl_1k.jpg` (879 KB), `painted_plaster_wall_rough_1k.jpg` (346 KB) |
 | Coast Sand Rocks 02 | Poly Haven | https://polyhaven.com/a/coast_sand_rocks_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | rough ground on the cliff's face and the dune at Gorleston (public/textures/ground_rough_*.jpg) | `coast_sand_rocks_02_diff_1k.jpg` (820 KB), `coast_sand_rocks_02_nor_gl_1k.jpg` (1.2 MB) |
 | Granite (generated) | FishDock (made from seeded noise) | source-assets/make_granite.py | Made for FishDock: no outside image | None needed | the rock armour's boulders (public/textures/rock_granite_*.jpg) |  |
@@ -169,8 +198,17 @@ it goes in (an asset site's other assets may be under other terms).
 | Inter (Bold, SemiBold) | Rasmus Andersson | https://rsms.me/inter/ | SIL Open Font License 1.1 | Credited in public/models/CREDITS.txt | the lettering on the pier lifebuoy stations' name board and 999 notice (textures/props2/station_sign.jpg, drawn for FishDock with Pillow; in public/models/pierprops.glb) | `station_sign.jpg` (100 KB) |
 | Aerial Sand (dry beach sand, footprints and ripples) | Rob Tuytel | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | a beach mark's dry sand, its light and dark kept and its colour the beach's own (src/lib/world3d/realPlace.js), Great Yarmouth's beach first (the colour at 1024 px, the normal at 512 px) | `aerial_sand_diff_1k.jpg` (479 KB), `aerial_sand_nor_1k.jpg` (650 KB), `beach_sand_diff.jpg` (213 KB), `beach_sand_nor.jpg` (81 KB) |
 | Damp Beach Sand | Dimitrios Savva | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | a beach mark's wet sand, below where the last waves reached (src/lib/world3d/realPlace.js) (the colour at 1024 px, the normal at 512 px) | `damp_beach_sand_diff_1k.jpg` (671 KB), `damp_beach_sand_nor_1k.jpg` (669 KB), `beach_wet_diff.jpg` (139 KB), `beach_wet_nor.jpg` (22 KB) |
-| Large Sandstone Blocks 01 | Rob Tuytel | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | Whitby's sandstone: the piers' battered walls and decks, the lighthouses, the Abbey's ruins and St Mary's Church (src/lib/world3d/realPlace.js, landmarksWhitby.js) (public/textures/sandstone_wall_*.jpg: the colour at 1024 px, the normal at 512 px) | `large_sandstone_blocks_01_diff_1k.jpg` (597 KB), `large_sandstone_blocks_01_nor_1k.jpg` (928 KB), `large_sandstone_blocks_01_rough_1k.jpg` (313 KB) |
-| LIDAR Composite DTM 2022, 1 m (Whitby) | Environment Agency | Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs) | Open Government Licence v3.0 | Required: "© Environment Agency copyright and/or database right 2022. All rights reserved." Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note) | the ground round Whitby's piers: the East and West Cliffs at their surveyed heights (src/lib/world3d/terrain3d.js: resampled every 8 m, 640 m each way round the mark) | `dtm_1m.tif` (16.0 MB) |
+| Large Sandstone Blocks 01 | Rob Tuytel | Poly Haven | CC0 1.0 | None needed (credited in public/models/CREDITS.txt) | the stone of the baked stone house fronts and the window sills (source-assets/blender/build_facades.py: public/textures/facade_stone_*.jpg); and public/textures/sandstone_wall_*.jpg (the colour at 1024 px, the normal at 512 px), kept for a stone pier without its own baked stonework (Whitby's piers, lighthouses, Abbey and St Mary's had it until 19 November 2026) | `large_sandstone_blocks_01_diff_1k.jpg` (597 KB), `large_sandstone_blocks_01_nor_1k.jpg` (928 KB), `large_sandstone_blocks_01_rough_1k.jpg` (313 KB) |
+| LIDAR Composite DTM 2022, 1 m (Whitby) | Environment Agency | Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs) | Open Government Licence v3.0 | Required: "© Environment Agency copyright and/or database right 2022. All rights reserved." Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note) | the ground round Whitby's piers: the East and West Cliffs at their surveyed heights (src/lib/world3d/terrain3d.js: each height the mean of the survey's 1 m cells over 5 m, every 5 m, 640 m each way round the mark, in centimetres) | `dtm_1m.tif` (16.0 MB) |
+| Cliff Side | James Ray Cock, Jenelle van Heerden, Dario Barresi | https://polyhaven.com/a/cliff_side | CC0 1.0 | Not required (credited anyway in CREDITS) | the rock of Whitby's cliffs, laid from three sides on their steep faces (public/textures/cliff_rock_*.jpg, 1024 px colour and normal; its light and dark only, the colour the cliff's own) | `cliff_side_diff_2k.jpg` (3.2 MB), `cliff_side_nor_gl_2k.jpg` (3.4 MB), `cliff_side_rough_2k.jpg` (1.7 MB) |
+| Leafy Grass | Charlotte Baglioni | https://polyhaven.com/a/leafy_grass | CC0 1.0 | Not required (credited anyway in CREDITS) | the grass on Whitby's cliffs and lawns (public/textures/cliff_grass_*.jpg, 1024 px colour and normal; its light and dark only, the colour the ground's own) | `leafy_grass_diff_2k.jpg` (4.5 MB), `leafy_grass_nor_gl_2k.jpg` (5.8 MB), `leafy_grass_rough_2k.jpg` (2.2 MB) |
+| Clay Roof Tiles 02 | Amal Kumar | https://polyhaven.com/a/clay_roof_tiles_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | clay pantile roofs in every town (public/textures/roof_clay_*.jpg, 1024 px colour and normal, 512 px roughness) | `clay_roof_tiles_02_diff_2k.jpg` (3.3 MB), `clay_roof_tiles_02_nor_gl_2k.jpg` (3.4 MB), `clay_roof_tiles_02_rough_2k.jpg` (1.3 MB) |
+| Roof Slates 03 | Rob Tuytel | https://polyhaven.com/a/roof_slates_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | slate roofs in every town (public/textures/roof_slate_*.jpg, 1024 px colour and normal, 512 px roughness) | `roof_slates_03_diff_2k.jpg` (2.0 MB), `roof_slates_03_nor_gl_2k.jpg` (2.6 MB), `roof_slates_03_rough_2k.jpg` (48 KB) |
+| Sandstone Cracks | Rob Tuytel | https://polyhaven.com/a/sandstone_cracks | CC0 1.0 | Not required (credited anyway in CREDITS) | the grain, pits and cracks of every block of Whitby's baked stonework (source-assets/blender/build_whitby_stone.py: public/textures/whitby_ashlar_*.jpg and whitby_flags_*.jpg); its light and dark only, the colour Whitby's own | `sandstone_cracks_diff_1k.jpg` (680 KB), `sandstone_cracks_nor_gl_1k.jpg` (1.2 MB), `sandstone_cracks_rough_1k.jpg` (344 KB) |
+| White Plaster 02 | Rob Tuytel | https://polyhaven.com/a/white_plaster_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | the painted render of the baked house fronts (source-assets/blender/build_facades.py: public/textures/facade_render_*.jpg); its light and dark only, each house's colour the game's | `white_plaster_02_diff_1k.jpg` (515 KB), `white_plaster_02_nor_gl_1k.jpg` (637 KB), `white_plaster_02_rough_1k.jpg` (289 KB) |
+| Whitby's stonework (ashlar and flags), baked | FishDock (modelled block by block from the photographs of the piers) | made for FishDock in Blender: source-assets/blender/build_whitby_stone.py | FishDock's own; made from CC0 scans (Poly Haven Sandstone Cracks) | Not required | Whitby's piers' walls (ashlar, a tile every 2.4 m) and decks (flags, every 3 m), the lighthouses, the Abbey's ruins and St Mary's Church (public/textures/whitby_ashlar_*.jpg, whitby_flags_*.jpg) |  |
+| Whitby's pier lighthouses, modelled | FishDock (proportions from photographs on Wikimedia Commons, docs/REFERENCE-PHOTOS.md; sizes estimated) | made for FishDock in Blender: source-assets/blender/build_whitby_lights.py | FishDock's own | Not required | the West Pier (1831) and East Pier (1855) lighthouses at Whitby (public/models/whitby_lights.glb) |  |
+| House fronts, modelled and baked | FishDock | made for FishDock in Blender: source-assets/blender/build_facades.py | FishDock's own; made from CC0 scans (Poly Haven Red Brick 03, White Plaster 02, Large Sandstone Blocks 01) | Not required | every town's brick, render and stone houses (public/textures/facade_{brick,render,stone}_*.jpg; src/lib/world3d/buildings3d.js) |  |
 
 Made for FishDock in Blender (no outside assets): the rod kit, the reel, the nets' frames, the fish bodies (the conger and eel from FishDock's own pictures, straightened by `source-assets/fish-straight/straighten.py`), the bench (its
 slats textured with Poly Haven's Brown Planks 03, above), the bollard and the lifebuoy housing; their scripts and sources are in `source-assets/blender/`. Attribution owed under CC BY-SA

@@ -7,8 +7,9 @@ import * as THREE from "three";
 import { styleFor, pitchedRoof, obb, footprintArea } from "./architecture.js";
 import { facade, roof, bricks, FACADE_TILE, FACADE_N, photoTex } from "./textures3d.js";
 
-// (the roofs photographed so far, and how many times each repeats across 3 m: none yet)
-const ROOF_SCANS = {};
+// (the roofs photographed (Poly Haven, CC0), and how many times each repeats across the roof's 3 m tile: "Clay Roof
+// Tiles 02" is 2.5 m across, "Roof Slates 03" 3 m)
+const ROOF_SCANS = { clay: 1.2, slate: 1 };
 const area2 = (ring) => { let a = 0; for (let i = 0; i < ring.length; i++) { const [x1, z1] = ring[i], [x2, z2] = ring[(i + 1) % ring.length]; a += x1 * z2 - x2 * z1; } return a / 2; };
 
 function bucket() { return { p: [], uv: [], c: [], i: [] }; }

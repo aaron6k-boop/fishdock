@@ -164,3 +164,10 @@ Plaster 02" (https://polyhaven.com/a/white_plaster_02) and "Large Sandstone Bloc
 
 Whitby's two pier lighthouses (public/models/whitby_lights.glb) are modelled in Blender for FishDock
 (source-assets/blender/build_whitby_lights.py) from photographs on Wikimedia Commons (docs/REFERENCE-PHOTOS.md).
+
+The roofs (public/textures/roof_clay_*.jpg and roof_slate_*.jpg, from 19 November 2026) are "Clay Roof Tiles 02" by
+Amal Kumar (https://polyhaven.com/a/clay_roof_tiles_02) and "Roof Slates 03" by Rob Tuytel
+(https://polyhaven.com/a/roof_slates_03), from Poly Haven, CC0 1.0. Whitby's cliffs (public/textures/cliff_rock_*.jpg
+and cliff_grass_*.jpg) are "Cliff Side" by James Ray Cock, Jenelle van Heerden and Dario Barresi
+(https://polyhaven.com/a/cliff_side) and "Leafy Grass" by Charlotte Baglioni (https://polyhaven.com/a/leafy_grass),
+from Poly Haven, CC0 1.0. Credited with thanks.

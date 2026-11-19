@@ -613,7 +613,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "1k",
-   "use": "the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness)",
+   "use": "the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness); and the brick of the baked house fronts (source-assets/blender/build_facades.py: public/textures/facade_brick_*.jpg)",
    "downloaded": "2026-11-04",
    "files": [
     {
@@ -2426,7 +2426,7 @@
    "attribution": "None needed (credited in public/models/CREDITS.txt)",
    "type": "PBR texture (1k: colour, normal (OpenGL), roughness)",
    "resolution": "1024",
-   "use": "Whitby's sandstone: the piers' battered walls and decks, the lighthouses, the Abbey's ruins and St Mary's Church (src/lib/world3d/realPlace.js, landmarksWhitby.js) (public/textures/sandstone_wall_*.jpg: the colour at 1024 px, the normal at 512 px)",
+   "use": "the stone of the baked stone house fronts and the window sills (source-assets/blender/build_facades.py: public/textures/facade_stone_*.jpg); and public/textures/sandstone_wall_*.jpg (the colour at 1024 px, the normal at 512 px), kept for a stone pier without its own baked stonework (Whitby's piers, lighthouses, Abbey and St Mary's had it until 19 November 2026)",
    "files": [
     {
      "file": "downloads/polyhaven-stone/large_sandstone_blocks_01_diff_1k.jpg",
@@ -2467,6 +2467,234 @@
      "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&format=image/tiff&subset=E(489200,490900)&subset=N(510700,512400)"
     }
    ]
+  },
+  {
+   "id": "polyhaven:cliff_side",
+   "name": "Cliff Side",
+   "source": "https://polyhaven.com/a/cliff_side",
+   "author": "James Ray Cock, Jenelle van Heerden, Dario Barresi",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures (photoscanned)",
+   "resolution": "2k",
+   "use": "the rock of Whitby's cliffs, laid from three sides on their steep faces (public/textures/cliff_rock_*.jpg, 1024 px colour and normal; its light and dark only, the colour the cliff's own)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/cliff_side/textures/cliff_side_diff_2k.jpg",
+     "bytes": 3387348,
+     "sha256": "bc6f92d72eb6383ecc3a1094ed9f5b37efb36ccf83cf29699bb5990e6775afee",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/cliff_side/textures/cliff_side_nor_gl_2k.jpg",
+     "bytes": 3585856,
+     "sha256": "eec5c0bb3daa1ad72f0f9c1d19caf78e84dfedcf3283b35b5a5dcf163718025f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/cliff_side/textures/cliff_side_rough_2k.jpg",
+     "bytes": 1765122,
+     "sha256": "7fd4f6d289b1b44c812533eaea7802e640dda55070b9746025a9d33117a1bd1f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/cliff_side/cliff_side_rough_2k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:leafy_grass",
+   "name": "Leafy Grass",
+   "source": "https://polyhaven.com/a/leafy_grass",
+   "author": "Charlotte Baglioni",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures (photoscanned)",
+   "resolution": "2k",
+   "use": "the grass on Whitby's cliffs and lawns (public/textures/cliff_grass_*.jpg, 1024 px colour and normal; its light and dark only, the colour the ground's own)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/leafy_grass/textures/leafy_grass_diff_2k.jpg",
+     "bytes": 4766204,
+     "sha256": "8e1c6d21365d4b89bc5a35ab664da98a78dbc3ab9ba6100474881c8619a5b113",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/leafy_grass/textures/leafy_grass_nor_gl_2k.jpg",
+     "bytes": 6047262,
+     "sha256": "df0cf0ce96e653f033e5b934d5b12995464bda027aa53bd12e329be889aa9f45",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/leafy_grass/textures/leafy_grass_rough_2k.jpg",
+     "bytes": 2274652,
+     "sha256": "34e1733bf4064b6950a575ff57e78c8b7ff71b63749eb48a49221bd65de6fb4f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/leafy_grass/leafy_grass_rough_2k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:clay_roof_tiles_02",
+   "name": "Clay Roof Tiles 02",
+   "source": "https://polyhaven.com/a/clay_roof_tiles_02",
+   "author": "Amal Kumar",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures (photoscanned)",
+   "resolution": "2k",
+   "use": "clay pantile roofs in every town (public/textures/roof_clay_*.jpg, 1024 px colour and normal, 512 px roughness)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/clay_roof_tiles_02/textures/clay_roof_tiles_02_diff_2k.jpg",
+     "bytes": 3459427,
+     "sha256": "570e1878985993bf81433d785b4fa2d4ab9f6d32447706193089b11ff0851731",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/clay_roof_tiles_02/clay_roof_tiles_02_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/clay_roof_tiles_02/textures/clay_roof_tiles_02_nor_gl_2k.jpg",
+     "bytes": 3526539,
+     "sha256": "762e2f18ba063fe3c587955be9f8a0a6e8e75cee4057e188970d1ec70a880194",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/clay_roof_tiles_02/clay_roof_tiles_02_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/clay_roof_tiles_02/textures/clay_roof_tiles_02_rough_2k.jpg",
+     "bytes": 1392056,
+     "sha256": "a70d571203b80f763a6bcd4463330d8e2a5480ee6e29b559d1a05f1a61d5a81e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/clay_roof_tiles_02/clay_roof_tiles_02_rough_2k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:roof_slates_03",
+   "name": "Roof Slates 03",
+   "source": "https://polyhaven.com/a/roof_slates_03",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures (photoscanned)",
+   "resolution": "2k",
+   "use": "slate roofs in every town (public/textures/roof_slate_*.jpg, 1024 px colour and normal, 512 px roughness)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/roof_slates_03/textures/roof_slates_03_diff_2k.jpg",
+     "bytes": 2083015,
+     "sha256": "955eb467fc609e4509c2354f0b88755ffa137dac352b651efed95026f4a6aa5c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_slates_03/roof_slates_03_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/roof_slates_03/textures/roof_slates_03_nor_gl_2k.jpg",
+     "bytes": 2741713,
+     "sha256": "f797ad9756e6584736831cf07f79872440a6a4811c80f9bcedd3b20b05c7596d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_slates_03/roof_slates_03_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/roof_slates_03/textures/roof_slates_03_rough_2k.jpg",
+     "bytes": 49508,
+     "sha256": "bd583b73aa9c496f0d8012c2d6acaa704d6acce912d7de1d5af723bbeffa9942",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/roof_slates_03/roof_slates_03_rough_2k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:sandstone_cracks",
+   "name": "Sandstone Cracks",
+   "source": "https://polyhaven.com/a/sandstone_cracks",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "the grain, pits and cracks of every block of Whitby's baked stonework (source-assets/blender/build_whitby_stone.py: public/textures/whitby_ashlar_*.jpg and whitby_flags_*.jpg); its light and dark only, the colour Whitby's own",
+   "downloaded": "earlier (already in the downloads folder)",
+   "files": [
+    {
+     "file": "downloads/polyhaven/sandstone_cracks/textures/sandstone_cracks_diff_1k.jpg",
+     "bytes": 696657,
+     "sha256": "cf381bbcf60aac570ce895719025a2b7adae7c03369b3d545b4f52f94e57e0e9",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandstone_cracks/sandstone_cracks_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/sandstone_cracks/textures/sandstone_cracks_nor_gl_1k.jpg",
+     "bytes": 1307622,
+     "sha256": "cb983540cae33979e79862fe27b4ec23a5d41c627230d3730e9d5ff6671859f9",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandstone_cracks/sandstone_cracks_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/sandstone_cracks/textures/sandstone_cracks_rough_1k.jpg",
+     "bytes": 352483,
+     "sha256": "4995b3ce148ceef48ea3bc0b83a8799fd0bf38e00c75677ff2de857a7d4cbdbb",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/sandstone_cracks/sandstone_cracks_rough_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:white_plaster_02",
+   "name": "White Plaster 02",
+   "source": "https://polyhaven.com/a/white_plaster_02",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures",
+   "resolution": "1k",
+   "use": "the painted render of the baked house fronts (source-assets/blender/build_facades.py: public/textures/facade_render_*.jpg); its light and dark only, each house's colour the game's",
+   "downloaded": "earlier (already in the downloads folder)",
+   "files": [
+    {
+     "file": "downloads/polyhaven/white_plaster_02/textures/white_plaster_02_diff_1k.jpg",
+     "bytes": 527219,
+     "sha256": "a1ebbe091bd1ae93d2abd5de8d69f9003a8d0ee6532bcf9a87c2492c97051f23",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_plaster_02/white_plaster_02_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/white_plaster_02/textures/white_plaster_02_nor_gl_1k.jpg",
+     "bytes": 652310,
+     "sha256": "eb572ca3630d5bfde72e2601b1f02412da23ca005cd19384dced8690be4cb783",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_plaster_02/white_plaster_02_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/white_plaster_02/textures/white_plaster_02_rough_1k.jpg",
+     "bytes": 295900,
+     "sha256": "4ff1fe957cd161b07f721fe6c28a9459c8c2e8ec65627a26c16e483a07c80d85",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/white_plaster_02/white_plaster_02_rough_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "fishdock:whitby-stone",
+   "name": "Whitby's stonework (ashlar and flags), baked",
+   "source": "made for FishDock in Blender: source-assets/blender/build_whitby_stone.py",
+   "author": "FishDock (modelled block by block from the photographs of the piers)",
+   "licence": "FishDock's own; made from CC0 scans (Poly Haven Sandstone Cracks)",
+   "attribution": "Not required",
+   "type": "baked PBR textures (colour, OpenGL normal, roughness), seamless",
+   "resolution": "baked at 2048 px; shipped 1024 px colour and normal, 512 px roughness",
+   "use": "Whitby's piers' walls (ashlar, a tile every 2.4 m) and decks (flags, every 3 m), the lighthouses, the Abbey's ruins and St Mary's Church (public/textures/whitby_ashlar_*.jpg, whitby_flags_*.jpg)",
+   "made": "2026-11-19"
+  },
+  {
+   "id": "fishdock:whitby-lights",
+   "name": "Whitby's pier lighthouses, modelled",
+   "source": "made for FishDock in Blender: source-assets/blender/build_whitby_lights.py",
+   "author": "FishDock (proportions from photographs on Wikimedia Commons, docs/REFERENCE-PHOTOS.md; sizes estimated)",
+   "licence": "FishDock's own",
+   "attribution": "Not required",
+   "type": "glTF model, three levels of detail each, ambient occlusion baked into vertex colours; no pictures (the game lays the baked ashlar on it)",
+   "resolution": "West: 33,888 / 7,454 / 1,694 triangles; East: 9,632 / 2,118 / 480",
+   "use": "the West Pier (1831) and East Pier (1855) lighthouses at Whitby (public/models/whitby_lights.glb)",
+   "made": "2026-11-19"
+  },
+  {
+   "id": "fishdock:facades",
+   "name": "House fronts, modelled and baked",
+   "source": "made for FishDock in Blender: source-assets/blender/build_facades.py",
+   "author": "FishDock",
+   "licence": "FishDock's own; made from CC0 scans (Poly Haven Red Brick 03, White Plaster 02, Large Sandstone Blocks 01)",
+   "attribution": "Not required",
+   "type": "baked PBR atlases (colour, OpenGL normal, roughness, glass mask), five bays of 3 m",
+   "resolution": "baked at 1024 px a bay; shipped 512 px a bay (2560 by 512), roughness and glass at half that",
+   "use": "every town's brick, render and stone houses (public/textures/facade_{brick,render,stone}_*.jpg; src/lib/world3d/buildings3d.js)",
+   "made": "2026-11-19"
   }
  ]
 }

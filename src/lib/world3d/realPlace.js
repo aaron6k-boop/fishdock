@@ -807,12 +807,16 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           if (vSand > 0.01) { vec3 sn = mix(texture2D(uSandN, vWPos.xz / uSandK.w).xyz, texture2D(uSandWN, vWPos.xz / uSandL.z).xyz, fdWet) * 2.0 - 1.0; float sk = 1.0 - smoothstep(12.0, 45.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(sn.x, sn.y, 0.0) * 0.6 * sk), vSand)); }
           if (vGrass > 0.01) { vec3 gn = (uClOn > 0.5 ? texture2D(uClGN, vWPos.xz / uClK.y).xyz : texture2D(uTurfN, vRufUv * 4.0).xyz) * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
           if (vRuf > 0.01 && vFace < 0.0 && uClOn > 0.5) {
-            // (the cliff's relief: the grass photograph's, and the rock's from whichever side it's laid from most)
+            // (the cliff's relief, in the world's own axes: the grass photograph's laid flat (across x, along z), the
+            // rock's from whichever side it's laid from most; then into the view. The usual shortcut of adding the map's
+            // tilt in screen axes lit the grass as crumpled paper)
+            float far = smoothstep(30.0, 140.0, length(vViewPosition));
             vec3 gn = texture2D(uClGN, vWPos.xz / uClK.y).xyz * 2.0 - 1.0;
-            vec3 rn = (fdTriW.x > fdTriW.z ? texture2D(uClRN, vWPos.zy / uClK.x).xyz : texture2D(uClRN, vWPos.xy / uClK.x).xyz) * 2.0 - 1.0;
-            rn = mix(rn, texture2D(uClRN, vWPos.xz / uClK.x).xyz * 2.0 - 1.0, fdTriW.y);
-            vec3 dn = mix(gn * 0.7, rn * 1.1, fdRock); float nk = 1.0 - smoothstep(40.0, 160.0, length(vViewPosition)) * 0.6;
-            normal = normalize(mix(normal, normalize(normal + vec3(dn.x, dn.y, 0.0)), vRuf * nk));
+            vec3 nw = vWNrm + vec3(gn.x, 0.0, -gn.y) * 0.28 * (1.0 - fdRock) * (1.0 - far);
+            vec3 rz = texture2D(uClRN, vWPos.xy / uClK.x).xyz * 2.0 - 1.0, rx = texture2D(uClRN, vWPos.zy / uClK.x).xyz * 2.0 - 1.0;
+            vec3 rw = vec3(rz.x, rz.y, 0.0) * fdTriW.z + vec3(0.0, rx.y, rx.x) * fdTriW.x;
+            nw += rw * 0.9 * fdRock * (1.0 - far * 0.6);
+            normal = normalize(mix(normal, normalize(mat3(viewMatrix) * normalize(nw)), vRuf));
           } else if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; float nk = vFace >= 0.0 ? 1.0 - smoothstep(10.0, 35.0, length(vViewPosition)) : 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf * nk * (vFace >= 0.0 ? 0.3 : 1.0))); }
           if (vFace >= 0.0 && fdDuneH > 0.0) {
             // the clumps stand up from the sand: the light catches their sunward side (their height's slope across the screen)
@@ -821,7 +825,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
           }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf13";
+    softMat.customProgramCacheKey = () => "fdruf14";
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
