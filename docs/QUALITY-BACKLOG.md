@@ -168,6 +168,16 @@ Seen on Aaron's PC and not fixed yet:
 - Frame rate on Ultra varies by a tenth or so from run to run; on the final runs Whitby drew 69 to 82 a second at 1.75 to 2 times the screen's resolution (its slowest 1% at 35 to 56), against 94 before the rebuild; the other places 66 (Lowestoft) to 90 (Great Yarmouth), against 89 to 115 before. The fine hillside's shadows and reflection, the window modules and the grass layer's overdraw are the costs to work on.
 - The other UK places (Brighton, Chesil, Brixham and the East Anglian marks) haven't had the hillside, building and clutter work applied with their own character yet.
 
+### First person, still to do after stage 1 of the overhaul (19 November)
+
+Seen in the played catch on Aaron's PC (`docs/GRAPHICS-OVERHAUL.md` has the whole list):
+- The hands need a new model or sculpt: fingernails, firmer knuckles, skin that isn't even. More work on the maps won't get there.
+- The right hand's first two fingers lift off the rod when the hand gives to the rod's turn.
+- Through the cast's wind-up and release the reel passes close in front of the eye and the left sleeve crosses the lower left of the picture.
+- Reaching down for the drop net the left sleeve is seen from inside, cut open near the eye.
+- Playing a fish with the hands drawn in, the left forearm comes in level from the left edge.
+- A stall of one to three seconds when the catch card opens (the game's meter calls it "fish inspect"); it was there before.
+
 ## Done (with evidence)
 
 | Date | What | Evidence |

@@ -104,7 +104,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
         vec3 toC = p - cameraPosition; float d = length(toC);
         vec3 ax = normalize(vel), side = normalize(cross(ax, toC));
         float len = length(vel) * uLen * (0.75 + 0.5 * r2);
-        float w = max(uWidth * sz, d * uPix * 1.15), thin = pow(uWidth * sz / w, 0.65);
+        float w = max(uWidth * sz, d * uPix * 1.35), thin = pow(uWidth * sz / w, 0.6);
         vec3 wp = p + ax * len * aCorner.y + side * w * aCorner.x * 0.5;
         // (faint within a couple of metres of your eye, where a streak crosses half the view in a blink, and none within a
         // hand's length; thinned out towards the box's edges, so the drops never show it)
@@ -112,7 +112,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
         vec3 view = toC / max(d, 1e-3);
         // (a drop is clear water, not paint: it shows about three quarters of the sky's light, each its own share of it, so
         // against a dark sea or cliff the rain is a fine grey and against the sky it is nearly lost, as rain is)
-        vCol = dropLight(p, view) * (0.6 + 0.3 * r2); vA = uAlpha * fade * thin * (0.45 + 0.55 * r3); vC = aCorner;
+        vCol = dropLight(p, view) * (0.66 + 0.3 * r2); vA = uAlpha * fade * thin * (0.45 + 0.55 * r3); vC = aCorner;
         vec4 mvPosition = viewMatrix * vec4(wp, 1.0); gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
       }`,
