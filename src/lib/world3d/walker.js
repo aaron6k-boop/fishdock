@@ -15,7 +15,7 @@
 // (three paces from 19 November: a walk up to 1.4 m/s over the first six tenths of the stick, a jog at 2.4 m/s at a full
 // push (the motion-captured run at the speed it was filmed at; a full push used to be the walk, and there was no
 // jog), and a run at 3.1 m/s with Sprint held)
-export const WALK = { speed: 1.4, jog: 2.4, walkTo: 0.6, sprint: 3.1, turn: 9, turnMax: [5.5, 4.6, 3.2], jump: 5.2, gravity: 16, step: 0.45, go: 9, halt: 13, air: 4.9, dead: 0.12 };
+export const WALK = { speed: 1.4, jog: 2.4, walkTo: 0.6, sprint: 3.1, turn: 9, turnMax: [5.5, 4.6, 3.2], lookTurn: 0.8, lookRate: 3.2, backAt: 1.9, backSpeed: 1.1, jump: 5.2, gravity: 16, step: 0.45, go: 9, halt: 13, air: 4.9, dead: 0.12 };
 
 /** A fresh walker standing at (x, z), facing `face` (radians, 0 = -z). */
 export function walker(x, z, face, y = 0) { return { x, z, y, vy: 0, vx: 0, vz: 0, ax: 0, az: 0, face, speed: 0, air: false, phase: 0, turnRate: 0, acc: 0, off: 0 }; }
@@ -55,16 +55,27 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
   // forwards is where the camera looks (yaw 0 = -z); right is 90° clockwise of it
   const fx = Math.sin(input.camYaw || 0), fz = -Math.cos(input.camYaw || 0), rx = -fz, rz = fx;
   const dx = (fx * iy + rx * ix) * mag, dz = (fz * iy + rz * ix) * mag;
-  const v = input.sprint ? W.sprint * mag : paceAt(mag, W);
+  // (in first person your body is under your own eyes, so it keeps to the way you look: pull the stick back and you
+  // back away, slowly, still facing ahead, rather than turning to walk towards your own eyes)
+  const eyes = input.lookYaw != null, back = eyes && mag > 0.05 && Math.abs(wrap(Math.atan2(dx, -dz) - input.lookYaw)) > W.backAt;
+  const v = back ? Math.min(W.backSpeed, paceAt(mag, W)) : input.sprint ? W.sprint * mag : paceAt(mag, W);
   // turn to face the way you're going: eased in at the end, never quicker than a body turns (a pivot standing, a wider
   // arc at speed), so turning back the way you came is a turn, not a flip
   const sp0 = Math.hypot(s.vx || 0, s.vz || 0);
   let off = 0;
   if (mag > 0.05) {
-    off = wrap(Math.atan2(dx, -dz) - s.face);
+    off = wrap(Math.atan2(dx, -dz) + (back ? Math.PI : 0) - s.face);
     const lim = turnLimit(sp0, W) * dt, step = off * (1 - Math.exp(-dt * W.turn));
     n.face = wrap(s.face + Math.max(-lim, Math.min(lim, step)));
+    n.follow = false;
+  } else if (eyes && !s.air) {
+    // (standing: you look round with your head; past about 45 degrees your feet come round after it, and keep on
+    // until you're square to your look again)
+    const o = wrap(input.lookYaw - s.face);
+    n.follow = s.follow ? Math.abs(o) > 0.1 : Math.abs(o) > W.lookTurn;
+    if (n.follow) { const lim = W.lookRate * dt; n.face = wrap(s.face + Math.max(-lim, Math.min(lim, o * (1 - Math.exp(-dt * W.turn))))); }
   }
+  n.back = back;
   n.off = wrap(off - wrap(n.face - s.face));
   n.turnRate = dt > 0 ? wrap(n.face - s.face) / dt : 0;
   const floor = (x, z) => ground.heightAt(x, z);

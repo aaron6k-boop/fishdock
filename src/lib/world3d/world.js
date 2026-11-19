@@ -15,7 +15,7 @@ import { createRockSpray } from "./rockSpray.js";
 import { createTipLights, createHeadTorch } from "./nightKit.js";
 import { setHandsDim, setHandsWet, setRigView, setSoftCut, ZOOM_DROP } from "./fpRig.js";
 import { wetSpotAt, dryWetSpots } from "./wetLook.js";
-import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
+import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, EYES_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
 import { safeSpots, spawnFor } from "./spawn.js";
 import { planCast } from "./castAim.js";
@@ -291,6 +291,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   function trimCasters() {
     scene.traverse((o) => {
       if (!o.isMesh || !o.castShadow || o.isInstancedMesh || o.userData.fdCast != null) return;
+      // (a person's meshes are sized by their bones, not by their own place in the scene: the newer people's are in
+      // metres under a skeleton a hundredth the size, so by this measure a whole jacket was 7 mm across, and none of
+      // them cast a shadow at all: seen on 19 November, looking for your own shadow from your own eyes)
+      if (o.isSkinnedMesh) { o.userData.fdCast = true; return; }
       const g = o.geometry; if (!g?.attributes?.position) return; if (!g.boundingSphere) g.computeBoundingSphere();
       o.updateWorldMatrix(true, false); const r = (g.boundingSphere?.radius || 0) * o.matrixWorld.getMaxScaleOnAxis();
       o.userData.fdCast = r >= 0.1; if (!o.userData.fdCast) o.castShadow = false; // (10 cm across or more casts)
@@ -453,6 +457,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // looks from (eased, so a step up or a jump doesn't jolt it), the footsteps' stride, and a glide between views ----
   let followAt = 0, pivotY = null, pivotXZ = null, gait = { d: 0 }, camBlend = null, clockT = 0; // (clockT: the scene's clock, so a filmed glide is exact)
   const WALK_FOV = 62;
+  // (your eyes from the joint your head nods on, metres forward and up: small on purpose. With a real head's 9 cm and
+  // 12 cm the camera came down to the collar when you looked at your feet, and the near edge of the view cut through
+  // the jacket's front on the people whose jackets stand proud of the chest: seen as torn orange cloth, h295)
+  const NECK_EYE = [0.03, 0.06];
   // (first person on an upright phone: the view is narrow across, 37 degrees at the old 1.15, and your own hands, a
   // forearm's length from your eye, filled a third of it and looked enormous. Wider, they take the share of the view
   // they do of your own, and more of the pier shows either side)
@@ -564,8 +572,14 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       // (the turn eases its own speed up and down; the pitch comes back to its level on its own after a look up or down,
       // walking or standing, and a double tap recentres behind you)
       const sinceTouch = performance.now() - look.touched;
-      look.follow(W.face, null, walkFollow({ dragging: look.dragging, sinceTouch, speed: W.camSpeed, off: W.face - look.yaw, dt }), dt);
-      look.easePitch(WALK_PITCH.level, walkPitchBack({ dragging: look.dragging, sinceTouch, dt }));
+      // (at your own eyes none of that: where you look is yours, your body comes round after it (walker.js), and you
+      // can look right down at yourself and up at the sky, the view staying where you leave it)
+      const eyesNow = look.fov < 31.8;
+      if (eyesNow !== W.eyes) { W.eyes = eyesNow; const r = eyesNow ? EYES_PITCH : WALK_PITCH; look.setPitchRange(r.min, r.max, false); }
+      if (!eyesNow) {
+        look.follow(W.face, null, walkFollow({ dragging: look.dragging, sinceTouch, speed: W.camSpeed, off: W.face - look.yaw, dt }), dt);
+        look.easePitch(WALK_PITCH.level, walkPitchBack({ dragging: look.dragging, sinceTouch, dt }));
+      }
       look.setHome(W.face, WALK_PITCH.level);
       yaw = look.yaw; pitch = look.pitch;
       // the height it looks from eases after you (a step up, a jump, a ramp onto the pier), never jolting
@@ -589,6 +603,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
           if (ld) { const m = Math.hypot(ld[0], ld[1]), c = m > 0.35 ? 0.35 / m : 1; W.lead[0] += (ld[0] * c - W.lead[0]) * kl; W.lead[1] += (ld[1] * c - W.lead[1]) * kl;
             const dy = ld[2] > 1.2 && ld[2] < 2 ? ld[2] - 1.62 : 0; W.lead[2] += (dy - W.lead[2]) * (1 - Math.exp(-dt * 3)); }
           pos.x += W.lead[0]; pos.z += W.lead[1]; pos.y += W.lead[2]; }
+        // (looking down or up turns your head on your neck, and your eyes are in front of and above that joint: looking
+        // down at yourself they come forward and down, over your chest, rather than staying above your collar)
+        { const a = Math.max(-1.0, Math.min(1.2, -pitch)), f = NECK_EYE[0] * (Math.cos(a) - 1) + NECK_EYE[1] * Math.sin(a), u = NECK_EYE[1] * (Math.cos(a) - 1) - NECK_EYE[0] * Math.sin(a);
+          pos.x += Math.sin(yaw) * f; pos.z -= Math.cos(yaw) * f; pos.y += u; }
         if (!reduceMotion) { const sx = Math.cos(yaw), sz = Math.sin(yaw), w = Math.sin(ph * 0.5) * 0.02 * sp; pos.x += sx * w; pos.z += sz * w; }
         anglers.get(localId)?.a.setFirstPerson(true);
       }
@@ -985,8 +1003,9 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
           else { camYaw = Math.atan2(dx, -dz); input = { x: 0, y: Math.min(1, 0.45 + d * 0.25), sprint: false }; }
         }
         const x0 = W.x, z0 = W.z, wasAir = W.air;
+        const eyesView = !walkTarget && look.fov < 31.8; // (first person: your body keeps to the way you look)
         const ph0 = W.phase;
-        while (rem > 1e-4) { const h = Math.min(0.05, rem); W = stepWalker(W, { ...input, camYaw, jump: walkJump }, h, env.ground); walkJump = false; rem -= h; }
+        while (rem > 1e-4) { const h = Math.min(0.05, rem); W = stepWalker(W, { ...input, camYaw, lookYaw: eyesView ? look.yaw : null, jump: walkJump }, h, env.ground); walkJump = false; rem -= h; }
         // a footstep each time a foot comes down (quicker as you speed up, softer at a stroll), on this ground; and the
         // landing from a jump
         void ph0;
