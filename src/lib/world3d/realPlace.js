@@ -676,6 +676,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const CL = local?.cliff || null;
   const clG = CL ? photoTex(CL.grass + "_diff") : null, clGN = clG && photoTex(CL.grass + "_nor", { srgb: false });
   const clR = CL ? photoTex(CL.rock + "_diff") : null, clRN = clR && photoTex(CL.rock + "_nor", { srgb: false });
+  const clOn = !!(CL && clG && clR);
   if (rufMap) {
     softMat.onBeforeCompile = (sh) => {
       sh.uniforms.uRuf = { value: rufMap }; sh.uniforms.uRufN = { value: rufNor }; sh.uniforms.uTurf = { value: turfT.map }; sh.uniforms.uTurfN = { value: turfT.normalMap };
@@ -685,13 +686,28 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2.5, 0, 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: CL && clG && clR ? 1 : 0 };
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; attribute float aSteep; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;")
         .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vSteep = aSteep; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);");
+      // (only the samplers this place uses are declared: with the sand's four, the cliff's four and the turf's two all in
+      // one shader it needed seventeen, and a graphics card allowing sixteen (most PCs through Direct3D) failed to build
+      // it, and drew none of the soft ground: Whitby's cliffs were missing on the PC)
       sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
-          uniform sampler2D uRuf, uRufN, uTurf, uTurfN, uSand, uSandN, uSandW, uSandWN, uClG, uClGN, uClR, uClRN; uniform vec4 uSandK, uClK; uniform vec3 uSandL, uClRock; uniform float uClOn; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;
+          ${BP ? "#define FD_SAND" : ""}
+          ${clOn ? "#define FD_CLIFF" : ""}
+          uniform sampler2D uRuf, uRufN;
+          #ifdef FD_CLIFF
+            uniform sampler2D uClG, uClGN, uClR, uClRN;
+          #else
+            uniform sampler2D uTurf, uTurfN;
+          #endif
+          #ifdef FD_SAND
+            uniform sampler2D uSand, uSandN, uSandW, uSandWN;
+          #endif
+          uniform vec4 uSandK, uClK; uniform vec3 uSandL, uClRock; uniform float uClOn; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;
           float fdDuneH = 0.0, fdWet = 0.0, fdRock = 0.0; vec3 fdTriW = vec3(0.0, 1.0, 0.0);
           float fdDH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float fdDN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fdDH(i), fdDH(i + vec2(1.0, 0.0)), f.x), mix(fdDH(i + vec2(0.0, 1.0)), fdDH(i + vec2(1.0, 1.0)), f.x), f.y); }
           float fdDF(vec2 p) { float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++) { s += a * fdDN(p); p = p * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }`)
         .replace("#include <color_fragment>", `#include <color_fragment>
+          #ifdef FD_SAND
           if (vSand > 0.01) {
             // the beach: a photograph of dry sand at two scales (so its tile doesn't show across a hundred metres), its
             // light and dark kept and its colour the beach's own; and where the waves have wet it, from the water's edge
@@ -712,17 +728,19 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             diffuseColor.rgb = mix(diffuseColor.rgb, mix(dry, wetC, fdWet), vSand);
             fdWet *= vSand;
           }
+          #endif
           if (vGrass > 0.01) {
-            // turf at two scales (2 m and about 7 m) so the blades don't repeat visibly across a lawn; the tint is the ground's
-            vec2 tuv = vRufUv * 4.0;
-            vec3 t1 = texture2D(uTurf, tuv).rgb, t2 = texture2D(uTurf, tuv * 0.29 + 0.41).rgb;
-            vec3 grass = vColor.rgb * mix(t1, t2, 0.45) * 2.05;
-            if (uClOn > 0.5) {
+            #ifdef FD_CLIFF
               // (where the place has its photographed grass (local.cliff), the lawns are that too, not the drawn turf)
               vec2 wq = vWPos.xz; vec3 q1 = texture2D(uClG, wq / uClK.y).rgb, q2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wq / (uClK.y * 3.7) + 0.31).rgb;
               float ql = dot(mix(q1, q2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02);
-              grass = vColor.rgb * 0.95 * mix(clamp(pow(ql, 0.75), 0.45, 1.7), 1.0, smoothstep(60.0, 260.0, length(vViewPosition)) * 0.6) * (0.9 + 0.2 * fdDN(wq / 19.0));
-            }
+              vec3 grass = vColor.rgb * 0.95 * mix(clamp(pow(ql, 0.75), 0.45, 1.7), 1.0, smoothstep(60.0, 260.0, length(vViewPosition)) * 0.6) * (0.9 + 0.2 * fdDN(wq / 19.0));
+            #else
+              // turf at two scales (2 m and about 7 m) so the blades don't repeat visibly across a lawn; the tint is the ground's
+              vec2 tuv = vRufUv * 4.0;
+              vec3 t1 = texture2D(uTurf, tuv).rgb, t2 = texture2D(uTurf, tuv * 0.29 + 0.41).rgb;
+              vec3 grass = vColor.rgb * mix(t1, t2, 0.45) * 2.05;
+            #endif
             diffuseColor.rgb = mix(diffuseColor.rgb, grass, vGrass);
           }
           if (vRuf > 0.01) {
@@ -735,7 +753,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             // scaled by 2.2 the ground came out at an eighth of its colour, and the dune's sand read as dark olive scrub)
             // (its stones' light and dark softened: at full contrast the sand read as a heap of pebbles)
             vec3 tinted = vColor.rgb * clamp(pow(lum / 0.06, 0.55), 0.45, 1.7) + (ph - lum) * 0.12;
-            if (vFace < 0.0 && uClOn > 0.5) {
+            #ifdef FD_CLIFF
+            if (vFace < 0.0) {
               // the cliff (local.cliff): grass from a photograph at two scales (the second turned, so neither repeats
               // across the slope), its light and dark kept and its colour the bank's tint; darker patches of scrub
               vec2 wp = vWPos.xz; float dist = length(vViewPosition);
@@ -765,6 +784,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               fdRock *= 1.0 - 0.7 * smoothstep(0.58, 0.7, fdDF(vec2(wp.x + wp.y, vWPos.y * 2.2) / 9.0 + 3.0));
               tinted = mix(grassC, rockC, fdRock);
             }
+            #endif
             if (vFace >= 0.0) {
               // the dune, drawn from where each point is on the ground (not from the tiled photograph, whose pebbles
               // read from the pier as an even yellow stipple): pale sand; marram grass in drifts metres across, straw
@@ -804,9 +824,17 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.46, fdWet);")
         .replace("#include <normal_fragment_maps>", `vec3 fdFlatN = normal;
           #include <normal_fragment_maps>
+          #ifdef FD_SAND
           if (vSand > 0.01) { vec3 sn = mix(texture2D(uSandN, vWPos.xz / uSandK.w).xyz, texture2D(uSandWN, vWPos.xz / uSandL.z).xyz, fdWet) * 2.0 - 1.0; float sk = 1.0 - smoothstep(12.0, 45.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(sn.x, sn.y, 0.0) * 0.6 * sk), vSand)); }
-          if (vGrass > 0.01) { vec3 gn = (uClOn > 0.5 ? texture2D(uClGN, vWPos.xz / uClK.y).xyz : texture2D(uTurfN, vRufUv * 4.0).xyz) * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
-          if (vRuf > 0.01 && vFace < 0.0 && uClOn > 0.5) {
+          #endif
+          #ifdef FD_CLIFF
+            #define FD_GRASS_N texture2D(uClGN, vWPos.xz / uClK.y).xyz
+          #else
+            #define FD_GRASS_N texture2D(uTurfN, vRufUv * 4.0).xyz
+          #endif
+          if (vGrass > 0.01) { vec3 gn = FD_GRASS_N * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
+          #ifdef FD_CLIFF
+          if (vRuf > 0.01 && vFace < 0.0) {
             // (the cliff's relief, in the world's own axes: the grass photograph's laid flat (across x, along z), the
             // rock's from whichever side it's laid from most; then into the view. The usual shortcut of adding the map's
             // tilt in screen axes lit the grass as crumpled paper)
@@ -817,7 +845,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             vec3 rw = vec3(rz.x, rz.y, 0.0) * fdTriW.z + vec3(0.0, rx.y, rx.x) * fdTriW.x;
             nw += rw * 0.9 * fdRock * (1.0 - far * 0.6);
             normal = normalize(mix(normal, normalize(mat3(viewMatrix) * normalize(nw)), vRuf));
-          } else if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; float nk = vFace >= 0.0 ? 1.0 - smoothstep(10.0, 35.0, length(vViewPosition)) : 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf * nk * (vFace >= 0.0 ? 0.3 : 1.0))); }
+          } else
+          #endif
+          if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; float nk = vFace >= 0.0 ? 1.0 - smoothstep(10.0, 35.0, length(vViewPosition)) : 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf * nk * (vFace >= 0.0 ? 0.3 : 1.0))); }
           if (vFace >= 0.0 && fdDuneH > 0.0) {
             // the clumps stand up from the sand: the light catches their sunward side (their height's slope across the screen)
             vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition); vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx); float det = dot(dpx, r1);
@@ -825,7 +855,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
           }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf14";
+    softMat.customProgramCacheKey = () => "fdruf15" + (BP ? "s" : "") + (clOn ? "c" : "");
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
