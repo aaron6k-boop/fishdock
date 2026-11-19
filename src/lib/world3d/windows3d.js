@@ -117,7 +117,9 @@ export function buildWindowModules(group, mods) {
     if (!G[t]) continue;
     for (const [part, geo] of Object.entries(G[t])) {
       const mesh = new THREE.InstancedMesh(geo, mats[part], Math.min(list.length, 1500));
-      mesh.castShadow = false; // (no shadows from the frames and sills: at the sun's shadow map's resolution a recess's shadow hardly shows, and the fifteen hundred or so modules were drawn again into it) mesh.receiveShadow = true; mesh.frustumCulled = false; mesh.count = 0; mesh.name = "fdWindows";
+      // (no shadows from the frames and sills: at the sun's shadow map's resolution a recess's shadow hardly shows, and
+      // the fifteen hundred or so modules were drawn again into it)
+      mesh.castShadow = false; mesh.receiveShadow = true; mesh.frustumCulled = false; mesh.count = 0; mesh.name = "fdWindows";
       if (part !== "glass") { const w = new THREE.Color(1, 1, 1); for (let k = 0; k < mesh.instanceMatrix.count; k++) mesh.setColorAt(k, w); } // (made now, so its shader is built with it)
       group.add(mesh); meshes.push({ t: +t, part, mesh, list });
     }

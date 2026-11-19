@@ -696,6 +696,20 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // turf: the lawns and the town's ground are grass (drawn turf, textures3d.js) rather than the deck's concrete tinted green
   const grs = new Float32Array(n * n); for (let k = 0; k < n * n; k++) grs[k] = bank[k] || dune[k] > 0.05 ? 0 : cls[k] === 3 || town[k] ? 1 : 0;
   g.setAttribute("aGrass", new THREE.BufferAttribute(grs, 1));
+  // (plain land at the edge of the soft ground: a quay's or a promenade's corner that a bank's or a lawn's triangle
+  // reaches. Drawn by the soft ground's shader with nothing of its own, it took the concrete's pale grey, and along the
+  // foot of Whitby's East Cliff the strip shone white on Aaron's PC. It takes its neighbour's ground instead: rough by a
+  // bank, grass by a lawn, its colour most of the way to theirs; the concrete's own triangles only take the tint, a
+  // dirty edge where the bank comes down onto it)
+  for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+    const k = j * n + i; if (cls[k] !== 1 || town[k] || bank[k] || dune[k] > 0.05) continue;
+    const nb = [k - 1, k + 1, k - n, k + n], bq = nb.find((q) => bank[q]), lq = nb.find((q) => cls[q] === 3 || town[q]), q = bq ?? lq; if (q === undefined) continue;
+    if (bq !== undefined) ruf[k] = Math.max(ruf[k], 0.75); else grs[k] = 1;
+    // (less of the neighbour's colour where the point is mostly among the concrete's own, so a promenade's edge isn't
+    // stained green along every lawn)
+    const plain = nb.filter((p) => cls[p] === 1 && !town[p] && !bank[p] && dune[p] <= 0.05).length, f = plain >= 2 ? 0.35 : 0.75;
+    for (let ch = 0; ch < 3; ch++) col[k * 3 + ch] += (col[q * 3 + ch] - col[k * 3 + ch]) * f;
+  }
   for (let k = 0; k < n * n; k++) if (bank[k] || dune[k] <= 0) faceA[k] = -1; // (-1: not the dune, no scrub drawn)
   // the beach's sand (a beach mark's: localDetail.js beach), drawn from a photograph of sand, wet below the last waves
   const sandA = new Float32Array(n * n); if (BP) for (let k = 0; k < n * n; k++) sandA[k] = (cls[k] === 2 || (cls[k] === 0 && h[k] > GROUND.water + 0.05)) && !dune[k] ? 1 : 0;
@@ -1044,8 +1058,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               #endif
               // (its edge ragged and fairly sharp, the grass breaking off at it as on a slip: blended softly over the 1 m
               // mesh it read from the harbour as brown smudges on a green baize)
-              float se = fdDN(vWPos.zy * 1.7) * tw.x + fdDN(vWPos.xz * 1.7) * tw.y + fdDN(vWPos.xy * 1.7) * tw.z;
-              tinted = mix(tinted, soilC, smoothstep(0.45, 0.66, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.22));
+              float se = (fdDN(vWPos.zy * 1.1) * tw.x + fdDN(vWPos.xz * 1.1) * tw.y + fdDN(vWPos.xy * 1.1) * tw.z) * 0.65 + (fdDN(vWPos.zy * 3.7) * tw.x + fdDN(vWPos.xz * 3.7) * tw.y + fdDN(vWPos.xy * 3.7) * tw.z) * 0.35;
+              tinted = mix(tinted, soilC, smoothstep(0.44, 0.68, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.36)); // (two scales of noise: one alone left the 1 m mesh's blocks showing)
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
