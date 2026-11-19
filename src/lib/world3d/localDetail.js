@@ -60,8 +60,10 @@ export const LOCAL = {
     // piling with grass on top, as Christopher Hilton's photograph from the pier shows (Geograph 7618525, bearing 338
     // from the camera meets that bank at about x -44). The dune used to run on to x -140 and hid the town behind it)
     dunes: (x, z) => z < -85 && z > -175 && x > -35 && x < 80,
-    // (the pier-head photograph Aaron shared, John Ellis, April 2018: across the harbour mouth the dune is a tall bank, about 8 m, estimated)
-    duneH: 8,
+    // (the spit's own height now comes from the survey, 5 to 6.5 m above datum, 2 to 3 m above the quay: terrain below.
+    // It was drawn as a bank of about 8 m, estimated from the pier-head photograph Aaron shared (John Ellis, April
+    // 2018). What is added here is the marram's hummocks on top of the surveyed ground)
+    duneH: 1.2,
     // and along its foot a bank of dark granite boulders in the water, from the end of the north pier round to the sea
     rocks: (x, z) => z < -70 && z > -190 && x > -40 && x < 90,
     // beyond the mapped square, north of the harbour mouth: the South Denes port and industrial estate (low sheds)
@@ -69,9 +71,11 @@ export const LOCAL = {
     // the town round the harbour mouth (photographs from the pier, the harbour and Pier Road): Victorian and Edwardian
     // houses and hotels, most of them painted render in white and cream, three storeys and more, some brick
     town: { render: 0.68, tall: true, buff: 0.3 }, // (buff: pale "Suffolk white" gault brick, common in the Yarmouth area's Victorian building)
-    // the ground the town stands on: the quay, Pier Gardens and the beach are low; from the foot of the grassy cliff
-    // behind them it rises to Cliff Hill, Marine Parade and the old town, about 15 m up (approximate, from the map's
-    // streets and photographs: no survey heights)
+    // the ground the town stands on, at its surveyed heights (terrain3d.js "gorleston": the Environment Agency's 1 m
+    // LIDAR): the quay, Pier Gardens and the beach low; the cliff behind them 9 m high, Marine Parade and the old town
+    // at 13 to 16 m. Until 19 November 2026 a slope shaped by hand from the map's streets and photographs
+    // (gorlestonHill, kept as the fallback should the survey's file not arrive)
+    terrain: "gorleston",
     hill: gorlestonHill,
     // where you can walk: the length of the pier, as far as its root at the quay (x -95, where the quay and Pier Gardens
     // begin). The town past it is the photographs above, taken on the pier 250 m and more from it: walked up to, a
@@ -79,7 +83,7 @@ export const LOCAL = {
     walkArea: (x) => x > -95,
     // (landmarks, above, also: the Pier Hotel; Pavilion Theatre: red brick and terracotta, copper roofs, four domed corner towers at its south end;
     // the bandstand in Pier Gardens; the Cliff Hotel on the cliff top)
-    note: "The lighthouse, lamps, fences, the height of the cliff and the dune across the harbour mouth at Gorleston are modelled from photographs and descriptions; their sizes are estimates. The town is shown by two photographs of it; no other buildings are drawn, and you can walk the pier but not on into the town.",
+    note: "The lighthouse, lamps and fences at Gorleston are modelled from photographs and descriptions; their sizes are estimates. The cliff, the town's ground and the spit across the harbour mouth stand at their surveyed heights (Environment Agency LIDAR, Open Government Licence). The town is shown by two photographs of it; no other buildings are drawn, and you can walk the pier but not on into the town.",
   },
   // Cromer Pier (photographs on Wikimedia Commons, 2008 to 2025: the pier from the beach and the cliff, along its deck,
   // its Pavilion Theatre and lifeboat station, and the town from the pier; their authors are listed in

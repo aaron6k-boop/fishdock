@@ -33,9 +33,9 @@ test("every place's grid is inline or a file, never both", () => {
   }
 });
 
-test("Cromer and Brixham: their surveyed grids are in the app, the right size, and give the heights the survey does", async () => {
+test("Cromer, Brixham and Gorleston: their surveyed grids are in the app, the right size, and give the heights the survey does", async () => {
   const { readFileSync } = await import("node:fs");
-  for (const [name, checks] of [["cromer", [[0, 300, 9, 14], [-40, 190, 0, 1], [0, 0, 0, 0]]], ["brixham", [[-640, 400, 44, 49], [0, 0, 0, 0.5], [200, 160, 0, 0]]]]) {
+  for (const [name, checks] of [["cromer", [[0, 300, 9, 14], [-40, 190, 0, 1], [0, 0, 0, 0]]], ["brixham", [[-640, 400, 44, 49], [0, 0, 0, 0.5], [200, 160, 0, 0]]], ["gorleston", [[-480, 200, 9, 10.5], [-400, 200, 0, 1], [0, -160, 2, 3.2], [300, 300, 0, 0]]]]) {
     const T = TERRAIN[name]; assert.ok(T && T.file, `${name} has its own file`);
     setTerrainBytes(name, new Uint8Array(readFileSync(new URL(`../public/textures/${T.file}`, import.meta.url))));
     const hill = terrainHill(name);
