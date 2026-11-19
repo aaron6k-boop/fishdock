@@ -107,8 +107,18 @@ export const LOCAL = {
     town: { render: 0.3, tall: true, buff: 0.06 }, // (Cromer's brick is mostly red, with flint)
     // the cliff behind the promenade: the retaining walls along its foot (OSM), the town on top about 12 m up
     // (estimated: no survey heights)
+    // (since 19 November 2026 at their surveyed heights: the Environment Agency's LIDAR, terrain3d.js "cromer". The
+    // estimate below is kept for when the survey's file can't be had)
+    terrain: "cromer",
     hill: cromerHill,
-    note: "Cromer Pier's iron legs, its deck, railings and lamps, the Pavilion Theatre, the lifeboat station and its slipway, the Hotel de Paris and the church tower are modelled from photographs and descriptions; their sizes, the deck's height and the cliff's are estimates. The other buildings of the town are drawn in a general style from their outlines on the map.",
+    note: "Cromer Pier's iron legs, its deck, railings and lamps, the Pavilion Theatre, the lifeboat station and its slipway, the Hotel de Paris and the church tower are modelled from photographs and descriptions; their sizes and the deck's height are estimates. The cliffs stand at their surveyed heights (Environment Agency LIDAR, Open Government Licence). The other buildings of the town are drawn in a general style from their outlines on the map.",
+  },
+  // Brixham Breakwater: the ground round the harbour at its surveyed heights (the Environment Agency's LIDAR,
+  // terrain3d.js "brixham"): the breakwater's root under the slope that climbs to Berry Head, the town on its hills
+  // across the harbour. Nothing else here is from photographs yet: the buildings are drawn in a general style
+  "brixham-breakwater": {
+    terrain: "brixham",
+    note: "The hills round Brixham's harbour stand at their surveyed heights (Environment Agency LIDAR, Open Government Licence). The breakwater, the buildings and the harbour are drawn in a general style from their outlines on OpenStreetMap; their sizes are estimates.",
   },
   // Great Yarmouth's beach north of Britannia Pier (added 18 November 2026; photographs on Wikimedia Commons, 2005 to
   // 2026, their authors listed in docs/REFERENCE-PHOTOS.md). The pier (1901, about 250 m: Wikipedia) stands open on short

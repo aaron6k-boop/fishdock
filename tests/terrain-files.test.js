@@ -2,7 +2,7 @@
 // its usual level until the file is fetched, and on its survey once it is; the bytes decode as the inline grids do.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TERRAIN, terrainHill, setTerrainBytes, loadTerrain } from "../src/lib/world3d/terrain3d.js";
+import { TERRAIN, RELIEF, terrainHill, setTerrainBytes, loadTerrain } from "../src/lib/world3d/terrain3d.js";
 
 // ---- a small grid coded as terrain_from_dtm.py codes it: rows of centimetres, changes as zigzag varints ----
 function code(rows) {
@@ -30,5 +30,16 @@ test("every place's grid is inline or a file, never both", () => {
     assert.ok(!!T.data !== !!T.file, `${name}: data or file`);
     assert.equal(T.enc || "dv16", T.enc || "dv16");
     if (T.file) assert.match(T.file, /^terrain_[a-z]+_5m\.bin$/);
+  }
+});
+
+test("Cromer and Brixham: their surveyed grids are in the app, the right size, and give the heights the survey does", async () => {
+  const { readFileSync } = await import("node:fs");
+  for (const [name, checks] of [["cromer", [[0, 300, 9, 14], [-40, 190, 0, 1], [0, 0, 0, 0]]], ["brixham", [[-640, 400, 44, 49], [0, 0, 0, 0.5], [200, 160, 0, 0]]]]) {
+    const T = TERRAIN[name]; assert.ok(T && T.file, `${name} has its own file`);
+    setTerrainBytes(name, new Uint8Array(readFileSync(new URL(`../public/textures/${T.file}`, import.meta.url))));
+    const hill = terrainHill(name);
+    for (const [x, z, lo, hi] of checks) { const h = hill(x, z); assert.ok(h >= lo && h <= hi, `${name} at ${x}, ${z}: ${h.toFixed(1)} m above its usual level, expected ${lo} to ${hi}`); }
+    const R = RELIEF[name]; assert.ok(R && R.x0 % 3 === 0 && R.z0 % 3 === 0 && (R.x0 + R.nx - 1) % 6 === 0 && (R.z0 + R.nz - 1) % 6 === 0, `${name}'s fine relief starts and ends on the ground grid's lines`);
   }
 });

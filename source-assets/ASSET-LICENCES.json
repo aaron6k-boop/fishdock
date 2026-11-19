@@ -2481,6 +2481,48 @@
    ]
   },
   {
+   "id": "ea:lidar-composite-dtm-1m-2022:cromer",
+   "name": "LIDAR Composite DTM 2022, 1 m (Cromer)",
+   "source": "Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs)",
+   "page": "https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc",
+   "author": "Environment Agency",
+   "licence": "Open Government Licence v3.0",
+   "attribution": "Required: \"© Environment Agency copyright and/or database right 2022. All rights reserved.\" Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note)",
+   "type": "elevation data (bare ground, metres above Ordnance Datum), GeoTIFF, British National Grid",
+   "resolution": "1 m",
+   "use": "the ground round Cromer Pier: the cliff behind the promenade and the cliffs to the west at their surveyed heights (src/lib/world3d/terrain3d.js \"cromer\": each height the mean of the survey's 1 m cells over 5 m, every 5 m, 640 m each way round the mark; public/textures/terrain_cromer_5m.bin), and the survey's own 1 m relief over the cliff either side of the pier (x -402 to 300 m, z 99 to 378 m from the mark; public/textures/terrain_cromer_1m.bin); made by source-assets/tools/terrain_from_dtm.py",
+   "files": [
+    {
+     "file": "renders/dem_cromer/dtm_1m.tif",
+     "bytes": 16777763,
+     "sha256": "3cafa07f5e88fb5fc0816be9bb599d373bede1da6cc125e6858b99462e3d7973",
+     "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&format=image/tiff&subset=E(621130,622830)&subset=N(341690,343390)"
+    }
+   ],
+   "downloaded": "2026-11-19"
+  },
+  {
+   "id": "ea:lidar-composite-dtm-1m-2022:brixham",
+   "name": "LIDAR Composite DTM 2022, 1 m (Brixham)",
+   "source": "Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs)",
+   "page": "https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc",
+   "author": "Environment Agency",
+   "licence": "Open Government Licence v3.0",
+   "attribution": "Required: \"© Environment Agency copyright and/or database right 2022. All rights reserved.\" Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note)",
+   "type": "elevation data (bare ground, metres above Ordnance Datum), GeoTIFF, British National Grid",
+   "resolution": "1 m",
+   "use": "the ground round Brixham's harbour: the hills either side at their surveyed heights (src/lib/world3d/terrain3d.js \"brixham\"; public/textures/terrain_brixham_5m.bin), and the survey's own 1 m relief over the slope above the breakwater's root (x 150 to 600 m, z 201 to 600 m from the mark; public/textures/terrain_brixham_1m.bin); made by source-assets/tools/terrain_from_dtm.py",
+   "files": [
+    {
+     "file": "renders/dem_brixham/dtm_1m.tif",
+     "bytes": 16777763,
+     "sha256": "b8074ad05ee83ad17bf01f932192558e09dfeb2b67e95cae1a29392686dd31d2",
+     "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&format=image/tiff&subset=E(292060,293760)&subset=N(56110,57810)"
+    }
+   ],
+   "downloaded": "2026-11-19"
+  },
+  {
    "id": "polyhaven:cliff_side",
    "name": "Cliff Side",
    "source": "https://polyhaven.com/a/cliff_side",

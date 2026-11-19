@@ -494,7 +494,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const local0 = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
   // (and a survey's heights for its ground, where a mark has them (terrain3d.js): never under a pier's deck, which a
   // survey of the bare ground can take for ground)
-  const local = local0?.terrain ? { ...local0, hill: offPiers(terrainHill(local0.terrain), place.piers) } : local0;
+  // (a place's surveyed terrain; if its file couldn't be had, the place's own estimate of its hill, where it has one)
+  const surveyed = local0?.terrain ? terrainHill(local0.terrain) : null;
+  const local = surveyed ? { ...local0, hill: offPiers(surveyed, place.piers) } : local0;
   const fenceKind = (x, z, nx, nz) => (local?.fence ? local.fence(x, z, nx, nz) : "rail");
   const spots = place.spots || [], nearSpot = (x, z, r = NEAR_SOLID) => spots.some((sp) => Math.hypot(x - sp.at[0], z - sp.at[2]) < r);
   const xs = place.grid.xs, n = xs.length, cls = unrle(place.grid.cls, n * n);
@@ -682,7 +684,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // the fine mesh stops), and it lies smooth along the streets and round the buildings, which stand on it ----
   // (Balanced too, since 19 November: it is one mesh, some 300,000 triangles and nothing more to draw each frame, and
   // without it a phone showed the East Cliff as smooth green ramps, Aaron's screenshots)
-  const REL = quality >= 1 && local0?.terrain && hill ? reliefOf(local0.terrain) : null;
+  const REL = quality >= 1 && surveyed && hill ? reliefOf(local0.terrain) : null;
   let fineCell = null, F = null;
   if (REL) {
     const fi0 = xs.indexOf(REL.x0), fi1 = xs.indexOf(REL.x0 + REL.nx - 1), fj0 = xs.indexOf(REL.z0), fj1 = xs.indexOf(REL.z0 + REL.nz - 1);
