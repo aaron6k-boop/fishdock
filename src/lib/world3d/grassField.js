@@ -28,7 +28,9 @@ const SQ = 4;
  */
 export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt = () => 0.5, quality = 1, seed = 1, atlas = FIELD } = {}) {
   if (quality < 1 || typeof document === "undefined") return null;
-  const ultra = quality >= 2, reach = ultra ? 30 : quality >= 1.5 ? 22 : 15, dens = ultra ? 15 : quality >= 1.5 ? 10 : 7, cap = ultra ? 36000 : 14000;
+  // (a phone, on Balanced, a smaller patch and thinner: the cards are cut out of their picture, and on a phone's
+  // graphics each layer of them over a pixel costs; a computer with a graphics card, on High and Ultra, the full)
+  const ultra = quality >= 2, reach = ultra ? 30 : 12, dens = ultra ? 15 : 5, cap = ultra ? 36000 : 6000;
   // ---- one clump: two cards crossed, each the cell's width, 1 tall (the kind's height is set in the shader) ----
   // (three cards at 60 degrees: with two, seen from above, each clump showed as a cross)
   const P = [], N = [], UV = [], I = [], CN = [];

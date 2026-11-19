@@ -457,7 +457,7 @@ export function contactShade({ cx, cz, size = 140, mpp = 0.1, rings = [], discs 
 // of grass stands on them (grassTufts.js): the shader's own noise, fdDH / fdDN / fdDF, in JavaScript ----
 // (lift: how much more of the town's rough ground is worn than a lawn; town, lawn: how far to the mud each goes)
 // (lawnLess: how much rarer the worn patches are on a lawn: at the town's rate the Abbey's lawns were blotched brown)
-const MUD = { lift: 0.05, town: 0.75, lawn: 0.25, lawnLess: 0.07 };
+const MUD = { lift: 0.02, town: 0.45, lawn: 0.22, lawnLess: 0.07 }; // (town 0.45: from above, the Abbey's headland was blotched brown)
 // (the grass drier and yellower in broad patches: its tint there, the noise's scale in metres, where it starts and is
 // full, and how far towards the tint)
 const GRASS_DRY = { tint: ["1.14", "1.02", "0.68"], scale: 37, lo: 0.5, hi: 0.78, k: 0.55 };
@@ -793,7 +793,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     gF.setAttribute("aSoil", new THREE.BufferAttribute(soilA, 1));
     gF.setIndex(nv > 65535 ? new THREE.Uint32BufferAttribute(ix, 1) : new THREE.Uint16BufferAttribute(ix, 1));
     gF.computeVertexNormals(); gF.computeBoundingSphere();
-    place.fineGround = { verts: nv, tris: ix.length / 3 };
+    place.fineGround = { verts: nv, tris: ix.length / 3, at: fineAt };
     fineInfo = (x, z) => { const i = Math.round(x - X0), j = Math.round(z - Z0); if (i < 0 || j < 0 || i >= nx || j >= nz || !pc[j * nx + i]) return null; return { soil: soilP[j * nx + i], slope: slopeP[j * nx + i] }; };
   }
   const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
@@ -945,17 +945,20 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // (at two scales, the second turned and three times the size, so the photograph's tile doesn't show as a
               // chequer across a 50 m face; only its light and dark over its own average are kept, the colour is the
               // cliff's own)
-              vec3 rX = texture2D(uClR, vWPos.zy / uClK.x).rgb, rY = texture2D(uClR, vWPos.xz / uClK.x).rgb, rZ = texture2D(uClR, vWPos.xy / uClK.x).rgb;
-              mat2 tw = mat2(0.8, 0.6, -0.6, 0.8); float k2 = uClK.x * 3.3;
-              vec3 sX = texture2D(uClR, tw * vWPos.zy / k2 + 0.37).rgb, sY = texture2D(uClR, tw * vWPos.xz / k2 + 0.37).rgb, sZ = texture2D(uClR, tw * vWPos.xy / k2 + 0.37).rgb;
+              // (on the faces the photograph is turned a quarter, so its grain runs along the beds, level, as a sedimentary
+              // cliff's does: the right way up its cracks ran down the face, and the cliff read as a hanging curtain)
+              vec3 rX = texture2D(uClR, vWPos.yz / uClK.x).rgb, rY = texture2D(uClR, vWPos.xz / uClK.x).rgb, rZ = texture2D(uClR, vWPos.yx / uClK.x).rgb;
+              mat2 tw = mat2(0.97, 0.24, -0.24, 0.97); float k2 = uClK.x * 3.3;
+              vec3 sX = texture2D(uClR, tw * vWPos.yz / k2 + 0.37).rgb, sY = texture2D(uClR, tw * vWPos.xz / k2 + 0.37).rgb, sZ = texture2D(uClR, tw * vWPos.yx / k2 + 0.37).rgb;
               vec3 rk = mix(rX * an.x + rY * an.y + rZ * an.z, sX * an.x + sY * an.y + sZ * an.z, 0.45);
               float rAvg = dot(texture2D(uClR, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15));
               float rl = dot(rk, vec3(0.3, 0.55, 0.15)) / max(rAvg, 0.02);
               // (the beds of a sedimentary cliff: paler and darker layers a metre or two thick, wavering along the face,
               // and darker streaks where water runs down it)
-              float beds = fdDN(vec2(vWPos.y * 0.62 + fdDN(wp / 40.0) * 3.0, (wp.x + wp.y) * 0.015));
+              float bedY = vWPos.y + fdDN(wp / 40.0) * 3.0;
+              float beds = fdDN(vec2(bedY * 0.62, (wp.x + wp.y) * 0.015)) * 0.65 + fdDN(vec2(bedY * 2.3, (wp.x + wp.y) * 0.05)) * 0.35; // (thick beds and thin ones within them)
               float runs = fdDN(vec2((wp.x - wp.y) * 0.35, vWPos.y * 0.04));
-              vec3 rockC = uClRock * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.82 + 0.3 * beds) * (1.0 - 0.18 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
+              vec3 rockC = uClRock * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.7 + 0.52 * beds) * (1.0 - 0.1 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
               // (it shows through in ragged outcrops: the slope's steepness, broken up by noise at two scales)
               fdRock = smoothstep(0.4, 0.62, vSteep + (fdDF(wp / 11.0) - 0.5) * 0.6 + (fdDN(wp / 2.7) - 0.5) * 0.12);
               // (local.cliff.rockFaces: the way the sea faces, where the waves have bared the rock; slopes turned away
@@ -1033,8 +1036,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             vec3 gn = texture2D(uClGN, vWPos.xz / uClK.y).xyz * 2.0 - 1.0;
             vec3 nw = vWNrm + vec3(gn.x, 0.0, -gn.y) * 0.55 * (1.0 - fdRock) * (1.0 - far);
             #ifdef FD_CLIFF
-            vec3 rz = texture2D(uClRN, vWPos.xy / uClK.x).xyz * 2.0 - 1.0, rx = texture2D(uClRN, vWPos.zy / uClK.x).xyz * 2.0 - 1.0;
-            vec3 rw = vec3(rz.x, rz.y, 0.0) * fdTriW.z + vec3(0.0, rx.y, rx.x) * fdTriW.x;
+            vec3 rz = texture2D(uClRN, vWPos.yx / uClK.x).xyz * 2.0 - 1.0, rx = texture2D(uClRN, vWPos.yz / uClK.x).xyz * 2.0 - 1.0;
+            vec3 rw = vec3(rz.y, rz.x, 0.0) * fdTriW.z + vec3(0.0, rx.x, rx.y) * fdTriW.x; // (turned a quarter, as the colour is)
             nw += rw * 0.9 * fdRock * (1.0 - far * 0.6);
             #else
             vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; nw += vec3(rn.x, 0.0, -rn.y) * 0.6 * vSteep * (1.0 - far * 0.6);
@@ -1128,6 +1131,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // ---- garden walls, fences and hedges (the map's barriers): the texture of a town between its streets ----
   {
     const parts = { wall: [], coping: [], fence: [], post: [], hedge: [] };
+    // (the walls in a photographed material: where the place's stone is its own (Whitby's sandstone, local.stone kit
+    // "whitby"), its baked ashlar; elsewhere the photographed red brick of the house fronts. The drawn brick, red and
+    // even, made the Abbey's ruined footings read as new brick walls)
+    const stoneWalls = local?.stone?.kit === "whitby", WT = stoneWalls ? 2.4 : 1.5;
+    const wallPh = photoTex(stoneWalls ? "whitby_ashlar_diff" : "brick_red_diff"), wallPhN = wallPh && photoTex(stoneWalls ? "whitby_ashlar_nor" : "brick_red_nor", { srgb: false });
     const okHere = (mx, mz) => !(nearSpot(mx, mz, 25) || !landAt([mx, mz]) || PR.some((bx) => inB([mx, mz], bx)));
     for (const b of (local?.generated === false ? [] : place.barriers || [])) {
       for (let k = 0; k + 1 < b.line.length; k++) {
@@ -1140,14 +1148,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           box(len + 0.02, top - y0, 0.035, 0.08, parts.fence, [len / 1.8, (top - y0) / 1.8]);
           for (let q = 0; q <= len; q += 1.8) { const f = q / len, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f; const g2 = new THREE.BoxGeometry(0.1, top - y0 + 0.08, 0.1); g2.translate(0, (top - y0 + 0.08) / 2, 0); g2.translate(px, y0 - 0.02, pz); parts.post.push(g2); }
         } else { // a brick wall with a coping on top
-          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, [len / 0.9, (top - y0) / 0.6]); // (the brick tile is four bricks by eight courses: 0.9 m by 0.6 m. At 2 m a tile the bricks were half a metre long)
+          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, wallPh ? [len / WT, (top - y0) / WT] : [len / 0.9, (top - y0) / 0.6]); // (the drawn brick tile is four bricks by eight courses: 0.9 m by 0.6 m; the photographs' tiles are WT)
           box(len + 0.07, 0.07, 0.3, top - y0 - 0.06, parts.coping);
         }
       }
     }
     const brick = bricks(31, [138, 96, 72]), wood = woodTex();
     const mats = {
-      wall: new THREE.MeshStandardMaterial({ map: brick.map, normalMap: brick.normalMap, roughness: 1, color: 0xb8aa9c }),
+      wall: wallPh ? new THREE.MeshStandardMaterial({ map: wallPh, normalMap: wallPhN, roughness: 1, color: stoneWalls ? 0xd8cebd : 0xe8e2dc }) : new THREE.MeshStandardMaterial({ map: brick.map, normalMap: brick.normalMap, roughness: 1, color: 0xb8aa9c }),
       coping: new THREE.MeshStandardMaterial({ color: 0x8e8a82, roughness: 0.9 }),
       fence: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.95, color: 0x9a8468 }),
       post: new THREE.MeshStandardMaterial({ color: 0x5f5244, roughness: 0.95 }),
