@@ -14,7 +14,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MODELS_BASE } from "./glbParts.js";
 import { DETAIL } from "./detail.js";
 
-const NEAR = 45, PLANT_NEAR = 22, PLANT_PER_M = 120;
+const NEAR = 45, PLANT_NEAR = 22, PLANT_PER_M = 120, SOLID_PER_M = 110;
 const farD = () => (DETAIL.ultra ? 170 : 120), plantFarD = () => (DETAIL.ultra ? 90 : 60); // (Ultra further out, detail.js)
 const PLANTS = /plant|shrub|grass|fern|dandelion|wrack/, SHADE = /nettle|shrub_02|fern/; // (the plants tall enough for their shadows to tell)
 let loader = null;
@@ -84,7 +84,9 @@ export function buildKit(group, sets) {
       });
       const near = mk(lv.near, true), far = lv.far === lv.near ? near : mk(lv.far, false);
       // (how far each is drawn, its near level and its last, squared)
-      const reach = at.map(([, , , , size = 1]) => { const f = solid ? farD() : Math.min(plantFarD(), Math.max(30, size * PLANT_PER_M)); return [Math.min(solid ? NEAR : PLANT_NEAR, f) ** 2, f * f]; });
+      // (a rock is drawn as far as its size can be seen: a boulder or an outcrop of two metres and more out to SOLID_PER_M
+      // metres for each metre it stands, 450 m at most, so the cliff across the harbour keeps its rocks)
+      const reach = at.map(([, , , , size = 1]) => { const f = solid ? Math.min(450, Math.max(farD(), size * SOLID_PER_M)) : Math.min(plantFarD(), Math.max(30, size * PLANT_PER_M)); return [Math.min(solid ? NEAR : PLANT_NEAR, f) ** 2, f * f]; });
       live.push({ S: { ...S, at }, near, far, mats, reach, at: new THREE.Vector3(1e9, 0, 1e9) });
     });
   })));

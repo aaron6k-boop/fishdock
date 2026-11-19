@@ -494,7 +494,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const local0 = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
   // (and a survey's heights for its ground, where a mark has them (terrain3d.js): never under a pier's deck, which a
   // survey of the bare ground can take for ground)
-  const local = local0?.terrain ? { ...local0, hill: offPiers(terrainHill(local0.terrain), place.piers) } : local0;
+  // (a place's surveyed terrain; if its file couldn't be had, the place's own estimate of its hill, where it has one)
+  const surveyed = local0?.terrain ? terrainHill(local0.terrain) : null;
+  const local = surveyed ? { ...local0, hill: offPiers(surveyed, place.piers) } : local0;
   const fenceKind = (x, z, nx, nz) => (local?.fence ? local.fence(x, z, nx, nz) : "rail");
   const spots = place.spots || [], nearSpot = (x, z, r = NEAR_SOLID) => spots.some((sp) => Math.hypot(x - sp.at[0], z - sp.at[2]) < r);
   const xs = place.grid.xs, n = xs.length, cls = unrle(place.grid.cls, n * n);
@@ -682,7 +684,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // the fine mesh stops), and it lies smooth along the streets and round the buildings, which stand on it ----
   // (Balanced too, since 19 November: it is one mesh, some 300,000 triangles and nothing more to draw each frame, and
   // without it a phone showed the East Cliff as smooth green ramps, Aaron's screenshots)
-  const REL = quality >= 1 && local0?.terrain && hill ? reliefOf(local0.terrain) : null;
+  const REL = quality >= 1 && surveyed && hill ? reliefOf(local0.terrain) : null;
   let fineCell = null, F = null;
   if (REL) {
     const fi0 = xs.indexOf(REL.x0), fi1 = xs.indexOf(REL.x0 + REL.nx - 1), fj0 = xs.indexOf(REL.z0), fj1 = xs.indexOf(REL.z0 + REL.nz - 1);
@@ -1962,11 +1964,17 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           }
         } else if (bank[k] && nb4(k).some((q) => cls[q] === 0 || cls[q] === 2)) {
           for (let c = 0; c < area * 0.03; c++) put("rock_moss_set_01", x0 + R() * cw, z0 + R() * ch, 0.5 + R() * 1.1, 1); // (fallen at the cliff's foot)
+          // (and the big ones: boulders a metre and more across, and now and then a slab of the cliff's own rock
+          // standing out of the foot of it; kit3, 19 November)
+          for (let c = 0; c < area * 0.012; c++) put("rock_moss_set_02", x0 + R() * cw, z0 + R() * ch, 0.6 + R() * 0.9, 1);
+          if (steep[k] > 0.35 && R() < area * 0.0025) put("coast_rocks_05", x0 + R() * cw, z0 + R() * ch, 1.2 + R() * 0.8, 1);
         }
         if (bank[k] || cls[k] === 3 || town[k]) {
           for (let c = 0; c < area * (bank[k] ? 0.05 : 0.02); c++) {
             const x = x0 + R() * cw, z = z0 + R() * ch, fi = fineInfo(x, z), soil = fi ? fi.soil : 0, slope = fi ? fi.slope : steep[k] * 1.5, r = R();
-            if (slope > 1.4) continue;
+            // (on a face too steep for plants, the rock itself stands out here and there: a scanned outcrop two to
+            // four metres high, sunk a third into the slope)
+            if (slope > 1.4) { if (bank[k] && r < 0.035) put(r < 0.018 ? "rock_face_01" : "rock_face_02", x, z, 2 + R() * 2.2, 1); continue; }
             if (bank[k]) {
               if (soil > 0.45 && r < 0.2) put("rock_moss_set_01", x, z, 0.3 + R() * 0.6, 1);
               else if (soil > 0.25 && r < 0.42) put("nettle_plant", x, z, 0.5 + R() * 0.5);
@@ -1998,7 +2006,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           }
         }
       }
-      kit = buildKit(group, Object.entries(S).map(([id, at]) => ({ id, at, flat: id === "wrack", sink: id === "wrack" ? 0 : undefined })));
+      kit = buildKit(group, Object.entries(S).map(([id, at]) => ({ id, at, flat: id === "wrack", sink: id === "wrack" ? 0 : /rock_face|coast_rocks/.test(id) ? 0.33 : /rock_moss_set_02/.test(id) ? 0.18 : undefined })));
       place.kitCounts = Object.fromEntries(Object.entries(S).map(([k, v]) => [k, v.length]));
     }
     if (field || tufts || kit) place.tuftsUpdate = (t, cam, wind, windDir) => { field?.update(t, cam, wind, windDir); tufts?.update(t, cam, wind, windDir); kit?.update(t, cam); };

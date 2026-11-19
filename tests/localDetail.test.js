@@ -9,9 +9,9 @@ test("local detail: only for documented marks, and nothing for others", () => {
   assert.equal(localFor(undefined), null);
 });
 
-test("local detail: the note says it's from photographs, in plain UK English with no em dashes", () => {
+test("local detail: the note says what it's from (photographs, or the survey where that is all a place has), in plain UK English with no em dashes", () => {
   for (const L of Object.values(LOCAL)) {
-    assert.match(L.note, /photograph/);
+    assert.match(L.note, /photograph|surveyed/);
     assert.ok(!/—/.test(L.note));
   }
 });
