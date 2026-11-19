@@ -30,7 +30,7 @@ const cache = new Map();
 // its own (public/textures/<file>), fetched before the place is built so that only that place downloads it.
 //   x0, z0: the first height's place (metres, as above); nx, nz: heights across and down, 1 m apart
 export const RELIEF = {
-  whitby: { file: "terrain_whitby_1m.bin", x0: -81, z0: 51, nx: 412, nz: 280, q: 0.02 },
+  whitby: { file: "terrain_whitby_1m.bin", x0: -81, z0: 51, nx: 532, nz: 280, q: 0.02 },
 };
 const reliefs = new Map();
 /** Fetch and unpack a place's fine relief (a promise; null if it has none or it can't be had). */
