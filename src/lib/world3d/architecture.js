@@ -59,6 +59,32 @@ export function styleFor(b) {
   };
 }
 
+/**
+ * A terrace or block the map draws as one outline, as the row of houses it is: cut along its length into plots 4.6 to
+ * 7.5 m wide (each its own house: its own storeys, height, walls, colour and roof, stepping with the ground), the ridges
+ * along the row. Only for houses whose outline is near enough its box; anything else comes back whole.
+ */
+export function splitRow(b) {
+  if (!b?.ring || b.ring.length < 4 || b.use || b.tall) return [b];
+  const st = styleFor(b); if (st.type !== "house" || st.walls === "stone" && town?.stoneAt) return [b];
+  const box = obb(b.ring); if (!box) return [b];
+  const { c, ax, pz, L, W } = box, A = footprintArea(b.ring);
+  if (L < 9 || W < 4 || W > 16 || A < 0.8 * L * W) return [b];
+  const r = hashOf((b.id ?? 1) * 3 + 11), cuts = [0];
+  let at = 0; const plotW = 4.6 + r * 2.4;
+  while (L - at > plotW * 1.5) { at += plotW * (0.8 + 0.4 * hashOf((b.id ?? 1) * 31 + cuts.length)); cuts.push(at); }
+  cuts.push(L); if (cuts.length < 3) return [b];
+  const out = [];
+  for (let k = 0; k + 1 < cuts.length; k++) {
+    const a0 = cuts[k] - L / 2, a1 = cuts[k + 1] - L / 2, w0 = -W / 2, w1 = W / 2;
+    const P = (a, w) => [c[0] + ax[0] * a + pz[0] * w, c[1] + ax[1] * a + pz[1] * w];
+    const id = (b.id ?? 1) * 64 + k + 1, rk = hashOf(id * 5 + 2);
+    out.push({ ...b, id, ring: [P(a0, w0), P(a1, w0), P(a1, w1), P(a0, w1)], ridge: ax, plotOf: b.id, roof: "gabled",
+      levels: b.levels || (rk < 0.3 ? 3 : 2) });
+  }
+  return out;
+}
+
 /** The footprint's oriented bounding box: centre, long axis (unit), length and width (metres). */
 export function obb(ring) {
   let best = null;
@@ -83,8 +109,15 @@ export function obb(ring) {
  * the full length and the ends are upright triangles (drawn in the wall's material). Returns faces as
  * { pts: [[x, y, z], ...] (3 or 4, outward-facing order), gable: bool }, plus the ridge and its height.
  */
-export function pitchedRoof(ring, base, { shape = "hip", pitch = 0.62, eave = 0.3, maxRise = 5 } = {}) {
-  const box = obb(ring); if (!box) return null;
+export function pitchedRoof(ring, base, { shape = "hip", pitch = 0.62, eave = 0.3, maxRise = 5, axis = null } = {}) {
+  let box = obb(ring); if (!box) return null;
+  // (axis: the ridge's direction given, as a terrace's houses have their ridges along the street whatever their shape)
+  if (axis) {
+    const pz = [-axis[1], axis[0]]; let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+    for (const [x, z] of ring) { const a = x * axis[0] + z * axis[1], bb = x * pz[0] + z * pz[1]; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, bb); b1 = Math.max(b1, bb); }
+    const ca = (a0 + a1) / 2, cb = (b0 + b1) / 2;
+    box = { ...box, ax: axis, pz, L: a1 - a0, W: b1 - b0, c: [axis[0] * ca + pz[0] * cb, axis[1] * ca + pz[1] * cb] };
+  }
   const { c, ax, W, L } = box;
   const rise = Math.min(maxRise, (W / 2) * Math.tan(pitch));
   // the eave: the footprint pushed out a little from its centre; a gable's ridge runs out to the eaves' ends so the

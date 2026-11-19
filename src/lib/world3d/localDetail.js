@@ -200,6 +200,9 @@ export const LOCAL = {
     bankTrees: 0.15,
     // (the cliffs' own surface, realPlace.js: photoscanned grass on the slopes and photoscanned rock showing through on
     // the steep faces, laid from three sides)
+    // (its beaches, Tate Hill Sands by the East Pier and the sands under the West Cliff: the photographed sand, dry and
+    // wet, in Whitby's darker, browner gold, sloping from the water)
+    beach: { slope: 0.035, tint: [0.5, 0.415, 0.3] },
     cliff: { grass: "grass_leafy", rock: "cliff_rock", grassTile: 2, rockTile: 4, rockTint: [0.17, 0.152, 0.125], rockFaces: [0.707, -0.707] }, // (rockFaces: the East Cliff faces the sea to the north-east; its slopes over the harbour are grassed)
     // St Mary's Church on its outline, at the top of the 199 Steps
     landmarks: { 158276579: "stMarys" },

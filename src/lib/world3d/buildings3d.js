@@ -4,7 +4,7 @@
 // than one picture stretched round a box. Pitched roofs with eaves and chimneys, a lighthouse and a coastwatch
 // lookout. All buildings share a handful of meshes (one per material), so a town of 500 stays quick on a phone.
 import * as THREE from "three";
-import { styleFor, pitchedRoof, obb, footprintArea } from "./architecture.js";
+import { styleFor, pitchedRoof, obb, footprintArea, splitRow } from "./architecture.js";
 import { facade, roof, bricks, FACADE_TILE, FACADE_N, photoTex } from "./textures3d.js";
 
 // (the roofs photographed (Poly Haven, CC0), and how many times each repeats across the roof's 3 m tile: "Clay Roof
@@ -123,6 +123,15 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   };
 
 
+  // a square tube from P to Q, w across (a gutter, a downpipe): its four sides
+  const tube = (Bk, P, Q, w, col) => {
+    const d = [Q[0] - P[0], Q[1] - P[1], Q[2] - P[2]], l = Math.hypot(...d) || 1; d[0] /= l; d[1] /= l; d[2] /= l;
+    const up = Math.abs(d[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+    let s = [d[1] * up[2] - d[2] * up[1], d[2] * up[0] - d[0] * up[2], d[0] * up[1] - d[1] * up[0]]; const sl = Math.hypot(...s) || 1; s = s.map((v) => (v / sl) * w / 2);
+    let tt = [d[1] * s[2] - d[2] * s[1], d[2] * s[0] - d[0] * s[2], d[0] * s[1] - d[1] * s[0]]; const tl = Math.hypot(...tt) || 1; tt = tt.map((v) => (v / tl) * w / 2);
+    const c = [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([a, bq]) => [s[0] * a + tt[0] * bq, s[1] * a + tt[1] * bq, s[2] * a + tt[2] * bq]);
+    for (let k = 0; k < 4; k++) { const o0 = c[k], o1 = c[(k + 1) % 4]; quad(Bk, [P[0] + o0[0], P[1] + o0[1], P[2] + o0[2]], [P[0] + o1[0], P[1] + o1[1], P[2] + o1[2]], [Q[0] + o1[0], Q[1] + o1[1], Q[2] + o1[2]], [Q[0] + o0[0], Q[1] + o0[1], Q[2] + o0[2]], [0, 0, 1, 0, 1, 1, 0, 1], col); }
+  };
   // a box standing out from a wall: a along the wall (from A, unit u), y up, d outward (unit n); five faces (not the back)
   const wallBox = (Bk, A, u, nrm, a0, a1, y0, y1, d0, d1, col) => {
     const P = (a, y, d) => [A[0] + u[0] * a + nrm[0] * d, y, A[2] + u[1] * a + nrm[1] * d];
@@ -137,6 +146,8 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const TRIMS = [[1, 1, 1], [1, 1, 1], [1, 1, 1], [0.95, 0.9, 0.8], [0.95, 0.9, 0.8], [0.62, 0.7, 0.6], [0.62, 0.64, 0.66], [0.22, 0.34, 0.26]];
   const detailed = (x, z) => Math.hypot(x, z) < 260; // (built detail on the houses near enough to see it: frames, sills, steps, gutters, pipes)
 
+  // (a terrace or block mapped as one outline, built as its row of houses: architecture.js splitRow)
+  buildings = buildings.flatMap((b) => splitRow(b));
   for (const b of buildings) {
     let ring = b.ring.slice(); if (ring.length < 3) continue;
     if (area2(ring) > 0) ring.reverse(); // see architecture.js: walk the footprint so faces point outward
@@ -261,7 +272,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     const roofB = B["roof_" + (st.roofMat || "slate")] || B.roof_slate, rc = st.roofMat === "clay" ? [1, 0.95, 0.92] : [1, 1, 1];
     const box = obb(ring);
     const pitched = st.roof === "hip" || st.roof === "gable";
-    const R = pitched && box && box.W < 26 ? pitchedRoof(ring, top, { shape: st.roof, pitch: st.pitch ?? 0.62, eave: st.type === "small" ? 0.2 : 0.3 }) : null;
+    const R = pitched && box && box.W < 26 ? pitchedRoof(ring, top, { shape: st.roof, pitch: (st.pitch ?? 0.62) + (b.plotOf ? (((b.id * 13) % 7) - 3) * 0.025 : 0), eave: st.type === "small" ? 0.2 : 0.3, axis: b.ridge || null }) : null;
     if (R) {
       for (const f of R.faces) {
         // (each face mapped on its own slope: across it level, and up it by the distance along the slope, one tile of
@@ -285,6 +296,21 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
         const rB = st.roofMat === "clay" ? roofB : B.dark, rcol = st.roofMat === "clay" ? [0.9, 0.86, 0.84] : [0.55, 0.57, 0.6];
         quad(rB, [r0[0] - px, ry - 0.02, r0[1] - pz], [r1[0] - px, ry - 0.02, r1[1] - pz], [r1[0], ry + 0.09, r1[1]], [r0[0], ry + 0.09, r0[1]], [0, 0, l / 0.3, 0, l / 0.3, 0.6, 0, 0.6], rcol);
         quad(rB, [r1[0] + px, ry - 0.02, r1[1] + pz], [r0[0] + px, ry - 0.02, r0[1] + pz], [r0[0], ry + 0.09, r0[1]], [r1[0], ry + 0.09, r1[1]], [0, 0, l / 0.3, 0, l / 0.3, 0.6, 0, 0.6], rcol);
+      }
+      // gutters along the eaves and a downpipe from each run to the ground (cast iron, painted black or dark grey), on
+      // houses and small buildings
+      if (st.type === "house" || st.type === "small") {
+        const gcol = (b.id | 0) % 3 === 0 ? [0.32, 0.33, 0.35] : [0.16, 0.16, 0.17];
+        for (const f of R.faces) {
+          if (f.gable) continue;
+          const lowp = f.pts.filter((q) => Math.abs(q[1] - top) < 0.01); if (lowp.length !== 2) continue;
+          let [A, Bq] = lowp; const ex = Bq[0] - A[0], ez = Bq[2] - A[2], el = Math.hypot(ex, ez); if (el < 1.2) continue;
+          const mx = (A[0] + Bq[0]) / 2 - box.c[0], mz = (A[2] + Bq[2]) / 2 - box.c[1]; let ox = -ez / el, oz = ex / el; if (ox * mx + oz * mz < 0) { ox = -ox; oz = -oz; }
+          tube(B.dark, [A[0] + ox * 0.06, top - 0.08, A[2] + oz * 0.06], [Bq[0] + ox * 0.06, top - 0.08, Bq[2] + oz * 0.06], 0.11, gcol);
+          const end = (b.id | 0) % 2 ? A : Bq, inX = (box.c[0] - end[0]), inZ = (box.c[1] - end[2]), il = Math.hypot(inX, inZ) || 1;
+          const px = end[0] + (inX / il) * 0.45 - ox * 0.25, pz = end[2] + (inZ / il) * 0.45 - oz * 0.25; // (back from the corner, against the wall)
+          tube(B.dark, [px + ox * 0.27, top - 0.1, pz + oz * 0.27], [px + ox * 0.27, groundAt(px, pz) + 0.05, pz + oz * 0.27], 0.085, gcol);
+        }
       }
       if (st.chimneys) {
         const [r0, r1] = R.ridge, y0 = top + R.rise * 0.55;

@@ -28,9 +28,10 @@ const SQ = 8;
  * @param {number} o.quality  0 Performance (none), 1 Balanced, 2 Ultra
  * @returns {{ mesh, update(t, cam, wind, windDir), dispose } | null}
  */
-export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt = () => 0.5, quality = 1, seed = 1 } = {}) {
+export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt = () => 0.5, quality = 1, seed = 1, sparse = false } = {}) {
   if (quality < 1 || typeof document === "undefined") return null;
-  const reach = quality >= 2 ? 34 : 22, perSq = quality >= 2 ? 30 : 20, cap = quality >= 2 ? 9000 : 3200;
+  // (sparse: with the thick layer of grass under them (grassField.js), only the odd taller clump among it)
+  const reach = quality >= 2 ? 34 : 22, perSq = Math.round((quality >= 2 ? 30 : 20) * (sparse ? 0.35 : 1)), cap = quality >= 2 ? 9000 : 3200;
   // ---- one tuft: three cards crossed at 60 degrees, each 0.6 m wide and tall, its foot at the ground ----
   const P = [], N = [], UV = [], I = [];
   for (let c = 0; c < 3; c++) {

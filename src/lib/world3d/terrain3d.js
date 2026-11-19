@@ -23,6 +23,34 @@ export const TERRAIN = {
 
 const cache = new Map();
 /** The hill function for a named grid: (x, z) => metres above the land's usual level (0 where the ground is low). */
+// ---- the survey's own fine relief, where a place's ground is seen close to (realPlace.js lays it on a finer mesh) ----
+// The 5 m terrain above is smooth: at Whitby the slope under St Mary's read as one green ramp. Here, over the East
+// Cliff, the hillside and Henrietta Street, the same survey's 1 m heights minus the 5 m terrain's (its paths, walls,
+// terraces, slips and gullies), in 2 cm steps, each row's first value then the changes as zigzag varints, in a file of
+// its own (public/textures/<file>), fetched before the place is built so that only that place downloads it.
+//   x0, z0: the first height's place (metres, as above); nx, nz: heights across and down, 1 m apart
+export const RELIEF = {
+  whitby: { file: "terrain_whitby_1m.bin", x0: -81, z0: 51, nx: 412, nz: 280, q: 0.02 },
+};
+const reliefs = new Map();
+/** Fetch and unpack a place's fine relief (a promise; null if it has none or it can't be had). */
+export function loadRelief(name, base = "") {
+  const R = RELIEF[name]; if (!R) return Promise.resolve(null);
+  if (reliefs.has(name)) return Promise.resolve(reliefs.get(name));
+  if (typeof fetch !== "function") return Promise.resolve(null);
+  return fetch(base + R.file).then((r) => (r.ok ? r.arrayBuffer() : null)).then((buf) => {
+    if (!buf) return null;
+    const b = new Uint8Array(buf), D = new Float32Array(R.nx * R.nz); let p = 0;
+    for (let j = 0; j < R.nz; j++) { let v = 0; for (let i = 0; i < R.nx; i++) { let z = 0, sh = 0, c; do { c = b[p++]; z += (c & 127) * 2 ** sh; sh += 7; } while (c & 128); v += z % 2 ? -(z + 1) / 2 : z / 2; D[j * R.nx + i] = v * R.q; } }
+    const rel = { ...R, D };
+    reliefs.set(name, rel); return rel;
+  }).catch(() => null);
+}
+/** A place's fine relief if it has been fetched: { x0, z0, nx, nz, D (metres, row by row) }, else null. */
+export function reliefOf(name) { return reliefs.get(name) || null; }
+/** For the tests: unpack a relief from its bytes. */
+export function setRelief(name, rel) { reliefs.set(name, rel); }
+
 export function terrainHill(name) {
   if (cache.has(name)) return cache.get(name);
   const T = TERRAIN[name]; if (!T) return null;
