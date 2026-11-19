@@ -315,7 +315,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     // ---- the roof ----
     // (each roof its own age: a little lighter or darker, warmer or greyer, as roofs replaced at different times are)
     const rv = 0.84 + 0.26 * (((b.id | 0) * 2654435761 >>> 0) % 1000) / 1000, rw = (((b.id | 0) * 40503 >>> 0) % 1000) / 1000 - 0.5;
-    const roofB = B["roof_" + (st.roofMat || "slate")] || B.roof_slate, rc = (st.roofMat === "clay" ? [1, 0.95, 0.92] : [1, 1, 1]).map((v, i) => v * rv * (1 + rw * [0.06, 0, -0.06][i]));
+    const roofB = B["roof_" + (st.roofMat || "slate")] || B.roof_slate, rc = (st.roofMat === "clay" ? [0.86, 0.76, 0.7] : [1, 1, 1]).map((v, i) => v * rv * (1 + rw * [0.06, 0, -0.06][i]));
     const box = obb(ring);
     const pitched = st.roof === "hip" || st.roof === "gable";
     const R = pitched && box && box.W < 26 ? pitchedRoof(ring, top, { shape: st.roof, pitch: (st.pitch ?? 0.62) + (b.plotOf ? (((b.id * 13) % 7) - 3) * 0.025 : 0), eave: st.type === "small" ? 0.2 : 0.3, axis: b.ridge || null }) : null;

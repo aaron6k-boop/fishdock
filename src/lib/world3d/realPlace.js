@@ -456,7 +456,8 @@ export function contactShade({ cx, cz, size = 140, mpp = 0.1, rings = [], discs 
 // ---- the worn, muddy patches in the grass (the soft ground's shader, FD_MUD), and the same worked out here so no tuft
 // of grass stands on them (grassTufts.js): the shader's own noise, fdDH / fdDN / fdDF, in JavaScript ----
 // (lift: how much more of the town's rough ground is worn than a lawn; town, lawn: how far to the mud each goes)
-const MUD = { lift: 0.05, town: 0.75, lawn: 0.35 };
+// (lawnLess: how much rarer the worn patches are on a lawn: at the town's rate the Abbey's lawns were blotched brown)
+const MUD = { lift: 0.05, town: 0.75, lawn: 0.25, lawnLess: 0.07 };
 // (the grass drier and yellower in broad patches: its tint there, the noise's scale in metres, where it starts and is
 // full, and how far towards the tint)
 const GRASS_DRY = { tint: ["1.14", "1.02", "0.68"], scale: 37, lo: 0.5, hi: 0.78, k: 0.55 };
@@ -475,7 +476,7 @@ export function marramAt(x, z, face) {
 export function dryAt(x, z) { const t = Math.min(1, Math.max(0, (mudDF(x / GRASS_DRY.scale + 3, z / GRASS_DRY.scale + 3) - GRASS_DRY.lo) / (GRASS_DRY.hi - GRASS_DRY.lo))); return t * t * (3 - 2 * t) * GRASS_DRY.k; }
 /** How worn to the mud the grass is here, 0..1, as the ground's shader draws it (town: the town's rough ground). */
 export function mudAt(x, z, town) {
-  const v = mudDF(x / 9 + 7, z / 9 + 7) + (mudDN(x / 1.7, z / 1.7) - 0.5) * 0.16 + (town ? MUD.lift : 0), t = Math.min(1, Math.max(0, (v - 0.6) / 0.12));
+  const v = mudDF(x / 9 + 7, z / 9 + 7) + (mudDN(x / 1.7, z / 1.7) - 0.5) * 0.16 + (town ? MUD.lift : -MUD.lawnLess), t = Math.min(1, Math.max(0, (v - 0.6) / 0.12));
   return t * t * (3 - 2 * t) * (town ? MUD.town : MUD.lawn);
 }
 
@@ -905,7 +906,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // (worn to the mud in patches: often on the town's rough ground (its vRuf a little above 0), now and then on a
               // lawn; the photograph's own colour, a little darker, its edge ragged)
               vec2 wm = vWPos.xz; float town = step(0.08, vRuf) * step(vRuf, 0.3);
-              float worn = smoothstep(0.6, 0.72, fdDF(wm / 9.0 + 7.0) + (fdDN(wm / 1.7) - 0.5) * 0.16 + town * ${MUD.lift.toFixed(3)}) * mix(${MUD.lawn.toFixed(2)}, ${MUD.town.toFixed(2)}, town);
+              float worn = smoothstep(0.6, 0.72, fdDF(wm / 9.0 + 7.0) + (fdDN(wm / 1.7) - 0.5) * 0.16 + town * ${MUD.lift.toFixed(3)} - (1.0 - town) * ${MUD.lawnLess.toFixed(3)}) * mix(${MUD.lawn.toFixed(2)}, ${MUD.town.toFixed(2)}, town);
               // (the photograph's orange of fallen leaves taken down by half towards its own grey, so it reads as earth; and
               // only well inside the grass, as at a lawn's edge it faded across the ground's triangles in straight lines)
               vec3 mudP = texture2D(uMud, wm / 2.5).rgb, mudC = mix(mudP, vec3(dot(mudP, vec3(0.3, 0.55, 0.15))) * vec3(1.08, 1.0, 0.86), 0.5) * 0.8 * (0.9 + 0.2 * fdDN(wm / 13.0));

@@ -30,16 +30,17 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
   if (quality < 1 || typeof document === "undefined") return null;
   const ultra = quality >= 2, reach = ultra ? 30 : quality >= 1.5 ? 22 : 15, dens = ultra ? 15 : quality >= 1.5 ? 10 : 7, cap = ultra ? 36000 : 14000;
   // ---- one clump: two cards crossed, each the cell's width, 1 tall (the kind's height is set in the shader) ----
-  const P = [], N = [], UV = [], I = [];
-  for (let c = 0; c < 2; c++) {
-    const a = c * Math.PI / 2 + 0.3, dx = Math.cos(a) * atlas.w * 0.5, dz = Math.sin(a) * atlas.w * 0.5, o = P.length / 3;
+  // (three cards at 60 degrees: with two, seen from above, each clump showed as a cross)
+  const P = [], N = [], UV = [], I = [], CN = [];
+  for (let c = 0; c < 3; c++) {
+    const a = c * Math.PI / 3 + 0.3, dx = Math.cos(a) * atlas.w * 0.5, dz = Math.sin(a) * atlas.w * 0.5, o = P.length / 3;
     P.push(-dx, 0, -dz, dx, 0, dz, dx, 1, dz, -dx, 1, -dz);
-    for (let k = 0; k < 4; k++) N.push(0, 1, 0);
+    for (let k = 0; k < 4; k++) { N.push(0, 1, 0); CN.push(-Math.sin(a), 0, Math.cos(a)); }
     UV.push(0, 0, 1, 0, 1, 1, 0, 1); I.push(o, o + 1, o + 2, o, o + 2, o + 3);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3));
-  geo.setAttribute("uv", new THREE.Float32BufferAttribute(UV, 2)); geo.setIndex(I);
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(UV, 2)); geo.setAttribute("aCN", new THREE.Float32BufferAttribute(CN, 3)); geo.setIndex(I);
   const aAttr = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3), aTint = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3), aSlope = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2);
   aAttr.setUsage(THREE.DynamicDrawUsage); aTint.setUsage(THREE.DynamicDrawUsage); aSlope.setUsage(THREE.DynamicDrawUsage);
   geo.setAttribute("aAttr", aAttr); geo.setAttribute("aTint", aTint); geo.setAttribute("aSlope", aSlope); // (aAttr: kind, phase, rank; aSlope: the ground's rise a metre east and south)
@@ -53,7 +54,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind; sh.uniforms.uWindDir = U.uWindDir;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", `#include <common>
-        uniform float uTime, uWind; uniform vec2 uWindDir; attribute vec3 aAttr; attribute vec3 aTint; attribute vec2 aSlope; varying vec3 vTint; varying float vUp, vGust;
+        uniform float uTime, uWind; uniform vec2 uWindDir; attribute vec3 aAttr; attribute vec3 aTint; attribute vec2 aSlope; attribute vec3 aCN; varying vec3 vTint; varying float vUp, vGust, vFace;
         float fdKH(float k) { return k < 0.5 ? ${kh[0]} : k < 1.5 ? ${kh[1]} : k < 2.5 ? ${kh[2]} : ${kh[3]}; }`)
       .replace("#include <uv_vertex>", `#include <uv_vertex>
         { float k = aAttr.x, cu = mod(k, ${atlas.cols.toFixed(1)}), cv = floor(k / ${atlas.cols.toFixed(1)});
@@ -65,6 +66,8 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
         { vec3 fdO = (instanceMatrix * vec4(transformed.x, 0.0, transformed.z, 0.0)).xyz; transformed.y += dot(fdO.xz, aSlope) / max(length(instanceMatrix[1].xyz), 1e-3); }
         vUp = position.y; vTint = aTint;
         vec3 fdW = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        // (how squarely the card faces the eye: seen edge on or from above it fades, the ground's own grass showing)
+        { vec3 cn = normalize((modelMatrix * instanceMatrix * vec4(aCN, 0.0)).xyz); vec3 vd = normalize(cameraPosition - fdW - vec3(0.0, 0.2, 0.0)); vFace = abs(dot(cn, vd)); }
         // (thinning out with distance: each clump, by its rank, sinks into the ground somewhere short of the reach)
         float fdR = ${reach.toFixed(1)} * (1.0 - 0.6 * aAttr.z), fdD = distance(fdW, cameraPosition);
         transformed *= smoothstep(fdR, fdR * 0.8, fdD);
@@ -76,7 +79,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
         float bend = uWind * (0.18 + 0.82 * gust) * (0.75 + 0.25 * sin(uTime * 3.1 + aAttr.y)) * position.y * position.y * fdKH(aAttr.x) * 0.45;
         vec3 wl = (vec4(wd.x, 0.0, wd.y, 0.0) * instanceMatrix).xyz;
         transformed += wl * bend + vec3(0.0, -bend * 0.25, 0.0);`);
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vTint; varying float vUp, vGust;")
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vTint; varying float vUp, vGust, vFace;")
       .replace("#include <map_fragment>", `
         vec4 fdTx = texture2D(map, vMapUv);
         float fdL = dot(fdTx.rgb, vec3(0.3, 0.55, 0.15));
@@ -86,7 +89,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
         diffuseColor.rgb = mix(fdTx.rgb * 0.9, vTint * (fdL / ${atlas.lum.toFixed(3)}) * 0.85, fdG) * (1.0 + 0.14 * vGust * vUp);
         // (a blade is a few pixels wide: in the picture's smaller copies its alpha is raised, so it doesn't fade away)
         vec2 fdDx = dFdx(vMapUv * vec2(2048.0, 1024.0)), fdDy = dFdy(vMapUv * vec2(2048.0, 1024.0));
-        diffuseColor.a *= fdTx.a * (1.0 + max(0.0, 0.5 * log2(max(dot(fdDx, fdDx), dot(fdDy, fdDy)))) * 0.3);`)
+        diffuseColor.a *= fdTx.a * (1.0 + max(0.0, 0.5 * log2(max(dot(fdDx, fdDx), dot(fdDy, fdDy)))) * 0.3) * smoothstep(0.12, 0.42, vFace);`)
       .replace("#include <normal_fragment_begin>", "#include <normal_fragment_begin>\nnormal = normalize(vNormal); nonPerturbedNormal = normal;")
       // (the sun through the blades from behind: lit grass brighter, its tips most, when you look towards the sun)
       .replace("#include <lights_fragment_end>", `#include <lights_fragment_end>
@@ -94,7 +97,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
           { float fdB = pow(max(0.0, dot(-normalize(vViewPosition), directionalLights[0].direction)), 3.0); reflectedLight.directDiffuse *= 1.0 + fdB * 0.9 * vUp; }
         #endif`);
   };
-  mat.customProgramCacheKey = () => "fdfield1";
+  mat.customProgramCacheKey = () => "fdfield2";
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.name = "fdGrassField"; mesh.castShadow = false; mesh.receiveShadow = true; mesh.noReflect = true; mesh.frustumCulled = false; mesh.count = 0;
   mesh.userData.kind = "grass"; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
