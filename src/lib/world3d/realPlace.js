@@ -1128,7 +1128,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
-  if (gF) { const gm = new THREE.Mesh(gF, softMat); gm.receiveShadow = true; gm.castShadow = true; gm.name = "fdFineGround"; gm.userData.kind = "the ground"; group.add(gm); targets.push(gm); }
+  // (on Balanced it throws no shadow: its one mesh was drawn whole a second time for the shadows round you, hundreds of
+  // metres from it, half a million triangles a frame for nothing a phone would show)
+  if (gF) { const gm = new THREE.Mesh(gF, softMat); gm.receiveShadow = true; gm.castShadow = quality >= 2; gm.name = "fdFineGround"; gm.userData.kind = "the ground"; group.add(gm); targets.push(gm); }
   place.deckMat = deckMat; // world.js darkens it in the rain
 
   const hillAt = (x, z, c) => (hill && (c === 1 || c === 3) ? hill(x, z) : 0);

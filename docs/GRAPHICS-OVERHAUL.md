@@ -29,7 +29,7 @@ How a stage is checked:
 | The East Cliff smooth green ramps on a phone | The 1 m surveyed hillside is drawn on Balanced too | Yes, phone-shaped screen on the PC |
 | Dark slabs on the hillside | Walls, fences and hedges follow the ground in short lengths | Yes |
 | The East Cliff one smooth brown wall | Its rock shows on the sea face: dark shale under buff sandstone, ledge shadows | Yes |
-| A dark ramp 40 m tall standing off the East Cliff | Flights of steps follow their line and the ground; a line mapped straight down a cliff isn't drawn as stairs | Yes |
+| Flights of steps drawn straight from their first point to their last | Each follows its mapped line and the ground, tread by tread; a line too steep to be stairs isn't drawn | Yes (the 199 Steps and Henrietta Street's views unchanged) |
 
 ### Measured (PC, 1920x1080, the same spot, the same script; before is the live code)
 
@@ -38,12 +38,13 @@ How a stage is checked:
 | Whitby, first person at rest, Ultra | 86 frames a second, slowest 1% 56 | 85, 56 |
 | after landing a fish | 69, 47 | 75, 47 |
 | heavy rain | 86, 56 | 87, 56 |
-| Phone-shaped screen on Balanced, at rest | 165 | 139 |
-| the same, heavy rain | 202 | 184 |
+| Phone-shaped screen on Balanced, at rest | 165 | 139 with the hillside in the shadow pass; 190 as shipped, without |
+| the same, heavy rain | 202 | 184; 197 as shipped |
 
-The phone-shaped figures are from the PC's graphics card, not a phone: they show the cost of the fine hillside on
-Balanced (530,000 more triangles), not what a phone will draw. Aaron's iPhone showed 50 to 57 before; its own reading
-after this stage is the one that counts, and if it has fallen the hillside comes off Balanced or gets a lighter mesh.
+The phone-shaped figures are from the PC's graphics card, not a phone, and vary by a tenth from run to run. They
+showed the fine hillside costing a sixth of the frame rate on Balanced while it was also drawn for the shadows; it
+throws no shadow on Balanced now, and the cost is within the run-to-run difference. Aaron's iPhone showed 50 to 57
+before; its own reading after this stage is the one that counts.
 Other places on the same build, third person on Ultra: Great Yarmouth 90 to 99, Gorleston 88 to 92, Lowestoft 82 to 88,
 Cromer 84 to 85, Whitby 75 to 77; loading 21 to 26 s, as before. No page or shader errors in any run.
 
@@ -57,6 +58,11 @@ Cromer 84 to 85, Whitby 75 to 77; loading 21 to 26 s, as before. No page or shad
 - Playing a fish with the hands drawn in, the left forearm comes in level from the left edge instead of from below.
 - A stall of one to three seconds when the catch card opens ("fish inspect" on the game's meter). It was there before
   this stage.
+- A dark patch about 10 m wide down the East Cliff's sea face, seen only from the camera 480 m out at sea off the
+  harbour mouth (not from the piers, nor from the sea to the east). It was there before this stage. A ray through it
+  meets nothing but the fine hillside (229 to 249 m east, 93 to 121 m south of the mark), whose heights, colours and
+  soil there are ordinary; it is not a wall, a flight of steps or a path, each of which was tried. So it is in the
+  lighting or the shadows from that one direction, not in the ground. Not found yet.
 - Trees are still leaf cards on simple branches.
 - Balanced still has no clutter (rocks, plants) and no windows in depth.
 
