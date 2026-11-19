@@ -2481,6 +2481,48 @@
    ]
   },
   {
+   "id": "ea:lidar-composite-dtm-1m-2022:cromer",
+   "name": "LIDAR Composite DTM 2022, 1 m (Cromer)",
+   "source": "Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs)",
+   "page": "https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc",
+   "author": "Environment Agency",
+   "licence": "Open Government Licence v3.0",
+   "attribution": "Required: \"© Environment Agency copyright and/or database right 2022. All rights reserved.\" Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note)",
+   "type": "elevation data (bare ground, metres above Ordnance Datum), GeoTIFF, British National Grid",
+   "resolution": "1 m",
+   "use": "the ground round Cromer Pier: the cliff behind the promenade and the cliffs to the west at their surveyed heights (src/lib/world3d/terrain3d.js \"cromer\": each height the mean of the survey's 1 m cells over 5 m, every 5 m, 640 m each way round the mark; public/textures/terrain_cromer_5m.bin), and the survey's own 1 m relief over the cliff either side of the pier (x -402 to 300 m, z 99 to 378 m from the mark; public/textures/terrain_cromer_1m.bin); made by source-assets/tools/terrain_from_dtm.py",
+   "files": [
+    {
+     "file": "renders/dem_cromer/dtm_1m.tif",
+     "bytes": 16777763,
+     "sha256": "3cafa07f5e88fb5fc0816be9bb599d373bede1da6cc125e6858b99462e3d7973",
+     "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&format=image/tiff&subset=E(621130,622830)&subset=N(341690,343390)"
+    }
+   ],
+   "downloaded": "2026-11-19"
+  },
+  {
+   "id": "ea:lidar-composite-dtm-1m-2022:brixham",
+   "name": "LIDAR Composite DTM 2022, 1 m (Brixham)",
+   "source": "Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs)",
+   "page": "https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc",
+   "author": "Environment Agency",
+   "licence": "Open Government Licence v3.0",
+   "attribution": "Required: \"© Environment Agency copyright and/or database right 2022. All rights reserved.\" Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note)",
+   "type": "elevation data (bare ground, metres above Ordnance Datum), GeoTIFF, British National Grid",
+   "resolution": "1 m",
+   "use": "the ground round Brixham's harbour: the hills either side at their surveyed heights (src/lib/world3d/terrain3d.js \"brixham\"; public/textures/terrain_brixham_5m.bin), and the survey's own 1 m relief over the slope above the breakwater's root (x 150 to 600 m, z 201 to 600 m from the mark; public/textures/terrain_brixham_1m.bin); made by source-assets/tools/terrain_from_dtm.py",
+   "files": [
+    {
+     "file": "renders/dem_brixham/dtm_1m.tif",
+     "bytes": 16777763,
+     "sha256": "b8074ad05ee83ad17bf01f932192558e09dfeb2b67e95cae1a29392686dd31d2",
+     "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&format=image/tiff&subset=E(292060,293760)&subset=N(56110,57810)"
+    }
+   ],
+   "downloaded": "2026-11-19"
+  },
+  {
    "id": "polyhaven:cliff_side",
    "name": "Cliff Side",
    "source": "https://polyhaven.com/a/cliff_side",
@@ -3373,6 +3415,182 @@
    "type": "models",
    "use": "the tops of the town's chimney stacks (public/models/chimney_caps.glb, chimneys3d.js): oversailing brick courses, flaunching and clay pots, modelled in Blender",
    "made": "2026-11-19"
+  },
+  {
+   "id": "polyhaven:rock_moss_set_02",
+   "name": "Rock Moss Set 02",
+   "source": "https://polyhaven.com/a/rock_moss_set_02",
+   "author": "Kless Gyzen",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "boulders a metre and more across at the foot of cliffs (six rocks), High and Ultra (public/models/kit/rock_moss_set_02.glb: cut down to a near and a far level in Blender, pictures at 512 px; FishDock-assets/queue/h228_kit3_nature.py on Aaron's PC; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/rock_moss_set_02/model/rock_moss_set_02_1k.gltf",
+     "bytes": 11608,
+     "sha256": "c3b992a7622e94f7d8da97a47277a2a5177a513af0312a127ec908d4056c97db",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_moss_set_02/rock_moss_set_02_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_02/model/textures/rock_moss_set_02_nor_gl_1k.jpg",
+     "bytes": 273527,
+     "sha256": "dd2503789089fb72ef469efd14364d393e769c0de8781a251475cac7e0b6f51d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_02/rock_moss_set_02_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_02/model/textures/rock_moss_set_02_diff_1k.jpg",
+     "bytes": 194307,
+     "sha256": "91dd2cc77d5198b067d77e5bdb3fa8ee7b8950aeff5aec2c1ccaddb76dcca481",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_02/rock_moss_set_02_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_02/model/textures/rock_moss_set_02_rough_1k.jpg",
+     "bytes": 146226,
+     "sha256": "12252219a98a560940359973e83af831abdcfab0ead3f0a2a7b135a0143105f1",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_02/rock_moss_set_02_rough_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_02/model/rock_moss_set_02.bin",
+     "bytes": 1316572,
+     "sha256": "2df9d8eaaca4207529b0f613d4886d3962d0b9ffc0cdfd2bc4bf35dbcd391cb5",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_moss_set_02/rock_moss_set_02.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:rock_face_01",
+   "name": "Rock Face 01",
+   "source": "https://polyhaven.com/a/rock_face_01",
+   "author": "Dario Barresi",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "an outcrop of bedded rock standing out of faces too steep for plants, High and Ultra (public/models/kit/rock_face_01.glb: cut down to a near and a far level in Blender, pictures at 1024 px; FishDock-assets/queue/h228_kit3_nature.py on Aaron's PC; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/rock_face_01/model/rock_face_01_1k.gltf",
+     "bytes": 2793,
+     "sha256": "96c332c01d173a2431115f3bac29be101fba341e5500e2a08e384f4edd17299e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_face_01/rock_face_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_01/model/textures/rock_face_01_arm_1k.jpg",
+     "bytes": 693610,
+     "sha256": "59128c79d207a50a69a38002986135ade3b19642d26158cec141eca41578c9ca",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_01/rock_face_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_01/model/textures/rock_face_01_nor_gl_1k.jpg",
+     "bytes": 1023400,
+     "sha256": "9a9d85b9a01f4e24fc9ceec8baf96c019f552bca69591ff544c7a725e28b1d97",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_01/rock_face_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_01/model/textures/rock_face_01_diff_1k.jpg",
+     "bytes": 853749,
+     "sha256": "41bd26ed2db1332b1ebb4b1326fd8af4d21f0f0eb57b8ea385033115c722cfdb",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_01/rock_face_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_01/model/rock_face_01.bin",
+     "bytes": 476436,
+     "sha256": "873eac0319333e92bc96ddeedf8ebf69dc3c68ff1dfe32d8c14ddc165cdb20ac",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_face_01/rock_face_01.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:rock_face_02",
+   "name": "Rock Face 02",
+   "source": "https://polyhaven.com/a/rock_face_02",
+   "author": "Dario Barresi, Rico Cilliers",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "an outcrop of rock on faces too steep for plants, High and Ultra (public/models/kit/rock_face_02.glb: cut down to a near and a far level in Blender, pictures at 1024 px; FishDock-assets/queue/h228_kit3_nature.py on Aaron's PC; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/rock_face_02/model/rock_face_02_1k.gltf",
+     "bytes": 2794,
+     "sha256": "ebeab82d463c89eb5f894b85807da111280a73b552d694257118f3f2d47bf760",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_face_02/rock_face_02_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_02/model/textures/rock_face_02_nor_gl_1k.jpg",
+     "bytes": 1082942,
+     "sha256": "a9dc200810f5488395fdc928b5a9441c007c33047d0375d946f33dcd2ff1c853",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_02/rock_face_02_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_02/model/textures/rock_face_02_arm_1k.jpg",
+     "bytes": 820389,
+     "sha256": "0f3f64b9f56e3c5cecbb99e45d8fa0d4cbf025d4455439d1c5f6672a408365ee",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_02/rock_face_02_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_02/model/rock_face_02.bin",
+     "bytes": 702068,
+     "sha256": "cfa3dea8f0f91525b5dfe93d889acacf961d20f7174aae100eae2c6e101edf31",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_face_02/rock_face_02.bin"
+    },
+    {
+     "file": "downloads/polyhaven/rock_face_02/model/textures/rock_face_02_diff_1k.jpg",
+     "bytes": 920193,
+     "sha256": "d777f2c9b598773c2143751c34913cf5eef0ae392af31fb73c28b98afab6fb7b",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_02/rock_face_02_diff_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:coast_rocks_05",
+   "name": "Coast Rocks 05",
+   "source": "https://polyhaven.com/a/coast_rocks_05",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "a slab of the cliff's own rock standing out of its foot by the sea, now and then, High and Ultra (public/models/kit/coast_rocks_05.glb: cut down to a near and a far level in Blender, pictures at 1024 px; FishDock-assets/queue/h228_kit3_nature.py on Aaron's PC; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/coast_rocks_05/model/coast_rocks_05_1k.gltf",
+     "bytes": 2821,
+     "sha256": "4b5e97d42b4d9e1999ee5961922adc6b5d81f4aad34219915def7975bb2a8eb7",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/coast_rocks_05/coast_rocks_05_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_05/model/textures/coast_rocks_05_arm_1k.jpg",
+     "bytes": 893696,
+     "sha256": "26b851f13a6e00500440d964393bee8aa1865660777c05b9082bdb12c43a23b6",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_05/coast_rocks_05_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_05/model/coast_rocks_05.bin",
+     "bytes": 22102224,
+     "sha256": "c46b19d62dd5d42d5f03bc7508e22fdc00ec88fa197b4fdf8db8e40929ea13cc",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/coast_rocks_05/coast_rocks_05.bin"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_05/model/textures/coast_rocks_05_nor_gl_1k.jpg",
+     "bytes": 1327762,
+     "sha256": "5d32e03ea42abc05dd913e7ead4e915d9d60f27c8942f75128a87f84e7baee9d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_05/coast_rocks_05_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/coast_rocks_05/model/textures/coast_rocks_05_diff_1k.jpg",
+     "bytes": 954605,
+     "sha256": "2ec4ec09422a14d55cc890ad902486cf76df8e663688fbc32f78a15684646ee1",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_05/coast_rocks_05_diff_1k.jpg"
+    }
+   ]
   }
  ]
 }

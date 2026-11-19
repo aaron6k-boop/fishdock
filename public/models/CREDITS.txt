@@ -148,7 +148,8 @@ until the baked stonework below replaced it; kept for a stone pier without its o
 (https://polyhaven.com/a/large_sandstone_blocks_01), from Poly Haven, CC0 1.0. Credited with thanks.
 
 The shape of the ground round Whitby's piers (src/lib/world3d/terrain3d.js, and the hillside's 1 m relief,
-public/textures/terrain_whitby_1m.bin) is from the Environment Agency's LIDAR
+public/textures/terrain_whitby_1m.bin), round Cromer Pier and round Brixham's harbour (from 19 November 2026:
+public/textures/terrain_cromer_*.bin, terrain_brixham_*.bin) is from the Environment Agency's LIDAR
 Composite DTM 2022, 1 m (https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc):
 © Environment Agency copyright and/or database right 2022. All rights reserved. Contains public sector information
 licensed under the Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
@@ -187,7 +188,9 @@ The ground's clutter on High and Ultra (public/models/kit/*.glb, from 19 Novembe
 "Nettle Plant" by Rob Tuytel and Rico Cilliers; "Weed Plant 02" by Rob Tuytel and Rico Cilliers; "Shrub 02" by Rico
 Cilliers; "Shrub Sorrel 01" by Rico Cilliers; "Dandelion 01" by Rob Tuytel and Rico Cilliers; "Fern 02" by Rob Tuytel
 and Rico Cilliers; "Dead Tree Trunk" by Rob Tuytel; "Dry Branches Medium 01" by Rico Cilliers; "Grass Medium 01" by
-Rob Tuytel and Rico Cilliers (each at https://polyhaven.com/a/<name>, e.g. https://polyhaven.com/a/nettle_plant),
+Rob Tuytel and Rico Cilliers; and the bigger rocks: "Rock Moss Set 02" by Kless Gyzen; "Rock Face 01" by Dario
+Barresi; "Rock Face 02" by Dario Barresi and Rico Cilliers; "Coast Rocks 05" by Rob Tuytel (each at
+https://polyhaven.com/a/<name>, e.g. https://polyhaven.com/a/nettle_plant),
 split into their separate pieces and cut down in Blender for FishDock. The wrack (kit/wrack.glb), the grass blades
 (public/textures/grass_field.webp) and the trees' leaf cluster (public/textures/leaf_cluster.webp) are modelled in
 Blender for FishDock (source-assets/blender/build_kit.py, build_grass_field.py, build_leaves.py). Credited with
