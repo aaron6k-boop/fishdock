@@ -1894,7 +1894,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             if (y > 0.5 && y < 0.95 && R() < 0.5) put("wrack", x, z, 0.6 + R() * 0.7); // (the strand line: where the last tide left it)
             if (atBack && R() < 0.45) { const fl = R() < 0.55; put(fl ? "rock_09" : "stone_01", x, z, fl ? 0.05 + R() * 0.1 : 0.07 + R() * 0.13, 1); }
             if (atSea && R() < 0.04) put("rock_moss_set_01", x, z, 0.35 + R() * 0.65, 1);
-            if (y > 0.5 && R() < 0.006) put(R() < 0.5 ? "dead_tree_trunk" : "dry_branches_medium_01", x, z, 0.35 + R() * 0.3);
+            if (y > 0.5 && R() < 0.0015) put(R() < 0.35 ? "dead_tree_trunk" : "dry_branches_medium_01", x, z, 0.35 + R() * 0.3); // (now and then: at one in 170 Great Yarmouth's wide beach was strewn with sticks)
           }
         } else if (bank[k] && nb4(k).some((q) => cls[q] === 0 || cls[q] === 2)) {
           for (let c = 0; c < area * 0.03; c++) put("rock_moss_set_01", x0 + R() * cw, z0 + R() * ch, 0.5 + R() * 1.1, 1); // (fallen at the cliff's foot)

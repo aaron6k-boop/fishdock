@@ -35,6 +35,8 @@ function loadKit(id) {
         if (m.transparent || m.alphaTest > 0 || /plant|grass|fern|nettle|weed|shrub|sorrel|dandelion/i.test(id)) { m.transparent = false; m.alphaTest = Math.max(0.5, m.alphaTest || 0); m.side = THREE.DoubleSide; }
         // (the wrack's olive-brown lifted: modelled in its colour as a dark heap it drew as black scribbles on the sand)
         if (id === "wrack") m.color.multiplyScalar(1.7);
+        // (driftwood bleached by sun and salt: the scans' dark bark lay on the sand as black sticks)
+        if (/trunk|branches/.test(id)) m.color.setRGB(1.55, 1.5, 1.45);
         if (!V.has(v)) V.set(v, { near: [], far: [] });
         V.get(v)[l].push({ geo, mat: m });
       });
