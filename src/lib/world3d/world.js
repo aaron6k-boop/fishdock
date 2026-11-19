@@ -13,7 +13,7 @@ import { setShadowReach } from "./realPlace.js";
 import { createAngler, waveHeight } from "./angler.js";
 import { createRockSpray } from "./rockSpray.js";
 import { createTipLights, createHeadTorch } from "./nightKit.js";
-import { setHandsDim, setHandsWet, setRigView, setSoftCut } from "./fpRig.js";
+import { setHandsDim, setHandsWet, setRigView, setSoftCut, ZOOM_DROP } from "./fpRig.js";
 import { wetSpotAt, dryWetSpots } from "./wetLook.js";
 import { createLook, lookAt, wrap, walkFollow, FOLLOW, easeBlend, followDist, WALK_PITCH, walkPitchBack } from "./look.js";
 import { layoutFor } from "./spots.js";
@@ -209,6 +209,39 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     try { const mats = renderer.compile(scene, camera); loadPend ||= new Set(); for (const m of mats) loadPend.add(m); } catch { /* (built as they are met instead) */ }
     finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
   }
+  // ---- and after loading: nothing is drawn with a shader that isn't built yet ----
+  // three.js builds a material's shader the first time something drawn needs it, and that first use waits for the
+  // driver: a quarter of a second each on Aaron's PC (Edge, RTX 3090), one after another. Timed there on 19 November
+  // with every graphics call measured: 35 seconds of a first two-minute session were spent waiting in that one call,
+  // 16 of them in a single stop soon after the place appeared as the pier's furniture arrived (63 shaders), one to two
+  // seconds each time a fish was hooked, netted or held up, and 22 and 10 seconds in the middle of one fight. What
+  // was already here handed late arrivals over in the background but gave up after a second and a half and waited
+  // for them all; and anything that reached the picture before it was noticed was built on the spot.
+  // So every draw is checked first: a thing whose own material has no shader yet is left out of this frame and handed
+  // over after it; one whose shader isn't ready is left out until it is (where the browser builds them off the page:
+  // elsewhere isReady is always true and it is drawn, and waited for, as before). Its shadow waits with it. It appears
+  // a moment late; the game never stops for it. Only the scene's own drawings are checked (the sky's reflection map,
+  // the post-processing passes and the sea's own passes use scenes of their own).
+  const unbuilt = new Set(), tries = new WeakMap(); let heldDraws = 0;
+  { const drawOne = renderer.renderBufferDirect;
+    renderer.renderBufferDirect = function (cam, sc, geometry, material, object, group) {
+      if (sc === scene || sc === null) { // (the picture, the mirror; null: the shadow maps)
+        const om = object.material, own = Array.isArray(om) ? om[group ? group.materialIndex : 0] : om;
+        if (own?.isMaterial) {
+          const pr = renderer.properties.get(own).currentProgram;
+          if (!pr && (tries.get(object) || 0) < 3) { if (sc === scene) unbuilt.add(object); heldDraws++; return; } // (asked for three times and still none: drawn as three.js would)
+          if (pr && pr.isReady?.() === false) { heldDraws++; return; }
+        }
+      }
+      drawOne.call(this, cam, sc, geometry, material, object, group);
+    };
+  }
+  function buildUnbuilt() {
+    if (!unbuilt.size) return;
+    const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
+    try { for (const o of unbuilt) { tries.set(o, (tries.get(o) || 0) + 1); renderer.compile(o, camera, scene); } } catch { /* (built as it is met instead) */ }
+    finally { if (rt) renderer.setRenderTarget(prev); unbuilt.clear(); }
+  }
   let warmMs = 0, warmCalls = 0; // (film checks only: how often the scene was readied, and the time it took on the page)
   function warm(root = scene, late = false) {
     const t0w = performance.now(); warmCalls++;
@@ -225,11 +258,13 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
         const prev = renderer.getRenderTarget(), rt = post?.target || null; if (rt) renderer.setRenderTarget(rt);
         let mats; try { mats = renderer.compile(scene, camera); } finally { if (rt) renderer.setRenderTarget(prev); for (const o of hidden) o.visible = false; }
         // (three's own compileAsync does this too, but threw, and never finished, on a material whose shader had gone
-        // in the meantime; so here: gone counts as done, and a second and a half is long enough to wait regardless)
+        // in the meantime; so here: gone counts as done. Half a minute at most: nothing unbuilt is drawn meanwhile
+        // (above), so there is no hurry. It gave up after a second and a half until 19 November, and then waited on
+        // the page for whatever was left: sixteen seconds for the pier's furniture on Aaron's PC)
         warmBusy = true; const t0 = performance.now();
         const check = () => {
           if (mats) for (const m of mats) { const pr = renderer.properties.get(m).currentProgram; if (!pr || pr.isReady?.() !== false) mats.delete(m); }
-          if (!mats || !mats.size || performance.now() - t0 > 1500) { warmBusy = false; warm(scene); } else setTimeout(check, 16);
+          if (!mats || !mats.size || performance.now() - t0 > 30000) { warmBusy = false; warm(scene); } else setTimeout(check, 16);
         };
         setTimeout(check, 16);
       } catch { warmBusy = false; }
@@ -274,6 +309,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // drawn before this with some things hidden, never draws it)
     renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
     if (post) post.render(); else renderer.render(scene, camera);
+    buildUnbuilt(); // (anything met for the first time in this frame: its shader asked for now, drawn when it is ready)
     if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); qs.push(q); }
     // (collect the answers that are ready, oldest first; a disjoint event, as a change of GPU clock, throws them away)
     while (qs.length && gl.getQueryParameter(qs[0], gl.QUERY_RESULT_AVAILABLE)) { const d = gl.getParameter(tq.GPU_DISJOINT_EXT); const ns = gl.getQueryParameter(qs[0], gl.QUERY_RESULT); gl.deleteQuery(qs.shift()); if (!d) gpuT[gpuN++ % 60] = ns / 1e6; }
@@ -752,7 +788,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     { const me = anglers.get(localId); if (me && !landShot) { me.a.root.getWorldPosition(tmpMe); me.a.showTag(camPos.distanceTo(tmpMe) > 12); } }
     // a portrait phone sees little side to side; first person widens the view a little so the rod and reel fit
     camera.fov = look.fov * ((mode === "first" || mode === "free") && camera.aspect < 0.8 ? FP_TALL : 1) * jumpZoom; camera.updateProjectionMatrix();
-    setRigView(look.fov * (camera.aspect < 0.8 ? FP_TALL : 1)); // (your own arms framed for the picture's height: fpRig.js)
+    setRigView(look.fov * (camera.aspect < 0.8 ? FP_TALL : 1), ZOOM_DROP * Math.min(1, (1 - jumpZoom) / 0.25)); // (your own arms framed for the picture's height, and lowered out of it as the view zooms in on a leap: fpRig.js)
     const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     camera.lookAt(camOverride && lookOverride ? lookOverride : camera.position.clone().add(d));
     for (const [id, x] of anglers) x.a.setFirstPerson((mode === "first" || mode === "free") && id === (focus?.a.id));
@@ -832,6 +868,12 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // side of a building is lit by it rather than going flat grey ----
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), env.envSky));
+  // (a background of its own, a single dark texel the sky's sphere covers entirely. Without one three.js draws a box
+  // behind the scene with a material it makes and throws away on every call, and its shader with it: built again each
+  // time the sky was refreshed, a stop of 1.3 to 1.8 seconds on Aaron's PC whenever the light or the cloud had changed
+  // a step ("PMREM.Background" in the graphics calls timed there, 19 November). A texture's background is drawn by
+  // the renderer's own, kept, mesh)
+  { const px = new THREE.DataTexture(new Uint8Array([8, 10, 14, 255]), 1, 1); px.colorSpace = THREE.SRGBColorSpace; px.needsUpdate = true; envScene.background = px; }
   let envRT = null, envKey = "", envWait = 0;
   function skyLight(s, force = false) {
     if (!s) return;
@@ -887,6 +929,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       torch(c) { torch.set(c); },
       /** The shader programs in use, by kind (for finding out why there are so many). */
       get programs() { const by = {}; for (const p of renderer.info.programs || []) { const k = `${p.name}|${(p.cacheKey || "").length}`; (by[p.name] ||= { n: 0, used: 0, keys: new Set() }).n++; by[p.name].used += p.usedTimes; by[p.name].keys.add(p.cacheKey); void k; } return Object.entries(by).map(([name, v]) => ({ name, n: v.n, used: v.used })).sort((a, b) => b.n - a.n); },
+      get heldDraws() { return heldDraws; }, // (how many draws have been left out while their shaders were built)
       programKeys(name) { return (renderer.info.programs || []).filter((p) => p.name === name).map((p) => p.cacheKey); },
       splash(x, z, size = 0.6, mult = 1) { const y = waveHeight(x, z, film ? film.t : 0, { ...env.waveState(), kind }); splash(new THREE.Vector3(x, y, z), size, mult); ripple(new THREE.Vector3(x, y, z), Math.min(1, size)); },
       /** (checks) n frames of ms each, as a phone would make them, drawn only at the end; each(i) after every frame */

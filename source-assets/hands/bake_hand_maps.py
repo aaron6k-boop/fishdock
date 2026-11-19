@@ -1,18 +1,24 @@
-# FishDock: skin detail for your hands in first person, baked from the rig itself (no outside textures)
-# The hands were one flat colour: no knuckle creases, no nails. This draws them into the hands' own uv tile of
-# public/models/fp_rig.glb (both hands share its layout, one tile each), from where each texel lies on the hand at
-# rest: which finger it's on and how far along it, and whether it faces the back of the hand or the palm. Three maps,
-# 1024 x 1024: a colour multiplier (neutral 0.85, so creases can darken and nails lighten), a normal map (the creases'
-# grooves and the nails' edges) and a roughness map (nails glossier than skin). fpRig.js lays them over the skin, the
-# skin's own colour still the player's choice.
+# FishDock: the skin of your hands in first person, painted from the rig itself (no outside textures)
+# Drawn into the hands' own uv tile of public/models/fp_rig.glb (both hands share its layout, one tile each), from where
+# each texel lies on the hand at rest: which finger it's on and how far along it, whether it faces the back of the hand
+# or the palm. Three maps, 2048 x 2048 (a fifth of a millimetre a texel): a colour multiplier (neutral 0.85, so skin can
+# be darker or lighter than the player's chosen colour), a normal map and a roughness map. fpRig.js lays them over the
+# skin as they are.
+# The second painter (19 November 2026). The first drew each crease as one dark line and each nail as a pink square,
+# and the game then doubled their strength: black scratches across the knuckles and palm in the footage from Aaron's
+# PC. Here a joint's skin is a field of fine wrinkles a millimetre apart that darken a little in their grooves; nails
+# have a nail's outline (a curved cuticle, a rounded tip, a pale free edge, a faint lunula, a fold of skin round them)
+# and stand proud; the palm, the pads and the knuckles are pinker than the back of the hand; veins and tendons are
+# soft swells, not lines; and all of it carries skin's own net of tiny creases.
 #   python3 bake_hand_maps.py <fp_rig.glb> <out dir>
 import sys, math
 import numpy as np
 from PIL import Image
 from glbmesh import load
 
-S = 1024
+S = 2048
 NEUTRAL = 0.85
+RELIEF = 1.6  # (the relief drawn this much deeper than life: true to life it is lost at the size a phone shows your hands)
 
 def smooth(a, b, x):
     t = np.clip((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t)
@@ -87,46 +93,65 @@ def main(glb, out):
             latv[take] = ((p[take] - q[take]) @ ch["lat"][k]) / ch["r"]
     on = best < np.array([ch["r"] for ch in chains])[ci] * 1.9  # (on a finger, not the palm)
 
-    H = np.zeros(K); A = np.ones((K, 3)); R = np.full(K, 0.56)
+    H = np.zeros(K); A = np.ones((K, 3)); R = np.full(K, 0.58)
     mm = 0.001
+    rng = np.random.default_rng(1911)
+    def waves(q, lam, n, along=None, spread=1.0):
+        # band-limited noise from where a texel is on the hand (so it never breaks at a seam of the map): n plane waves
+        # of wavelength about lam, their directions random, or within spread of along; unit variance
+        out = np.zeros(len(q))
+        for _ in range(n):
+            d = rng.standard_normal(3)
+            if along is not None: d = along + spread * d / np.linalg.norm(d)
+            d /= np.linalg.norm(d); out += np.cos(q @ d * (2 * np.pi / (lam * rng.uniform(0.75, 1.3))) + rng.uniform(0, 2 * np.pi))
+        return out / math.sqrt(n / 2)
     def line(s, at, w): return np.exp(-0.5 * ((s - at) / w) ** 2)
+    RED = np.array([0.0, 1.0, 1.1]); PINK = np.array([-0.35, 0.75, 1.0])  # (what a darker, redder patch takes out of green and blue; pink lightens red too)
+    backAll = np.zeros(K); palmAll = np.zeros(K); nailAll = np.zeros(K)
     for c_i, ch in enumerate(chains):
-        sel = on & (ci == c_i); s = s_[sel]; dv = dorsv[sel]; lv = latv[sel]
+        sel = on & (ci == c_i); s = s_[sel]; dv = dorsv[sel]; lv = latv[sel]; q3 = p[sel]
         back, palm = smooth(0.05, 0.45, dv), smooth(0.0, 0.4, -dv)
         thumb = ch["name"] == "thumb"
         j1, j2, tip = ch["cum"][1], ch["cum"][2], ch["cum"][3]
-        h = np.zeros(len(s)); a = np.ones((len(s), 3)); rough = np.full(len(s), 0.56)
+        axis = (ch["pts"][3] - ch["pts"][0]) / np.linalg.norm(ch["pts"][3] - ch["pts"][0])
+        h = np.zeros(len(s)); a = np.ones((len(s), 3)); rough = np.full(len(s), 0.58)
         curve = 0.9 * mm * lv ** 2  # (creases curve round the finger, towards the tip at its sides)
-        # the back of each joint: a cluster of fine wrinkles, the skin there a little darker and redder
-        for jat, n_l, spread, depth in ((j1, 4, 1.25, 0.22), (j2, 3, 0.95, 0.16)):
-            if thumb and jat == j1: n_l, spread = 4, 1.4
-            zone = back * line(s, jat, 4.5 * mm * spread)
-            a *= 1 - zone[:, None] * np.array([0.05, 0.085, 0.09])
-            for k in range(n_l):
-                off = (k - (n_l - 1) / 2) * spread * mm * 1.6
-                ln = back * line(s - curve, jat + off, 0.32 * mm) * (1 - 0.18 * abs(k - (n_l - 1) / 2))
-                h -= depth * mm * ln; a *= 1 - 0.13 * ln[:, None]
-        # the knuckle at the base of each finger: a little redder, raised
+        warp = waves(q3, 6 * mm, 6) * 0.22 * mm
+        # the back of each joint: an oval of fine wrinkles about a millimetre apart, the skin there a little redder
+        for jat, sig, lam, depth in ((j1, 3.4 * (1.15 if thumb else 1), 1.15, 0.12), (j2, 2.3, 0.95, 0.08)):
+            zone = back * line(s, jat, sig * mm) * (1 - smooth(0.8, 1.15, np.abs(lv)))
+            groove = (0.5 - 0.5 * np.cos((s - jat - curve + warp) * (2 * np.pi / (lam * mm)))) ** 3  # (narrow grooves, broad folds between)
+            h -= depth * mm * zone * groove; a *= 1 - (zone * groove)[:, None] * (0.05 + 0.07 * RED) - zone[:, None] * 0.035 * RED
+            h += 0.22 * mm * zone  # (the joint stands a little proud)
+        # the knuckle at the base of each finger: redder, raised, loosely wrinkled
         if not thumb:
-            kz = back * line(s, 0.0, 6 * mm); a *= 1 - kz[:, None] * np.array([0.02, 0.07, 0.075]); h += 0.25 * mm * kz
-        # the palm side: one firm crease at each joint, and the one where the finger meets the palm
-        for jat, depth in ((j1 + 1.0 * mm, 0.4), (j2 + 0.6 * mm, 0.3), (-2.5 * mm if not thumb else j1 + 1 * mm, 0.35)):
-            ln = palm * line(s + 0.5 * curve, jat, 0.45 * mm)
-            h -= depth * mm * ln; a *= 1 - 0.2 * ln[:, None]
-        # the fingertip's pad: a little redder
-        pad = palm * smooth(j2 + 0.4 * (tip - j2), tip, s); a *= 1 - pad[:, None] * np.array([0.0, 0.06, 0.07])
-        # the nail: on the back of the last bone, from a little past the joint to just beyond the tip
+            kz = back * line(s, 0.0, 6.5 * mm) * (1 - smooth(0.9, 1.5, np.abs(lv)))
+            kw = (0.5 - 0.5 * np.cos((s + warp * 2) * (2 * np.pi / (1.7 * mm)))) ** 2
+            a *= 1 - kz[:, None] * 0.05 * RED - (kz * kw)[:, None] * 0.03; h += 0.3 * mm * kz - 0.05 * mm * kz * kw
+        # the palm side: two close creases at each joint, soft and a little red-brown, not drawn lines
+        for jat, depth in ((j1 + 1.0 * mm, 0.2), (j1 - 0.6 * mm, 0.1), (j2 + 0.6 * mm, 0.16), (-2.5 * mm if not thumb else j1 + 1 * mm, 0.18), (-0.6 * mm if not thumb else j1 + 2.4 * mm, 0.08)):
+            ln = palm * line(s + 0.5 * curve + 0.5 * warp, jat, 0.5 * mm)
+            h -= depth * mm * ln; a *= 1 - ln[:, None] * depth * (0.18 + 0.2 * RED)
+        # the palm side of a finger is lighter and pinker than its back, the pad of the fingertip pinker still
+        a *= 1 + palm[:, None] * np.array([0.04, 0.0, -0.01])
+        pad = palm * smooth(j2 + 0.3 * (tip - j2), tip, s); a *= 1 - pad[:, None] * 0.05 * RED
+        # ---- the nail: on the back of the last bone ----
         q = (s - j2) / (tip - j2)
-        across = 1 - smooth(0.5, 0.66, np.abs(lv))
-        along = smooth(0.30, 0.36, q + 0.06 * lv ** 2) * (1 - smooth(1.02, 1.07, q))
-        nail = smooth(0.25, 0.55, dv) * across * along
-        a = a * (1 - nail[:, None]) + nail[:, None] * np.array([1.07, 0.98, 0.98])
-        lun = nail * (1 - smooth(0.38, 0.45, q)) * (1 - smooth(0.2, 0.35, np.abs(lv))); a += lun[:, None] * np.array([0.05, 0.06, 0.06])
-        free = nail * smooth(0.93, 0.99, q); a = a * (1 - free[:, None]) + free[:, None] * np.array([1.14, 1.12, 1.06])
-        rim = smooth(0.25, 0.55, dv) * np.clip(along * (1 - across) * 4 * across + (smooth(0.27, 0.31, q) - smooth(0.31, 0.36, q)) * across, 0, 1)
-        a *= 1 - 0.18 * rim[:, None]; h += 0.12 * mm * nail - 0.18 * mm * rim
-        rough = rough * (1 - nail) + 0.26 * nail
+        wq = 0.56 + 0.1 * smooth(0.35, 0.7, q); u = lv / wq  # (the nail's half width, of the finger's: narrower at the cuticle)
+        def plate(grow):
+            qb = 0.36 - grow + 0.1 * u ** 2; qt = 1.035 + grow - 0.11 * u ** 2  # (the cuticle's curve and the rounded tip)
+            return smooth(0.05, 0.3, dv) * smooth(0, 0.1, 1 + grow * 2.5 - np.abs(u)) * smooth(qb - 0.02, qb + 0.02, q) * (1 - smooth(qt - 0.02, qt + 0.015, q))
+        nail = plate(0.0); fold = plate(0.07) * (1 - nail)
+        bed = np.array([1.07, 0.965, 0.955])  # (the nail bed through the nail: lighter and pinker than the skin beside it)
+        free = nail * smooth(0.9 - 0.09 * u ** 2, 0.95 - 0.09 * u ** 2, q)  # (the free edge, pale)
+        lun = nail * (1 - smooth(0.44, 0.54, q + 0.16 * u ** 2)) * 0.55
+        col = bed[None, :] * (1 - free[:, None]) + free[:, None] * np.array([1.15, 1.12, 1.05]); col = col * (1 - lun[:, None]) + lun[:, None] * np.array([1.12, 1.06, 1.04])
+        a = a * (1 - nail[:, None]) + nail[:, None] * col
+        a *= 1 - fold[:, None] * (0.05 + 0.07 * RED)  # (the fold of skin round the nail, redder)
+        h = h * (1 - nail) + nail * (0.22 * mm - 0.05 * mm * u ** 2 + 0.004 * mm * np.cos(lv * 46)) - 0.16 * mm * fold  # (the plate proud of its groove, faintly ridged along)
+        rough = rough * (1 - nail) + 0.2 * nail
         H[sel] += h; A[sel] *= a; R[sel] = np.minimum(R[sel], rough)
+        backAll[sel] = back * (1 - nail); palmAll[sel] = palm; nailAll[sel] = nail
     # the palm's own creases and the veins on the back of the hand, in the hand's own frame: a from the wrist (0) to the
     # line of the knuckles (1), b across from the index finger's side (0) to the little finger's (1)
     wrist = bone(f"DEF-hand.{side}")[:3, 3]
@@ -138,6 +163,7 @@ def main(glb, out):
     if handN @ chains[1]["dors"][0] < 0: handN = -handN  # (pointing out of the back of the hand)
     facing = n @ handN
     palmS, backS = (~on) * smooth(0.15, 0.5, -facing), (~on) * smooth(0.15, 0.5, facing)
+    backAll += backS; palmAll += palmS
     def pdist(poly):  # (distance in metres from each texel to a line drawn in the hand's frame)
         P2 = np.array(poly, float); best_d = np.full(K, 1e9)
         for i in range(len(P2) - 1):
@@ -145,46 +171,60 @@ def main(glb, out):
             rel = np.stack([(pa - a0[0]) * lenA, (pb - a0[1]) * lenB], 1); t = np.clip((rel @ dm) / (dm @ dm), 0, 1)
             best_d = np.minimum(best_d, np.linalg.norm(rel - np.outer(t, dm), axis=1))
         return best_d
-    for spec in (
-        ([(0.80, 1.02), (0.79, 0.75), (0.83, 0.5), (0.9, 0.3), (0.95, 0.22)], 0.38, 0.55),  # (across under the fingers, from the little finger's side)
-        ([(0.74, -0.02), (0.69, 0.25), (0.63, 0.55), (0.6, 0.78)], 0.38, 0.55),  # (across the middle, from the index finger's side)
+    wob = waves(p, 7 * mm, 6) * 0.5 * mm
+    for poly, depth, wdt in (
+        ([(0.80, 1.02), (0.79, 0.75), (0.83, 0.5), (0.9, 0.3), (0.95, 0.22)], 0.24, 0.7),  # (across under the fingers, from the little finger's side)
+        ([(0.74, -0.02), (0.69, 0.25), (0.63, 0.55), (0.6, 0.78)], 0.24, 0.7),  # (across the middle, from the index finger's side)
         # (round the ball of the thumb, stopping short of the wrist: carried on to it, its end was cut off at the edge of
-        # the wrist's own small patch of the map and showed as a dark blot)
-        ([(0.73, 0.02), (0.55, 0.06), (0.35, 0.12), (0.18, 0.2)], 0.42, 0.6),
-        # (no wrist creases: the wrist is its own small patch of the map, squeezed, and two faint creases there came out as
-        # one dark broken line, a scar across the wrist close to the eye in the cast, even at a third of the palm's depth.
-        # 15 November)
+        # the wrist's own small patch of the map and showed as a dark blot. No wrist creases, for the same reason)
+        ([(0.73, 0.02), (0.55, 0.06), (0.35, 0.12), (0.18, 0.2)], 0.26, 0.75),
     ):
-        poly, depth, wdt, dark = (*spec, 0.16) if len(spec) == 3 else spec
-        ln = palmS * np.exp(-0.5 * (pdist(poly) / (wdt * mm)) ** 2)
-        H -= depth * mm * ln; A *= 1 - dark * ln[:, None]
-    # a few faint veins fanning out over the back of the hand from the wrist, a little bluer, standing a touch proud
-    for poly in ([(0.02, 0.35), (0.2, 0.33), (0.35, 0.3), (0.52, 0.27), (0.7, 0.22)], [(0.02, 0.5), (0.2, 0.49), (0.4, 0.5), (0.56, 0.53), (0.72, 0.58)], [(0.05, 0.62), (0.25, 0.68), (0.45, 0.75), (0.6, 0.81), (0.75, 0.88)]):
-        ln = backS * np.exp(-0.5 * (pdist([(a0, b0 + 0.025 * math.sin(a0 * 17 + b0 * 5)) for a0, b0 in poly]) / (1.3 * mm)) ** 2) * (0.5 + 0.5 * smooth(0.0, 0.3, pa)) * (1 - smooth(0.6, 0.8, pa))
-        H += 0.14 * mm * ln; A *= 1 - ln[:, None] * np.array([0.035, 0.022, 0.0])
-    # a very fine skin grain everywhere, so the light never reads as plastic
-    rng = np.random.default_rng(7); grain = rng.normal(0, 1, K)
-    H += 0.015 * mm * grain
+        ln = palmS * np.exp(-0.5 * ((pdist(poly) + wob) / (wdt * mm)) ** 2)
+        H -= depth * mm * ln; A *= 1 - ln[:, None] * (0.05 + 0.06 * RED)
+    # the palm: lighter and pinker than the back of the hand, mottled red and pale as blood shows through it
+    pm = waves(p, 9 * mm, 10)
+    A *= 1 + palmAll[:, None] * (np.array([0.05, 0.0, -0.012]) + pm[:, None] * np.array([0.012, -0.022, -0.024]))
+    # the back of the hand: tendons from each knuckle to the wrist and veins between them, soft swells in the light
+    for bk in (0.03, 0.36, 0.68, 0.99):
+        ln = backS * np.exp(-0.5 * (pdist([(0.95, bk), (0.5, 0.5 + (bk - 0.5) * 0.62), (0.08, 0.5 + (bk - 0.5) * 0.3)]) / (2.4 * mm)) ** 2) * smooth(0.05, 0.3, pa) * (1 - smooth(0.82, 1.0, pa))
+        H += 0.3 * mm * ln
+    for poly in ([(0.02, 0.35), (0.2, 0.33), (0.35, 0.3), (0.52, 0.27), (0.7, 0.22)], [(0.02, 0.5), (0.2, 0.49), (0.4, 0.5), (0.56, 0.53), (0.72, 0.58)], [(0.05, 0.62), (0.25, 0.68), (0.45, 0.75), (0.6, 0.81), (0.75, 0.88)], [(0.4, 0.5), (0.5, 0.42), (0.6, 0.4), (0.74, 0.42)]):
+        ln = backS * np.exp(-0.5 * (pdist([(a0, b0 + 0.03 * math.sin(a0 * 17 + b0 * 5)) for a0, b0 in poly]) / (1.5 * mm)) ** 2) * (0.5 + 0.5 * smooth(0.0, 0.3, pa)) * (1 - smooth(0.6, 0.8, pa))
+        H += 0.2 * mm * ln; A *= 1 - ln[:, None] * np.array([0.03, 0.016, -0.004])
+    # ---- skin everywhere: uneven colour, and its net of tiny creases (deeper and more open on the back of the hand) ----
+    skin = 1 - nailAll
+    blot = waves(p, 28 * mm, 10); mott = waves(p, 3.5 * mm, 22)
+    A *= 1 + skin[:, None] * (blot[:, None] * np.array([0.01, -0.012, -0.018]) + mott[:, None] * np.array([0.008, -0.009, -0.011]))
+    for lam, amp, n_w in ((1.0, 0.03, 28), (0.55, 0.014, 34)):
+        w = waves(p, lam * mm, n_w); net = np.exp(-(w / 0.3) ** 2)  # (creases where the noise crosses zero)
+        H -= amp * mm * net * skin * (0.45 + 0.75 * backAll); A *= 1 - (net * skin * (0.2 + 0.8 * backAll))[:, None] * (0.012 + 0.012 * RED)
+    R += skin * (0.03 * backAll - 0.04 * palmAll + 0.03 * waves(p, 6 * mm, 12))
+    # (a few freckles on the back of the hand)
+    for _ in range(9):
+        c = p[rng.integers(0, K)]; f = np.exp(-0.5 * (np.linalg.norm(p - c, axis=1) / (rng.uniform(0.5, 1.0) * mm)) ** 2) * backAll
+        A *= 1 - f[:, None] * np.array([0.06, 0.09, 0.11])
+    R = np.clip(R, 0.15, 0.8)
 
     # ---- into the maps ----
     alb = np.full((S, S, 3), NEUTRAL); alb[idx] = np.clip(NEUTRAL * A, 0, 1)
     hgt = np.zeros((S, S)); hgt[idx] = H
-    rgh = np.full((S, S), 0.56); rgh[idx] = R
+    rgh = np.full((S, S), 0.58); rgh[idx] = R
     # (spread a few texels past each island's edge, so filtering never brings in the neutral background)
     for arr in (alb, hgt, rgh):
         m = M.copy()
-        for _ in range(4):
+        for _ in range(8):
             src = arr.copy(); grow = np.zeros_like(m)
             for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 sh = np.roll(np.roll(m, dy, 0), dx, 1); val = np.roll(np.roll(src, dy, 0), dx, 1)
                 put = sh & ~m & ~grow; arr[put] = val[put]; grow |= put
             m |= grow
-    gy, gx = np.gradient(hgt, mpt)  # (slopes: rows run down v, columns along u)
+    hgt = (hgt + np.roll(hgt, 1, 0) + np.roll(hgt, -1, 0) + np.roll(hgt, 1, 1) + np.roll(hgt, -1, 1)) / 5  # (no stair steps from the island's raster)
+    gy, gx = np.gradient(hgt * RELIEF, mpt)  # (slopes: rows run down v, columns along u)
     nrm = np.stack([-gx, -gy, np.ones_like(hgt)], -1); nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
-    Image.fromarray((alb * 255 + 0.5).astype(np.uint8), "RGB").save(f"{out}/hand_colour.webp", quality=92, method=6)
-    Image.fromarray(((nrm * 0.5 + 0.5) * 255 + 0.5).astype(np.uint8), "RGB").save(f"{out}/hand_normal.webp", quality=95, method=6)
+    Image.fromarray((alb * 255 + 0.5).astype(np.uint8), "RGB").save(f"{out}/hand_colour.webp", quality=90, method=6)
+    Image.fromarray(((nrm * 0.5 + 0.5) * 255 + 0.5).astype(np.uint8), "RGB").save(f"{out}/hand_normal.webp", quality=88, method=6)
     rg = np.zeros((S, S, 3)); rg[..., 1] = rgh; rg[..., 0] = rgh; rg[..., 2] = rgh
-    Image.fromarray((rg * 255 + 0.5).astype(np.uint8), "RGB").save(f"{out}/hand_rough.webp", quality=92, method=6)
+    Image.fromarray((rg * 255 + 0.5).astype(np.uint8), "RGB").resize((1024, 1024), Image.LANCZOS).save(f"{out}/hand_rough.webp", quality=88, method=6)
     print("written", out)
 
 if __name__ == "__main__": main(sys.argv[1], sys.argv[2])

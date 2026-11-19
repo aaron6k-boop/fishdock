@@ -130,7 +130,12 @@ const FRAME_AT = 0.5;
 export const framingP0 = (vfovDeg) => -((RIG.reelBelow - (FRAME_AT * vfovDeg) / 2) * Math.PI) / 180;
 let P0 = framingP0(62);
 /** the game's first-person field of view top to bottom (degrees), for the framing (world.js, each frame) */
-export function setRigView(vfovDeg) { if (vfovDeg > 10 && vfovDeg < 120) P0 = framingP0(vfovDeg); }
+// (drop, radians: the arms lowered in the picture by that much more. The view zooms in to follow a leaping fish, to
+// two and a half times, and your hands, a forearm's length from the lens, were magnified with it: a thumb the size of
+// the screen's corner in the footage from Aaron's PC, 19 November. Lowered as it zooms, they leave by the bottom edge
+// as they would from a pair of binoculars, and come back as it widens)
+export const ZOOM_DROP = 0.14;
+export function setRigView(vfovDeg, drop = 0) { if (vfovDeg > 10 && vfovDeg < 120) P0 = framingP0(vfovDeg) + drop; }
 export const rigP0 = () => P0;
 /** a place and angle from the eye, level (RIG.holdBody, the cast's path), in the view's frame at p0 as angler.js uses
  * them: x right, y up, z along the view (metres), e the angle up from the view's line and sw round to the right
@@ -153,6 +158,13 @@ const REST_E = 0.6, REST_SW = -0.3, REST_UP = 0.035, REST_OUT = 0.04; // (and th
 // body has gone back with the cast: at the hold's own distance both elbows locked straight); the hands give to the rod
 // again from 0.95 s, over 0.3 s; the left hand leaves the butt for the reel's handle at leftToReel)
 export const CAST_FOLLOW = { e: 0.2, sw: 0.06, z: -0.06, from: 0.95, over: 0.3, leftToReel: 1.0 };
+// (the wind-up and the release as you see them: the reel kept low and to the right, 35 to 45 cm from your eye, and the
+// rod swung up and back over your right shoulder about its own handle, 45 degrees past upright at most. As Blender
+// made them the hands rose to head height, as an overhead cast's do: for half a second the reel crossed 25 cm in front
+// of your eye, the rod stood up the middle of the screen and the left sleeve filled the lower left (the footage on
+// Aaron's PC, 19 November). The cast's moments 1 to 4, from the eye, level, as RIG.cast.path's are; both wrists stay
+// inside their range and neither arm straightens (tests/fpRig.test.js))
+export const CAST_VIEW = { 1: { x: 0.1, y: -0.26, z: 0.27, e: 1.4, sw: -0.2 }, 2: { x: 0.16, y: -0.25, z: 0.24, e: 1.9, sw: -0.8 }, 3: { x: 0.09, y: -0.24, z: 0.26, e: 1.8, sw: -0.3 }, 4: { x: 0.06, y: -0.31, z: 0.31, e: 1.15, sw: 0 } };
 /** the hold as Blender made it (the grips' own), in the view's frame */
 export const holdMade = () => toView(RIG.holdBody);
 export const holdView = () => { const k = toView(RIG.holdBody); return { x: k.x, y: k.y + REST_UP, z: k.z + REST_OUT, e: REST_E, sw: REST_SW }; };
@@ -166,7 +178,7 @@ export function castAt(t, k0 = holdView()) {
   // ahead, the rod stood upright in the middle of the screen for a second and more after every cast: the footage on
   // Aaron's PC, 19 November)
   const follow = { x: k0.x, y: k0.y, z: k0.z + CAST_FOLLOW.z, e: k0.e + CAST_FOLLOW.e, sw: k0.sw + CAST_FOLLOW.sw };
-  const path = RIG.cast.path, n = path.length, T = path.map((k) => k.t), P = path.map((k, i) => (i === 0 || i === n - 1 ? k0 : i >= n - 3 ? follow : toView(k))), still = new Set(RIG.cast.still);
+  const path = RIG.cast.path, n = path.length, T = path.map((k) => k.t), P = path.map((k, i) => (i === 0 || i === n - 1 ? k0 : i >= n - 3 ? follow : toView(CAST_VIEW[i] ? { ...k, ...CAST_VIEW[i] } : k))), still = new Set(RIG.cast.still);
   t = clamp(t, 0, T[n - 1]); let i = 0; while (i < n - 2 && t > T[i + 1]) i++;
   const tan = (k, c) => (still.has(k) ? 0 : (P[k + 1][c] - P[k - 1][c]) / (T[k + 1] - T[k - 1]));
   const h = T[i + 1] - T[i], u = (t - T[i]) / h, h00 = 2 * u ** 3 - 3 * u ** 2 + 1, h10 = u ** 3 - 2 * u ** 2 + u, h01 = -2 * u ** 3 + 3 * u ** 2, h11 = u ** 3 - u ** 2;
@@ -260,9 +272,9 @@ export function skinShade(sh) {
     // (the light that wraps round past the shadow's edge, a third of the way into the dark side, warm)
     .replace("#include <lights_physical_pars_fragment>", chunk.replace(SKIN_BLEED, `${SKIN_BLEED}\n\t{ float fpW = saturate( ( dot( geometryNormal, directLight.direction ) + 0.5 ) / 1.5 ); reflectedLight.directDiffuse += max( fpW - dotNL, 0.0 ) * directLight.color * vec3( 0.9, 0.26, 0.15 ) * BRDF_Lambert( material.diffuseColor ); }`))
     // (patches 3 to 10 cm across, a few per cent redder or paler; the knuckles' and palms' sheen varies with them)
-    // (the baked creases, knuckles, nails and veins at twice their strength: drawn true to life they were too faint to
-    // see at the size a phone shows your hands, which read as smooth and even as a mannequin's, 16 November)
-    .replace("#include <map_fragment>", "#ifdef USE_MAP\n{ vec4 fpMap = texture2D( map, vMapUv ); diffuseColor.rgb *= max( vec3( 0.0 ), 0.85 + ( fpMap.rgb - 0.85 ) * 2.0 ); }\n#endif")
+    // (the painted skin as it is: the map is the skin's colour over the player's own, 0.85 for no change. Until 19
+    // November its marks were doubled here, on top of the painter's own two and a half times: creases as black lines)
+    .replace("#include <map_fragment>", "#ifdef USE_MAP\n{ vec4 fpMap = texture2D( map, vMapUv ); diffuseColor.rgb *= fpMap.rgb * ( 1.0 / 0.85 ); }\n#endif")
     // (and the hair on your forearms and the backs of your hands: short fine strands lying along the arm, each a couple
     // of millimetres apart and a centimetre or so long, more on the outside of the arm than the inside, drawn darker
     // than the skin. Where a strand would be finer than a pixel they even out into the slight darkening hair gives
@@ -416,7 +428,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // skin keeps the player's own colour; nothing waits on it: the plain skin until it's in)
   if (!gloves && typeof document !== "undefined") {
     const tl = new THREE.TextureLoader(), got = {};
-    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 0.86; skinMat.roughness = 0.86 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(2.2, 2.2); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
+    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 0.86; skinMat.roughness = 0.86 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(1.5, 1.5); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
     for (const [k, f] of [["map", "hand_colour"], ["normalMap", "hand_normal"], ["roughnessMap", "hand_rough"]]) tl.load(TEX_BASE + f + ".webp", (t) => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; got[k] = t; done(); }, undefined, () => {});
   }
   // (wet: the skin's roughness down by 40% and its colour 4% darker; the coat's roughness down by half and 12% darker,

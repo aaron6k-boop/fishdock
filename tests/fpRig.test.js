@@ -279,9 +279,10 @@ test("playing a fish: the rod where you hold it, pumped up, dragged down and acr
 });
 
 test("the cast: both hands on the rod all the way through, arms never stretched, wrists inside their range", () => {
-  let worstR = 0, worstL = 0, worstLen = 0, worstPen = 0;
+  let worstR = 0, worstL = 0, worstLen = 0, worstPen = 0, nearest = 9, highest = -90, furthestBack = 0;
   for (let t = 0; t <= 2.4 + 1e-9; t += 1 / 24) {
     const key = castAt(t);
+    nearest = Math.min(nearest, Math.hypot(key.x, key.y, key.z)); highest = Math.max(highest, (Math.atan2(key.y, key.z) * 180) / Math.PI); furthestBack = Math.max(furthestBack, key.e);
     const P = place(rigP0(), key), butt = P.reel.clone().addScaledVector(P.dir, -META.seat), a = butt.clone().addScaledVector(P.dir, 0.065);
     const left = t < CAST_FOLLOW.leftToReel ? { at: a, axis: P.dir.clone(), palm: V(1, 0.2, 0), kind: "butt", sock: { pos: a.clone(), quat: rodFrame(P.dir, P.rest, bodyUp(P.vf, P.vu)) } } : crankSpec(P, TURN[0]);
     pose(P, [left, seatSpec(P)], 12, t);
@@ -291,6 +292,9 @@ test("the cast: both hands on the rod all the way through, arms never stretched,
     for (const S of ["R", "L"]) { const A = R.arm[S]; worstPen = Math.max(worstPen, limitsPen(wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC[S], S))); }
   }
   assert.ok(worstPen < 1, `the wrists and elbows at most ${worstPen.toFixed(2)} outside their range (the gates' measure)`);
+  assert.ok(nearest > 0.33, `the reel never nearer your eye than ${nearest.toFixed(2)} m (it crossed at 0.25 m, in front of your face)`);
+  assert.ok(highest < -8, `the reel always below the middle of the view: at its highest ${highest.toFixed(0)} degrees (it rose above the middle)`);
+  assert.ok(furthestBack < 2.45, `the rod at most ${furthestBack.toFixed(2)} radians round from the view's line, 50 degrees past upright (it lay level behind you at 2.75)`);
   assert.ok(worstR < 0.045, `right hand's wrist within 4.5 cm of where the grip was made (it gives to the lowered rod at the cast's start and end): ${worstR}`);
   assert.ok(worstL < 0.005, `left hand short of the butt by ${worstL}`);
   assert.ok(worstLen < 1e-5, "no bone longer or shorter");
