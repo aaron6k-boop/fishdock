@@ -24,11 +24,13 @@ export function styleFor(b) {
   const RENDER = [[1, 1, 1], [0.98, 0.94, 0.84], [0.9, 0.95, 1], [0.98, 0.96, 0.9], [0.95, 0.9, 0.82]];
   const BRICK = [[1, 1, 1], [0.9, 0.86, 0.84], [1.05, 0.95, 0.9], [0.82, 0.78, 0.76]];
   const BUFF = [[1, 1, 1], [0.96, 0.95, 0.92], [1.03, 1, 0.94], [0.9, 0.89, 0.86]];
+  // (the sheds' painted cladding: goosewing grey, a slate blue, a green, an off-white, a darker grey-green)
+  const CLAD = [[0.78, 0.8, 0.8], [0.42, 0.5, 0.6], [0.4, 0.52, 0.42], [0.95, 0.94, 0.9], [0.5, 0.56, 0.52]];
   if (b.use === "lighthouse") return { type: "lighthouse", walls: "brick", roof: "dome", storeys: 0, h: b.tall ? Math.max(12, b.h) : 21, tint: [1, 1, 1] };
   // (a port's sheds, where a place says so (localDetail.js `sheds`): profiled steel, one tall storey, no windows, a low
   // roof. Drawn as houses or brick mills by their size alone, with a lit window in every bay, they were not what stands
   // on a quay)
-  if (b.use === "portshed") { const flat = A > 1400 || b.roof === "flat"; return { type: "warehouse", walls: "cladding", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: 1, h: b.tall ? Math.min(b.h, 14) : A > 600 ? 9 : 6.5, pitch: 0.2, tint: [1, 1, 1] }; }
+  if (b.use === "portshed") { const flat = A > 1400 || b.roof === "flat"; return { type: "warehouse", walls: "cladding", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: 1, h: b.tall ? Math.min(b.h, 14) : A > 600 ? 9 : 6.5, pitch: 0.2, tint: tinted(CLAD) }; }
   if (b.use === "lookout") return { type: "lookout", walls: "render", roof: "flat", roofMat: "felt", storeys: 2, h: 6.4, tint: [1, 1, 1] };
   // (single storey: sheds, huts, kiosks, and anything mapped as public toilets or a shelter whatever its building tag,
   // such as the Pier Head Public Toilets at Gorleston, which was drawn as a two-storey house)
@@ -38,7 +40,7 @@ export function styleFor(b) {
   if (/^(church|chapel|cathedral)$/.test(k)) return { type: "church", walls: "stone", roof: "gable", roofMat: "slate", storeys: 0, h: b.tall ? b.h : 12, tint: [1, 1, 1] };
   if (/^(industrial|warehouse|commercial|retail|supermarket|hangar|boathouse|transportation|service)$/.test(k) || A > 650) {
     const flat = A > 1400 || b.roof === "flat";
-    return { type: "warehouse", walls: r < 0.55 ? "cladding" : "brick", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: b.levels || 2, h: b.tall ? b.h : 8, pitch: 0.28, tint: [1, 1, 1] };
+    return { type: "warehouse", walls: r < 0.55 ? "cladding" : "brick", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: b.levels || 2, h: b.tall ? b.h : 8, pitch: 0.28, tint: r < 0.55 ? tinted(CLAD) : [1, 1, 1] };
   }
   const storeys = b.levels || (/^(hotel|apartments|flats)$/.test(k) ? 4 : town?.tall ? (A < 70 ? 2 : r < 0.3 ? 4 : 3) : A < 110 ? 2 : r < 0.7 ? 2 : 3);
   const brick = town?.render != null ? r < 1 - town.render : /^(terrace|house|semidetached_house|detached)$/.test(k) ? r < 0.6 : r < 0.45;

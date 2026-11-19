@@ -118,7 +118,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "2k",
-   "use": "rust runs and pitting on the harbour wall's steel piling (public/textures/wall_rust_*.jpg, 1024 px colour and normal, 256 px roughness)",
+   "use": "rust runs and pitting on the harbour wall's steel piling (public/textures/wall_rust_*.jpg, 1024 px colour and normal, 256 px roughness); the wear and grime of the sheds' painted cladding, its light and dark only (source-assets/blender/build_facades.py: public/textures/facade_cladding_*.jpg)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -550,7 +550,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "1k",
-   "use": "the harbour wall's concrete cap (public/textures/cap_concrete_*.jpg, 512 px colour and normal, 256 px roughness)",
+   "use": "the harbour wall's concrete cap (public/textures/cap_concrete_*.jpg, 512 px colour and normal, 256 px roughness); the concrete plinth under the sheds' cladding (facade_cladding_*.jpg)",
    "downloaded": "2026-11-03",
    "files": [
     {
@@ -613,7 +613,7 @@
    "attribution": "Not required (credited anyway in CREDITS)",
    "type": "textures",
    "resolution": "1k",
-   "use": "the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness); and the brick of the baked house fronts (source-assets/blender/build_facades.py: public/textures/facade_brick_*.jpg)",
+   "use": "the coastwatch building's brick (public/textures/brick_red_*.jpg, 1024 px colour, 512 px normal, 256 px roughness); and the brick of the baked house fronts (source-assets/blender/build_facades.py: public/textures/facade_brick_*.jpg); the chimney stacks and brick towers, and the chimneys' oversailing courses (buildings3d.js, chimneys3d.js), and the red brick arches over the buff fronts' windows",
    "downloaded": "2026-11-04",
    "files": [
     {
@@ -2725,6 +2725,38 @@
      "bytes": 4539452,
      "sha256": "29c997d77f56e4ea16d3e998a306be0c17fddb28ab4822657c7cd8249040ffda",
      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brown_mud_leaves_01/brown_mud_leaves_01_diff_2k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:brick_wall_003",
+   "name": "Brick Wall 003",
+   "source": "https://polyhaven.com/a/brick_wall_003",
+   "author": "Dimitrios Savva (photography), Rob Tuytel (processing)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "textures (photoscanned)",
+   "resolution": "2k",
+   "use": "the pale buff brick of the baked buff house fronts (source-assets/blender/build_facades.py: public/textures/facade_buff_*.jpg), its colour drawn towards cream",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/brick_wall_003/textures/brick_wall_003_diff_2k.jpg",
+     "bytes": 2524760,
+     "sha256": "e9e5695b41dea599460197ff41f908c746bfadf7548d38f8e1f4fd18cee859fc",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_003/brick_wall_003_diff_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/brick_wall_003/textures/brick_wall_003_nor_gl_2k.jpg",
+     "bytes": 4326637,
+     "sha256": "7d68ae5e4f16561a678cb711e1c420c32450f5a24c833a540e57d2a1af5266a9",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_003/brick_wall_003_nor_gl_2k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/brick_wall_003/textures/brick_wall_003_rough_2k.jpg",
+     "bytes": 1359004,
+     "sha256": "d890354a87b3688279568d2ee63e1fc62cedbb1a2fe7e9fbb37ebb0400dc1a6a",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_003/brick_wall_003_rough_2k.jpg"
     }
    ]
   }

@@ -866,6 +866,12 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               marram *= 0.78 + 0.44 * mix(0.5, fdDN(wp * vec2(5.0, 1.6) + 11.0), nearK) + 0.25 * (clump - 0.47) * midK;
               float scrubK = smoothstep(0.56, 0.66, fdDF(wp / 19.0 + 5.0)) * (1.0 - vFace);
               vec3 growth = mix(marram, vec3(0.04, 0.052, 0.027) * (0.8 + 0.6 * clump), scrubK * 0.85);
+              #ifdef FD_PGRASS
+              // (close to, the photographed grass's own light and dark in the marram and scrub, so they read as blades and
+              // not as smooth blots of colour)
+              { float gq = dot(texture2D(uClG, wp / 1.3).rgb, vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02);
+                growth *= mix(1.0, clamp(gq, 0.45, 1.7), nearK * 0.85); }
+              #endif
               // (thicker growth is darker inside: the stems shade each other)
               growth *= mix(1.0, 0.8, smoothstep(th + 0.03, th + 0.2, field));
               tinted = mix(sand, growth, cover * 0.96);

@@ -23,6 +23,10 @@ KINDS = {
     # Poly Haven's Brick Wall 003, its pink-beige drawn towards cream; its arches in red brick, as the Victorians often
     # set them)
     "buff": dict(scan=PH + "/brick_wall_003", tile=1.5, tint=(1.12, 1.2, 1.16), trim=(0.88, 0.87, 0.83), lintel="arch", door=(0.05, 0.16, 0.12)),
+    # (cladding: the port's sheds and warehouses, profiled steel sheet (its corrugations modelled, 76 mm apart) painted
+    # pale, the shed's own colour the game's tint, the paint's wear and grime from Poly Haven's Rusty Painted Metal;
+    # on a concrete plinth; a roller shutter door, a steel door, a strip of high windows, louvred vents)
+    "cladding": dict(clad=True, scan=PH + "/rusty_painted_metal", tile=1.5, tint=(0.8, 0.81, 0.79), norm=0.3, trim=(0.55, 0.57, 0.58), door=(0.12, 0.16, 0.15)),
 }
 def find(base, kind):
     # a Poly Haven map: base is the asset's folder (searched through) or a file prefix; kind a list of names to try
@@ -167,6 +171,64 @@ def bay_shop(K, M, x0):
 def bay_wide(K, M, x0):
     return bay_window(K, M, x0, w=1.7, h=1.55, panes=(3, 2), curtain="curtain2", blind=True)
 
+# ---- the sheds' cladding: the profiled sheet as a solid (its face corrugated, its back flat), openings cut through it ----
+def corrugated(name, m, x0=0.0, x1=15.0, y0=0.0, y1=3.0, P=0.076, A=0.009, back=0.06):
+    bm = bmesh.new(); n = int(round((x1 - x0) / (P / 8)))
+    xs = [x0 + (x1 - x0) * i / n for i in range(n + 1)]
+    F = [[bm.verts.new((x, -A * math.sin(2 * math.pi * (x - x0) / P), y)) for y in (y0, y1)] for x in xs]
+    Bk = [[bm.verts.new((x, back, y)) for y in (y0, y1)] for x in xs]
+    for i in range(n):
+        bm.faces.new((F[i][0], F[i + 1][0], F[i + 1][1], F[i][1]))  # (the face)
+        bm.faces.new((Bk[i][1], Bk[i + 1][1], Bk[i + 1][0], Bk[i][0]))  # (the back)
+        bm.faces.new((F[i][1], F[i + 1][1], Bk[i + 1][1], Bk[i][1]))  # (the top)
+        bm.faces.new((Bk[i][0], Bk[i + 1][0], F[i + 1][0], F[i][0]))  # (the foot)
+    bm.faces.new((F[0][0], F[0][1], Bk[0][1], Bk[0][0])); bm.faces.new((Bk[n][0], Bk[n][1], F[n][1], F[n][0]))
+    bm.normal_update(); bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new(name, me); col.objects.link(o); o.data.materials.append(m); return o
+def clad_windows(K, M, x0):
+    # a strip of high windows in aluminium frames, the shed dark behind
+    xa, xb, ya, yb = x0 + 0.25, x0 + 2.75, 1.95, 2.6
+    cuts = [box("cut", xa, xb, ya, yb, -0.6, 0.2, M["trim"])]
+    for k in range(4):
+        a = xa + (xb - xa) * k / 3 - (0.025 if k else 0); box("mullion", max(xa, a - 0.025), min(xb, a + 0.025), ya, yb, -0.09, -0.03, M["alu"], 0.003)
+    for (c, d) in ((ya, ya + 0.05), (yb - 0.05, yb)): box("rail", xa, xb, c, d, -0.09, -0.03, M["alu"], 0.003)
+    box("glass", xa + 0.03, xb - 0.03, ya + 0.04, yb - 0.04, -0.07, -0.065, M["glass"])
+    box("cill", xa - 0.05, xb + 0.05, ya - 0.04, ya, -0.02, 0.06, M["alu"], 0.004)
+    box("room", xa - 0.1, xb + 0.1, ya - 0.1, yb + 0.1, -0.62, -0.6, M["shedroom"])
+    return cuts
+def clad_shutter(K, M, x0):
+    # a roller shutter door, its slats ribbed, in steel guides, the shutter's housing over it
+    xa, xb, yb = x0 + 0.2, x0 + 2.8, 2.7
+    cuts = [box("cut", xa, xb, 0.0, yb, -0.6, 0.2, M["trim"])]
+    y = 0.04
+    while y < yb - 0.02:
+        box("slat", xa + 0.02, xb - 0.02, y, min(yb, y + 0.068), -0.1, -0.085, M["shutter"], 0.012); y += 0.075
+    box("bottom_rail", xa + 0.02, xb - 0.02, 0.0, 0.05, -0.105, -0.075, M["alu"], 0.004)
+    for a in (xa - 0.06, xb - 0.02): box("guide", a, a + 0.08, 0.0, yb, -0.11, 0.02, M["alu"], 0.004)
+    box("housing", xa - 0.08, xb + 0.08, yb, yb + 0.28, -0.04, 0.12, M["shutter"], 0.01)
+    box("room", xa, xb, 0, yb, -0.62, -0.6, M["shedroom"])
+    return cuts
+def clad_door(K, M, x0):
+    # a steel door with its kick plate and lever, a small wired-glass window beside it; a lamp over the door
+    xc = x0 + 1.0; w, h = 0.95, 2.1; xa, xb = xc - w / 2, xc + w / 2
+    cuts = [box("cut", xa, xb, 0.0, h, -0.6, 0.2, M["trim"]), box("cut", x0 + 1.8, x0 + 2.6, 1.2, 1.9, -0.6, 0.2, M["trim"])]
+    for (a, b, c, d) in ((xa - 0.06, xa, 0, h + 0.06), (xb, xb + 0.06, 0, h + 0.06), (xa - 0.06, xb + 0.06, h, h + 0.06)): box("doorframe", a, b, c, d, -0.06, 0.03, M["alu"], 0.004)
+    box("door", xa + 0.01, xb - 0.01, 0.02, h - 0.01, -0.08, -0.04, M["door"], 0.006)
+    box("kick", xa + 0.06, xb - 0.06, 0.05, 0.3, -0.04, -0.035, M["alu"], 0.002)
+    box("lever", xb - 0.2, xb - 0.06, 1.0, 1.03, -0.035, 0.0, M["alu"], 0.006)
+    box("lamp", xc - 0.12, xc + 0.12, h + 0.2, h + 0.36, 0.0, 0.14, M["alu"], 0.02)
+    box("frame2", x0 + 1.77, x0 + 2.63, 1.17, 1.93, -0.07, -0.02, M["alu"], 0.004)
+    box("glass", x0 + 1.81, x0 + 2.59, 1.21, 1.89, -0.065, -0.06, M["glass"])
+    box("room", x0 + 1.7, x0 + 2.7, 1.1, 2.0, -0.62, -0.6, M["shedroom"]); box("room", xa, xb, 0, h, -0.62, -0.6, M["shedroom"])
+    return cuts
+def clad_vents(K, M, x0):
+    # two louvred vents high on the wall
+    for a in (x0 + 0.7, x0 + 1.9):
+        box("vent_frame", a, a + 0.5, 2.2, 2.7, 0.0, 0.05, M["alu"], 0.004)
+        for k in range(6): yy = 2.24 + k * 0.075; box("louvre", a + 0.03, a + 0.47, yy, yy + 0.05, 0.03, 0.07, M["alu"], 0.003)
+    return []
+
 def build(kind):
     K = KINDS[kind]
     M = {"wall": scanned(kind + "_wall", K["scan"], K["tint"], K.get("norm")), "trim": principled(kind + "_trim", K["trim"], 0.4), "sill": scanned(kind + "_sill", OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01", (0.95, 0.94, 0.9)),
@@ -177,12 +239,26 @@ def build(kind):
          "chair": principled("chair", (0.07, 0.045, 0.035), 0.7), "shelf": principled("shelf", (0.3, 0.22, 0.15), 0.6)}
     for i, c in enumerate(((0.55, 0.12, 0.08), (0.12, 0.28, 0.5), (0.72, 0.6, 0.2), (0.15, 0.38, 0.18), (0.75, 0.72, 0.66), (0.35, 0.18, 0.32))): M["goods%d" % i] = principled("goods%d" % i, c, 0.6)
     M["room"] = principled("room", (0.05, 0.046, 0.042), 0.9); M["shoproom"] = principled("shoproom", (0.2, 0.19, 0.17), 0.8)
-    # the wall: five bays, 15 m by 3 m, 30 cm thick, its face at z = 0
-    wall = box("wall", 0, 15, 0, 3, -0.3, 0.0, M["wall"], 0.0, K["tile"])
+    M["alu"] = principled("alu", (0.55, 0.57, 0.58), 0.45, 0.6); M["shutter"] = principled("shutter", (0.42, 0.44, 0.45), 0.5, 0.5); M["shedroom"] = principled("shedroom", (0.03, 0.03, 0.032), 0.9)
     cuts = []
-    cuts += bay_window(K, M, 0.0); cuts += bay_door(K, M, 3.0); cuts += bay_shop(K, M, 6.0); cuts += bay_wide(K, M, 12.0)
-    # (bay 4, 9 to 12 m, plain wall: a cast-iron downpipe down one side)
-    box("downpipe", 11.82, 11.9, 0, 3, 0.02, 0.1, principled("iron", (0.03, 0.035, 0.04), 0.5, 0.3), 0.01)
+    if K.get("clad"):
+        # the shed: the sheet from 45 cm up, on a concrete plinth; the atlas's five bays as a shed uses them (a strip of
+        # high windows, the roller shutter, a steel door and window, plain sheet (no downpipe: a shed's long walls are
+        # mostly this bay, and one every 3 m read as a fence), sheet with vents)
+        wall = corrugated("wall", M["wall"], y0=0.45)
+        plinth = box("plinth", 0, 15, 0, 0.45, -0.3, 0.03, scanned("plinth", PH + "/concrete_wall_004", (0.92, 0.92, 0.9)), 0.0, 1.5)
+        cuts += clad_windows(K, M, 0.0); cuts += clad_shutter(K, M, 3.0); cuts += clad_door(K, M, 6.0); cuts += clad_vents(K, M, 12.0)
+        for c in list(cuts):
+            if c.location.z < 0.5 and min(v.co.z for v in c.data.vertices) < 0.45:
+                cp = c.copy(); cp.data = c.data.copy(); col.objects.link(cp)
+                b = plinth.modifiers.new("cut", "BOOLEAN"); b.operation = "DIFFERENCE"; b.object = cp; b.solver = "EXACT"
+                bpy.context.view_layer.objects.active = plinth; bpy.ops.object.modifier_apply(modifier=b.name); bpy.data.objects.remove(cp, do_unlink=True)
+    else:
+        # the wall: five bays, 15 m by 3 m, 30 cm thick, its face at z = 0
+        wall = box("wall", 0, 15, 0, 3, -0.3, 0.0, M["wall"], 0.0, K["tile"])
+        cuts += bay_window(K, M, 0.0); cuts += bay_door(K, M, 3.0); cuts += bay_shop(K, M, 6.0); cuts += bay_wide(K, M, 12.0)
+        # (bay 4, 9 to 12 m, plain wall: a cast-iron downpipe down one side)
+        box("downpipe", 11.82, 11.9, 0, 3, 0.02, 0.1, principled("iron", (0.03, 0.035, 0.04), 0.5, 0.3), 0.01)
     for c in cuts:
         b = wall.modifiers.new("cut", "BOOLEAN"); b.operation = "DIFFERENCE"; b.object = c; b.solver = "EXACT"
         bpy.context.view_layer.objects.active = wall; bpy.ops.object.modifier_apply(modifier=b.name); bpy.data.objects.remove(c, do_unlink=True)

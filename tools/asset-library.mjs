@@ -51,6 +51,7 @@ const USE = {
   "eels.glb": ["The conger and the eel (from their straightened pictures)", "close (in the hand) to mid (in the water)"],
   "pierprops.glb": ["Lamps, lifebuoy stations, bollards, benches", "all distances, instanced along the pier"],
   "armour.glb": ["Rock armour: four scanned boulders, near, middling, far and most distant levels (build_armour.py)", "all distances, instanced, the level by distance"],
+  "chimney_caps.glb": ["the tops of the town's chimney stacks, modelled (build_chimneys.py): oversailing brick courses, cement flaunching and two clay pots; instanced (chimneys3d.js)", "two levels: near within 70 m, far beyond"],
   "whitby_lights.glb": ["Whitby's West and East Pier lighthouses, modelled (build_whitby_lights.py), three levels each, ambient occlusion in the vertices", "all distances, the level by distance (70 m, 220 m)"],
 };
 

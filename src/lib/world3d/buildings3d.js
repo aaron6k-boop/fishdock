@@ -24,7 +24,7 @@ function meshOf(B, mat) {
 }
 
 // the house fronts published in public/textures (facade_<kind>_*.jpg)
-const BAKED_FRONTS = ["brick", "render", "stone"];
+const BAKED_FRONTS = ["brick", "render", "stone"]; // (buff and cladding join once their baked fronts are published)
 
 /**
  * Adds the buildings to `group`. groundAt(x, z) gives the ground's height; avoid(x, z) is true where nothing may stand
@@ -184,7 +184,13 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
           const f0 = q / nb, f1 = (q + 1) / nb, y0 = base + s * sh, y1 = y0 + sh;
           const A = [x1 + (x2 - x1) * f0, y0, z1 + (z2 - z1) * f0], Bp = [x1 + (x2 - x1) * f1, y0, z1 + (z2 - z1) * f1];
           let t = len / nb < 1.6 ? FACADE_TILE.plain : (st.wide && s > 0 && q % 2 === 0 ? FACADE_TILE.window2 : FACADE_TILE.window);
-          if (st.type === "warehouse") t = s === 0 && front && q === Math.floor(nb / 2) ? FACADE_TILE.door : (q + s) % 3 === 0 && st.walls !== "cladding" ? FACADE_TILE.window : FACADE_TILE.plain;
+          if (st.type === "warehouse" && st.walls === "cladding" && tex.cladding.baked) {
+            // (a clad shed's baked front: the roller shutter in the middle of its longest side, a steel door two bays
+            // along, a strip of high windows every fourth bay and vents now and then on its top storey, plain sheet
+            // between)
+            const mid = Math.floor(nb / 2), hi = s === storeys - 1;
+            t = s === 0 && front && q === mid ? FACADE_TILE.door : s === 0 && front && q === mid + 2 ? FACADE_TILE.shop : hi && q % 4 === 1 ? FACADE_TILE.window : hi && q % 6 === 4 ? FACADE_TILE.window2 : FACADE_TILE.plain;
+          } else if (st.type === "warehouse") t = s === 0 && front && q === Math.floor(nb / 2) ? FACADE_TILE.door : (q + s) % 3 === 0 && st.walls !== "cladding" ? FACADE_TILE.window : FACADE_TILE.plain;
           else if (st.type === "lookout") t = s === 1 ? FACADE_TILE.shop : front && q === Math.floor(nb / 2) ? FACADE_TILE.door : q % 2 ? FACADE_TILE.window : FACADE_TILE.plain;
           else if (s === 0 && st.shop && len > 4) t = FACADE_TILE.shop;
           else if (s === 0 && front && q === Math.floor(nb / 2) && len / nb >= 1.6) t = FACADE_TILE.door;
