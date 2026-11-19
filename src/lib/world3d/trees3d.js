@@ -28,28 +28,40 @@ const SPECIES = {
 const PARK = ["sycamore", "lime", "holmoak", "sycamore", "lime"], VERGE = ["hawthorn", "hawthorn", "sycamore"], WOOD = ["sycamore", "lime", "lime", "holmoak"];
 
 // ---- drawings ----
-// the whole tree on a card (the far level and the lower presets)
+// the whole tree on a card (the far level and the lower presets). A crown in separate masses of leaf, each lit from
+// above and dark beneath, on limbs that show between them, with sky through the gaps at its edge: it was one round
+// ball of green dabs on a stick, and read as a lollipop from the pier (the pictures of 19 November).
 function cardTexture(seed = 5) {
   if (typeof document === "undefined") return null;
-  const n = 256, c = document.createElement("canvas"); c.width = n; c.height = n; const g = c.getContext("2d");
+  const n = 512, c = document.createElement("canvas"); c.width = n; c.height = n; const g = c.getContext("2d");
   let s = seed * 7919 + 17; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  g.clearRect(0, 0, n, n);
-  g.strokeStyle = "#3a3028"; g.lineCap = "round";
-  g.lineWidth = 9; g.beginPath(); g.moveTo(n * 0.5, n); g.lineTo(n * 0.5, n * 0.58); g.stroke();
-  for (let b = 0; b < 5; b++) { g.lineWidth = 4; g.beginPath(); g.moveTo(n * 0.5, n * (0.58 + rnd() * 0.1)); g.lineTo(n * (0.25 + rnd() * 0.5), n * (0.25 + rnd() * 0.25)); g.stroke(); }
-  const greens = [[40, 60, 30], [54, 80, 38], [70, 100, 46], [84, 118, 54], [98, 130, 62]]; // (matched to the built trees' deeper green, so a tree doesn't change colour as it changes level)
-  const cx = n * 0.5, cy = n * 0.42, rx = n * 0.46, ry = n * 0.36;
-  for (let layer = 0; layer < 5; layer++) {
-    const col = greens[layer];
-    for (let k = 0; k < 90; k++) {
-      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * (0.75 + layer * 0.06);
-      const x = cx + Math.cos(a) * rx * r + (rnd() - 0.5) * 10, y = cy + Math.sin(a) * ry * r + (rnd() - 0.5) * 10 - layer * 2;
-      if (r > 0.92 && rnd() < 0.5) continue;
-      const rad = 6 + rnd() * 9 * (1 - r * 0.4), shade = 0.85 + rnd() * 0.3;
-      g.fillStyle = `rgba(${col[0] * shade | 0},${col[1] * shade | 0},${col[2] * shade | 0},${0.85 + rnd() * 0.15})`;
-      for (let d = 0; d < 4; d++) { g.beginPath(); g.arc(x + (rnd() - 0.5) * rad, y + (rnd() - 0.5) * rad, rad * (0.5 + rnd() * 0.5), 0, Math.PI * 2); g.fill(); }
+  g.clearRect(0, 0, n, n); g.lineCap = "round"; g.lineJoin = "round";
+  // (the crown's masses: a ring of them round a middle, uneven, wider than tall, the lowest hanging two thirds of the way down the card, so little bare trunk shows)
+  const lobes = [];
+  for (let k = 0; k < 11; k++) { const a = (k / 11) * Math.PI * 2 + rnd() * 0.5, r = k < 8 ? 0.62 + rnd() * 0.38 : rnd() * 0.4;
+    lobes.push({ x: 0.5 + Math.cos(a) * 0.31 * r + (rnd() - 0.5) * 0.05, y: 0.4 - Math.sin(a) * 0.27 * r + (rnd() - 0.5) * 0.04, r: 0.115 + rnd() * 0.075 }); }
+  lobes.sort((a, b) => b.y - a.y); // (the low ones first, so the upper masses lie over them)
+  // trunk and limbs: the trunk tapering, a limb to each of the lower masses
+  const bark = (w, pts, k = 1) => { g.strokeStyle = `rgb(${58 * k | 0},${48 * k | 0},${40 * k | 0})`; g.lineWidth = w; g.beginPath(); g.moveTo(pts[0][0] * n, pts[0][1] * n); for (let q = 1; q < pts.length; q++) g.lineTo(pts[q][0] * n, pts[q][1] * n); g.stroke(); };
+  bark(n * 0.05, [[0.5, 1], [0.5, 0.82]]); bark(n * 0.036, [[0.5, 0.84], [0.495, 0.6]]); bark(n * 0.012, [[0.488, 1], [0.488, 0.66]], 1.5);
+  for (const L of lobes.slice(0, 7)) { const mx = 0.5 + (L.x - 0.5) * 0.45, my = 0.7 - (0.7 - L.y) * 0.35; bark(n * (0.012 + rnd() * 0.01), [[0.497, 0.68 + rnd() * 0.1], [mx, my], [L.x, L.y + L.r * 0.3]]); }
+  // leaf: each mass a heap of small clumps, darker low in the mass and on its right, lit top left; a dark skirt beneath
+  const tone = [[30, 46, 26], [42, 64, 32], [56, 84, 40], [74, 104, 48], [94, 126, 58], [116, 146, 70]];
+  for (const L of lobes) {
+    for (let d = 0; d < 230; d++) {
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * (0.82 + rnd() * 0.3), u = Math.cos(a) * r, v = Math.sin(a) * r;
+      if (r > 0.95 && rnd() < 0.55) continue; // (a ragged edge)
+      const x = (L.x + u * L.r * 1.12) * n, y = (L.y + v * L.r * 0.86) * n;
+      const lit = Math.max(0, Math.min(1, 0.52 - v * 0.42 - u * 0.2 + (rnd() - 0.5) * 0.3)), col = tone[Math.min(tone.length - 1, (lit * tone.length) | 0)], sz = n * (0.012 + rnd() * 0.014);
+      g.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      for (let q = 0; q < 3; q++) { g.beginPath(); g.ellipse(x + (rnd() - 0.5) * sz * 1.6, y + (rnd() - 0.5) * sz * 1.6, sz, sz * (0.55 + rnd() * 0.35), rnd() * 3, 0, Math.PI * 2); g.fill(); }
     }
   }
+  // sky through the crown near its edge
+  g.globalCompositeOperation = "destination-out";
+  for (let h = 0; h < 22; h++) { const a = rnd() * Math.PI * 2, r = 0.55 + rnd() * 0.4, x = (0.5 + Math.cos(a) * 0.38 * r) * n, y = (0.4 - Math.sin(a) * 0.33 * r) * n;
+    g.beginPath(); g.ellipse(x, y, n * (0.008 + rnd() * 0.014), n * (0.006 + rnd() * 0.01), rnd() * 3, 0, Math.PI * 2); g.fill(); }
+  g.globalCompositeOperation = "source-over";
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter;
   return t;
 }
@@ -212,9 +224,13 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
   { const pos = [], uv = [], idx = [], nrm = []; let o = 0;
     for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI, ca = Math.cos(a), sa = Math.sin(a), P = plane.attributes.position, U = plane.attributes.uv;
       for (let v = 0; v < P.count; v++) { const x = P.getX(v), y = P.getY(v); pos.push(x * ca, y, x * sa); uv.push(U.getX(v), U.getY(v)); nrm.push(0, 1, 0); }
-      for (const t of plane.index.array) idx.push(t + o); o += P.count; }
+      for (const t of plane.index.array) idx.push(t + o);
+      // (and the same card from behind, as a front face: drawn double-sided, the half of the cards seen from behind had
+      // their normals turned over and were lit from underneath, so some far trees stood black beside green ones)
+      { const T = plane.index.array; for (let q = 0; q < T.length; q += 3) idx.push(T[q] + o, T[q + 2] + o, T[q + 1] + o); }
+      o += P.count; }
     cardGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); cardGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); cardGeo.setAttribute("normal", new THREE.Float32BufferAttribute(nrm, 3)); cardGeo.setIndex(idx); }
-  const cardMat = new THREE.MeshStandardMaterial({ map: cardTex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.9, metalness: 0, color: 0xffffff });
+  const cardMat = new THREE.MeshStandardMaterial({ map: cardTex, alphaTest: 0.45, side: THREE.FrontSide, roughness: 0.9, metalness: 0, color: 0xffffff });
   const cards = new THREE.InstancedMesh(cardGeo, cardMat, placed.length);
   const setCard = (t, i, on) => { e.set(t.lean, t.rot, 0); q.setFromEuler(e); sc.set(on ? t.w : 0, on ? t.h : 0, on ? t.w : 0); m.compose(v3.set(t.x, t.y - 0.05, t.z), q, sc); cards.setMatrixAt(i, m); };
   placed.forEach((t, i) => { setCard(t, i, true); col.setRGB(t.tint, t.tint * (0.97 + 0.06 * (t.tint - 1)), t.tint * 0.95); cards.setColorAt(i, col); });

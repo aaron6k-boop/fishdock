@@ -55,14 +55,17 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
   const U = { uTime: { value: 0 }, uWind: { value: 0.3 }, uWindDir: { value: new THREE.Vector2(0.3, -1) } };
   const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.9, metalness: 0, color: 0xffffff });
   const kh = atlas.KH.map((v) => v.toFixed(3));
+  const endW = hi ? "0.2" : "0.34"; // (how far in from each end of a card its blades shorten)
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind; sh.uniforms.uWindDir = U.uWindDir;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", `#include <common>
-        uniform float uTime, uWind; uniform vec2 uWindDir; attribute vec3 aAttr; attribute vec3 aTint; attribute vec2 aSlope; attribute vec3 aCN; varying vec3 vTint; varying float vUp, vGust, vFace;
+        uniform float uTime, uWind; uniform vec2 uWindDir; attribute vec3 aAttr; attribute vec3 aTint; attribute vec2 aSlope; attribute vec3 aCN; varying vec3 vTint; varying float vUp, vGust, vFace; varying vec3 vEnd;
         float fdKH(float k) { return k < 0.5 ? ${kh[0]} : k < 1.5 ? ${kh[1]} : k < 2.5 ? ${kh[2]} : ${kh[3]}; }`)
       .replace("#include <uv_vertex>", `#include <uv_vertex>
         { float k = aAttr.x, cu = mod(k, ${atlas.cols.toFixed(1)}), cv = floor(k / ${atlas.cols.toFixed(1)});
           // (the kind's cell, and only as much of it as its blades fill)
+          // (for the ends of the card, below: how far along it, its cell's foot in the picture, and its blades' height there)
+          vEnd = vec3(vMapUv.x, cv / ${atlas.rows.toFixed(1)}, fdKH(k) / ${atlas.h.toFixed(3)} / ${atlas.rows.toFixed(1)});
           vMapUv = vec2((cu + 0.003 + vMapUv.x * 0.994) / ${atlas.cols.toFixed(1)}, (cv + vMapUv.y * fdKH(k) / ${atlas.h.toFixed(3)}) / ${atlas.rows.toFixed(1)}); }`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>
         transformed.y *= fdKH(aAttr.x);
@@ -83,9 +86,14 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
         float bend = uWind * (0.18 + 0.82 * gust) * (0.75 + 0.25 * sin(uTime * 3.1 + aAttr.y)) * position.y * position.y * fdKH(aAttr.x) * 0.45;
         vec3 wl = (vec4(wd.x, 0.0, wd.y, 0.0) * instanceMatrix).xyz;
         transformed += wl * bend + vec3(0.0, -bend * 0.25, 0.0);`);
-    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vTint; varying float vUp, vGust, vFace;")
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vTint; varying float vUp, vGust, vFace; varying vec3 vEnd;")
       .replace("#include <map_fragment>", `
-        vec4 fdTx = texture2D(map, vMapUv);
+        // (the blades shorten towards each end of the card, so it stands as a clump: each card is a strip of grass cut
+        // square at its ends, and where they stand thinly (Balanced, a phone) a lawn read as rows of little hedges)
+        float fdEnd = mix(0.3, 1.0, smoothstep(0.0, ${endW}, vEnd.x) * smoothstep(1.0, 1.0 - ${endW}, vEnd.x));
+        float fdV = (vMapUv.y - vEnd.y) / fdEnd;
+        if (fdV > vEnd.z) discard;
+        vec4 fdTx = texture2D(map, vec2(vMapUv.x, vEnd.y + fdV));
         float fdL = dot(fdTx.rgb, vec3(0.3, 0.55, 0.15));
         // (green blades take the ground's colour where they stand, their own light and dark kept; the flowers and the
         // dried blades, not green, keep their own)
@@ -107,7 +115,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
           { float fdB = pow(max(0.0, dot(-normalize(vViewPosition), directionalLights[0].direction)), 3.0); reflectedLight.directDiffuse *= 1.0 + fdB * 0.9 * vUp; }
         #endif`);
   };
-  mat.customProgramCacheKey = () => "fdfield3";
+  mat.customProgramCacheKey = () => "fdfield4" + (hi ? "h" : "b");
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.name = "fdGrassField"; mesh.castShadow = false; mesh.receiveShadow = true; mesh.noReflect = true; mesh.frustumCulled = false; mesh.count = 0;
   mesh.userData.kind = "grass"; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
