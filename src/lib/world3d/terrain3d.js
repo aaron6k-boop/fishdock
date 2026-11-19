@@ -27,11 +27,13 @@ export const TERRAIN = {
   // Brixham's breakwater, 5.8 m (the hills either side of the harbour reach 59 m)
   cromer: { step: 5, n: 257, half: 640, floor: 6.8, enc: "dv16", file: "terrain_cromer_5m.bin" },
   brixham: { step: 5, n: 257, half: 640, floor: 5.8, enc: "dv16", file: "terrain_brixham_5m.bin" },
-  // Gorleston South Pier (gorleston-south-pier): the same survey and tool. floor: the quay and Pier Gardens, 3.6 m.
+  // Gorleston South Pier (gorleston-south-pier): the same survey and tool. floor: 4.0 m, just over the pier's own
+  // head (3.9 m; its arm is at 2.6 to 3.5 m, the quay and Pier Gardens at 1.4 to 3.5 m). At the land's usual level
+  // there, 3.6 m, the head stood 0.3 m proud of its own deck and came through it as a patch of sand (the PC, 19 November).
   // The cliff south of the pier's root rises 9 m in 30 m to Marine Parade at 13 to 16 m; the old town behind the quay
   // stands at 6 to 9 m; the spit north of the harbour mouth is at 5 to 6.5 m (it had been drawn as an 8 m dune, an
   // estimate from photographs)
-  gorleston: { step: 5, n: 257, half: 640, floor: 3.6, enc: "dv16", file: "terrain_gorleston_5m.bin" },
+  gorleston: { step: 5, n: 257, half: 640, floor: 4.0, enc: "dv16", file: "terrain_gorleston_5m.bin" },
 };
 
 const cache = new Map();
