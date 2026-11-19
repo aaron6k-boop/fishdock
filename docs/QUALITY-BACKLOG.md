@@ -165,7 +165,7 @@ Seen on Aaron's PC and not fixed yet:
 - The trees are still last generation: leaf cards on simple branches. Modelled trees (Blender, branching to twigs, two or three levels) are next for vegetation.
 - Where a promenade's concrete meets a bank (the foot of the East Cliff) the edge follows the ground grid's 3 m steps.
 - From inside a house (only possible with the free camera) the walls are invisible and the window modules hang in the air.
-- Frame rate on Ultra varies by a tenth or so from run to run; on the last runs Whitby drew 82 a second at 1.75 times the screen's resolution (its slowest 1% at 56; earlier runs of the same code 64 to 67, slowest 1% 31 to 40), against 94 before the rebuild; the other places __PLACES__. The fine hillside's shadows and reflection, the window modules and the grass layer's overdraw are the costs to work on.
+- Frame rate on Ultra varies by a tenth or so from run to run; on the final runs Whitby drew 69 to 82 a second at 1.75 to 2 times the screen's resolution (its slowest 1% at 35 to 56), against 94 before the rebuild; the other places 66 (Lowestoft) to 90 (Great Yarmouth), against 89 to 115 before. The fine hillside's shadows and reflection, the window modules and the grass layer's overdraw are the costs to work on.
 - The other UK places (Brighton, Chesil, Brixham and the East Anglian marks) haven't had the hillside, building and clutter work applied with their own character yet.
 
 ## Done (with evidence)
