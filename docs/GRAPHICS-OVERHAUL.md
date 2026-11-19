@@ -86,6 +86,77 @@ cliff's own material and shape (as the East Cliff's beds now do), not from loose
 Still to do for these two: their own buildings from photographs (Brixham has none yet), Brixham's breakwater in its
 limestone, the harbour's quays, and trees.
 
+## Stage 3 (19 November): the catch without stops, a hand's skin, the cast out of your face
+
+Stage 1's footage showed two things its own notes had put down to the test: the picture stopping for seconds at a time
+through a first catch, and scratches for creases on the hands. Both were real.
+
+### The stops
+
+A job on the PC played two catches with no pictures taken (taking them can itself stall the page) and logged every
+frame that took over 70 ms, then again with every graphics call timed. In a first two-minute session 35 seconds went in
+one call, three.js waiting for the driver to finish a shader the first time something drawn needed it, about a quarter
+of a second each. Four causes, each fixed:
+
+| Cause | How it showed | Fix |
+|---|---|---|
+| Anything drawn before its shader was built made the page wait for it | One to two seconds when a fish was hooked, netted or held up; 22 and 10 seconds in the middle of one fight | Every draw is checked: a thing whose shader isn't ready is left out until it is, and appears a moment late |
+| Late arrivals were handed over in the background, but after 1.5 s the page waited for whatever was left | 16 seconds for the pier's furniture soon after the place appeared | It waits in the background for as long as it takes (half a minute at most) |
+| A lamp's light was hidden by day and shown at dusk, and the number of lights is written into every lit shader | 63 shaders rebuilt on the spot at Whitby, 15.5 s, each time the lamps came on or went off; then more stops as you first looked at each thing with its new shader | The light stays, at nothing, by day |
+| three.js made and threw away a material every time the sky's reflection map was refreshed | 1.3 to 1.8 s whenever the light or the cloud changed a step | The reflection scene has a background of its own, so that material is never made |
+
+Measured on the PC (Edge, RTX 3090, a new browser profile each run, so every shader is built from nothing: the worst
+case, a first visit). Time the picture stood still, frames over 100 ms added up:
+
+| | Before (main) | After |
+|---|---|---|
+| Wide screen, Ultra: looking round at rest | 0.3 s | 0 |
+| first catch | 43.8 s in 16 stops, the longest 22 s | 3.8 s in 3 stops, the longest 2.9 s |
+| second catch | 1.1 s | 0.1 s |
+| walking off, then rain | 5.4 s | 1.6 s |
+| Phone-shaped, Balanced: looking round at rest | 12.9 s in 5 stops | 0 |
+| first catch | 19.7 s in 12 stops, the longest 4.2 s | 5.3 s in 5 stops, the longest 4.1 s |
+| second catch | 0 | 0.5 s |
+| walking off, then rain | 4.4 s | 1.6 s |
+
+Frame rate at rest in the same runs: wide 83 before, 81 after; phone-shaped 168, then 158. The lamps' light is now
+worked out by day as well, at nothing; that is the likely cost, and it is within what one run differs from the next
+on the wide screen but not on the phone-shaped one.
+
+Still there: one stop of three to four seconds the first time a landed fish is held up for a look ("fish inspect"). No
+script or graphics call on the page is waiting during it; the time is in the browser's own graphics process. Not found.
+
+### Hands
+
+The skin's maps were one dark line per crease and a pink square per nail, drawn at 1024 and then made five times
+stronger between the painter and the game. Painted again from the rig at 2048 (a fifth of a millimetre a texel): fields
+of fine wrinkles over each joint, nails with a cuticle's curve, a rounded tip, a pale edge and a fold of skin round
+them, pinker palms, pads and knuckles, tendons and veins as soft swells, skin's own net of tiny creases; used by the
+game as painted. `source-assets/hands/bake_hand_maps.py`.
+
+### The cast, and a leap's zoom
+
+Through the wind-up and release the reel crossed 25 cm in front of your eye and the rod stood up the middle of the
+screen. The cast's four middle moments are now set for the view: the reel low and to the right, 35 to 45 cm away, the
+rod swung back over your right shoulder about its own handle, 45 degrees past upright at most; a test holds it there
+with both wrists in their range.
+When the view zooms in to follow a leaping fish your hands were magnified with it, up to two and a half times. They
+now drop out of the bottom of the picture as it zooms and come back as it widens.
+
+### A page left open across an update
+
+The live check after stage 2 opened Cromer from a page loaded before the update: the old page asked for a code file
+the new build no longer serves, and the screen stayed black. Every screen loaded on demand, and the 3D world's code,
+now load the page again once when that happens (`src/lib/staleReload.js`).
+
+### Still wrong after stage 3
+
+- The stop when a fish is first held up (above).
+- The hands are the same model: its shapes are sound but its fingers are thick and its grip on the rod is loose (the
+  first two fingers of the right hand).
+- In the cast's wind-up your left sleeve still fills the lower left of the picture for about half a second.
+- Everything listed after stage 1 that isn't named here.
+
 ## The phases, and where each stands
 
 1. Graphics engine audit: not started as a written audit. Measured so far: Whitby on Ultra 76 to 85 frames a second.
@@ -94,13 +165,15 @@ limestone, the harbour's quays, and trees.
    not yet placed.
 3. Textures and materials: Whitby's stone, grass, sand, soil; others not yet.
 4. Water and weather: rain and the wet deck (this stage). Waves at walls and rocks, spray, sky and cloud not yet.
-5. First-person fishing: this stage. Rod and reel detail not yet.
+5. First-person fishing: stages 1 and 3. Rod and reel detail and a new hand model not yet.
 6. Characters and animation: not started.
 7. Fish and fishing physics: not started.
 8. UK places: Whitby first; Gorleston, Cromer and Brixham next.
-9. Loading and performance: not started. The frame rate lost to the Whitby rebuild is still to be won back.
+9. Loading and performance: the stops through a first catch (stage 3). Loading time, the stop when a fish is first
+   held up and the frame rate lost to the Whitby rebuild are still to do.
 10. Interface: not started.
 11. Immersion: not started.
-12. Automated picture checks: the twenty fixed cameras and the played catch exist as PC jobs; no automatic comparison
-    against approved pictures yet.
-13. Release process: branches, a PR per stage, checked on the PC before merging and on the live site after.
+12. Automated picture checks: the twenty fixed cameras and the played catch exist as PC jobs, and since stage 3 a job
+    that plays two catches and adds up every stop; no automatic comparison against approved pictures yet.
+13. Release process: branches, a PR per stage, checked on the PC before merging and on the live site after; a page
+    left open across an update now loads itself again (stage 3).

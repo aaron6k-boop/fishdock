@@ -57,6 +57,11 @@ chat is linked to Aaron's PC, as the rig, rod kit and nets were made. Nothing is
   1024 maps, 77 KB in all): fine wrinkles across the back of each finger joint, a firm crease on the palm side, nails
   (paler, glossier, a lighter free edge), redder knuckles and fingertip pads. Laid over the skin as a multiplier, so the
   player's skin colour stays theirs. Subtle at arm's length, as it should be.
+- **Painted again (19 Nov, overhaul stage 3):** those maps drew each crease as one dark line and each nail as a square,
+  and by then the painter and the game between them made the marks five times stronger: black scratches over the
+  knuckles and palm on the PC's footage. The painter now makes fields of fine wrinkles, nails with a nail's outline,
+  pinker palms and pads, tendons and veins as soft swells and skin's net of tiny creases, at 2048 (three maps, about
+  300 KB in all), and the game uses them as painted. See `docs/GRAPHICS-OVERHAUL.md`, stage 3.
 - **Since:** the palm's own creases (under the fingers, across the middle, round the ball of the thumb) and a few faint
   veins over the back of the hand. Wrist creases were tried and taken out (15 Nov): the wrist is its own small,
   squeezed patch of the map, and two faint creases there came out as one dark broken line, a scar across the wrist in
