@@ -682,7 +682,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       sh.uniforms.uSand = { value: sandMap || rufMap }; sh.uniforms.uSandN = { value: sandNor || rufNor }; sh.uniforms.uSandW = { value: wetMap || rufMap }; sh.uniforms.uSandWN = { value: wetNor || rufNor };
       sh.uniforms.uSandK = { value: new THREE.Vector4(...(BP?.tint || [0.56, 0.46, 0.31]), BP?.tile || 3.5) }; sh.uniforms.uSandL = { value: new THREE.Vector3(BP?.lum || 0.283, BP?.lumWet || 0.122, BP?.tileWet || 2.2) };
       sh.uniforms.uClG = { value: clG || rufMap }; sh.uniforms.uClGN = { value: clGN || rufNor }; sh.uniforms.uClR = { value: clR || rufMap }; sh.uniforms.uClRN = { value: clRN || rufNor };
-      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2.5, CL?.rockLum || 0.2, CL?.grassLum || 0.08) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: CL && clG && clR ? 1 : 0 };
+      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2.5, 0, 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: CL && clG && clR ? 1 : 0 };
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; attribute float aSteep; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;")
         .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vSteep = aSteep; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);");
       sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
@@ -717,6 +717,12 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             vec2 tuv = vRufUv * 4.0;
             vec3 t1 = texture2D(uTurf, tuv).rgb, t2 = texture2D(uTurf, tuv * 0.29 + 0.41).rgb;
             vec3 grass = vColor.rgb * mix(t1, t2, 0.45) * 2.05;
+            if (uClOn > 0.5) {
+              // (where the place has its photographed grass (local.cliff), the lawns are that too, not the drawn turf)
+              vec2 wq = vWPos.xz; vec3 q1 = texture2D(uClG, wq / uClK.y).rgb, q2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wq / (uClK.y * 3.7) + 0.31).rgb;
+              float ql = dot(mix(q1, q2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02);
+              grass = vColor.rgb * 0.95 * mix(clamp(pow(ql, 0.75), 0.45, 1.7), 1.0, smoothstep(60.0, 260.0, length(vViewPosition)) * 0.6) * (0.9 + 0.2 * fdDN(wq / 19.0));
+            }
             diffuseColor.rgb = mix(diffuseColor.rgb, grass, vGrass);
           }
           if (vRuf > 0.01) {
@@ -734,7 +740,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // across the slope), its light and dark kept and its colour the bank's tint; darker patches of scrub
               vec2 wp = vWPos.xz; float dist = length(vViewPosition);
               vec3 g1 = texture2D(uClG, wp / uClK.y).rgb, g2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wp / (uClK.y * 3.7) + 0.31).rgb;
-              float gl = dot(mix(g1, g2, 0.4), vec3(0.3, 0.55, 0.15)) / uClK.w;
+              float gl = dot(mix(g1, g2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02); // (over the photograph's own average)
               vec3 grassC = vColor.rgb * mix(clamp(pow(gl, 0.75), 0.45, 1.7), 1.0, smoothstep(60.0, 260.0, dist) * 0.6) * (0.86 + 0.28 * fdDN(wp / 23.0));
               grassC = mix(grassC, grassC * vec3(0.62, 0.6, 0.52), smoothstep(0.6, 0.72, fdDF(wp / 17.0 + 9.0)) * 0.7);
               // the rock: the photograph laid from the three sides, each weighted by how squarely the ground faces it
@@ -799,7 +805,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         .replace("#include <normal_fragment_maps>", `vec3 fdFlatN = normal;
           #include <normal_fragment_maps>
           if (vSand > 0.01) { vec3 sn = mix(texture2D(uSandN, vWPos.xz / uSandK.w).xyz, texture2D(uSandWN, vWPos.xz / uSandL.z).xyz, fdWet) * 2.0 - 1.0; float sk = 1.0 - smoothstep(12.0, 45.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(sn.x, sn.y, 0.0) * 0.6 * sk), vSand)); }
-          if (vGrass > 0.01) { vec3 gn = texture2D(uTurfN, vRufUv * 4.0).xyz * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
+          if (vGrass > 0.01) { vec3 gn = (uClOn > 0.5 ? texture2D(uClGN, vWPos.xz / uClK.y).xyz : texture2D(uTurfN, vRufUv * 4.0).xyz) * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
           if (vRuf > 0.01 && vFace < 0.0 && uClOn > 0.5) {
             // (the cliff's relief: the grass photograph's, and the rock's from whichever side it's laid from most)
             vec3 gn = texture2D(uClGN, vWPos.xz / uClK.y).xyz * 2.0 - 1.0;
@@ -815,7 +821,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
           }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf12";
+    softMat.customProgramCacheKey = () => "fdruf13";
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);

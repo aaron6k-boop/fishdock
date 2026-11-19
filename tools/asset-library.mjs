@@ -50,6 +50,8 @@ const USE = {
   "nets.glb": ["Drop net and landing net", "close to mid"],
   "eels.glb": ["The conger and the eel (from their straightened pictures)", "close (in the hand) to mid (in the water)"],
   "pierprops.glb": ["Lamps, lifebuoy stations, bollards, benches", "all distances, instanced along the pier"],
+  "armour.glb": ["Rock armour: four scanned boulders, near, middling, far and most distant levels (build_armour.py)", "all distances, instanced, the level by distance"],
+  "whitby_lights.glb": ["Whitby's West and East Pier lighthouses, modelled (build_whitby_lights.py), three levels each, ambient occlusion in the vertices", "all distances, the level by distance (70 m, 220 m)"],
 };
 
 export function build() {
