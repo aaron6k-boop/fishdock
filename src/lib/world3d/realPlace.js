@@ -1297,17 +1297,22 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // ---- flights of steps (the map's highway=steps): treads where the ground falls along the line, 17 cm a riser ----
   {
     const treads = [];
+    // (each flight follows its mapped line and the ground under it, tread by tread; one too steep to be stairs, a line
+    // mapped straight down a cliff, isn't drawn. Drawn straight from its first point to its last at an even pitch, the
+    // path down Whitby's East Cliff was a dark ramp 40 m tall standing off the face: seen from the harbour mouth on
+    // Aaron's PC, 19 November)
     for (const st of place.steps || []) {
       const L = st.line; if (L.length < 2) continue;
       const [xa, za] = L[0], [xb, zb] = L[L.length - 1]; if (!landAt([xa, za]) || !landAt([xb, zb]) || nearSpot(xa, za, 25) || nearSpot(xb, zb, 25)) continue;
-      let ya = groundAt(xa, za) || LAND, yb = groundAt(xb, zb) || LAND;
-      let from = [xa, za, ya], to = [xb, zb, yb]; if (ya > yb) { from = [xb, zb, yb]; to = [xa, za, ya]; }
-      const rise = to[2] - from[2]; if (rise < 0.3) continue; // (steps on the flat: the map says so, the ground here doesn't)
-      const n = Math.max(2, Math.round(rise / 0.17)), run = Math.hypot(to[0] - from[0], to[1] - from[1]), tread = Math.max(0.26, Math.min(0.45, run / n));
-      const ax = (to[0] - from[0]) / run, az = (to[1] - from[1]) / run, ang = -Math.atan2(az, ax);
+      const ya = groundAt(xa, za) || LAND, yb = groundAt(xb, zb) || LAND, rise = Math.abs(yb - ya); if (rise < 0.3) continue; // (steps on the flat: the map says so, the ground here doesn't)
+      const cum = [0]; for (let k = 1; k < L.length; k++) cum.push(cum[k - 1] + Math.hypot(L[k][0] - L[k - 1][0], L[k][1] - L[k - 1][1]));
+      const run = cum[cum.length - 1]; if (run < 0.5 || rise > run * 0.85) continue;
+      const n = Math.max(2, Math.round(rise / 0.17)), tread = Math.max(0.26, Math.min(0.6, run / n));
       for (let i = 0; i < n; i++) {
-        const d = (i + 0.5) * (run / n), cx = from[0] + ax * d, cz = from[1] + az * d, yTop = from[2] + (i + 1) * (rise / n);
-        const g2 = new THREE.BoxGeometry(tread, 0.17 + 0.02, st.w); g2.translate(0, -0.095, 0); g2.rotateY(ang); g2.translate(cx, yTop, cz); treads.push(g2);
+        const d = (i + 0.5) * (run / n); let k = 1; while (k < L.length - 1 && cum[k] < d) k++;
+        const f = (d - cum[k - 1]) / Math.max(1e-6, cum[k] - cum[k - 1]), cx = L[k - 1][0] + (L[k][0] - L[k - 1][0]) * f, cz = L[k - 1][1] + (L[k][1] - L[k - 1][1]) * f;
+        const ang = -Math.atan2(L[k][1] - L[k - 1][1], L[k][0] - L[k - 1][0]), yTop = Math.round(((groundAt(cx, cz) || LAND) + 0.06) / 0.17) * 0.17;
+        const g2 = new THREE.BoxGeometry(tread, 0.17 + 0.1, st.w); g2.translate(0, -0.135, 0); g2.rotateY(ang); g2.translate(cx, yTop, cz); treads.push(g2);
       }
     }
     if (treads.length) { const g2 = mergeGeometries(treads); treads.forEach((q) => q.dispose()); const m = new THREE.Mesh(g2, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb4b0a8, roughness: 0.9 })); m.castShadow = m.receiveShadow = true; m.userData.kind = "steps"; group.add(m); }

@@ -28,7 +28,24 @@ How a stage is checked:
 | The deck dry in rain | Whitby's flags darken, take a sheen and hold puddles with the rain's rings | Yes |
 | The East Cliff smooth green ramps on a phone | The 1 m surveyed hillside is drawn on Balanced too | Yes, phone-shaped screen on the PC |
 | Dark slabs on the hillside | Walls, fences and hedges follow the ground in short lengths | Yes |
-| The East Cliff one smooth brown wall | Its rock shows on the sea face: dark shale under buff sandstone, ledge shadows | See the measurements below |
+| The East Cliff one smooth brown wall | Its rock shows on the sea face: dark shale under buff sandstone, ledge shadows | Yes |
+| A dark ramp 40 m tall standing off the East Cliff | Flights of steps follow their line and the ground; a line mapped straight down a cliff isn't drawn as stairs | Yes |
+
+### Measured (PC, 1920x1080, the same spot, the same script; before is the live code)
+
+| | Before | After |
+|---|---|---|
+| Whitby, first person at rest, Ultra | 86 frames a second, slowest 1% 56 | 85, 56 |
+| after landing a fish | 69, 47 | 75, 47 |
+| heavy rain | 86, 56 | 87, 56 |
+| Phone-shaped screen on Balanced, at rest | 165 | 139 |
+| the same, heavy rain | 202 | 184 |
+
+The phone-shaped figures are from the PC's graphics card, not a phone: they show the cost of the fine hillside on
+Balanced (530,000 more triangles), not what a phone will draw. Aaron's iPhone showed 50 to 57 before; its own reading
+after this stage is the one that counts, and if it has fallen the hillside comes off Balanced or gets a lighter mesh.
+Other places on the same build, third person on Ultra: Great Yarmouth 90 to 99, Gorleston 88 to 92, Lowestoft 82 to 88,
+Cromer 84 to 85, Whitby 75 to 77; loading 21 to 26 s, as before. No page or shader errors in any run.
 
 ### Still wrong after stage 1 (seen in the PC's footage)
 
