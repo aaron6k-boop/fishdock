@@ -708,7 +708,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       sh.uniforms.uSand = { value: sandMap || rufMap }; sh.uniforms.uSandN = { value: sandNor || rufNor }; sh.uniforms.uSandW = { value: wetMap || rufMap }; sh.uniforms.uSandWN = { value: wetNor || rufNor };
       sh.uniforms.uSandK = { value: new THREE.Vector4(...(BP?.tint || [0.56, 0.46, 0.31]), BP?.tile || 3.5) }; sh.uniforms.uSandL = { value: new THREE.Vector3(BP?.lum || 0.283, BP?.lumWet || 0.122, BP?.tileWet || 2.2) };
       sh.uniforms.uClG = { value: clG || rufMap }; sh.uniforms.uClGN = { value: clGN || rufNor }; sh.uniforms.uClR = { value: clR || rufMap }; sh.uniforms.uClRN = { value: clRN || rufNor };
-      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, 0, 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
+      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, CL?.rockFaces?.[0] || 0, CL?.rockFaces?.[1] || 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; attribute float aSteep; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;")
         .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vSteep = aSteep; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);");
       // (only the samplers this place uses are declared: with the sand's four, the cliff's four and the turf's two all in
@@ -829,6 +829,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               vec3 rockC = uClRock * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.82 + 0.3 * beds) * (1.0 - 0.18 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
               // (it shows through in ragged outcrops: the slope's steepness, broken up by noise at two scales)
               fdRock = smoothstep(0.4, 0.62, vSteep + (fdDF(wp / 11.0) - 0.5) * 0.6 + (fdDN(wp / 2.7) - 0.5) * 0.12);
+              // (local.cliff.rockFaces: the way the sea faces, where the waves have bared the rock; slopes turned away
+              // from it, inland or over the harbour, stay grassed: Whitby's bank under St Mary's was a dark blotch)
+              if (dot(uClK.zw, uClK.zw) > 0.0) fdRock *= smoothstep(-0.4, 0.05, dot(normalize(vWNrm.xz + vec2(1e-5)), uClK.zw));
               // (and even on the steep faces, scrub and grass hold on in patches and along the ledges)
               fdRock *= 1.0 - 0.7 * smoothstep(0.58, 0.7, fdDF(vec2(wp.x + wp.y, vWPos.y * 2.2) / 9.0 + 3.0));
               tinted = mix(grassC, rockC, fdRock);
@@ -1635,7 +1638,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         if (!inGrid(x, z)) return null;
         const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n;
         // (on a dune, the marram's own straw and grey-green, as its shader mixes them, not the sand's colour under it)
-        if (dune[k] > 0.05 && faceA[k] >= 0 && !bank[k]) { const d = marramAt(x, z, faceA[k]).dry; return [0.115 + (0.34 - 0.115) * d, 0.15 + (0.3 - 0.15) * d, 0.062 + (0.145 - 0.062) * d].map((v) => v * 1.25); }
+        if (dune[k] > 0.05 && faceA[k] >= 0 && !bank[k]) { const d = marramAt(x, z, faceA[k]).dry; return [0.115 + (0.34 - 0.115) * d, 0.15 + (0.3 - 0.15) * d, 0.062 + (0.145 - 0.062) * d].map((v) => v * 0.9); }
         return [0, 1, 2].map((ch) => onGrid(col, 3, ch, x, z) * 0.95);
       },
       avoid: (x, z) => nearSpot(x, z, 3) || onRoad(x, z) || lots.some((b) => inB([x, z], b) && inside([x, z], b.r)) || drawnB.some((b) => inB([x, z], b) && inside([x, z], b.r)) || allPiers.some((b) => inB([x, z], b)),

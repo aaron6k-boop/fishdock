@@ -88,7 +88,7 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.name = "fdGrassTufts"; mesh.castShadow = false; mesh.receiveShadow = true; mesh.noReflect = true; mesh.frustumCulled = false;
   mesh.count = 0; mesh.userData.kind = "grass";
-  mesh.userData.grassAt = grassAt; mesh.userData.yAt = yAt; mesh.userData.avoid = avoid; // (for the tests and pictures: where there's grass)
+  mesh.userData.grassAt = grassAt; mesh.userData.yAt = yAt; mesh.userData.avoid = avoid; mesh.userData.roughAt = roughAt; // (for the tests and pictures: where there's grass)
   const col = new THREE.Color(1, 1, 1);
   for (let k = 0; k < cap; k++) mesh.setColorAt(k, col);
   group.add(mesh);
