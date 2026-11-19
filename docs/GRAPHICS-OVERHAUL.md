@@ -341,16 +341,16 @@ other with the same cameras):
 
 | | Live | This build |
 | --- | --- | --- |
-| Whitby, phone setting: plants placed | none | about 2,100 on the first count, fewer since level mown ground was left bare |
+| Plants placed, phone setting | none | Whitby 1,780, Gorleston 644 (Ultra at Whitby: 4,649) |
 | Whitby, phone setting, at the spot | 150 fps, 6.7 ms, 2,824k triangles | 152 fps, 6.6 ms, 2,278k triangles |
 | Gorleston, phone setting, at the spot | 170 fps, 5.9 ms, 1,039k triangles | 176 fps, 5.7 ms, 1,125k triangles |
-| Whitby loads in (phone setting) | 23 s | 19 s |
-| Gorleston loads in (phone setting) | 19 s | 17 s |
+| Whitby loads in (phone setting), two runs each | 19 s, 23 s | 19 s, 19 s |
+| Gorleston loads in (phone setting), two runs each | 18 s, 19 s | 17 s, 19 s |
 | Placing the scrub, on the PC | | 0.07 s |
 
 No cost that these runs can tell on the phone setting. On Ultra the PC's own frame rate swung between 51 and 92 frames
 a second from run to run that night, live build and new alike, with the game's resolution scale at a different step
-each time, so no Ultra figure is given: the scrub adds about 60,000 triangles to a frame of 6.4 million at Whitby.
+each time, so no Ultra figure is given: the scrub and the far trees' second faces add about 60,000 triangles to a frame of 6.4 million at Whitby.
 
 Not done in this step: the bushes are painted cards, and from closer than about 8 m they look it; nothing new grows
 in the joints of paving or at the foot of walls on the phone setting; the grass blades still stop at 12 m there; trees
