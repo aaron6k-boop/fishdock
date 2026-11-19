@@ -734,7 +734,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // (where the place has its photographed grass (local.cliff), the lawns are that too, not the drawn turf)
               vec2 wq = vWPos.xz; vec3 q1 = texture2D(uClG, wq / uClK.y).rgb, q2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wq / (uClK.y * 3.7) + 0.31).rgb;
               float ql = dot(mix(q1, q2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02);
-              vec3 grass = vColor.rgb * 0.95 * mix(clamp(pow(ql, 0.75), 0.45, 1.7), 1.0, smoothstep(60.0, 260.0, length(vViewPosition)) * 0.6) * (0.9 + 0.2 * fdDN(wq / 19.0));
+              vec3 grass = vColor.rgb * 0.95 * mix(clamp(ql, 0.35, 2.0), 1.0, smoothstep(60.0, 260.0, length(vViewPosition)) * 0.6) * (0.9 + 0.2 * fdDN(wq / 19.0));
             #else
               // turf at two scales (2 m and about 7 m) so the blades don't repeat visibly across a lawn; the tint is the ground's
               vec2 tuv = vRufUv * 4.0;
@@ -760,8 +760,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               vec2 wp = vWPos.xz; float dist = length(vViewPosition);
               vec3 g1 = texture2D(uClG, wp / uClK.y).rgb, g2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wp / (uClK.y * 3.7) + 0.31).rgb;
               float gl = dot(mix(g1, g2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02); // (over the photograph's own average)
-              vec3 grassC = vColor.rgb * mix(clamp(pow(gl, 0.75), 0.45, 1.7), 1.0, smoothstep(60.0, 260.0, dist) * 0.6) * (0.86 + 0.28 * fdDN(wp / 23.0));
-              grassC = mix(grassC, grassC * vec3(0.62, 0.6, 0.52), smoothstep(0.6, 0.72, fdDF(wp / 17.0 + 9.0)) * 0.7);
+              vec3 grassC = vColor.rgb * mix(clamp(gl, 0.35, 2.0), 1.0, smoothstep(60.0, 260.0, dist) * 0.6) * (0.86 + 0.28 * fdDN(wp / 23.0));
+              // (patches of darker, browner scrub, broken up, not a stain)
+              grassC = mix(grassC, grassC * vec3(0.74, 0.72, 0.6), smoothstep(0.62, 0.74, fdDF(wp / 17.0 + 9.0) + (fdDN(wp / 3.1) - 0.5) * 0.18) * 0.6);
               // the rock: the photograph laid from the three sides, each weighted by how squarely the ground faces it
               vec3 an = pow(abs(vWNrm), vec3(4.0)); an /= (an.x + an.y + an.z); fdTriW = an;
               // (at two scales, the second turned and three times the size, so the photograph's tile doesn't show as a
@@ -840,7 +841,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             // tilt in screen axes lit the grass as crumpled paper)
             float far = smoothstep(30.0, 140.0, length(vViewPosition));
             vec3 gn = texture2D(uClGN, vWPos.xz / uClK.y).xyz * 2.0 - 1.0;
-            vec3 nw = vWNrm + vec3(gn.x, 0.0, -gn.y) * 0.28 * (1.0 - fdRock) * (1.0 - far);
+            vec3 nw = vWNrm + vec3(gn.x, 0.0, -gn.y) * 0.55 * (1.0 - fdRock) * (1.0 - far);
             vec3 rz = texture2D(uClRN, vWPos.xy / uClK.x).xyz * 2.0 - 1.0, rx = texture2D(uClRN, vWPos.zy / uClK.x).xyz * 2.0 - 1.0;
             vec3 rw = vec3(rz.x, rz.y, 0.0) * fdTriW.z + vec3(0.0, rx.y, rx.x) * fdTriW.x;
             nw += rw * 0.9 * fdRock * (1.0 - far * 0.6);
