@@ -7,7 +7,8 @@ import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { createFpRig, castAt, rodFrame, holdView, holdMade, rigP0, bodyUp, profileAt } from "../src/lib/world3d/fpRig.js";
+import { createFpRig, castAt, rodFrame, holdView, holdMade, rigP0, bodyUp, profileAt, CAST_FOLLOW } from "../src/lib/world3d/fpRig.js";
+import { FP_FIGHT } from "../src/lib/world3d/angler.js";
 import { handleProfile, HANDLE_PROFILE, KNOB_PROFILE } from "../src/lib/world3d/rodKit.js";
 import { RIG } from "../src/lib/world3d/fpRigData.js";
 import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "../src/lib/world3d/fpIk.js";
@@ -257,17 +258,37 @@ test("the resting hold: the rod across the view with its tip in the picture, bot
   }
 });
 
+test("playing a fish: the rod where you hold it, pumped up, dragged down and across by a run, both wrists inside their range, no arm locked straight", () => {
+  // (angler.js: the fight's angle is the resting hold's, FP_FIGHT on top; a pump lifts the rod FP_FIGHT.pump, a surge drags it
+  // down FP_FIGHT.surge, a run takes it FP_FIGHT.run to the right or FP_FIGHT.left to the left; the hands go 5.5 cm out with a surge and FP_FIGHT.pumpIn in with a pump, from FP_FIGHT.in nearer than the resting hold)
+  const hv = holdView(); let worst = 0, worstElbow = 0, lowest = 9, where = "";
+  // (a surge: the rod down, the hands out; a pump: the rod up, the hands in; and between)
+  for (const [de, out] of [[-FP_FIGHT.surge, 0.055], [-FP_FIGHT.surge, 0], [-0.1, 0.03], [0, 0], [0.08, -FP_FIGHT.pumpIn / 2], [FP_FIGHT.pump, -FP_FIGHT.pumpIn], [FP_FIGHT.pump, 0]]) for (const dsw of [-FP_FIGHT.left, 0, FP_FIGHT.run]) for (const pitch of [rigP0(), -0.3]) {
+    const dz = out - FP_FIGHT.in, key = { x: hv.x, y: hv.y - Math.max(0, out) * 0.4, z: hv.z + dz, e: hv.e - FP_FIGHT.de + de, sw: hv.sw + FP_FIGHT.sw + dsw };
+    const P = place(pitch, key);
+    pose(P, [crankSpec(P, TURN[0]), seatSpec(P)], 40);
+    for (const S of ["L", "R"]) {
+      const A = R.arm[S], w = wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC[S], S);
+      if (limitsPen(w) > worst) { worst = limitsPen(w); where = `${S} at ${de}, out ${out}, across ${dsw}, pitch ${pitch.toFixed(2)}: ${JSON.stringify(w, (k, v) => (typeof v === 'number' ? Math.round(v) : v))}`; } worstElbow = Math.max(worstElbow, w.elbow);
+    }
+    lowest = Math.min(lowest, key.e);
+  }
+  assert.ok(lowest > 0.3, `the rod never below ${lowest.toFixed(2)} radians up from the view's line (it pointed under it, and far left, on 19 November)`);
+  assert.ok(worst < 1.6, `the wrists at most ${worst.toFixed(2)} outside their range (the gates' measure; 1 is the edge of the natural range, a fish dragging the rod over takes them a little past it): ${where}`);
+  assert.ok(worstElbow < 172, `no arm locked straight: ${worstElbow.toFixed(0)} degrees`);
+});
+
 test("the cast: both hands on the rod all the way through, arms never stretched, wrists inside their range", () => {
   let worstR = 0, worstL = 0, worstLen = 0, worstPen = 0;
   for (let t = 0; t <= 2.4 + 1e-9; t += 1 / 24) {
     const key = castAt(t);
     const P = place(rigP0(), key), butt = P.reel.clone().addScaledVector(P.dir, -META.seat), a = butt.clone().addScaledVector(P.dir, 0.065);
-    const left = t < 1.95 ? { at: a, axis: P.dir.clone(), palm: V(1, 0.2, 0), kind: "butt", sock: { pos: a.clone(), quat: rodFrame(P.dir, P.rest, bodyUp(P.vf, P.vu)) } } : crankSpec(P, TURN[0]);
+    const left = t < CAST_FOLLOW.leftToReel ? { at: a, axis: P.dir.clone(), palm: V(1, 0.2, 0), kind: "butt", sock: { pos: a.clone(), quat: rodFrame(P.dir, P.rest, bodyUp(P.vf, P.vu)) } } : crankSpec(P, TURN[0]);
     pose(P, [left, seatSpec(P)], 12, t);
     worstR = Math.max(worstR, at(R.arm.R.H).distanceTo(P.reel.clone().add(V(...RIG.seat.p).applyQuaternion(P.rq))));
     worstL = Math.max(worstL, rig.shortfall[0]);
     worstLen = Math.max(worstLen, lengthsKept("L"), lengthsKept("R"));
-    for (const S of ["R", ...(t < 1.95 ? ["L"] : [])]) { const A = R.arm[S]; worstPen = Math.max(worstPen, limitsPen(wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC[S], S))); }
+    for (const S of ["R", "L"]) { const A = R.arm[S]; worstPen = Math.max(worstPen, limitsPen(wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC[S], S))); }
   }
   assert.ok(worstPen < 1, `the wrists and elbows at most ${worstPen.toFixed(2)} outside their range (the gates' measure)`);
   assert.ok(worstR < 0.045, `right hand's wrist within 4.5 cm of where the grip was made (it gives to the lowered rod at the cast's start and end): ${worstR}`);

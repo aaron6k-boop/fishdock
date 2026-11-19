@@ -149,6 +149,10 @@ export function toView(k, p0 = P0) {
 // hands where they were. The winding hand keeps its angle on the knob (pose: holdTurn), so the arms sit as they did)
 const SEAT_GIVE = 0.5;
 const REST_E = 0.6, REST_SW = -0.3, REST_UP = 0.035, REST_OUT = 0.04; // (and the reel 3.5 cm higher and 4 cm further out, where the lowered reel's knob and the hand on it are back in the picture)
+// (the follow-through from the resting hold: the rod 11 degrees higher, a little less across, the reel 6 cm nearer (the
+// body has gone back with the cast: at the hold's own distance both elbows locked straight); the hands give to the rod
+// again from 0.95 s, over 0.3 s; the left hand leaves the butt for the reel's handle at leftToReel)
+export const CAST_FOLLOW = { e: 0.2, sw: 0.06, z: -0.06, from: 0.95, over: 0.3, leftToReel: 1.0 };
 /** the hold as Blender made it (the grips' own), in the view's frame */
 export const holdMade = () => toView(RIG.holdBody);
 export const holdView = () => { const k = toView(RIG.holdBody); return { x: k.x, y: k.y + REST_UP, z: k.z + REST_OUT, e: REST_E, sw: REST_SW }; };
@@ -157,7 +161,12 @@ export const holdView = () => { const k = toView(RIG.holdBody); return { x: k.x,
  * places it: a smooth curve through Gate 3's moments, still at the hold, at the top of the wind-up and through the
  * follow-through. k0: the hold it starts from and goes back to (the game's own, holdView() unless a film sets another) */
 export function castAt(t, k0 = holdView()) {
-  const path = RIG.cast.path, n = path.length, T = path.map((k) => k.t), P = path.map((k, i) => (i === 0 || i === n - 1 ? k0 : toView(k))), still = new Set(RIG.cast.still);
+  // (the follow-through, the two keys before the last, while the lead flies and until it is down: the resting hold with
+  // the rod a little higher, pointing after the line. As Blender made it, 69 degrees up and dead
+  // ahead, the rod stood upright in the middle of the screen for a second and more after every cast: the footage on
+  // Aaron's PC, 19 November)
+  const follow = { x: k0.x, y: k0.y, z: k0.z + CAST_FOLLOW.z, e: k0.e + CAST_FOLLOW.e, sw: k0.sw + CAST_FOLLOW.sw };
+  const path = RIG.cast.path, n = path.length, T = path.map((k) => k.t), P = path.map((k, i) => (i === 0 || i === n - 1 ? k0 : i >= n - 3 ? follow : toView(k))), still = new Set(RIG.cast.still);
   t = clamp(t, 0, T[n - 1]); let i = 0; while (i < n - 2 && t > T[i + 1]) i++;
   const tan = (k, c) => (still.has(k) ? 0 : (P[k + 1][c] - P[k - 1][c]) / (T[k + 1] - T[k - 1]));
   const h = T[i + 1] - T[i], u = (t - T[i]) / h, h00 = 2 * u ** 3 - 3 * u ** 2 + 1, h10 = u ** 3 - 2 * u ** 2 + u, h01 = -2 * u ** 3 + 3 * u ** 2, h11 = u ** 3 - u ** 2;
@@ -754,7 +763,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       // cast, whose own moments were made and checked in Blender with the grips as they are: eased out over its first
       // quarter of a second and back in over its last three tenths)
       const castEnd = RIG.cast.path[RIG.cast.path.length - 1].t;
-      const giveK = o.castT == null ? 1 : clamp(Math.max(1 - o.castT / 0.25, (o.castT - (castEnd - 0.3)) / 0.3), 0, 1);
+      const giveK = o.castT == null ? 1 : clamp(Math.max(1 - o.castT / 0.25, (o.castT - CAST_FOLLOW.from) / CAST_FOLLOW.over), 0, 1);
       const turned = giveK > 0 && !!o.holdTurn && 2 * Math.acos(Math.min(1, Math.abs(o.holdTurn.w))) > 0.08;
       // ---- 1. the base clip ----
       R.clips.hold.apply(1 / RIG.fps);

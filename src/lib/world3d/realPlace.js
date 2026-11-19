@@ -79,15 +79,6 @@ function stoneWall(st, h, part = "wall") {
   const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1.2, 1.2), color: st.tint ?? 0xf0d8ac, roughness: 0.93 });
   return weather(m, { scale: 0.55, mottle: 0.35, grime: [WALL_BOTTOM, 1.1, 0.75], streaks: [h, 3.5, 0.3], rough: [0.9, 1.1] });
 }
-// a box's faces mapped at world scale, each in its own plane (for a tiling texture laid at its real size)
-function worldUV(geo) {
-  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
-  for (let i = 0; i < p.count; i++) {
-    const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
-    if (ny >= nx && ny >= nz) uv.setXY(i, p.getX(i), p.getZ(i)); else if (nx >= nz) uv.setXY(i, p.getZ(i), p.getY(i)); else uv.setXY(i, p.getX(i), p.getY(i));
-  }
-  uv.needsUpdate = true; return geo;
-}
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
 const RAIL = { within: 260, inset: 0.22, h: 1.1, post: 2.0 };
@@ -1227,19 +1218,34 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const stoneWalls = local?.stone?.kit === "whitby", WT = stoneWalls ? 2.4 : 1.5;
     const wallPh = photoTex(stoneWalls ? "whitby_ashlar_diff" : "brick_red_diff"), wallPhN = wallPh && photoTex(stoneWalls ? "whitby_ashlar_nor" : "brick_red_nor", { srgb: false });
     const okHere = (mx, mz) => !(nearSpot(mx, mz, 25) || !landAt([mx, mz]) || PR.some((bx) => inB([mx, mz], bx)));
+    // (each run follows the ground: cut into lengths of 2.5 m or less, each one's foot and top sloping with the ground
+    // between its ends and its foot sunk 0.35 m. As one level box from the lower end's ground to the higher end's top,
+    // a wall running down a bank stood as a dark slab many metres tall: the East Cliff's on Aaron's phone, 19 November)
+    const SUNK = 0.35;
     for (const b of (local?.generated === false ? [] : place.barriers || [])) {
       for (let k = 0; k + 1 < b.line.length; k++) {
-        const [x1, z1] = b.line[k], [x2, z2] = b.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
-        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2; if (!okHere(mx, mz)) continue;
-        const y1 = groundAt(x1, z1) || LAND, y2 = groundAt(x2, z2) || LAND, y0 = Math.min(y1, y2), top = Math.max(y1, y2) + b.h, ang = -Math.atan2(z2 - z1, x2 - x1);
-        const box = (w, h, d, dy, bucket, uvScale) => { const g2 = new THREE.BoxGeometry(w, h, d); if (uvScale) { const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uvScale[0], uv.getY(i) * uvScale[1]); } g2.translate(0, dy + h / 2, 0); g2.rotateY(ang); g2.translate(mx, y0 - 0.02, mz); bucket.push(g2); };
-        if (b.kind === "hedge") box(len + 0.05, top - y0, 0.8, 0, parts.hedge);
-        else if (b.kind === "fence") { // close-boarded panels between posts (the common garden fence)
-          box(len + 0.02, top - y0, 0.035, 0.08, parts.fence, [len / 1.8, (top - y0) / 1.8]);
-          for (let q = 0; q <= len; q += 1.8) { const f = q / len, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f; const g2 = new THREE.BoxGeometry(0.1, top - y0 + 0.08, 0.1); g2.translate(0, (top - y0 + 0.08) / 2, 0); g2.translate(px, y0 - 0.02, pz); parts.post.push(g2); }
-        } else { // a brick wall with a coping on top
-          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, wallPh ? [len / WT, (top - y0) / WT] : [len / 0.9, (top - y0) / 0.6]); // (the drawn brick tile is four bricks by eight courses: 0.9 m by 0.6 m; the photographs' tiles are WT)
-          box(len + 0.07, 0.07, 0.3, top - y0 - 0.06, parts.coping);
+        const [xa, za] = b.line[k], [xb, zb] = b.line[k + 1], run = Math.hypot(xb - xa, zb - za); if (run < 0.3) continue;
+        if (!okHere((xa + xb) / 2, (za + zb) / 2)) continue;
+        const ang = -Math.atan2(zb - za, xb - xa), nP = Math.max(1, Math.ceil(run / 2.5));
+        for (let q = 0; q < nP; q++) {
+          const f1 = q / nP, f2 = (q + 1) / nP, x1 = xa + (xb - xa) * f1, z1 = za + (zb - za) * f1, x2 = xa + (xb - xa) * f2, z2 = za + (zb - za) * f2, len = run / nP;
+          const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, y1 = groundAt(x1, z1) || LAND, y2 = groundAt(x2, z2) || LAND, H = b.h;
+          // (a box w long, h tall and d thick, its foot dy above the ground, leaning with the ground from y1 to y2)
+          const box = (w, h, d, dy, bucket, uvScale, sunk = 0) => {
+            const g2 = new THREE.BoxGeometry(w, h + sunk, d);
+            if (uvScale) { const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uvScale[0], uv.getY(i) * uvScale[1]); }
+            const P = g2.attributes.position;
+            for (let i = 0; i < P.count; i++) P.setY(i, P.getY(i) + dy + (h - sunk) / 2 + y1 + (P.getX(i) / w + 0.5) * (y2 - y1));
+            g2.rotateY(ang); g2.translate(mx, -0.02, mz); g2.computeVertexNormals(); bucket.push(g2);
+          };
+          if (b.kind === "hedge") box(len + 0.05, H, 0.8, 0, parts.hedge, null, SUNK);
+          else if (b.kind === "fence") { // close-boarded panels between posts (the common garden fence)
+            box(len + 0.02, H, 0.035, 0.08, parts.fence, [len / 1.8, H / 1.8]);
+            for (let d = 0; d <= len + 0.01; d += 1.8) { const f = d / len, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f, py = y1 + (y2 - y1) * f; const g2 = new THREE.BoxGeometry(0.1, H + 0.08 + SUNK, 0.1); g2.translate(px, py - 0.02 + (H + 0.08 - SUNK) / 2, pz); parts.post.push(g2); }
+          } else { // a wall with a coping on top
+            box(len + 0.05, H - 0.06, 0.24, 0, parts.wall, wallPh ? [len / WT, H / WT] : [len / 0.9, H / 0.6], SUNK); // (the drawn brick tile is four bricks by eight courses: 0.9 m by 0.6 m; the photographs' tiles are WT)
+            box(len + 0.07, 0.07, 0.3, H - 0.06, parts.coping);
+          }
         }
       }
     }
@@ -1711,13 +1717,26 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       // deck (Whitby's piers: the photographs along them), in the same stone
       if (local?.stone?.coping) {
         const cg = [], C = local.stone.coping;
+        // (each coping stone one whole block of the wall's stonework, the full depth of the course, its joints square
+        // to the edge: laid by the world's axes as the walls are, the course was cut from the blocks at whatever
+        // angle the pier ran, two part-rows with skewed joints. row: the height of a course in the kit's tile, 0.48 m
+        // of Whitby's 2.4 m; the stones drawn C.d / row times their size, 1.2 to 2.2 m long)
+        const row = C.row ?? 0.48, ks = row / C.d; let along = 0;
+        const copeUV = (g2, len) => {
+          const P = g2.attributes.position, N = g2.attributes.normal, uv = g2.attributes.uv;
+          for (let i = 0; i < P.count; i++) {
+            const top = Math.abs(N.getY(i)) > 0.5, end = Math.abs(N.getX(i)) > 0.5;
+            uv.setXY(i, (along + (end ? P.getZ(i) : P.getX(i) + len / 2)) * ks, row * (1 + (top || end ? P.getZ(i) / C.d + 0.5 : P.getY(i) / C.h + 0.5)));
+          }
+          along += len; return g2;
+        };
         for (let k = 0; k < ring.length; k++) {
           const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
           let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
           if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) { nx = -nx; nz = -nz; }
           if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) continue;
-          const g2 = new THREE.BoxGeometry(len + C.d * 0.9, C.h, C.d); g2.rotateY(-Math.atan2(z2 - z1, x2 - x1));
-          g2.translate(mid[0] - nx * (C.d / 2 - C.out), p.h + C.up - C.h / 2, mid[1] - nz * (C.d / 2 - C.out)); cg.push(worldUV(g2));
+          const g2 = copeUV(new THREE.BoxGeometry(len + C.d * 0.9, C.h, C.d), len); g2.rotateY(-Math.atan2(z2 - z1, x2 - x1));
+          g2.translate(mid[0] - nx * (C.d / 2 - C.out), p.h + C.up - C.h / 2, mid[1] - nz * (C.d / 2 - C.out)); cg.push(g2);
         }
         if (cg.length) {
           const cm = new THREE.Mesh(mergeGeometries(cg), stoneSide); cg.forEach((q) => q.dispose());
