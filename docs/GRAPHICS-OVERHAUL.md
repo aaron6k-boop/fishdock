@@ -111,19 +111,26 @@ case, a first visit). Time the picture stood still, frames over 100 ms added up:
 | | Before (main) | After |
 |---|---|---|
 | Wide screen, Ultra: looking round at rest | 0.3 s | 0 |
-| first catch | 43.8 s in 16 stops, the longest 22 s | 3.8 s in 3 stops, the longest 2.9 s |
-| second catch | 1.1 s | 0.1 s |
-| walking off, then rain | 5.4 s | 1.6 s |
+| first catch | 43.8 s in 16 stops, the longest 22 s | 3.6 s in 3 stops, the longest 3.3 s |
+| second catch | 1.1 s | 1.1 s |
+| walking off, then rain | 5.4 s | 2.2 s |
 | Phone-shaped, Balanced: looking round at rest | 12.9 s in 5 stops | 0 |
-| first catch | 19.7 s in 12 stops, the longest 4.2 s | 5.3 s in 5 stops, the longest 4.1 s |
-| second catch | 0 | 0.5 s |
-| walking off, then rain | 4.4 s | 1.6 s |
+| first catch | 19.7 s in 12 stops, the longest 4.2 s | 3.6 s in 3 stops, the longest 1.8 s |
+| second catch | 0 | 1.1 s |
+| walking off, then rain | 4.4 s | 2.4 s |
 
-Frame rate at rest in the same runs: wide 83 before, 81 after; phone-shaped 168, then 158. The lamps' light is now
-worked out by day as well, at nothing; that is the likely cost, and it is within what one run differs from the next
-on the wide screen but not on the phone-shaped one.
+The after column is the build that was merged (run h270 on the PC); two earlier runs of the same fixes gave 3.8 and
+5.3 s for the first catch.
 
-Still there: one stop of three to four seconds the first time a landed fish is held up for a look ("fish inspect"). No
+Frame rate, from the game's meter in these and the filmed runs. Phone-shaped at rest: 165 to 175 before, 158 to 179
+after. Wide in rain, late in each run: 85 to 88 before, 77 to 91 after. Wide at rest, read a few seconds after the
+place appears: 83 to 86 before, 70 to 83 over seven runs after. That last reading is lower and more scattered than it
+was. Late shaders are now built in the background for some seconds after the place appears instead of stopping the
+page, which may be what pulls it down; that is not confirmed. A change to pass over lamps that are off in the light
+loop was tried for it and taken out again: it showed no gain.
+
+Still there: one stop of one and a half to three and a half seconds the first time a landed fish is held up for a look
+("fish inspect"). No
 script or graphics call on the page is waiting during it; the time is in the browser's own graphics process. Not found.
 
 ### Hands
@@ -151,7 +158,8 @@ now load the page again once when that happens (`src/lib/staleReload.js`).
 
 ### Still wrong after stage 3
 
-- The stop when a fish is first held up (above).
+- The stop when a fish is first held up, and the wide screen's lower reading at rest (both above).
+- The leap's zoom is in but not yet seen: no fish leapt in the filmed catches.
 - The hands are the same model: its shapes are sound but its fingers are thick and its grip on the rod is loose (the
   first two fingers of the right hand).
 - In the cast's wind-up your left sleeve still fills the lower left of the picture for about half a second.
