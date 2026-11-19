@@ -256,11 +256,14 @@ What walking in first person draws now is your own body, as everyone else sees i
 - **The whole body, less the head** (`human3d.js` setHeadless). Each of your meshes gets its own list of triangles
   with the head's at the end, drawn short of them; the sun's shadow pass draws the whole list, so your shadow keeps its
   head. A hat and glasses go the same way. Nothing is scaled or hidden by a shader, and no new shader is built.
-- **The camera is at the model's eyes** and turns about the neck: looking down brings your eyes forward and down over
-  your chest (`world.js` NECK_EYE), as tucking your chin does, instead of looking into your own collar.
-- **You can look down at yourself.** At your eyes the view tips from 83 degrees down to 52 up (`look.js` EYES_PITCH; it
+- **The camera is at the model's eyes** and turns a little about the neck: looking down brings your eyes a few
+  centimetres forward and down (`world.js` NECK_EYE). A real head's 9 cm and 12 cm were tried first and brought the
+  camera down to the collar, where the near edge of the view cut through the front of the jackets that stand proud of
+  the chest (seen as torn cloth on the people in orange, h295), so it is kept small.
+- **You can look down at yourself.** At your eyes the view tips from 69 degrees down to 52 up (`look.js` EYES_PITCH; it
   was 43 down, 6 up, the range that suits the camera behind you) and stays where you leave it. Looking down you see
-  your chest, your free hand swinging, your legs and wellies, and the reel at your side.
+  your chest, your free hand swinging, your legs and wellies, and the reel at your side. No steeper than 69: past
+  that the bottom of the picture looks back into your own collar, where your neck ends.
 - **Where you look is yours.** The camera no longer comes round after your body in first person (it turned you in a
   circle when you pushed the stick sideways). Standing, your body comes round after your look once your head has
   turned about 45 degrees, at 3.2 radians a second. Pull the stick back and you back away at
@@ -275,14 +278,36 @@ What walking in first person draws now is your own body, as everyone else sees i
   every part of every such person was struck off (job h288 listed them: ten meshes, none casting). A person's meshes
   are now never struck off. This is for everyone you can see, in every view.
 
-Seen on the PC (jobs h284 to h287; a phone-shaped screen on the phone setting at Gorleston, a wide one on Ultra at
+Seen on the PC (jobs h284 to h298; a phone-shaped screen on the phone setting at Gorleston, a wide one on Ultra at
 Whitby): standing, walking, jogging and sprinting looking ahead and down; a look to the side; the body coming round;
 backing away; a sideways push; back to the fishing spot (the fishing view's arms return); and from behind, where the
-head is there as before. No page errors.
+head is there as before. Then as five people (h298): the bearded angler, the woman angler at two builds, the angler
+in the fishing jacket and the man with stubble at the slight build, each standing, walking and jogging, looking ahead
+and down. Your shadow lies on the ground ahead of you with its head on. No page errors. (Three of some forty runs
+came up as a blank page that never loaded, each a different person and each fine when run again: the filming
+harness, which has done it before on older builds.)
+
+What it costs, measured on the PC with the live build and this one run in turn, twice (jobs h291 to h294; the PC was
+running slower that evening than in the afternoon for both, so only readings from the same hour are compared):
+
+| Standing in the walking view | Live build | This build |
+| --- | --- | --- |
+| Phone-shaped, phone setting, first person: GPU time a frame | 5.9 to 6.5 ms | 4.9 to 6.7 ms |
+| the same: draws a frame | 149 to 171 | 171 to 191 |
+| Phone-shaped, phone setting, from behind: GPU time a frame | 5.2 to 6.4 ms | 5.7 to 6.4 ms |
+| the same: draws a frame | 207 to 227 | 217 to 237 |
+| Wide, Ultra, first person: frames a second | 52 to 60 at 1.5x and 1.75x | 49 to 57 at 2x |
+
+So about twenty more draws a frame for your body and its shadow, and no difference in GPU time that these runs can
+tell from their own scatter. On Ultra the game's own resolution scale settled at a different step in each run, so the
+GPU times are not comparable there; the frame rate held about level at the higher scale. With the body's shadow
+switched on and off in one session (h290) the GPU time moved by less than the scatter between readings.
 
 Not done: fishing in first person still draws only your arms (look down while fishing and there is no body); your feet
 slide a little when your body comes round on the spot faster than the turning steps; backing away uses the walk run
-backwards, not a filmed backwards walk; the woman and the other builds were not filmed in this view.
+backwards, not a filmed backwards walk; at the steepest look down the collar of some jackets shows a ragged edge at
+the very bottom of the picture, and the jackets are plainly faceted that close; the woman with her hair tied back
+(f09) and the other eleven people were not filmed in this view.
 
 ## The phases, and where each stands
 

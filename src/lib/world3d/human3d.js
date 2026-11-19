@@ -1180,6 +1180,9 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     for (const hp of headParts) {
       hp.m.onBeforeShadow = () => { if (headless) hp.g2.setDrawRange(0, hp.all ?? Infinity); };
       hp.m.onAfterShadow = () => { if (headless) hp.g2.setDrawRange(0, hp.n); };
+      // (and whole in the water's mirror and a wet deck's: your reflection keeps its head too)
+      const was = hp.m.onBeforeRender;
+      hp.m.onBeforeRender = function (r, sc, cam) { was.apply(this, arguments); if (headless) hp.g2.setDrawRange(0, cam?.userData?.fdMirror ? hp.all ?? Infinity : hp.n); };
     }
     return headParts;
   };

@@ -457,7 +457,10 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
   // looks from (eased, so a step up or a jump doesn't jolt it), the footsteps' stride, and a glide between views ----
   let followAt = 0, pivotY = null, pivotXZ = null, gait = { d: 0 }, camBlend = null, clockT = 0; // (clockT: the scene's clock, so a filmed glide is exact)
   const WALK_FOV = 62;
-  const NECK_EYE = [0.1, 0.17]; // your eyes from the joint your head nods on: metres forward, metres up
+  // (your eyes from the joint your head nods on, metres forward and up: small on purpose. With a real head's 9 cm and
+  // 12 cm the camera came down to the collar when you looked at your feet, and the near edge of the view cut through
+  // the jacket's front on the people whose jackets stand proud of the chest: seen as torn orange cloth, h295)
+  const NECK_EYE = [0.03, 0.06];
   // (first person on an upright phone: the view is narrow across, 37 degrees at the old 1.15, and your own hands, a
   // forearm's length from your eye, filled a third of it and looked enormous. Wider, they take the share of the view
   // they do of your own, and more of the pier shows either side)
@@ -602,7 +605,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
           pos.x += W.lead[0]; pos.z += W.lead[1]; pos.y += W.lead[2]; }
         // (looking down or up turns your head on your neck, and your eyes are in front of and above that joint: looking
         // down at yourself they come forward and down, over your chest, rather than staying above your collar)
-        { const a = Math.max(-1.0, Math.min(1.15, -pitch)), f = NECK_EYE[0] * (Math.cos(a) - 1) + NECK_EYE[1] * Math.sin(a), u = NECK_EYE[1] * (Math.cos(a) - 1) - NECK_EYE[0] * Math.sin(a);
+        { const a = Math.max(-1.0, Math.min(1.2, -pitch)), f = NECK_EYE[0] * (Math.cos(a) - 1) + NECK_EYE[1] * Math.sin(a), u = NECK_EYE[1] * (Math.cos(a) - 1) - NECK_EYE[0] * Math.sin(a);
           pos.x += Math.sin(yaw) * f; pos.z -= Math.cos(yaw) * f; pos.y += u; }
         if (!reduceMotion) { const sx = Math.cos(yaw), sz = Math.sin(yaw), w = Math.sin(ph * 0.5) * 0.02 * sp; pos.x += sx * w; pos.z += sz * w; }
         anglers.get(localId)?.a.setFirstPerson(true);
