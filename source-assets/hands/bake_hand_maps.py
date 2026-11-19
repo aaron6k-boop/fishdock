@@ -202,10 +202,10 @@ def main(glb, out):
     # the back of the hand: tendons from each knuckle to the wrist and veins between them, soft swells in the light
     for bk in (0.03, 0.36, 0.68, 0.99):
         ln = backS * np.exp(-0.5 * (pdist([(0.95, bk), (0.5, 0.5 + (bk - 0.5) * 0.62), (0.08, 0.5 + (bk - 0.5) * 0.3)]) / (2.4 * mm)) ** 2) * smooth(0.05, 0.3, pa) * (1 - smooth(0.82, 1.0, pa))
-        H += 0.3 * mm * ln
+        H += 0.2 * mm * ln
     for poly in ([(0.02, 0.35), (0.2, 0.33), (0.35, 0.3), (0.52, 0.27), (0.7, 0.22)], [(0.02, 0.5), (0.2, 0.49), (0.4, 0.5), (0.56, 0.53), (0.72, 0.58)], [(0.05, 0.62), (0.25, 0.68), (0.45, 0.75), (0.6, 0.81), (0.75, 0.88)], [(0.4, 0.5), (0.5, 0.42), (0.6, 0.4), (0.74, 0.42)]):
         ln = backS * np.exp(-0.5 * (pdist([(a0, b0 + 0.03 * math.sin(a0 * 17 + b0 * 5)) for a0, b0 in poly]) / (1.5 * mm)) ** 2) * (0.5 + 0.5 * smooth(0.0, 0.3, pa)) * (1 - smooth(0.6, 0.8, pa))
-        H += 0.2 * mm * ln; A *= 1 - ln[:, None] * np.array([0.045, 0.02, -0.008])
+        H += 0.1 * mm * ln; A *= 1 - ln[:, None] * np.array([0.045, 0.02, -0.008])  # (0.2 mm stood up like cord on the PC's footage)
     # ---- skin everywhere: uneven colour, and its net of tiny creases (deeper and more open on the back of the hand) ----
     skin = 1 - nailAll
     blot = waves(p, 28 * mm, 10); mott = waves(p, 3.5 * mm, 22)
