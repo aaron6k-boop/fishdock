@@ -869,7 +869,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       sh.uniforms.uSand = { value: sandMap || rufMap }; sh.uniforms.uSandN = { value: sandNor || rufNor }; sh.uniforms.uSandW = { value: wetMap || rufMap }; sh.uniforms.uSandWN = { value: wetNor || rufNor };
       sh.uniforms.uSandK = { value: new THREE.Vector4(...(BP?.tint || [0.56, 0.46, 0.31]), BP?.tile || 3.5) }; sh.uniforms.uSandL = { value: new THREE.Vector3(BP?.lum || 0.283, BP?.lumWet || 0.122, BP?.tileWet || 2.2) };
       sh.uniforms.uClG = { value: clG || rufMap }; sh.uniforms.uClGN = { value: clGN || rufNor }; sh.uniforms.uClR = { value: clR || rufMap }; sh.uniforms.uClRN = { value: clRN || rufNor };
-      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, CL?.rockFaces?.[0] || 0, CL?.rockFaces?.[1] || 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
+      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, CL?.rockFaces?.[0] || 0, CL?.rockFaces?.[1] || 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClCap = { value: new THREE.Vector4(CL?.cap?.[0] || 0, ...(CL?.cap?.slice(1) || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; attribute float aSteep; attribute float aSoil; varying float vSoil; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;")
         .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vSteep = aSteep; vSoil = aSoil; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);");
       // (only the samplers this place uses are declared: with the sand's four, the cliff's four and the turf's two all in
@@ -895,7 +895,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           #ifdef FD_SAND
             uniform sampler2D uSand, uSandN, uSandW, uSandWN;
           #endif
-          uniform vec4 uSandK, uClK; uniform vec3 uSandL, uClRock; uniform float uClOn; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying float vSoil; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;
+          uniform vec4 uSandK, uClK, uClCap; uniform vec3 uSandL, uClRock; uniform float uClOn; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying float vSoil; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;
           float fdDuneH = 0.0, fdWet = 0.0, fdRock = 0.0; vec3 fdTriW = vec3(0.0, 1.0, 0.0);
           float fdDH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float fdDN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fdDH(i), fdDH(i + vec2(1.0, 0.0)), f.x), mix(fdDH(i + vec2(0.0, 1.0)), fdDH(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -999,7 +999,13 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               float bedY = vWPos.y + fdDN(wp / 40.0) * 3.0;
               float beds = fdDN(vec2(bedY * 0.62, (wp.x + wp.y) * 0.015)) * 0.65 + fdDN(vec2(bedY * 2.3, (wp.x + wp.y) * 0.05)) * 0.35; // (thick beds and thin ones within them)
               float runs = fdDN(vec2((wp.x - wp.y) * 0.35, vWPos.y * 0.04));
-              vec3 rockC = uClRock * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.7 + 0.52 * beds) * (1.0 - 0.1 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
+              // (local.cliff.cap: the rock above a level is another: Whitby's dark grey shale under buff sandstone, the
+              // join wavering a few metres along the face; and every three metres or so a ledge's shadow, a thin dark
+              // line under the harder beds)
+              vec3 rockT = uClRock;
+              if (uClCap.x > 0.0) rockT = mix(uClRock, uClCap.yzw, smoothstep(-1.2, 1.2, vWPos.y + (fdDN(wp / 23.0) - 0.5) * 6.0 - uClCap.x));
+              float lf = fract(bedY * 0.31 + fdDN(wp / 17.0) * 0.6), ledge = smoothstep(0.4, 0.47, lf) * (1.0 - smoothstep(0.5, 0.6, lf));
+              vec3 rockC = rockT * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.7 + 0.52 * beds) * (1.0 - 0.28 * ledge) * (1.0 - 0.1 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
               // (it shows through in ragged outcrops: the slope's steepness, broken up by noise at two scales)
               fdRock = smoothstep(0.4, 0.62, vSteep + (fdDF(wp / 11.0) - 0.5) * 0.6 + (fdDN(wp / 2.7) - 0.5) * 0.12);
               // (local.cliff.rockFaces: the way the sea faces, where the waves have bared the rock; slopes turned away
@@ -1071,7 +1077,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // (its edge ragged and fairly sharp, the grass breaking off at it as on a slip: blended softly over the 1 m
               // mesh it read from the harbour as brown smudges on a green baize)
               float se = (fdDN(vWPos.zy * 1.1) * tw.x + fdDN(vWPos.xz * 1.1) * tw.y + fdDN(vWPos.xy * 1.1) * tw.z) * 0.65 + (fdDN(vWPos.zy * 3.7) * tw.x + fdDN(vWPos.xz * 3.7) * tw.y + fdDN(vWPos.xy * 3.7) * tw.z) * 0.35;
-              tinted = mix(tinted, soilC, smoothstep(0.44, 0.68, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.36)); // (two scales of noise: one alone left the 1 m mesh's blocks showing)
+              // (where the cliff's own rock shows, the soil lies only in its gullies and on its ledges: over all of a steep
+              // face it made the East Cliff one smooth brown wall, the PC's footage of 19 November)
+              tinted = mix(tinted, soilC, smoothstep(0.44, 0.68, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.36) * (1.0 - 0.8 * fdRock)); // (two scales of noise: one alone left the 1 m mesh's blocks showing)
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
