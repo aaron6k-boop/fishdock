@@ -3,6 +3,7 @@
 // person (behind you), spectator (behind whoever you pick), cinematic (it chooses angles for bites, fights and
 // landings) and free look. Looking round never pauses the fishing. Quality: Performance, Balanced or High Quality,
 // chosen by Auto from the phone, and stepped down if frames run slow. Nothing is drawn while hidden.
+import { DETAIL } from "./detail.js";
 import * as THREE from "three";
 import { setThinPixel } from "./thinAA.js";
 import { checkScene } from "./sceneCheck.js";
@@ -110,6 +111,7 @@ export const CAMERA_MODES = [
 export function createWorld(canvas, { venue = "pier", quality = "balanced", shed = false, onSound, onFeel, reduceMotion = false, real = null, pano = null, trackJumps = true } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   setPeopleDetail(Q.q >= 2); // (High and Ultra: the people's full-detail textures)
+  DETAIL.ultra = Q === QUALITY3D.ultra; // (Ultra: the grass layer and the ground's clutter further out, detail.js)
   // (with post-processing the antialiasing is the post buffer's own MSAA, so the screen's would be wasted)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !Q.post, powerPreference: "high-performance" });
   // (three.js asks the graphics driver, after every shader it builds, whether it built and for its log: a question

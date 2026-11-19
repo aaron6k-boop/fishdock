@@ -13,6 +13,7 @@
 // - They thin out with distance, the last of them sinking into the ground at the edge of their reach.
 // Placement: the world is cut into 4 m squares, each with its own seed, worked out once and kept (so the grass is the
 // same each time you come back); as the camera moves, the squares within reach are copied into the one mesh.
+import { DETAIL } from "./detail.js";
 import * as THREE from "three";
 import { TEX_BASE } from "./textures3d.js";
 
@@ -30,7 +31,8 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
   if (quality < 1 || typeof document === "undefined") return null;
   // (a phone, on Balanced, a smaller patch and thinner: the cards are cut out of their picture, and on a phone's
   // graphics each layer of them over a pixel costs; a computer with a graphics card, on High and Ultra, the full)
-  const ultra = quality >= 2, reach = ultra ? 30 : 12, dens = ultra ? 15 : 5, cap = ultra ? 36000 : 6000;
+  // (Ultra: 30 m and thick; High: 20 m; Balanced, or a phone: 12 m and thinner)
+  const hi = quality >= 2, ultra = hi && DETAIL.ultra, reach = ultra ? 30 : hi ? 20 : 12, dens = ultra ? 15 : hi ? 10 : 5, cap = ultra ? 36000 : hi ? 16000 : 6000;
   // ---- one clump: two cards crossed, each the cell's width, 1 tall (the kind's height is set in the shader) ----
   // (three cards at 60 degrees: with two, seen from above, each clump showed as a cross)
   const P = [], N = [], UV = [], I = [], CN = [];
@@ -88,7 +90,13 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
         // (green blades take the ground's colour where they stand, their own light and dark kept; the flowers and the
         // dried blades, not green, keep their own)
         float fdG = clamp((fdTx.g - max(fdTx.r * 0.92, fdTx.b * 1.1)) * 9.0, 0.0, 1.0);
-        diffuseColor.rgb = mix(fdTx.rgb * 0.9, vTint * (fdL / ${atlas.lum.toFixed(3)}) * 0.85, fdG) * (1.0 + 0.14 * vGust * vUp);
+        // (the seed heads and dry blades taken halfway to their own grey: at full colour a slope of Yorkshire fog read as
+        // a field of lavender on Aaron's PC)
+        vec3 fdOwn = mix(vec3(fdL), fdTx.rgb, 0.5) * 0.8;
+        diffuseColor.rgb = mix(fdOwn, vTint * (fdL / ${atlas.lum.toFixed(3)}) * 0.8, fdG) * (1.0 + 0.14 * vGust * vUp);
+        // (darker towards the root, where the blades shade each other and the soil shows between them: lit evenly to
+        // the ground the cards read as pale cut-out combs from a few metres off)
+        diffuseColor.rgb *= mix(0.42, 1.04, smoothstep(0.0, 0.6, vUp));
         // (a blade is a few pixels wide: in the picture's smaller copies its alpha is raised, so it doesn't fade away)
         vec2 fdDx = dFdx(vMapUv * vec2(2048.0, 1024.0)), fdDy = dFdy(vMapUv * vec2(2048.0, 1024.0));
         diffuseColor.a *= fdTx.a * (1.0 + max(0.0, 0.5 * log2(max(dot(fdDx, fdDx), dot(fdDy, fdDy)))) * 0.3) * smoothstep(0.12, 0.42, vFace);`)
@@ -99,7 +107,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
           { float fdB = pow(max(0.0, dot(-normalize(vViewPosition), directionalLights[0].direction)), 3.0); reflectedLight.directDiffuse *= 1.0 + fdB * 0.9 * vUp; }
         #endif`);
   };
-  mat.customProgramCacheKey = () => "fdfield2";
+  mat.customProgramCacheKey = () => "fdfield3";
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.name = "fdGrassField"; mesh.castShadow = false; mesh.receiveShadow = true; mesh.noReflect = true; mesh.frustumCulled = false; mesh.count = 0;
   mesh.userData.kind = "grass"; mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

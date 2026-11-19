@@ -56,7 +56,7 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
   const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, metalness: 0, color: 0xffffff });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind; sh.uniforms.uWindDir = U.uWindDir;
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime, uWind; uniform vec2 uWindDir; attribute float aKind; attribute float aPhase; attribute vec2 aSlope;")
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime, uWind; uniform vec2 uWindDir; attribute float aKind; attribute float aPhase; attribute vec2 aSlope; varying float vUp;")
       .replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv.x = (vMapUv.x * 0.996 + 0.002 + aKind) * 0.25;")
       .replace("#include <begin_vertex>", `#include <begin_vertex>
         { vec3 fdO = (instanceMatrix * vec4(transformed.x, 0.0, transformed.z, 0.0)).xyz; transformed.y += dot(fdO.xz, aSlope) / max(length(instanceMatrix[1].xyz), 1e-3); } // (the foot along the slope)
@@ -64,12 +64,12 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
         float fdD = distance((modelMatrix * instanceMatrix[3]).xyz, cameraPosition);
         transformed *= smoothstep(${reach.toFixed(1)}, ${(reach * 0.62).toFixed(1)}, fdD);
         // (the wind: the tips swing most, the root not at all; a slow sway with the gusts and a quicker small shiver)
-        float up = clamp(position.y / ${CARD.toFixed(2)}, 0.0, 1.0); up *= up;
+        float up = clamp(position.y / ${CARD.toFixed(2)}, 0.0, 1.0); vUp = up; up *= up;
         float sway = (0.55 + 0.45 * sin(uTime * 0.8 + aPhase)) * sin(uTime * 1.9 + aPhase * 1.3) * uWind;
         vec2 wd = normalize(uWindDir + vec2(1e-4));
         vec3 wl = (vec4(wd.x, 0.0, wd.y, 0.0) * instanceMatrix).xyz; // (into the tuft's own axes)
         transformed += wl * up * (sway * 0.07 + uWind * 0.04) + vec3(0.0, 0.0, sin(uTime * 4.3 + aPhase * 2.7 + position.x * 9.0) * uWind * 0.012 * up);`);
-    sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>", `
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vUp;").replace("#include <map_fragment>", `
       vec4 fdTx = texture2D(map, vMapUv);
       float fdTl = dot(fdTx.rgb, vec3(0.3, 0.55, 0.15));
       // (the ground's colour (the instance's) times the blade's own light over the picture's mean, with a little of the
@@ -79,6 +79,7 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
       // mean swung the dry, straw-coloured tufts to pink)
       vec2 fdHue = clamp(fdTx.rg / max(vec2(fdTl), vec2(1e-3)) / vec2(${HUE_MEAN.slice(0, 2).map((v) => v.toFixed(3)).join(", ")}), 0.8, 1.25);
       diffuseColor.rgb *= 0.8 * (fdTl / ${LUM_MEAN.toFixed(3)}) * mix(vec3(1.0), vec3(fdHue, 1.0), 0.3);
+      diffuseColor.rgb *= mix(0.62, 1.03, smoothstep(0.0, 0.4, vUp)); // (darker at the root, as the grass layer, if less: a tuft's taller cards went to dark stars)
       // (a blade is a few pixels wide: in the picture's smaller copies, further off, it fades to a thin haze and the alpha
       // test would cut it away, so its alpha is raised with the copy's level)
       vec2 fdDx = dFdx(vMapUv * vec2(2048.0, 512.0)), fdDy = dFdy(vMapUv * vec2(2048.0, 512.0));
@@ -86,7 +87,7 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
       // (lit as the ground is, from either side: the cards' normals point up, and aren't turned over on their backs)
       .replace("#include <normal_fragment_begin>", "#include <normal_fragment_begin>\nnormal = normalize(vNormal); nonPerturbedNormal = normal;");
   };
-  mat.customProgramCacheKey = () => "fdtuft2";
+  mat.customProgramCacheKey = () => "fdtuft3";
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.name = "fdGrassTufts"; mesh.castShadow = false; mesh.receiveShadow = true; mesh.noReflect = true; mesh.frustumCulled = false;
   mesh.count = 0; mesh.userData.kind = "grass";

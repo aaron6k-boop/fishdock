@@ -601,7 +601,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   for (let k = 0; k < n * n; k++) {
     if (cls[k] !== 1 || bank[k] || dune[k] > 0.05 || inland) continue;
     const q = [X[k], Z[k]]; if (PR.some((b) => inB(q, b))) continue;
-    const w = nearestWall(X[k], Z[k]); if (w && w.d < 26) continue;
+    // (near a harbour wall the land is its quay, concrete; but not where it lies between a beach and a bank, as at the back
+    // of Whitby's Tate Hill Sands: drawn as the quay's concrete, its puddles shone white as snow on Aaron's PC)
+    const w = nearestWall(X[k], Z[k]);
+    if (w && w.d < 26) { const i = k % n; if (w.d < 5 || i < 1 || i > n - 2 || k < n || k >= n * n - n) continue; let soft = 0; for (const q of [k - 1, k + 1, k - n, k + n]) if (cls[q] === 2 || cls[q] === 3 || bank[q]) soft++; if (!soft) continue; }
     town[k] = 1; // (the streets draw their own tarmac and pavements over it, so no margin is kept for them)
   }
   // along every wall: a vertex on the water side within a cell of it moves onto the wall's line, at the deck's height;
@@ -883,6 +886,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             fdWet = 1.0 - smoothstep(reach - 0.12, reach + 0.04, vWPos.y);
             // (the sand's edge broken up by noise, not the ground grid's 3 m staircase)
             float sW = smoothstep(0.28, 0.72, vSand + (fdDN(wp / 2.3) - 0.5) * 0.55 + (fdDN(wp * 1.7) - 0.5) * 0.15);
+            // (never wet against the grass or the bank's foot: in a hollow at the back of the beach the wet film shone white
+            // as snow on Aaron's PC, though no wave reaches there)
+            fdWet *= 1.0 - smoothstep(0.04, 0.35, vGrass + vRuf);
             diffuseColor.rgb = mix(diffuseColor.rgb, mix(dry, wetC, fdWet), sW);
             fdWet *= sW;
           }
@@ -1011,11 +1017,28 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             }
             // (bare soil on the fine hillside, where its slope is steep or runs in a gully: Whitby's brown clay and shale,
             // the rough photograph's stones and hollows in it)
-            if (vSoil > 0.01) { vec3 soilC = mix(vec3(0.15, 0.115, 0.082), vec3(0.235, 0.185, 0.13), fdDN(vWPos.xz / 3.0)) * clamp(pow(lum / 0.06, 0.6), 0.5, 1.6); tinted = mix(tinted, soilC, clamp(vSoil * (0.75 + 0.5 * fdDN(vWPos.xz / 1.3)), 0.0, 1.0)); }
+            // (on a steep face the photograph is laid on each of the three planes and blended by the slope's facing, so it
+            // isn't smeared down the face in streaks; Whitby's earth, from the mud photograph taken towards its own grey)
+            if (vSoil > 0.01) {
+              vec3 tw = pow(abs(vWNrm), vec3(4.0)); tw /= tw.x + tw.y + tw.z;
+              // (its slow changes of tone on the three planes too: taken from above alone they ran down a steep face as stripes)
+              float sn3 = fdDN(vWPos.zy / 3.0) * tw.x + fdDN(vWPos.xz / 3.0) * tw.y + fdDN(vWPos.xy / 3.0) * tw.z;
+              float sm3 = fdDN(vWPos.zy / 1.3) * tw.x + fdDN(vWPos.xz / 1.3) * tw.y + fdDN(vWPos.xy / 1.3) * tw.z;
+              vec3 soilC = mix(vec3(0.15, 0.115, 0.082), vec3(0.235, 0.185, 0.13), sn3);
+              #ifdef FD_MUD
+                vec3 sp = texture2D(uMud, vWPos.zy / 2.2).rgb * tw.x + texture2D(uMud, vWPos.xz / 2.2).rgb * tw.y + texture2D(uMud, vWPos.xy / 2.2).rgb * tw.z;
+                float sl = dot(sp, vec3(0.3, 0.55, 0.15));
+                soilC *= clamp(pow(sl / 0.1, 0.75), 0.45, 1.8); // (the photograph averages 0.1 in linear light)
+                soilC = mix(soilC, mix(sp, vec3(sl) * vec3(1.1, 0.98, 0.82), 0.6) * 0.95, 0.35);
+              #else
+                soilC *= clamp(pow(lum / 0.06, 0.6), 0.5, 1.6);
+              #endif
+              tinted = mix(tinted, soilC, clamp(vSoil * (0.75 + 0.5 * sm3), 0.0, 1.0));
+            }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
         // (wet sand shines: a film of water over it)
-        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.46, fdWet);")
+        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.56, fdWet);")
         .replace("#include <normal_fragment_maps>", `vec3 fdFlatN = normal;
           #include <normal_fragment_maps>
           #ifdef FD_SAND
@@ -1053,7 +1076,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
           }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf17" + (BP ? "s" : "") + (grOn ? "g" : "") + (clOn ? "c" : "") + (mudOn ? "m" : "");
+    softMat.customProgramCacheKey = () => "fdruf18" + (BP ? "s" : "") + (grOn ? "g" : "") + (clOn ? "c" : "") + (mudOn ? "m" : "");
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
@@ -1157,7 +1180,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const mats = {
       wall: wallPh ? new THREE.MeshStandardMaterial({ map: wallPh, normalMap: wallPhN, roughness: 1, color: stoneWalls ? 0xd8cebd : 0xe8e2dc }) : new THREE.MeshStandardMaterial({ map: brick.map, normalMap: brick.normalMap, roughness: 1, color: 0xb8aa9c }),
       coping: new THREE.MeshStandardMaterial({ color: 0x8e8a82, roughness: 0.9 }),
-      fence: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.95, color: 0x9a8468 }),
+      fence: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.95, color: 0xb8ab94 }), // (weathered boards: at 0x9a8468 a fence in shade drew as a black slab across the houses behind)
       post: new THREE.MeshStandardMaterial({ color: 0x5f5244, roughness: 0.95 }),
       hedge: weather(new THREE.MeshStandardMaterial({ color: 0x2d4f22, roughness: 1 }), { scale: 0.6, mottle: 0.5 }),
     };
