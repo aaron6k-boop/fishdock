@@ -227,6 +227,22 @@ left and back at a jog. Upright at every pace; no page errors.
 Not done yet: the rod is still carried upright at the chest with the right forearm held still; only the man was
 filmed; slopes and steps were not; foot placement, turning on the spot and the third-person camera are as they were.
 
+### The phone's frame rate, first step (19 November): a lighter hillside on Balanced
+
+Measured on the phone setting on the PC (390x844 at 3x, Balanced, job h281), looking where the recording looks: 2.98
+million triangles a frame towards the town and never fewer than 2.2 million whichever way you look. Hiding one thing
+at a time: the 1 m hillside is 0.9 million of them (it is drawn three times a frame: the picture, the water's mirror
+and a depth pass), the grass 0.67 million, the chimney caps 96 thousand.
+
+The hillside is now drawn in 2 m squares on Balanced wherever four of its 1 m cells lie flat enough to make one (their
+shared edges straight within 3 cm, so no crack opens against 1 m neighbours); paths, walls and gullies keep their 1 m
+cells. Its own triangles: 298 thousand, then 132 thousand. A frame towards the town: 2.98 million, then 2.20 million.
+Seen on the PC at the phone's size: no cracks, the relief as before. Ultra and High are unchanged.
+
+What this does for Aaron's phone is not known until he reads its counter again: the PC's graphics card is not slowed
+by triangles the way a phone's is. Still to look at: the grass's 0.67 million, the chimney caps, and why nothing is
+left out of a frame when you look out to sea.
+
 ## The phases, and where each stands
 
 1. Graphics engine audit: not started as a written audit. Measured so far: Whitby on Ultra 76 to 85 frames a second.
