@@ -32,8 +32,10 @@ export function scrubSpots({ grassAt, yAt, roughAt = () => 1, avoid = () => fals
     const r0 = hash(i, j, seed), px = x + (hash(i, j, seed + 1) - 0.5) * step, pz = z + (hash(i, j, seed + 2) - 0.5) * step;
     const rough = roughAt(px, pz); if (rough > 1.5) continue;
     const thick = noise(px / 38, pz / 38, seed + 7), patch = noise(px / 11, pz / 11, seed + 9), tk = Math.max(0, Math.min(1, (thick - 0.5) / 0.16));
-    // (how wild the ground is: a bank is, a verge half so, open grass a little; a slope more than the flat)
-    const wild0 = rough >= 1 ? 0.8 : rough >= 0.5 ? 0.45 : 0.22, wildMost = Math.min(1, wild0 + 0.4);
+    // (how wild the ground is: a bank is, a verge and open grass hardly at all on the level; a slope more than the flat)
+    // (level mown ground, a clifftop green or a verge, grows next to nothing: a bush stood on the lawn strip of
+    // Gorleston's pier)
+    const wild0 = rough >= 1 ? 0.8 : rough >= 0.5 ? 0.2 : 0.08, wildMost = Math.min(1, wild0 + 0.4);
     // (most squares grow nothing whatever their slope: those are passed over before the ground is asked anything more)
     if (r0 >= tk * wildMost * 0.7 + (0.14 + 0.4 * patch) * wildMost * 0.7) continue;
     const d = far(px, pz); if (d > reach) continue;
@@ -43,7 +45,7 @@ export function scrubSpots({ grassAt, yAt, roughAt = () => 1, avoid = () => fals
     const bushy = tk * wild; // (thickets, where the slow noise is high)
     let kind = null;
     if (r0 < bushy * 0.7) kind = hash(i, j, seed + 3) < 0.34 + 0.3 * sl ? "gorse" : "scrub";
-    else if (r0 < bushy * 0.7 + (0.14 + 0.4 * patch) * wild * (sl > 0.25 ? 0.7 : 0.3) && patch > 0.45) kind = "bracken";
+    else if (r0 < bushy * 0.7 + (0.14 + 0.4 * patch) * wild * (sl > 0.25 ? 0.7 : bushy > 0 ? 0.3 : 0.06) && patch > 0.45) kind = "bracken"; // (on a slope, or at a thicket's edge; hardly ever alone on the flat)
     if (!kind || avoid(px, pz)) continue;
     const S = SIZE[kind], k = hash(i, j, seed + 4), w = S[0] + (S[1] - S[0]) * k, h = (S[2] + (S[3] - S[2]) * (0.3 * k + 0.7 * hash(i, j, seed + 5))) * (0.75 + 0.25 * g);
     out.push({ x: px, y, z: pz, kind, w, h, rot: hash(i, j, seed + 6) * Math.PI, tint: 0.82 + 0.3 * hash(i, j, seed + 8), d });

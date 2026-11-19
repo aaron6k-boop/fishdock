@@ -336,7 +336,28 @@ What changed:
   normals turned over and were lit from underneath. Each card is now two front faces.
 - **Grass in clumps** (`grassField.js`): the blades shorten towards each end of a card.
 
-Two things found on the way, both fixed before anything was published:
+How much there is, and what it costs (jobs h311 to h313; the new build and the live one photographed one after the
+other with the same cameras):
+
+| | Live | This build |
+| --- | --- | --- |
+| Whitby, phone setting: plants placed | none | about 2,100 on the first count, fewer since level mown ground was left bare |
+| Whitby, phone setting, at the spot | 150 fps, 6.7 ms, 2,824k triangles | 152 fps, 6.6 ms, 2,278k triangles |
+| Gorleston, phone setting, at the spot | 170 fps, 5.9 ms, 1,039k triangles | 176 fps, 5.7 ms, 1,125k triangles |
+| Whitby loads in (phone setting) | 23 s | 19 s |
+| Gorleston loads in (phone setting) | 19 s | 17 s |
+| Placing the scrub, on the PC | | 0.07 s |
+
+No cost that these runs can tell on the phone setting. On Ultra the PC's own frame rate swung between 51 and 92 frames
+a second from run to run that night, live build and new alike, with the game's resolution scale at a different step
+each time, so no Ultra figure is given: the scrub adds about 60,000 triangles to a frame of 6.4 million at Whitby.
+
+Not done in this step: the bushes are painted cards, and from closer than about 8 m they look it; nothing new grows
+in the joints of paving or at the foot of walls on the phone setting; the grass blades still stop at 12 m there; trees
+close to are unchanged; the hillside's own colour is unchanged; Cromer, Brixham and the other places get the scrub by
+the same rules but were not photographed.
+
+Found on the way, and fixed before anything was published:
 
 - The first version asked the ground "is this a road?" for every candidate, each against every stretch of every
   road: Whitby's loading went from 19 s to 70 s on the PC. Roads, buildings, car parks and piers are now drawn once

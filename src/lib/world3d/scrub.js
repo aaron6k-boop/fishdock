@@ -43,7 +43,7 @@ export function scrubAtlas(month = new Date().getMonth()) {
     return at;
   };
   const SCRUB = [[44, 62, 34], [58, 82, 42], [76, 104, 52], [96, 126, 62], [118, 148, 76]], GORSE = [[36, 60, 40], [48, 76, 46], [62, 94, 54], [80, 114, 64]];
-  const green = month >= 3 && month <= 8, BR0 = green ? [70, 110, 48] : [132, 88, 46], BR1 = green ? [112, 152, 70] : [184, 130, 72];
+  const green = month >= 3 && month <= 8, BR0 = green ? [70, 110, 48] : [112, 80, 48], BR1 = green ? [112, 152, 70] : [156, 118, 74]; // (dead bracken is a dull tan brown: brighter, a lone stand on a lawn read as an orange starfish)
   // (a flower only where there is bush under it: on some of the dabs just drawn)
   const flowers = (at) => { const fl = month >= 2 && month <= 4 ? 120 : 28; for (let f = 0; f < fl && at.length; f++) { const [x, y] = at[(rnd() * at.length) | 0]; g.fillStyle = rgb([226, 190, 44], 0.9 + rnd() * 0.2); g.beginPath(); g.arc(x, y, 2.4 + rnd() * 1.4, 0, 7); g.fill(); } };
   // bracken: fronds arching out from one foot; from above, a rosette of them
