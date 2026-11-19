@@ -239,7 +239,7 @@ const FP_HAIR = `{ vec2 hc = vec2( vHair.y * 95.0, vHair.z * 520.0 ), ci = floor
   float x = cf.y - 0.5 - ( cf.x - 0.5 ) * slant, w = 0.14 + 0.35 * aa, len = 0.45 + 0.5 * fpSkinHash( vec3( ci, 5.7 ) );
   float strand = ( 1.0 - smoothstep( w * 0.3, w, abs( x ) ) ) * step( 0.3, pick ) * smoothstep( 0.0, 0.12, cf.x ) * ( 1.0 - smoothstep( len - 0.2, len, cf.x ) );
   float k = mix( strand * min( 1.0, 0.24 / w ), 0.12, smoothstep( 0.45, 1.2, aa ) );
-  diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 0.6, 0.52, 0.47 ), k * vHair.x ); }`;
+  diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 0.8, 0.74, 0.7 ), k * vHair.x ); }`; // (fair and fine: at 0.6 the hairs read as dark dashes drawn on the arm)
 export function skinShade(sh) {
   // (the point as the model was made, before the bones move it: taken after skinning, as it was until 15 November, the
   // patches stayed where they were while the arm moved through them, sliding over the skin as you cast or wound)
