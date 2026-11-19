@@ -822,7 +822,22 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
   const toLocal = (v) => root.worldToLocal(v.clone());
   const pts = Array.from({ length: NSEG + 1 }, () => new THREE.Vector3());
 
+  // ---- walking about in first person: your own body, seen from your own eyes ----
+  // Until 19 November walking in first person drew the arms made for fishing, set in the view: no body to look down
+  // at, no legs, and at the new jog their jacket rose into the picture as a dark shapeless mass over half the screen
+  // with no rod in sight (Aaron's recording at Gorleston, 17:19). Walking, you are now your whole self: the same body
+  // everyone else sees, moving as it does, with the camera at its eyes and its head not drawn; the rod is carried as
+  // it is seen from outside, so it rises through the right of your view. Everything a frame works out while walking
+  // is worked out as for the outside view; fishing is as it was.
+  let bodyView = false;
   function frame(t, now, dt, env) {
+    const want = fp && !!walking && !!fig.bodyReady;
+    if (want !== bodyView) { bodyView = want; fig.setFirstPerson(fp && !want); fig.setHeadless?.(want); fpv?.show(fp && !want); }
+    if (!want) return frame0(t, now, dt, env);
+    fp = false;
+    try { const out = frame0(t, now, dt, env); tag.visible = false; return out; } finally { fp = true; }
+  }
+  function frame0(t, now, dt, env) {
     easeFishBox(dt);
     if (fpv && !fpvCounted && fpv.ready) { fpvCounted = true; assetsN++; } // (your arms loaded: their shaders built with the rest)
     if ((fig.version || 0) !== figVer) { figVer = fig.version || 0; assetsN++; } // (a person's model in, or its detailed one swapped in: its textures readied too)
@@ -1408,11 +1423,12 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // 16 November recording. A runner holds it up, close to upright, and raises it more through a quick turn)
       carry.run += (clamp((walking.speed - WALK.speed - 0.2) / (WALK.sprint - WALK.speed - 0.2), 0, 1) - carry.run) * (1 - Math.exp(-dt * 3));
       carry.lift += (clamp(Math.abs(walking.turnRate || 0) / 3, 0, 1) - carry.lift) * (1 - Math.exp(-dt * (Math.abs(walking.turnRate || 0) / 3 > carry.lift ? 14 : 2)));
-      const raise = Math.min(0.52, carry.run * 0.45 + carry.lift * 0.35) * (1 - clamp(carry.up / 0.6, 0, 1));
+      // (from your own eyes it comes up less at a run: held as high as it looks right from outside, it stood above the top of the view)
+      const raise = Math.min(bodyView ? 0.2 : 0.52, carry.run * 0.45 + carry.lift * 0.35) * (1 - clamp(carry.up / 0.6, 0, 1));
       // (the rod's weight: it comes round after the body, not rigidly with it, a short moment behind as you turn)
       if (carry.wy == null) carry.wy = walking.face;
       carry.wy += wrapR(walking.face - carry.wy) * (1 - Math.exp(-dt * 7)); const lagAz = clamp(wrapR(walking.face - carry.wy), -0.5, 0.5);
-      const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + raise + carry.d.y * 0.6, az = -0.086 + carry.trail + carry.sway * 0.35 + lagAz;
+      const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + raise + carry.d.y * 0.6, az = (bodyView ? 0.05 + raise * 0.35 : -0.086) + carry.trail + carry.sway * 0.35 + lagAz; // (seen from your own eyes it leans a little in across you, more as it comes up at a run: square ahead it stood off the side of a phone's narrow picture)
       dir = new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
       // (and held a little further out from your side while you turn: stepping round, the right leg came out under the
       // rod and the hand holding it went into the thigh)
@@ -1941,7 +1957,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       if (perf) { const P = (window.__fdPerf ||= { n: 0, ms: 0, max: 0 }), d = performance.now() - perf; P.n++; P.ms += d; if (d > P.max) P.max = d; }
     }
     for (let i = 0; i < 2; i++) if (hands[i]) hands[i] = { ...hands[i], at: toFigP(hands[i].at), axis: toFig(hands[i].axis), palm: toFig(hands[i].palm) };
-    fig.pose({ t, dt, act: actNow, emote, kneel, sit: sitNow > 0.001 ? { w: sitNow, ...SEAT } : null, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5, off: walking.off || 0, floor: walking.floor || null } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFigP(toLocal(lookAtW)) : null, speaking, hood: fig.look?.hat === 4, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
+    fig.pose({ t, dt, act: actNow, emote, kneel, sit: sitNow > 0.001 ? { w: sitNow, ...SEAT } : null, walk: walking ? { speed: walking.speed || 0, air: !!walking.air, sprint: (walking.speed || 0) > 5, off: walking.off || 0, back: !!walking.back, floor: walking.floor || null } : null, lean, brace, crouch, twist, hands, idle: idleMode, look: lookAtW ? toFigP(toLocal(lookAtW)) : null, speaking, hood: fig.look?.hat === 4, weather: { rain: env.rain || 0, wind: env.wind || 0, windDir: toFig(new THREE.Vector3(env.windDir?.[0] || 1, 0, env.windDir?.[1] || 0).applyAxisAngle(UP, -root.rotation.y)).toArray().filter((_, i) => i !== 1) } });
     tag.position.y = fig.top + 0.3; talk.position.y = tag.position.y + 0.31;
     if (said) { said.t0 ??= t; const age = t - said.t0; if (age > SAY_S) { root.remove(said.s); said.s.material.map.dispose(); said.s.material.dispose(); said = null; }
       else { said.s.position.y = tag.position.y + (speaking ? 0.5 : 0.17); said.s.material.opacity = Math.min(1, (SAY_S - age) / 0.5) * Math.min(1, age / 0.15); said.s.visible = !fp && !tagOff; } }
@@ -2161,7 +2177,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     // your head torch, seen from outside you (third person): on your forehead, shining where your face points and
     // tipped down a little, as a head torch is worn. In first person the world uses the camera, which is your eye
     const torchAt = local && !fp ? headTorchAt() : null;
-    return { torchAt, phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater, to: tech === "lift" && age >= LT.swingIn - 0.3 ? toWorld(fp ? SWING_FP.clone() : SWING_TP.clone()) : null /* (where a fish swung in is coming to, as it swings down out of the air in under a second: world.js keeps it and the fish in the picture) */ } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, lead: walking && fp && fig.eyeAt ? (() => { const e = fig.group.localToWorld(fig.eyeAt.clone()); return [e.x - root.position.x, e.z - root.position.z, e.y - root.position.y]; })() : null /* (walking in first person: how far your eyes are ahead of your feet, leaning into a stride, and how high: world.js puts the camera there) */, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
+    return { torchAt, phase: ph, tech, age, info, land: ph === "landing" && age < LT.end + 0.4 ? { net: netOn && !netIdle && netAt ? netAt.clone() : null, fish: rigAt ? rigAt.clone() : null, stage: landStage, end: LT.end, edge, water: dropRig?.waterY ?? landWater, to: tech === "lift" && age >= LT.swingIn - 0.3 ? toWorld(fp ? SWING_FP.clone() : SWING_TP.clone()) : null /* (where a fish swung in is coming to, as it swings down out of the air in under a second: world.js keeps it and the fish in the picture) */ } : null, tip: toWorld(pts[NSEG]), rig: rigAt ? rigAt.clone() : null, fishAt: fish.visible ? fish.position.clone() : null, eye: toWorld(fp ? eyeNow : new THREE.Vector3(0, 1.62 - leanNow * 0.25, -0.05 - leanNow)), at: walking ? root.position.clone() : at.clone(), face: walking ? walking.face : face, walking: !!walking, lead: walking && (fp || bodyView) && fig.eyeAt ? (() => { const e = fig.group.localToWorld(fig.eyeAt.clone()); return [e.x - root.position.x, e.z - root.position.z, e.y - root.position.y]; })() : null /* (walking in first person: how far your eyes are ahead of your feet, leaning into a stride, and how high: world.js puts the camera there) */, cast: castAt.clone(), near: nearAt.clone(), edge, landed: ph === "landing" && age >= LT.card, jump: jumpWatch ? jumpAt : null, kept: kept?.state || null, release: releaseInfo ? { ...releaseInfo, edge } : null, keptAt: kept && fish.visible ? (keptPose?.centre || fish.position.clone().addScaledVector(fBase, fishLen * 0.5)) : null };
   }
   // first person: the eye is in your own head (just in front of it), so leaning out over the rail takes your eye, your
   // shoulders and your arms together, and your hands still reach the rod
@@ -2244,6 +2260,7 @@ const FPR = { get x() { return filmSet("__fdFpr")?.x ?? holdView().x; }, get y()
     // first person: your own head, body and arms would fill the view, so only your hands show, on the rod
     setFirstPerson(on) {
       if (fp === !!on) return; fp = !!on; fig.setFirstPerson(fp); tag.visible = !on && !tagOff; feetShadow.visible = !fp && !walking?.air;
+      if (!fp && bodyView) { bodyView = false; fig.setHeadless?.(false); }
       if (fp && !fpv) makeFpv();
       fpv?.show(fp);
     },

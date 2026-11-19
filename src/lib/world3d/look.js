@@ -105,6 +105,8 @@ export function walkFollow({ dragging = false, sinceTouch = 1e9, speed = 0, off 
 // (WALK_PITCH: how far you can tip the view while walking about; level: where it settles. With the follow camera's
 // height that keeps the deck ahead of you in view and never lets the sky fill the screen)
 export const WALK_PITCH = { min: -0.75, max: 0.1, level: -0.2, wait: 1600, rate: 1.4 };
+// (at your own eyes, first person: down to your own boots and well up into the sky)
+export const EYES_PITCH = { min: -1.45, max: 0.9 };
 /** How far (0..1) the walking camera's pitch eases back towards its level this frame, whether or not you're moving. */
 export function walkPitchBack({ dragging = false, sinceTouch = 1e9, dt = 0.016 } = {}) {
   if (dragging || sinceTouch < WALK_PITCH.wait) return 0;

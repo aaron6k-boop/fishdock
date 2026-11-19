@@ -332,14 +332,14 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
   // body's arm, sleeve and shoulder that close to the eye fills the screen); dressed in your jacket colour and gloves
   const standOutfit = { ...(outfit || {}), jacket: COATS[L.coat]?.hex ?? outfit?.jacket };
   const stand = createFigure({ id, look: L.gloves ? { ...L, skinHex: 0x23262a } : L, outfit: standOutfit, venue }); group.add(stand.group);
-  let H = null, fp = false, gone = false, version = 0; // (version: one more each time a model is put in, so the scene readies its new textures)
+  let H = null, fp = false, gone = false, version = 0, headlessWant = false; // (version: one more each time a model is put in, so the scene readies its new textures)
   // (in first person none of the body is drawn: your arms and hands are drawn on their own, fpRig.js)
   const show = () => { if (H) H.root.visible = !fp; stand.group.visible = !H && !fp; };
   if (realistic && typeof document !== "undefined") {
     const file = L.file || "gardener", put = (g, clips, hd = false) => {
       try { performance.mark(`fd:person-${file}${hd ? "-hd" : ""}`); } catch { /* (loading checks only) */ }
       const next = makeHuman(L, g, clips[L.sex === "f" ? "f" : "m"], outfit, venue), old = H;
-      H = next; group.add(H.root); H.setFirstPerson(fp); old?.dispose(); version++; show();
+      H = next; group.add(H.root); H.setFirstPerson(fp); H.setHeadless?.(headlessWant); old?.dispose(); version++; show();
     };
     Promise.all([personGLB(file), clipSet()]).then(([g, clips]) => {
       if (gone) return;
@@ -362,6 +362,9 @@ export function createPerson({ id = "", look = null, outfit, venue = "pier", rea
     hand(i) { return who().hand(i); },
     get chest() { return H ? H.chest : null; },
     setFirstPerson(on) { fp = !!on; H?.setFirstPerson(fp); show(); },
+    /** your own body seen from your own eyes: everything but the head (walking about in first person) */
+    setHeadless(on) { headlessWant = !!on; H?.setHeadless?.(headlessWant); },
+    get bodyReady() { return !!H?.setHeadless; },
     dispose() { gone = true; stand.dispose(); H?.dispose(); },
   };
 }
@@ -745,7 +748,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     let stride = 0, ws = 0; for (const key of LOCO) { stride += w[key] * (clips[key]?.userData.travel || 1) * k; ws += w[key]; }
     if (ws > 0) stride *= stretch;
     const adv = moved + turning * 0.55 * speedOf("walk_slow") * dt;
-    if (ws > 0 && walking) st.u = (st.u + adv / (stride / ws)) % 1;
+    if (ws > 0 && walking) st.u = (st.u + (o.walk.back ? -adv : adv) / (stride / ws)) % 1; // (backing away: the same steps, run backwards)
     for (const key of LOCO) { const a = act[key]; if (!a) continue; a.setEffectiveWeight(w[key]); a.time = (((st.u + (offs[key] || 0)) % 1) + 1) % 1 * a.getClip().duration; }
     // standing: the idle, and now and then a look round (when nothing in particular holds their eye)
     if (act.idle) act.idle.time = (act.idle.time + dt) % act.idle.getClip().duration;
@@ -1027,7 +1030,13 @@ function makeHuman(L, gltf, clips, outfit, venue) {
       // ease on and off: a free hand goes back to the motion capture
       if (spec) { hs.last = spec; hs.w = Math.min(1, hs.w + dt / 0.3); } else hs.w = Math.max(0, hs.w - dt / 0.35);
       const use = spec || hs.last;
-      if (!use || hs.w <= 0) { hs.kind = null; keepClear(s, i, sg, dt); continue; }
+      if (!use || hs.w <= 0) {
+        hs.kind = null; keepClear(s, i, sg, dt);
+        // (a free hand swinging at your side hangs half closed, a little more at a run: the walks hold it out flat,
+        // which is what you see of yourself looking down in first person)
+        if (o.walk) { const c = 0.34 + 0.14 * clamp((st.v - 1.6) / 1.4, 0, 1); for (const [fb, f] of FINGERS[s]) fb.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), c * f)); for (const fb of THUMB[s]) fb.quaternion.multiply(tmp.q.setFromAxisAngle(V(0, 0, 1), 0.18)); }
+        continue;
+      }
       for (const n of ARM) save[s + n] = B(s + "_" + n).quaternion.clone();
       const target = use.at.clone();
       if (use.kind !== hs.kind) { hs.from.copy(hs.kind ? hs.out : target); hs.kind = use.kind; hs.u = 0; }
@@ -1136,6 +1145,49 @@ function makeHuman(L, gltf, clips, outfit, venue) {
   // (far off, at the lightest level of detail, the pose is worked out every other frame, the time carried over: a
   // person 40 m away moves as smoothly to the eye, for half the work)
   let skip = 0, owed = 0;
+  // ---- seen from your own eyes: the whole body, less the head ----
+  // Walking about in first person you see what you would: your own chest, arms, legs and feet as you look down, the
+  // arm swinging at the edge of the view, the rod in your hand. The head (with its hair, hat and face) is drawn to
+  // nothing, or you would be looking out through the inside of your own face; the eyes' place is kept from the head
+  // bone's own turn, so the view stays at your eyes. (Your shadow has no head while you walk like this.)
+  // ---- your own body from your own eyes: everything but your head (walking about in first person) ----
+  // Each mesh gets its own list of triangles with the head's at the end, and the list is drawn short of them; the
+  // shadow pass draws the whole list, so your shadow keeps its head. (The points themselves are shared with everyone
+  // else who wears this model: only the list is yours.) What sits on the head (a hat, glasses) goes the same way.
+  let headless = false, headParts = null; const headB = B("Head");
+  const underHead = (o) => { for (let q = o; q; q = q.parent) if (q === headB) return true; return false; };
+  const partsOfHead = () => {
+    if (headParts) return headParts;
+    headParts = [];
+    for (const m of skinned) {
+      const g = m.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+      if (!g.index || !si || !sw || g.groups.length) continue;
+      const isHead = m.skeleton.bones.map(underHead), nv = g.attributes.position.count, hv = new Uint8Array(nv);
+      for (let v = 0; v < nv; v++) { let w = 0; for (let c = 0; c < 4; c++) if (isHead[si.getComponent(v, c)]) w += sw.getComponent(v, c); hv[v] = w > 0.5 ? 1 : 0; }
+      const src = g.index.array, out = new src.constructor(src.length); let nb = 0, nh = src.length;
+      for (let t = 0; t < src.length; t += 3) {
+        const a = src[t], b = src[t + 1], c = src[t + 2];
+        if (hv[a] || hv[b] || hv[c]) { nh -= 3; out[nh] = a; out[nh + 1] = b; out[nh + 2] = c; } else { out[nb] = a; out[nb + 1] = b; out[nb + 2] = c; nb += 3; }
+      }
+      if (nb === src.length) continue;
+      const g2 = new THREE.BufferGeometry();
+      for (const name in g.attributes) g2.setAttribute(name, g.attributes[name]);
+      g2.morphAttributes = g.morphAttributes; g2.morphTargetsRelative = g.morphTargetsRelative;
+      g2.setIndex(new THREE.BufferAttribute(out, 1)); g2.boundingSphere = g.boundingSphere; g2.boundingBox = g.boundingBox;
+      headParts.push({ m, g, g2, n: nb });
+    }
+    if (headB) headB.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && o.geometry) headParts.push({ m: o, g: o.geometry, g2: o.geometry, n: 0, all: o.geometry.drawRange.count }); });
+    for (const hp of headParts) {
+      hp.m.onBeforeShadow = () => { if (headless) hp.g2.setDrawRange(0, hp.all ?? Infinity); };
+      hp.m.onAfterShadow = () => { if (headless) hp.g2.setDrawRange(0, hp.n); };
+    }
+    return headParts;
+  };
+  const setHeadless = (on) => {
+    on = !!on && !!headB; if (on === headless) return;
+    headless = on;
+    for (const hp of partsOfHead()) { hp.m.geometry = on ? hp.g2 : hp.g; hp.g2.setDrawRange(0, on ? hp.n : hp.all ?? Infinity); }
+  };
   const poseAtDistance = (o) => {
     if (lodNow === 2 && lodSets[2].length) { skip ^= 1; if (skip) { owed += o.dt || 0; return; } if (owed) { o = { ...o, dt: (o.dt || 0) + owed }; owed = 0; } }
     else owed = 0;
@@ -1145,6 +1197,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     root, pose: poseAtDistance,
     get top() { return wFigSafe(B("Head")).y + (top0 - headY0) * k; },
     get headAt() { return wFigSafe(B("Head")); },
+    setHeadless,
     get eyeAt() { const a = B("LEye"), b = B("REye"); if (!a || !b) return wFigSafe(B("Head")).add(V(0, 0.1, -0.08)); return wFigSafe(a).add(wFigSafe(b)).multiplyScalar(0.5).add(V(0, 0, -0.02)); },
     /** where the face points (the figure's space): the eyes' middle, and a unit vector out of the face, square to the
      * line between the eyes and to the neck's line up into the head. A head torch shines this way. Which of the two
@@ -1156,7 +1209,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     /** the shoulders' middle (the figure's space) and which way they face: a carried rod moves with them */
     get chest() { const l = wFigSafe(B("L_UpperArm")), r = wFigSafe(B("R_UpperArm")); return { p: l.clone().add(r).multiplyScalar(0.5), yaw: Math.atan2(-(l.z - r.z), l.x - r.x) }; },
     setFirstPerson(on) { fp = !!on; },
-    dispose() { root.parent?.remove(root); mixer.stopAllAction(); mixer.uncacheRoot(model); for (const m of mats) m.dispose(); for (const m of extraMats) m.dispose(); for (const o of extra) o.geometry?.dispose?.(); },
+    dispose() { root.parent?.remove(root); mixer.stopAllAction(); mixer.uncacheRoot(model); for (const m of mats) m.dispose(); for (const m of extraMats) m.dispose(); for (const o of extra) o.geometry?.dispose?.(); for (const hp of headParts || []) if (hp.g2 !== hp.g) { hp.m.geometry = hp.g; for (const name in hp.g2.attributes) hp.g2.deleteAttribute(name); hp.g2.dispose(); } },
   };
   function wFigSafe(b) { const g = groupOf(); const p = wp(b); return g ? g.worldToLocal(p) : p; }
 }

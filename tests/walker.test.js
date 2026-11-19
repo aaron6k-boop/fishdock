@@ -96,3 +96,30 @@ test("the walking camera comes round behind you as you walk, but never while you
   const slow = walkFollow({ speed: 0.5, off: 1, dt: 1 / 30 }); assert.ok(slow < k, "gentler walking slowly");
   const easing = walkFollow({ sinceTouch: FOLLOW.wait + 200, speed: 1.8, off: 1, dt: 1 / 30 }); assert.ok(easing > 0 && easing < k, "eases in after a look round");
 });
+
+// ---- first person: your body keeps to the way you look ----
+test("first person, standing: a small look round leaves your feet where they are; a big one brings you round", () => {
+  const ground = { walkable: () => true, heightAt: () => 0 };
+  let s = walker(0, 0, 0);
+  for (let i = 0; i < 120; i++) s = stepWalker(s, { x: 0, y: 0, camYaw: 0.5, lookYaw: 0.5 }, 1 / 60, ground);
+  assert.equal(s.face, 0, "half a radian is a turn of the head");
+  let most = 0;
+  for (let i = 0; i < 180; i++) { const f0 = s.face; s = stepWalker(s, { x: 0, y: 0, camYaw: 2, lookYaw: 2 }, 1 / 60, ground); most = Math.max(most, Math.abs(s.face - f0) * 60); }
+  assert.ok(Math.abs(s.face - 2) < 0.11, `square to the look again (${s.face.toFixed(2)})`);
+  assert.ok(most <= WALK.lookRate + 1e-6, "no quicker than a person turns on the spot");
+  assert.equal(s.x, 0); assert.equal(s.z, 0);
+});
+
+test("first person: the stick pulled back backs you away slowly, still facing the way you look", () => {
+  const ground = { walkable: () => true, heightAt: () => 0 };
+  let s = walker(0, 0, 0);
+  for (let i = 0; i < 180; i++) s = stepWalker(s, { x: 0, y: -1, camYaw: 0, lookYaw: 0, sprint: true }, 1 / 60, ground);
+  assert.ok(s.back, "backing");
+  assert.ok(Math.abs(s.face) < 0.05, "facing ahead");
+  assert.ok(s.z > 1, "moving back (+z)");
+  assert.ok(s.speed <= WALK.backSpeed + 0.01, `slowly (${s.speed.toFixed(2)} m/s)`);
+  // (seen from behind, as before: you turn and walk towards the camera)
+  let t = walker(0, 0, 0);
+  for (let i = 0; i < 180; i++) t = stepWalker(t, { x: 0, y: -1, camYaw: 0 }, 1 / 60, ground);
+  assert.ok(!t.back && Math.abs(Math.abs(t.face) - Math.PI) < 0.1, "third person turns round");
+});

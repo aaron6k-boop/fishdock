@@ -243,6 +243,47 @@ What this does for Aaron's phone is not known until he reads its counter again: 
 by triangles the way a phone's is. Still to look at: the grass's 0.67 million, the chimney caps, and why nothing is
 left out of a frame when you look out to sea.
 
+### Walking in first person: your own body, and the rod in view (19 November)
+
+Aaron's recording of 17:19 (Gorleston, iPhone, 18 s) showed walking and jogging in first person with a dark, shapeless
+mass over the lower left half of the screen and neither rod nor hands in sight. The cause: walking in first person drew
+the fishing view's arms (`fpRig.js`) at the camera, and since the movement step a full push of the stick is a jog, at
+which those arms' "carried at a run" pose brings the jacket's sleeve up across the view. The movement step was filmed
+from outside only before it was published; first person was not looked at. It is now part of the filming.
+
+What walking in first person draws now is your own body, as everyone else sees it, from your own eyes:
+
+- **The whole body, less the head** (`human3d.js` setHeadless). Each of your meshes gets its own list of triangles
+  with the head's at the end, drawn short of them; the sun's shadow pass draws the whole list, so your shadow keeps its
+  head. A hat and glasses go the same way. Nothing is scaled or hidden by a shader, and no new shader is built.
+- **The camera is at the model's eyes** and turns about the neck: looking down brings your eyes forward and down over
+  your chest (`world.js` NECK_EYE), as tucking your chin does, instead of looking into your own collar.
+- **You can look down at yourself.** At your eyes the view tips from 83 degrees down to 52 up (`look.js` EYES_PITCH; it
+  was 43 down, 6 up, the range that suits the camera behind you) and stays where you leave it. Looking down you see
+  your chest, your free hand swinging, your legs and wellies, and the reel at your side.
+- **Where you look is yours.** The camera no longer comes round after your body in first person (it turned you in a
+  circle when you pushed the stick sideways). Standing, your body comes round after your look once your head has
+  turned about 45 degrees, at 3.2 radians a second. Pull the stick back and you back away at
+  1.1 m/s facing the way you look, the stride run backwards, rather than turning to walk into your own eyes
+  (`walker.js` lookYaw, back).
+- **The rod is in the picture.** Carried at your right side as from outside, but leaning a little in across you and
+  rising less at a run, so it stands in the right of a phone's narrow picture at a walk, a jog and a sprint.
+- **A free hand hangs half closed** while you walk or run (the walks held it out flat), for everyone.
+- **People cast shadows again.** Looking for my own shadow from my own eyes there was none, from outside either: the
+  rule that stops specks casting shadows (`world.js` trimCasters) measured a mesh by its own place in the scene, and
+  the newer people's meshes are in metres under a skeleton a hundredth the size, so a whole jacket measured 7 mm and
+  every part of every such person was struck off (job h288 listed them: ten meshes, none casting). A person's meshes
+  are now never struck off. This is for everyone you can see, in every view.
+
+Seen on the PC (jobs h284 to h287; a phone-shaped screen on the phone setting at Gorleston, a wide one on Ultra at
+Whitby): standing, walking, jogging and sprinting looking ahead and down; a look to the side; the body coming round;
+backing away; a sideways push; back to the fishing spot (the fishing view's arms return); and from behind, where the
+head is there as before. No page errors.
+
+Not done: fishing in first person still draws only your arms (look down while fishing and there is no body); your feet
+slide a little when your body comes round on the spot faster than the turning steps; backing away uses the walk run
+backwards, not a filmed backwards walk; the woman and the other builds were not filmed in this view.
+
 ## The phases, and where each stands
 
 1. Graphics engine audit: not started as a written audit. Measured so far: Whitby on Ultra 76 to 85 frames a second.
