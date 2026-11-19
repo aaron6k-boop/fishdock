@@ -19,7 +19,7 @@ import { buildChair, CHAIR, SEAT, SIT_EYE, wantsSit, sitStep, sitEase } from "./
 import { WALK } from "./walker.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
-import { createFpRig, castAt as rigCastAt, rodFrame, holdView, bodyUp } from "./fpRig.js";
+import { createFpRig, castAt as rigCastAt, rodFrame, holdView, holdMade, bodyUp } from "./fpRig.js";
 import { loadPart, fitNet } from "./glbParts.js";
 import { fitRodReel, buildRod, rodWet, handleProfile, KNOB_PROFILE } from "./rodKit.js";
 import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
@@ -1923,7 +1923,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (fp && fpv) {
       const vw = fpView || viewVecs();
       const perf = FILM && typeof window !== "undefined" && window.__fdPerfOn ? performance.now() : 0; // (film only: what posing the arms costs each frame)
-      fpv.pose({ hands: walking ? [null, hands[1]] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt, castT: ph === "cast" ? age : null });
+      fpv.pose({ hands: walking ? [null, hands[1]] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt, castT: ph === "cast" ? age : null, holdTurn: fpRest && dir && !walking ? (() => { const hm = holdMade(), made = vw.vf.clone().multiplyScalar(Math.cos(hm.e) * Math.cos(hm.sw)).addScaledVector(vw.vu, Math.sin(hm.e)).addScaledVector(vw.vr, Math.cos(hm.e) * Math.sin(hm.sw)).normalize(); return rodFrame(dir, fpRest, fpUp).multiply(rodFrame(made, made, fpUp).invert()); })() : null }); // (holdTurn: the rod's turn from the hold the grips were made at)
       if (FILM) fpSpecs = walking ? [null, hands[1]?.kind || null] : hands.map((h) => (h ? h.kind || "?" : null)); // (film checks: what each hand was given to hold)
       if (perf) { const P = (window.__fdPerf ||= { n: 0, ms: 0, max: 0 }), d = performance.now() - perf; P.n++; P.ms += d; if (d > P.max) P.max = d; }
     }

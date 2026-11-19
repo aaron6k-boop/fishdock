@@ -142,7 +142,16 @@ export function toView(k, p0 = P0) {
   return Math.abs(sw1) <= Math.PI / 2 ? { x: k.x, y: vy, z: vz, e: e1, sw: sw1 } : { x: k.x, y: vy, z: vz, e: Math.PI - e1, sw: Math.atan2(-d[0], -df) };
 }
 /** the hold in the view's frame now */
-export const holdView = () => toView(RIG.holdBody);
+// (the rod at rest across the view, not up the middle of it: Blender's hold has the rod at 45 degrees from your body,
+// which with the reel framed low in the picture stood it 69 to 74 degrees up from your line of sight, a pole down the
+// centre of the screen with its tip out of the top (Aaron's phone screenshots, 19 November). Held as you would while
+// you wait: about 34 degrees up and 17 across to the left, the tip in the picture over the water; the reel and your
+// hands where they were. The winding hand keeps its angle on the knob (pose: holdTurn), so the arms sit as they did)
+const SEAT_GIVE = 0.5;
+const REST_E = 0.6, REST_SW = -0.3, REST_UP = 0.035, REST_OUT = 0.04; // (and the reel 3.5 cm higher and 4 cm further out, where the lowered reel's knob and the hand on it are back in the picture)
+/** the hold as Blender made it (the grips' own), in the view's frame */
+export const holdMade = () => toView(RIG.holdBody);
+export const holdView = () => { const k = toView(RIG.holdBody); return { x: k.x, y: k.y + REST_UP, z: k.z + REST_OUT, e: REST_E, sw: REST_SW }; };
 
 /** where the reel is held and the rod's angle at a moment of the cast (seconds), in the view's frame as angler.js
  * places it: a smooth curve through Gate 3's moments, still at the hold, at the top of the wind-up and through the
@@ -741,6 +750,12 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
       const wait = empty || specs.some((sp) => sp && (sp.kind === "seat" || sp.kind === "crank") && !sp.sock);
       R.scene.visible = !wait; if (wait) { for (const h of hands) h.away = true; return; }
       group.updateWorldMatrix(true, false); Mg.copy(group.matrixWorld); MgInv.copy(Mg).invert(); qg.setFromRotationMatrix(Mg);
+      // (the rod turned from the hold the grips were made at: the hands give to it, below. Not through the middle of a
+      // cast, whose own moments were made and checked in Blender with the grips as they are: eased out over its first
+      // quarter of a second and back in over its last three tenths)
+      const castEnd = RIG.cast.path[RIG.cast.path.length - 1].t;
+      const giveK = o.castT == null ? 1 : clamp(Math.max(1 - o.castT / 0.25, (o.castT - (castEnd - 0.3)) / 0.3), 0, 1);
+      const turned = giveK > 0 && !!o.holdTurn && 2 * Math.acos(Math.min(1, Math.abs(o.holdTurn.w))) > 0.08;
       // ---- 1. the base clip ----
       R.clips.hold.apply(1 / RIG.fps);
       if (o.castT != null && R.clips.cast && o.castT + 1 / RIG.fps < R.clips.cast.duration) R.clips.cast.apply(o.castT + 1 / RIG.fps, (n) => n.startsWith("DEF-spine"));
@@ -776,9 +791,42 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
           for (const b of [A.U, A.U1, A.F, A.F1, A.H]) { const r = R.rest.get(b.name); b.quaternion.copy(r.q); }
           A.U.updateMatrixWorld(true);
           want = { pos: A.H.getWorldPosition(V()), quat: A.H.getWorldQuaternion(new THREE.Quaternion()), grip: "relax", kind: null };
-        } else if (spec.kind === "seat" && spec.sock) want = { ...seatTarget(spec, Mg, qg), kind: "seat" };
+        } else if (spec.kind === "seat" && spec.sock) {
+          want = { ...seatTarget(spec, Mg, qg), kind: "seat" };
+          // (the rod lowered from the hold the grip was made at: the hand doesn't tip all the way with it, the rod lying
+          // more across the palm, as you'd hold a rod pointed out over the water. Carried round rigidly, the wrist was
+          // cocked 47 degrees to the little finger's side, well past what a wrist does. Half the rod's turn about the
+          // palm's own normal is undone, 26 degrees at most, about the point of the rod under the palm; the fingers are
+          // then kept outside the handle as ever (clearFingers))
+          if (turned) {
+            const n = loc[S].palm.clone().applyQuaternion(want.quat).normalize(), hq = qg.clone().multiply(o.holdTurn).multiply(qg.clone().invert());
+            const d = hq.x * n.x + hq.y * n.y + hq.z * n.z, tw = new THREE.Quaternion(n.x * d, n.y * d, n.z * d, hq.w);
+            if (tw.lengthSq() > 1e-8) {
+              tw.normalize(); if (tw.w < 0) tw.set(-tw.x, -tw.y, -tw.z, -tw.w);
+              const ang = 2 * Math.acos(Math.min(1, tw.w)), back = (giveK * Math.min(0.45, ang * SEAT_GIVE)) / Math.max(ang, 1e-6);
+              const un = new THREE.Quaternion().slerp(tw.invert(), back);
+              const sp = spec.sock.pos.clone().applyMatrix4(Mg), ax = (spec.axis ? spec.axis.clone() : V(0, 1, 0)).applyQuaternion(qg).normalize();
+              const piv = sp.clone().addScaledVector(ax, want.pos.clone().sub(sp).dot(ax) * 0.5); // (on the rod, half way from the reel's stem between your fingers to abreast of the wrist)
+              want.pos.sub(piv).applyQuaternion(un).add(piv); want.quat.premultiply(un);
+            }
+          }
+        }
         else if (spec.kind === "crank" && spec.sock) {
           want = { ...knobTarget(spec, Mg, qg), kind: "crank" };
+          // (the knob turns freely in your fingers: with the rod held lower or higher than in the hold the grip was made
+          // at, the hand keeps its own angle round the knob's axle instead of tipping with the rod. Carried round with it,
+          // a rod lowered to rest across the view tipped the hand forwards and lifted the elbow, sleeve and all, up into
+          // the middle of the picture. holdTurn: the rod's turn from the hold, world; only its part about the axle undone)
+          if (turned) {
+            const ax = V(1, 0, 0).applyQuaternion(spec.sock.quat.clone().premultiply(qg)).normalize(), kp = spec.sock.pos.clone().applyMatrix4(Mg);
+            const hq = qg.clone().multiply(o.holdTurn).multiply(qg.clone().invert()); // (the turn in the world's frame, as the grip is)
+            const d = hq.x * ax.x + hq.y * ax.y + hq.z * ax.z, tw = new THREE.Quaternion(ax.x * d, ax.y * d, ax.z * d, hq.w);
+            if (tw.lengthSq() > 1e-8) {
+              // (six tenths of it: all of it hung the hand under the knob with the wrist out of the bottom of the picture)
+              tw.normalize().invert(); tw.copy(new THREE.Quaternion().slerp(tw, 0.6 * giveK));
+              want.pos.sub(kp).applyQuaternion(tw).add(kp); want.quat.premultiply(tw); if (want.elbow) want.elbow.sub(kp).applyQuaternion(tw).add(kp);
+            }
+          }
           // (the shoulder rises and falls a little with the knob, as Gate 2's turns have it)
           if (R.clips.reel && RIG.reelTh?.length) { const th = want.th, T = RIG.reelTh; let k = 0, bestD = 1e9; for (let j = 0; j < T.length - 1; j++) { const d = Math.abs(((th - T[j]) + 540) % 360 - 180); if (d < bestD) { bestD = d; k = j; } } const v = R.clips.reel.value((k + 1) / RIG.fps, A.sh.name); if (v) { A.sh.quaternion.fromArray(v); A.sh.updateMatrixWorld(true); } }
         } else want = { ...wrapTarget(h, A, spec, Mg, qg, bodyQ), kind: spec.kind };

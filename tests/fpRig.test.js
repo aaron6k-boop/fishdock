@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { createFpRig, castAt, rodFrame, holdView, rigP0, bodyUp, profileAt } from "../src/lib/world3d/fpRig.js";
+import { createFpRig, castAt, rodFrame, holdView, holdMade, rigP0, bodyUp, profileAt } from "../src/lib/world3d/fpRig.js";
 import { handleProfile, HANDLE_PROFILE, KNOB_PROFILE } from "../src/lib/world3d/rodKit.js";
 import { RIG } from "../src/lib/world3d/fpRigData.js";
 import { twoBone, wristAngles, limitsPen, pairRotation, twistAbout } from "../src/lib/world3d/fpIk.js";
@@ -83,10 +83,10 @@ const gltf = await new Promise((res, rej) => new GLTFLoader().parse(buf.buffer.s
 const scene = new THREE.Scene(), rig = createFpRig({ model: gltf }); scene.add(rig.group); rig.show(true);
 const R = rig.internals;
 /** the rod as angler.js places it in first person: the reel from the eye in the view's frame, the rod at its angle */
-function place(pitch, key = holdView(), yaw = 0) {
+function place(pitch, key = holdMade(), yaw = 0) {
   const eye = V(0, 1.6, 0), vf = V(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)), vr = V(Math.cos(yaw), 0, Math.sin(yaw)), vu = V().crossVectors(vr, vf);
   const dir = vf.clone().multiplyScalar(Math.cos(key.e) * Math.cos(key.sw)).addScaledVector(vu, Math.sin(key.e)).addScaledVector(vr, Math.cos(key.e) * Math.sin(key.sw)).normalize();
-  const h = holdView(), rest = vf.clone().multiplyScalar(Math.cos(h.e) * Math.cos(h.sw)).addScaledVector(vu, Math.sin(h.e)).addScaledVector(vr, Math.cos(h.e) * Math.sin(h.sw)).normalize();
+  const h = holdMade(), rest = vf.clone().multiplyScalar(Math.cos(h.e) * Math.cos(h.sw)).addScaledVector(vu, Math.sin(h.e)).addScaledVector(vr, Math.cos(h.e) * Math.sin(h.sw)).normalize();
   return { eye, vf, vr, vu, dir, rest, reel: eye.clone().addScaledVector(vr, key.x).addScaledVector(vu, key.y).addScaledVector(vf, key.z), rq: rodFrame(dir, rest, bodyUp(vf, vu)) };
 }
 const C = ([x, y, z]) => V(x, z, -y);
@@ -95,7 +95,9 @@ const HUB = [0, 1, 2].map((i) => TURN.reduce((s, r) => s + r.knob_rod[i], 0) / T
 const inReel = (P, b) => C(b.map((v, i) => v - SEATB[i])).applyQuaternion(P.rq).add(P.reel);
 const seatSpec = (P) => ({ at: P.reel.clone(), axis: P.dir.clone(), kind: "seat", sock: { pos: P.reel.clone(), quat: P.rq.clone() } });
 const crankSpec = (P, row) => { const k = inReel(P, row.knob_rod); return { at: k, axis: V(1, 0, 0), kind: "crank", hub: inReel(P, HUB), spin: 0, sock: { pos: k.clone(), quat: P.rq.clone() } }; };
-const pose = (P, hands, n = 1, castT = null) => { for (let i = 0; i < n; i++) rig.pose({ hands, eye: P.eye, vr: P.vr, vu: P.vu, vf: P.vf, dt: 1 / 30, castT }); };
+// (as angler.js poses them: holdTurn the rod's turn from the hold the grips were made at, to where it is now)
+const turnOf = (P) => { const up = bodyUp(P.vf, P.vu); return rodFrame(P.dir, P.rest, up).multiply(rodFrame(P.rest, P.rest, up).invert()); };
+const pose = (P, hands, n = 1, castT = null) => { const holdTurn = turnOf(P); for (let i = 0; i < n; i++) rig.pose({ hands, eye: P.eye, vr: P.vr, vu: P.vu, vf: P.vf, dt: 1 / 30, castT, holdTurn }); };
 const at = (b) => b.getWorldPosition(V());
 const LOC = Object.fromEntries(["L", "R"].map((S) => [S, { k: V(...RIG.loc[S].k), palm: V(...RIG.loc[S].palm), along: V(...RIG.loc[S].along) }]));
 // (a hand's turn from Blender's, as the exporter carries it: the y-up turn applied to the bone's own Blender frame, so a
@@ -154,7 +156,7 @@ test("the handle's outline: rodkit.glb's measured parts, scaled to each rod as t
 test("your fingers on the reel seat stay outside it: none in the metal, the foam pressed in no more than it gives", () => {
   const prof = handleProfile(PIER, true);
   for (const [pitch, yaw] of [[rigP0(), 0], [-0.12, 0], [-0.75, 0.4], [0.35, -0.5]]) {
-    const P = place(pitch, holdView(), yaw), row = TURN[0];
+    const P = place(pitch, holdMade(), yaw), row = TURN[0];
     pose(P, [crankSpec(P, row), seatSpec(P)], 20);
     const before = intoHandle(P, prof), A = R.arm.R, hand = at(A.H), handQ = A.H.getWorldQuaternion(new THREE.Quaternion());
     // (as it was: the index finger 4.2 mm and the thumb 2.4 mm inside the lock nut, the far trim through the index finger;
@@ -188,7 +190,7 @@ function intoThumb() {
 test("your fingers on the reel seat stay out of your own thumb (Aaron, 17 November: the index finger went 8 mm into it)", () => {
   const prof = handleProfile(PIER, true);
   for (const [pitch, yaw] of [[rigP0(), 0], [-0.75, 0.4], [0.35, -0.5]]) {
-    const P = place(pitch, holdView(), yaw);
+    const P = place(pitch, holdMade(), yaw);
     pose(P, [crankSpec(P, TURN[0]), { ...seatSpec(P), prof }], 20);
     const w = intoThumb(); assert.ok(w < 1, `pitch ${pitch}: a finger ${w.toFixed(1)} mm into the thumb`);
     // (and the thumb moved out of the way still rests on the handle, not held off it)
@@ -219,7 +221,7 @@ test("your fingers round the reel's knob stay out of it all the way round a turn
 
 test("winding: the left hand and arm go round with the knob as in Gate 2's turns, wherever you look, arms unstretched", () => {
   for (const [pitch, yaw] of [[rigP0(), 0], [-0.12, 0], [-0.75, 0.4], [0.35, -0.5]]) {
-    const P = place(pitch, holdView(), yaw);
+    const P = place(pitch, holdMade(), yaw);
     for (const row of TURN) {
       pose(P, [crankSpec(P, row), seatSpec(P)], 2);
       const want = inReel(P, [row.hand_rod[0][3], row.hand_rod[1][3], row.hand_rod[2][3]]);
@@ -231,6 +233,27 @@ test("winding: the left hand and arm go round with the knob as in Gate 2's turns
       const A = R.arm.L, w = wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC.L, "L");
       [w.flex, w.rad, w.pron].forEach((v, k) => assert.ok(Math.abs(v - row.wrist[k]) < 5, `knob ${row.th}: wrist ${k} ${v.toFixed(1)} against Gate 2's ${row.wrist[k]}`));
     }
+  }
+});
+
+test("the resting hold: the rod across the view with its tip in the picture, both wrists inside their range, elbows down", () => {
+  for (const [name, vfov] of [["a wide screen", 62], ["an upright phone", 79 * 1.27 > 100 ? 100 : 79]]) {
+    const hv = holdView(), half = (vfov / 2) * Math.PI / 180;
+    // (the tip of a 3.6 m rod from the reel, as an angle up from the view's line: inside the picture's top edge)
+    const tipUp = Math.atan2(hv.y + 3.3 * Math.sin(hv.e), hv.z + 3.3 * Math.cos(hv.e) * Math.cos(hv.sw));
+    assert.ok(tipUp < half, `${name}: the tip ${(tipUp * 180 / Math.PI).toFixed(0)} degrees up, the picture's edge at ${(vfov / 2).toFixed(0)}`);
+    assert.ok(hv.sw < -0.15 && hv.e < 0.9, "leaning across the view, not up its middle");
+  }
+  for (const pitch of [rigP0(), -0.12, -0.5, 0.2]) {
+    const P = place(pitch, holdView());
+    pose(P, [crankSpec(P, TURN[0]), seatSpec(P)], 40);
+    for (const S of ["L", "R"]) {
+      const A = R.arm[S], pen = limitsPen(wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC[S], S));
+      assert.ok(pen < 1, `${S} wrist ${pen.toFixed(2)} outside its range at pitch ${pitch}`);
+      const up = bodyUp(P.vf, P.vu); // (the elbow below the hand in your body's frame: not lifted into the picture)
+      assert.ok(at(A.F).sub(at(A.H)).dot(up) < 0.02, `${S} elbow above its hand`);
+    }
+    assert.ok(lengthsKept("L") < 1e-5 && lengthsKept("R") < 1e-5, "no bone longer or shorter");
   }
 });
 
@@ -247,7 +270,7 @@ test("the cast: both hands on the rod all the way through, arms never stretched,
     for (const S of ["R", ...(t < 1.95 ? ["L"] : [])]) { const A = R.arm[S]; worstPen = Math.max(worstPen, limitsPen(wristAngles(at(A.U), at(A.F), at(A.H), A.H.getWorldQuaternion(new THREE.Quaternion()), LOC[S], S))); }
   }
   assert.ok(worstPen < 1, `the wrists and elbows at most ${worstPen.toFixed(2)} outside their range (the gates' measure)`);
-  assert.ok(worstR < 0.002, `right hand off the reel seat by ${worstR}`);
+  assert.ok(worstR < 0.045, `right hand's wrist within 4.5 cm of where the grip was made (it gives to the lowered rod at the cast's start and end): ${worstR}`);
   assert.ok(worstL < 0.005, `left hand short of the butt by ${worstL}`);
   assert.ok(worstLen < 1e-5, "no bone longer or shorter");
 });
