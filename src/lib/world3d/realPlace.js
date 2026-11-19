@@ -1259,6 +1259,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         for (let q = 0; q < nP; q++) {
           const f1 = q / nP, f2 = (q + 1) / nP, x1 = xa + (xb - xa) * f1, z1 = za + (zb - za) * f1, x2 = xa + (xb - xa) * f2, z2 = za + (zb - za) * f2, len = run / nP;
           const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, y1 = groundAt(x1, z1) || LAND, y2 = groundAt(x2, z2) || LAND, H = b.h;
+          if (Math.abs(y2 - y1) > len * 1.2) continue; // (no wall runs down a cliff: a mapped line a metre or two over the edge of one stood on its face as a dark slab)
           // (a box w long, h tall and d thick, its foot dy above the ground, leaning with the ground from y1 to y2)
           const box = (w, h, d, dy, bucket, uvScale, sunk = 0) => {
             const g2 = new THREE.BoxGeometry(w, h + sunk, d);
