@@ -7,7 +7,7 @@ import { DETAIL } from "./detail.js";
 import * as THREE from "three";
 import { setThinPixel } from "./thinAA.js";
 import { checkScene } from "./sceneCheck.js";
-import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor } from "./walker.js";
+import { walker, stepWalker, keepApart, roomToFish, stepGait, surfaceFor, WALK } from "./walker.js";
 import { createEnvironment } from "./environment.js";
 import { setShadowReach } from "./realPlace.js";
 import { createAngler, waveHeight } from "./angler.js";
@@ -22,7 +22,7 @@ import { planCast } from "./castAim.js";
 import { addRipple, stepRipples } from "./waterFx.js";
 import { shotFor } from "./landCam.js";
 import { createPost } from "./post.js";
-import { setPeopleDetail, prefetchPeople, holdDetail } from "./human3d.js";
+import { setPeopleDetail, prefetchPeople, holdDetail, GAIT, RUN_UP } from "./human3d.js";
 export { holdDetail };
 import { loadPart } from "./glbParts.js";
 import { loadRelief, loadTerrain } from "./terrain3d.js";
@@ -943,6 +943,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
       get camera() { return camera; },
       buildMs,
       at(x, y, z, look) { camOverride = x == null ? null : new THREE.Vector3(x, y, z); lookOverride = look ? new THREE.Vector3(...look) : null; },
+      get tune() { return { WALK, GAIT, RUN_UP }; }, // (the numbers of each pace, to try others on the PC before settling them)
       get walker() { return W ? { x: W.x, y: W.y, z: W.z, face: W.face, speed: W.speed } : null; },
       walkInput(x, y, sprint = false) { walkIn = { x, y, sprint }; },
       get fight() { return lastFight; },

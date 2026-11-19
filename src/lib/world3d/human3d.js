@@ -76,6 +76,11 @@ export const GAIT = [1.95, 2.25], RUN_UP = [2.7, 3.0];
 // moving back under the hips, about 3.3 m/s at 2.7 steps a second, against the same measure on the Rocketbox walk and
 // jog (within 2 and 7 per cent of their stated 1.39 and 2.42 m/s): 15 November)
 export const SPRINT_SPEED = 3.35;
+// (not used from 19 November: filmed from the side on the PC, that retargeted run is bent forward at the waist by some
+// forty degrees with the hips low, a crouched scurry, at its own speed as much as blended (footage_loco1). The jog,
+// Rocketbox's own run, is upright and reads as running both at its filmed 2.4 m/s and lengthened to 3 m/s, so it
+// carries the run too until a full run is retargeted properly)
+export const SPRINT_CLIP = false;
 /**
  * The movements' weights at a speed vs (m/s), from the clips' own speeds sp (walk_slow, walk, walk_fast, run) at the
  * person's size k: { w: { idle, walk_slow, walk, walk_fast, run }, stretch } (stretch: how much longer than the clips'
@@ -736,7 +741,7 @@ function makeHuman(L, gltf, clips, outfit, venue) {
     // (without the turning steps, as before: small steps of the slow walk)
     const turning = !canPivot && o.walk && st.v < 0.4 ? clamp((st.turn - 0.8) / 2, 0, 1) : 0;
     const vs = Math.max(st.v, turning * 0.55 * speedOf("walk_slow"));
-    const sp = LOCO.map((key) => (key === "sprint" && !clips.sprint ? 0 : speedOf(key))), { w, stretch } = gaitWeights(vs, sp, k);
+    const sp = LOCO.map((key) => (key === "sprint" && (!SPRINT_CLIP || !clips.sprint) ? 0 : speedOf(key))), { w, stretch } = gaitWeights(vs, sp, k);
     let stride = 0, ws = 0; for (const key of LOCO) { stride += w[key] * (clips[key]?.userData.travel || 1) * k; ws += w[key]; }
     if (ws > 0) stride *= stretch;
     const adv = moved + turning * 0.55 * speedOf("walk_slow") * dt;

@@ -3,7 +3,7 @@
 // gets you up a wall a step won't, and you land again.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { walker, stepWalker, WALK } from "../src/lib/world3d/walker.js";
+import { walker, stepWalker, WALK, paceAt } from "../src/lib/world3d/walker.js";
 
 // a deck from x -5 to 5, z -20 to 20, 2 m high; water beyond; a 1 m high box at z -10 (x -1..1)
 const ground = {
@@ -15,10 +15,13 @@ const run = (s, input, secs, g = ground) => { for (let t = 0; t < secs; t += 1 /
 test("the stick moves you the way the camera looks, at walking or sprinting speed, and you turn to face it", () => {
   let s = walker(0, 10, 0, 2);
   s = run(s, { x: 0, y: 1, camYaw: 0 }, 1);
-  assert.ok(Math.abs(s.z - (10 - WALK.speed)) < 0.45, `walked north about ${WALK.speed} m (z ${s.z})`);
+  assert.ok(Math.abs(s.z - (10 - WALK.jog)) < 0.7, `a full push jogs north about ${WALK.jog} m in a second, less the setting off (z ${s.z})`);
+  // (a part push walks: six tenths of the stick's travel past its dead zone is the walk's 1.4 m/s)
+  assert.ok(Math.abs(paceAt(WALK.walkTo) - WALK.speed) < 1e-9 && Math.abs(paceAt(1) - WALK.jog) < 1e-9 && paceAt(0.3) < WALK.speed * 0.55 && paceAt(0.8) > WALK.speed && paceAt(0.8) < WALK.jog);
+  { let h = walker(0, 10, 0, 2); h = run(h, { x: 0, y: 0.7, camYaw: 0 }, 2); assert.ok(h.speed > 0.9 && h.speed <= WALK.speed + 0.01, `seven tenths of a push walks: ${h.speed.toFixed(2)} m/s`); }
   assert.ok(Math.abs(s.x) < 1e-6);
   let t = walker(0, 10, 0, 2); t = run(t, { x: 0, y: 1, camYaw: 0, sprint: true }, 1);
-  assert.ok(10 - t.z > 10 - s.z + (WALK.sprint - WALK.speed) * 0.6, `sprinting is quicker (getting up to a sprint takes a moment longer): ${(10 - t.z).toFixed(2)} m against ${(10 - s.z).toFixed(2)}`);
+  assert.ok(10 - t.z > 10 - s.z + (WALK.sprint - WALK.jog) * 0.5, `sprinting is quicker (getting up to a sprint takes a moment longer): ${(10 - t.z).toFixed(2)} m against ${(10 - s.z).toFixed(2)}`);
   // the camera turned to face east: pushing forwards walks east, and you turn to face east
   // (you turn to face it as you set off, and stride out once you're round: no sliding off sideways)
   let e0 = walker(0, 0, 0, 2); e0 = run(e0, { x: 0, y: 1, camYaw: Math.PI / 2 }, 0.15);

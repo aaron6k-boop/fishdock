@@ -183,6 +183,50 @@ That is Gorleston's real fault and the next piece of work: its buildings drawn a
 Measured (Ultra, 1920x1080, read a few seconds after the place appears): 66 frames a second before, 67 to 68 after;
 loading 21 s, then 22 s; no page errors.
 
+## The recording of 19 November (16:10) and the second brief
+
+Aaron's 75 second recording on his iPhone at Whitby (uploads/ScreenRecording_11-19-2026_16-10-01_1.mp4), with a brief
+that sets a new order: running and character movement first, then grass and vegetation, houses, cliffs and terrain,
+pier materials, then fishing animation, lighting and consistency. What the recording shows, frame by frame:
+
+- **Frame rate: 33 to 42 on the phone's own counter.** It showed 50 to 57 before stage 1. Stage 1 put the 1 m
+  hillside on Balanced; that is the first suspect and has to be measured, not guessed.
+- **Running:** the character (the woman with the ponytail) sprints along the pier carrying the rod upright at her
+  right side. There is a red glow on the ground at her feet.
+- **The hillside:** on the phone it is a smooth pale green surface with flat grey smears where paths are, one flight
+  of steps as a brown strip, a zig-zag fence and a single round tree. Balanced has no grass clumps, no clutter.
+- **Houses:** a row of plain boxes with painted-on windows.
+- **First person:** the cast's wind-up still shows the rod upright in the middle of a phone's narrow picture.
+
+The same movement filmed on the PC before any change (job h277, Ultra, from behind, the side, the front and close; in
+renders/footage_loco0_1615.zip):
+
+- At a full push of the stick the character walks at 1.4 m/s: there is no jog. Sprint is 3.2 m/s.
+- Walking, both hands hold the rod in front of the body, so neither arm swings and the chest does not turn.
+- Sprinting, the body is bent well forward with both knees deeply bent and the hips low: a crouched scurry, not a run.
+- The clothes are near black from head to knee, so the limbs are hard to read against each other.
+
+Order of work on movement: (1) the rod carried in one hand at the side so the other arm swings and the chest turns;
+(2) three paces, walk, jog and sprint, each at the speed its motion capture was filmed at; (3) the sprint's posture;
+(4) turns, stops and starts; (5) feet on slopes and steps; then both sexes and every build, filmed again the same way.
+
+### Movement, first step (19 November): three paces, and the sprint stood up
+
+Four ways of running were filmed side by side on the PC (job h278: the live settings, the motion-captured jog at its
+own 2.4 m/s, the jog lengthened to 3 m/s, and the retargeted full run at its own 3.35 m/s). The crouch is in the
+retargeted full run itself, at its own speed as much as blended; the jog is upright at both speeds. So:
+
+- **Three paces.** The first six tenths of the stick walk, up to 1.4 m/s; a full push jogs at 2.4 m/s, the speed that
+  clip was filmed at; Sprint runs at 3.1 m/s on the same clip with a longer stride. A full push used to be the walk.
+- **The retargeted full run is retired** (`human3d.js` SPRINT_CLIP) until a run is retargeted properly.
+- **Setting off** is eased for the faster paces, so a jog or a run builds over about half a second without a jolt.
+
+Seen on the PC (job h279, Ultra): walk, jog and sprint from the lit side, behind and in front, a stop, and turns right,
+left and back at a jog. Upright at every pace; no page errors.
+
+Not done yet: the rod is still carried upright at the chest with the right forearm held still; only the man was
+filmed; slopes and steps were not; foot placement, turning on the spot and the third-person camera are as they were.
+
 ## The phases, and where each stands
 
 1. Graphics engine audit: not started as a written audit. Measured so far: Whitby on Ultra 76 to 85 frames a second.
