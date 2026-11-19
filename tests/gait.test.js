@@ -19,13 +19,14 @@ test("walking at the game's walking pace is all walk, at the clip's own stride",
   }
 });
 
-test("sprinting is the full run near the speed it was captured at; without it, the jog quicker mostly by a longer stride", () => {
-  for (const sp of [SP.m, SP.f]) {
-    const { w, stretch } = gaitWeights(WALK.sprint, sp), pace = WALK.sprint / sp[4] / stretch;
-    assert.equal(w.sprint, 1); assert.ok(Math.abs(stretch - 1) < 0.06, `stride ${stretch.toFixed(3)}`); assert.ok(Math.abs(pace - 1) < 0.03, `pace ${pace.toFixed(3)}`);
+test("sprinting is the jog lengthened, mostly by a longer stride (the retargeted full run is not used: it runs bent double)", () => {
+  // (as the game asks from 19 November: no speed for the full run's clip, human3d.js SPRINT_CLIP)
+  for (const sp of [SP.m, SP.f, SP.old]) {
+    const { w, stretch } = gaitWeights(WALK.sprint, [sp[0], sp[1], sp[2], sp[3], 0]), pace = WALK.sprint / sp[3] / stretch;
+    assert.equal(w.run, 1); assert.equal(w.sprint, 0); assert.ok(stretch > 1.15 && stretch <= 1.35, `stride ${stretch.toFixed(3)}`); assert.ok(pace >= 1 && pace < 1.1, `pace ${pace.toFixed(3)}`);
   }
-  const { w, stretch } = gaitWeights(WALK.sprint, SP.old), pace = WALK.sprint / SP.old[3] / stretch;
-  assert.equal(w.run, 1); assert.ok(stretch > 1.15 && stretch <= 1.35, `stride ${stretch.toFixed(3)}`); assert.ok(pace >= 1 && pace < 1.1, `pace ${pace.toFixed(3)}`);
+  // (and a full push of the stick is the jog as it was filmed: no stretch to speak of)
+  for (const sp of [SP.m, SP.f]) { const { w, stretch } = gaitWeights(WALK.jog, [sp[0], sp[1], sp[2], sp[3], 0]); assert.equal(w.run, 1); assert.ok(Math.abs(stretch - 1) < 0.06, `jog's stride ${stretch.toFixed(3)}`); }
 });
 
 test("the full run takes over from the jog only above jogging pace, and the two runs are never mixed with a walk", () => {

@@ -12,7 +12,10 @@
 // (speed: an ordinary walk, about 1.4 m/s, as people walk when nobody's hurrying them, so the walk is the motion-captured
 // walk at its own pace; sprint: a run at 3.2 m/s, the captured run a little quicker. Until 15 November they were 1.8 and
 // 4.2: the walk came out a third of a jog and the run a jog sped up nearly twice over, legs whirring)
-export const WALK = { speed: 1.4, sprint: 3.2, turn: 9, turnMax: [5.5, 4.6, 3.2], jump: 5.2, gravity: 16, step: 0.45, go: 9, halt: 13, air: 4.9, dead: 0.12 };
+// (three paces from 19 November: a walk up to 1.4 m/s over the first six tenths of the stick, a jog at 2.4 m/s at a full
+// push (the motion-captured run at the speed it was filmed at; a full push used to be the walk, and there was no
+// jog), and a run at 3.1 m/s with Sprint held)
+export const WALK = { speed: 1.4, jog: 2.4, walkTo: 0.6, sprint: 3.1, turn: 9, turnMax: [5.5, 4.6, 3.2], jump: 5.2, gravity: 16, step: 0.45, go: 9, halt: 13, air: 4.9, dead: 0.12 };
 
 /** A fresh walker standing at (x, z), facing `face` (radians, 0 = -z). */
 export function walker(x, z, face, y = 0) { return { x, z, y, vy: 0, vx: 0, vz: 0, ax: 0, az: 0, face, speed: 0, air: false, phase: 0, turnRate: 0, acc: 0, off: 0 }; }
@@ -25,6 +28,11 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export function turnLimit(speed, W = WALK) {
   const [a, b, c] = W.turnMax, s = Math.max(0, speed);
   return s <= W.speed ? a + (b - a) * (s / W.speed) : b + (c - b) * Math.min(1, (s - W.speed) / Math.max(0.01, W.sprint - W.speed));
+}
+/** The speed (m/s) a push of the stick asks for without Sprint (mag 0 to 1, after the dead zone): a walk, then a jog. */
+export function paceAt(mag, W = WALK) {
+  const m = Math.max(0, Math.min(1, mag)), jog = W.jog ?? W.speed, to = W.walkTo ?? 1;
+  return m <= to ? W.speed * (m / to) : W.speed + (jog - W.speed) * ((m - to) / (1 - to));
 }
 /** How much of the wanted speed to make when facing `off` radians away from where you're going (1 straight on). */
 export function alignSpeed(off) { return Math.max(0.12, Math.min(1, (Math.cos(off) + 0.35) / 1.35)); }
@@ -47,7 +55,7 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
   // forwards is where the camera looks (yaw 0 = -z); right is 90° clockwise of it
   const fx = Math.sin(input.camYaw || 0), fz = -Math.cos(input.camYaw || 0), rx = -fz, rz = fx;
   const dx = (fx * iy + rx * ix) * mag, dz = (fz * iy + rz * ix) * mag;
-  const v = (input.sprint ? W.sprint : W.speed) * mag;
+  const v = input.sprint ? W.sprint * mag : paceAt(mag, W);
   // turn to face the way you're going: eased in at the end, never quicker than a body turns (a pivot standing, a wider
   // arc at speed), so turning back the way you came is a turn, not a flip
   const sp0 = Math.hypot(s.vx || 0, s.vz || 0);
@@ -71,7 +79,9 @@ export function stepWalker(s, input, dt, ground, opt = {}) {
     const k = 1 - Math.exp(-dt * W.air);
     n.vx = (s.vx || 0) + (tvx - (s.vx || 0)) * k; n.vz = (s.vz || 0) + (tvz - (s.vz || 0)) * k; n.ax = 0; n.az = 0;
   } else {
-    const w = Math.hypot(tvx, tvz) >= sp0 - 1e-6 && mag > 0 ? W.go : W.halt;
+    // (getting up to a jog or a run takes a little longer than to a walk: at the walk's briskness a jog set off at
+    // 8 m/s², more than a person manages from standing; eased by the square root of the pace, both stay under 7)
+    const vt = Math.hypot(tvx, tvz), w = vt >= sp0 - 1e-6 && mag > 0 ? W.go * Math.sqrt(W.speed / Math.max(W.speed, vt)) : W.halt;
     [n.vx, n.ax] = spring(s.vx || 0, s.ax || 0, tvx, w, dt); [n.vz, n.az] = spring(s.vz || 0, s.az || 0, tvz, w, dt);
   }
   // (settled: a halt ends at rest rather than creeping on)

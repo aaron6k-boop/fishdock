@@ -20,7 +20,7 @@ test("the speed spring is exact: the same at 120, 60, 20 and 16 frames a second"
 });
 test("setting off: a moment's build, no jolt; a walk and a stop end up the same at 60 and 20 frames a second", () => {
   const a = run(walker(0, 0, 0), { x: 0, y: 1, camYaw: 0 }, 1.2, 1 / 60), b = run(walker(0, 0, 0), { x: 0, y: 1, camYaw: 0 }, 1.2, 1 / 20);
-  assert.ok(Math.abs(a.s.z - b.s.z) < 0.03, `${a.s.z.toFixed(3)} vs ${b.s.z.toFixed(3)}`);
+  assert.ok(Math.abs(a.s.z - b.s.z) < 0.05, `${a.s.z.toFixed(3)} vs ${b.s.z.toFixed(3)}`); // (2% of the 2.4 m a jog covers in that time; 3 cm when a full push was the walk)
   // the acceleration rises from nothing (no step in speed on the first frame) and stays below what a person manages
   assert.ok(a.out[0].speed < 0.05, `first frame ${a.out[0].speed}`);
   const maxAcc = Math.max(...a.out.slice(1).map((s, i) => (s.speed - a.out[i].speed) * 60));
