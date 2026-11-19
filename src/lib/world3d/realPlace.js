@@ -822,8 +822,23 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       for (let ch = 0; ch < 3; ch++) C3[v * 3 + ch] *= ao;
     }
     const ix = [];
+    // (below the highest settings the hillside is drawn in 2 m squares wherever four of its 1 m cells make a whole one:
+    // a quarter of the triangles for nearly the same shape. Measured on the phone setting on Aaron's PC, 19 November,
+    // looking at the town from the pier: 2.98 million triangles a frame, 0.9 million of them this hillside, drawn three
+    // times over (the picture, the water's mirror, the depth pass); his phone showed 33 to 42 frames a second there.
+    // Cells left over at an edge or round a gap stay 1 m, and a 2 m square is only made where the four cells' middle
+    // edges are near enough straight (within 3 cm) that no crack opens against 1 m neighbours)
+    const wide2 = quality < 2, done = wide2 ? new Uint8Array((nx - 1) * (nz - 1)) : null;
+    const yOf = (v) => P3[v * 3 + 1], straight = (a, m, b) => Math.abs(yOf(m) - (yOf(a) + yOf(b)) / 2) < 0.03;
+    if (wide2) for (let j = 0; j + 2 < nz; j += 2) for (let i = 0; i + 2 < nx; i += 2) {
+      const q = j * (nx - 1) + i; if (!qc[q] || !qc[q + 1] || !qc[q + nx - 1] || !qc[q + nx]) continue;
+      const a = idx[j * nx + i], b = idx[j * nx + i + 2], c = idx[(j + 2) * nx + i], d = idx[(j + 2) * nx + i + 2];
+      const n = idx[j * nx + i + 1], w = idx[(j + 1) * nx + i], e = idx[(j + 1) * nx + i + 2], so = idx[(j + 2) * nx + i + 1];
+      if (!straight(a, n, b) || !straight(a, w, c) || !straight(b, e, d) || !straight(c, so, d)) continue;
+      ix.push(a, c, b, b, c, d); done[q] = done[q + 1] = done[q + nx - 1] = done[q + nx] = 1;
+    }
     for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
-      if (!qc[j * (nx - 1) + i]) continue;
+      if (!qc[j * (nx - 1) + i] || (done && done[j * (nx - 1) + i])) continue;
       const a = idx[j * nx + i], b = idx[j * nx + i + 1], c = idx[(j + 1) * nx + i], d = idx[(j + 1) * nx + i + 1];
       ix.push(a, c, b, b, c, d);
     }
