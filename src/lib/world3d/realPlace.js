@@ -1507,7 +1507,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const bankAt = (x, z) => { if (!local?.hill) return 0; const d = Math.abs(local.hill(x - 2, z) - local.hill(x + 2, z)); return d > 0.3 ? Math.min(1, d / 0.8) : 0; };
     const woods = (place.woods || []).map(bb), woodAt = (x, z) => woods.some((b) => inB([x, z], b));
     const backsT = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null;
-    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || PR.some((b) => inB([x, z], b)) /* (never on a pier: the map's coastline often runs round them, so they count as land) */ || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, bankTrees: local?.bankTrees ?? 1, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
+    // (nor on an open pier's deck: Whitby's West Pier extension, a timber deck over the sea, had a tree growing out of it
+    // beside the footbridge, as its ring isn't among the solid piers')
+    const allPiers = (place.piers || []).filter((p) => p.ring).map((p) => bb(p.ring));
+    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || allPiers.some((b) => inB([x, z], b) || (x > b.x0 - 4 && x < b.x1 + 4 && z > b.z0 - 4 && z < b.z1 + 4 && b.r.some((q, i) => segDist([x, z], q, b.r[(i + 1) % b.r.length]) < 4))) /* (never on a pier, or within 4 m of one: the map's coastline often runs round them, so they count as land) */ || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, bankTrees: local?.bankTrees ?? 1, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
     if (trees) { place.trees = trees.count; place.treesBuilt = trees.built; place.treesUpdate = trees.update; }
   }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)

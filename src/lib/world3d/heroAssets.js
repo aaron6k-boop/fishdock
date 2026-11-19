@@ -16,14 +16,16 @@ import { loadPart } from "./glbParts.js";
 export function heroSwap(group, standIns, file, node, { at, base, ry = 0, look = null, dist = [70, 220] } = {}) {
   return loadPart(file).then((scene) => {
     const lod = new THREE.LOD(); lod.name = node;
-    const seen = new Set();
+    // (each swap its own copies of the model's materials: two lighthouses from one file shared them, and the second's
+    // weathering was compiled into the first's shader again, which then failed and drew nothing)
+    const own = new Map(), mine = (mt) => { if (!own.has(mt)) { const c = mt.clone(); if (look) look(c); own.set(mt, c); } return own.get(mt); };
     for (let i = 0; i < 3; i++) {
       const src = scene.getObjectByName(`${node}_LOD${i}`); if (!src) continue;
       const o = src.clone(true); o.position.set(0, 0, 0); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
       o.traverse((m) => {
         if (!m.isMesh) return;
         m.castShadow = i < 2; m.receiveShadow = true; m.userData.kind = "a building";
-        for (const mt of Array.isArray(m.material) ? m.material : [m.material]) if (look && !seen.has(mt)) { seen.add(mt); look(mt); }
+        m.material = Array.isArray(m.material) ? m.material.map(mine) : mine(m.material);
       });
       lod.addLevel(o, i === 0 ? 0 : dist[i - 1]);
     }
