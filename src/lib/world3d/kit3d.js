@@ -4,9 +4,9 @@
 // far level (source h207: exports/kit2/<id>.glb, objects <id>_v<k>_near and _far, shipped as public/models/kit/<id>.glb
 // with their pictures at 512 px); the wrack is modelled there. Each placement is one of its model's variants, sized by
 // the set's tallest. Each variant is one instanced mesh per level and material:
-// rocks and wood within NEAR metres of the camera at their near level, out to far() their far one, none beyond; a plant
+// rocks and wood within NEAR metres of the camera at their near level, out to farD() their far one, none beyond; a plant
 // near within PLANT_NEAR, and out only as far as its size can be seen in the grass (PLANT_PER_M metres for each metre
-// it stands, plantFar() at most: on Aaron's PC every plant out to 170 m took Whitby from 3.7 to 13.9 million triangles a
+// it stands, plantFarD() at most: on Aaron's PC every plant out to 170 m took Whitby from 3.7 to 13.9 million triangles a
 // frame and from 94 to 64 frames a second); looked at again as the camera moves. Where each goes is the place's
 // (realPlace.js): this only draws them, each at its spot, turned and sized.
 import * as THREE from "three";
@@ -15,7 +15,7 @@ import { MODELS_BASE } from "./glbParts.js";
 import { DETAIL } from "./detail.js";
 
 const NEAR = 45, PLANT_NEAR = 22, PLANT_PER_M = 120;
-const far = () => (DETAIL.ultra ? 170 : 120), plantFar = () => (DETAIL.ultra ? 90 : 60); // (Ultra further out, detail.js)
+const farD = () => (DETAIL.ultra ? 170 : 120), plantFarD = () => (DETAIL.ultra ? 90 : 60); // (Ultra further out, detail.js)
 const PLANTS = /plant|shrub|grass|fern|dandelion|wrack/, SHADE = /nettle|shrub_02|fern/; // (the plants tall enough for their shadows to tell)
 let loader = null;
 const kits = new Map();
@@ -82,7 +82,7 @@ export function buildKit(group, sets) {
       });
       const near = mk(lv.near, true), far = lv.far === lv.near ? near : mk(lv.far, false);
       // (how far each is drawn, its near level and its last, squared)
-      const reach = at.map(([, , , , size = 1]) => { const f = solid ? far() : Math.min(plantFar(), Math.max(30, size * PLANT_PER_M)); return [Math.min(solid ? NEAR : PLANT_NEAR, f) ** 2, f * f]; });
+      const reach = at.map(([, , , , size = 1]) => { const f = solid ? farD() : Math.min(plantFarD(), Math.max(30, size * PLANT_PER_M)); return [Math.min(solid ? NEAR : PLANT_NEAR, f) ** 2, f * f]; });
       live.push({ S: { ...S, at }, near, far, mats, reach, at: new THREE.Vector3(1e9, 0, 1e9) });
     });
   })));

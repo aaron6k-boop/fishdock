@@ -21,7 +21,9 @@ export function styleFor(b) {
   const k = b.kind || "yes";
   const storeyH = 3;
   const tinted = (list) => list[Math.floor(r2 * list.length)];
-  const RENDER = [[1, 1, 1], [0.98, 0.94, 0.84], [0.9, 0.95, 1], [0.98, 0.96, 0.9], [0.95, 0.9, 0.82]];
+  // (render's colour washes: white and creams most, a pale stone, and now and then a soft yellow, pink, grey-blue or
+  // sage, as in any British seaside town's painted terraces)
+  const RENDER = [[1, 1, 1], [0.98, 0.94, 0.84], [0.9, 0.95, 1], [0.98, 0.96, 0.9], [0.95, 0.9, 0.82], [1, 1, 1], [0.99, 0.93, 0.74], [0.98, 0.89, 0.85], [0.87, 0.91, 0.95], [0.89, 0.93, 0.85], [0.97, 0.95, 0.88]];
   const BRICK = [[1, 1, 1], [0.9, 0.86, 0.84], [1.05, 0.95, 0.9], [0.82, 0.78, 0.76]];
   const BUFF = [[1, 1, 1], [0.96, 0.95, 0.92], [1.03, 1, 0.94], [0.9, 0.89, 0.86]];
   // (the sheds' painted cladding: goosewing grey, a slate blue, a green, an off-white, a darker grey-green)

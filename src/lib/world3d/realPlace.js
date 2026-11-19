@@ -1131,7 +1131,19 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         }
       }
     };
-    for (const r of place.roads || []) { if (r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(r.kind === "tarmac" ? T : Pa, r.line, 0, r.w / 2, r.kind === "tarmac" ? 0.035 : 0.06); if (r.kind === "tarmac") { ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); kerb(r.line, r.w / 2); } }
+    // (a footpath across grass or a bank, not a paved way through the town: worn earth and grit, its edges ragged where the
+    // grass grows over them (the uv across it 0 to 1, for the shader); drawn as paving, every path on Whitby's East
+    // Cliff read as a strip of brown card laid on the slope)
+    const Pg = { p: [], uv: [], i: [] };
+    const nearV = (x, z) => { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; if (i < n - 1 && x - xs[i] > xs[i + 1] - x) i++; if (j < n - 1 && z - xs[j] > xs[j + 1] - z) j++; return j * n + i; };
+    const onSoft = (line) => { let s = 0, m = 0; for (let k = 0; k + 1 < line.length; k++) { const x = (line[k][0] + line[k + 1][0]) / 2, z = (line[k][1] + line[k + 1][1]) / 2, c = cAt(x, z), v = nearV(x, z); m++; if (c === 3 || bank[v] || (c === 1 && town[v])) s++; } return m > 0 && s / m > 0.6; };
+    for (const r of place.roads || []) {
+      if (r.kind !== "path" || r.line.some(([x, z]) => nearSpot(x, z, 25)) || !onSoft(r.line)) continue;
+      const half = r.w / 2 + 0.35, v0 = Pg.uv.length; ribbon(Pg, r.line, 0, half, 0.025);
+      for (let q = v0 + 1; q < Pg.uv.length; q += 2) Pg.uv[q] /= (2 * half) / 6;
+      r.soft = true;
+    }
+    for (const r of place.roads || []) { if (r.soft || r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(r.kind === "tarmac" ? T : Pa, r.line, 0, r.w / 2, r.kind === "tarmac" ? 0.035 : 0.06); if (r.kind === "tarmac") { ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); kerb(r.line, r.w / 2); } }
     // car parks (the map's amenity=parking): a sheet of tarmac on the ground, bays painted on it
     for (const ring of place.parking || []) {
       if (ring.length < 3 || ring.some(([x, z]) => nearSpot(x, z, 25))) continue;
@@ -1149,6 +1161,29 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     mk(Gl, new THREE.MeshStandardMaterial({ map: grateTex(), roughness: 0.75, metalness: 0.3, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     mk(Pv, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb8b4ac, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
     mk(Pa, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xaaa69c, roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
+    {
+      // (the footpaths' earth: the mud photograph laid by the world's own axes (not along the path, where its tile ran on
+      // in lines), taken half to grey and lightened as trodden grit, paler down the middle where most feet go; the edges
+      // cut away by noise, so the grass under shows through them)
+      const mud = photoTex("ground_mud_diff");
+      const pm = new THREE.MeshStandardMaterial({ map: mud || cTex.map, color: 0xffffff, roughness: 0.95, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide });
+      pm.onBeforeCompile = (sh) => {
+        sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vPgW; varying float vPgA;").replace("#include <uv_vertex>", "#include <uv_vertex>\nvPgA = uv.y; vPgW = (modelMatrix * vec4(position, 1.0)).xyz;");
+        sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+          varying vec3 vPgW; varying float vPgA;
+          float pgH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+          float pgN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(pgH(i), pgH(i + vec2(1.0, 0.0)), f.x), mix(pgH(i + vec2(0.0, 1.0)), pgH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+          .replace("#include <map_fragment>", `
+          vec3 pgP = texture2D(map, vPgW.xz / 2.4).rgb; float pgL = dot(pgP, vec3(0.3, 0.55, 0.15));
+          float pgE = abs(vPgA * 2.0 - 1.0), pgR = 0.62 + 0.3 * pgN(vPgW.xz * 1.1) + 0.12 * pgN(vPgW.xz * 4.3) - 0.06;
+          if (pgE > pgR) discard;
+          vec3 pgC = mix(pgP, vec3(pgL) * vec3(1.08, 1.0, 0.88), 0.55) * 1.8;
+          pgC *= mix(1.12, 0.82, smoothstep(0.1, pgR, pgE)) * (0.9 + 0.2 * pgN(vPgW.xz / 7.0));
+          diffuseColor.rgb *= pgC;`);
+      };
+      pm.customProgramCacheKey = () => "fdpath1";
+      mk(Pg, pm);
+    }
   }
 
   // ---- garden walls, fences and hedges (the map's barriers): the texture of a town between its streets ----
