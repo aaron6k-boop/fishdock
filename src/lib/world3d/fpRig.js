@@ -428,7 +428,7 @@ export function createFpRig({ gloves = false, skinHex = 0xc99a74, coatHex = 0x2b
   // skin keeps the player's own colour; nothing waits on it: the plain skin until it's in)
   if (!gloves && typeof document !== "undefined") {
     const tl = new THREE.TextureLoader(), got = {};
-    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 0.86; skinMat.roughness = 0.86 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(1.5, 1.5); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
+    const done = () => { if (!got.map || !got.normalMap || !got.roughnessMap) return; Object.assign(skinMat, got); skinMat.userData.dryRough = 0.86; skinMat.roughness = 0.86 * (1 - skinMat.userData.wetGloss * WET); skinMat.normalScale.set(1.8, 1.8); skinMat.userData.base.multiplyScalar(1 / HAND_NEUTRAL); skinMat.color.multiplyScalar(1 / HAND_NEUTRAL); skinMat.needsUpdate = true; };
     for (const [k, f] of [["map", "hand_colour"], ["normalMap", "hand_normal"], ["roughnessMap", "hand_rough"]]) tl.load(TEX_BASE + f + ".webp", (t) => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; got[k] = t; done(); }, undefined, () => {});
   }
   // (wet: the skin's roughness down by 40% and its colour 4% darker; the coat's roughness down by half and 12% darker,

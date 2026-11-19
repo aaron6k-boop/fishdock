@@ -926,7 +926,11 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     // ---- lamps after dark: the pools by the anglers, the lanterns and windows, their streaks on the water ----
     const lampOn = look.lampOn;
     // (switched off altogether by day: an unlit light still costs every pixel it might reach)
-    for (const pl of pointLights) { pl.intensity = lampOn * (pl.userData.cd || 60); pl.visible = lampOn > 0.02; }
+    // (never hidden: off is no light, not no lamp. The number of lamps is written into every lit material's shader, so
+    // hiding them as day came and showing them at dusk rebuilt all of those shaders on the spot: 63 of them at Whitby,
+    // fifteen and a half seconds with the picture stopped on Aaron's PC, each time the lamps came on or went off
+    // (the graphics calls timed there, 19 November). A lamp at nothing costs a few sums a pixel by day)
+    for (const pl of pointLights) pl.intensity = lampOn > 0.02 ? lampOn * (pl.userData.cd || 60) : 0;
     for (const m of lamps) { if (m.emissiveIntensity != null) m.emissiveIntensity = st.night * 0.9 + st.dusk * 0.3; else m.visible = st.night + st.dusk > 0.3; }
     for (let i = 0; i < 4; i++) { const q = lampSpots[i]; wU.uLamps.value[i].set(q ? q[0] : 0, q ? q[1] : 0, q ? q[2] : 0, q ? lampOn : 0); }
     // the ground darkens and shines in the rain (wetLook.js), and stays wet a while after it (st.wet: from the last

@@ -6,3 +6,4 @@ dist-e2e/
 *.log
 desktop/node_modules
 desktop/out
+__pycache__/

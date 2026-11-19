@@ -80,9 +80,9 @@ it goes in (an asset site's other assets may be under other terms).
 | ground_mud_diff.jpg | 388 KB | 1024x1024 | jpeg |
 | ground_rough_diff.jpg | 193 KB | 1024x1024 | jpeg |
 | ground_rough_nor.jpg | 84 KB | 512x512 | jpeg |
-| hand_colour.webp | 9 KB | 1024x1024 | webp |
-| hand_normal.webp | 66 KB | 1024x1024 | webp |
-| hand_rough.webp | 3 KB | 1024x1024 | webp |
+| hand_colour.webp | 116 KB | 2048x2048 | webp |
+| hand_normal.webp | 158 KB | 2048x2048 | webp |
+| hand_rough.webp | 18 KB | 1024x1024 | webp |
 | leaf_cluster.webp | 47 KB | 512x512 | webp |
 | pier_concrete_diff.jpg | 334 KB | 1024x1024 | jpeg |
 | pier_concrete_nor.jpg | 184 KB | 1024x1024 | jpeg |
