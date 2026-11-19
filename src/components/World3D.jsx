@@ -12,6 +12,7 @@ import { SKYLINE_NOTE } from "../lib/world3d/skyline.js";
 import { effectiveGfx } from "./GraphicsPanel.jsx";
 import { localFor } from "../lib/world3d/localDetail.js";
 import { createLoadGate } from "../lib/loadGate.js";
+import { fresh } from "../lib/staleReload.js";
 import { play, soundPan, soundOn, soundOff, soundEnv, setVolumes, holdRecordings } from "../lib/sceneAudio.js";
 import { fretAndStorm } from "../lib/world3d/skyLook.js";
 
@@ -83,7 +84,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         if (!r.ok) throw new Error("no place");
         const [lat, lon] = (r.headers.get("x-mark") || "").split(",").map(Number);
         const osm = await r.json(); mark("place-data");
-        const { buildPlace } = await import("../lib/world3d/osmPlace.js");
+        const { buildPlace } = await fresh(() => import("../lib/world3d/osmPlace.js"));
         // a mark whose listed position is approximate may use the nearest bank within 400 m (and the label says so)
         // (only when the server used that listed position: some marks have a checked position kept on the server)
         const listed = spotById(spotId);
@@ -104,7 +105,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
     let gone = false, w = null, untrack = null, release = null;
     (async () => {
       try {
-        const mod = await import("../lib/world3d/world.js"); mark("world-code");
+        const mod = await fresh(() => import("../lib/world3d/world.js")); mark("world-code");
         if (gone) return;
         // (the people's files, the rod and the nets asked for now, to come in while the world is built: world.js prefetch)
         mod.prefetch(props.current.anglers);

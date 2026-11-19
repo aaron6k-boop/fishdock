@@ -9,26 +9,27 @@ import { parsePlay, parsePlayMap } from "./lib/playRoute.js";
 import { nationAt, setDistanceUnit } from "./lib/geo.js";
 import { activeSession, onSessionChange, recoverSession } from "./lib/session.js";
 import { restore } from "./lib/account.js";
+import { fresh } from "./lib/staleReload.js";
 import { startSync } from "./lib/sync.js";
 import { Icon, Toast } from "./components/ui.jsx";
 import Home from "./pages/Home.jsx";
 import Onboarding from "./components/Onboarding.jsx";
 import PlacePicker from "./components/PlacePicker.jsx";
 
-const Explore = lazy(() => import("./pages/Explore.jsx"));
-const Tackle = lazy(() => import("./pages/Tackle.jsx"));
-const Catches = lazy(() => import("./pages/Catches.jsx"));
-const Community = lazy(() => import("./pages/Community.jsx"));
-const Live = lazy(() => import("./pages/Live.jsx"));
-const CastAdvisor = lazy(() => import("./pages/CastAdvisor.jsx"));
-const Settings = lazy(() => import("./pages/Settings.jsx"));
-const Admin = lazy(() => import("./pages/Admin.jsx"));
-const Watch = lazy(() => import("./pages/Watch.jsx"));
-const TryLive = lazy(() => import("./pages/TryLive.jsx"));
-const Together = lazy(() => import("./pages/Together.jsx"));
-const Party = lazy(() => import("./pages/Party.jsx"));
-const SpotMap = lazy(() => import("./pages/SpotMap.jsx"));
-const GameMap = lazy(() => import("./pages/SpotMap.jsx").then((m) => ({ default: m.GameMap })));
+const Explore = lazy(() => fresh(() => import("./pages/Explore.jsx")));
+const Tackle = lazy(() => fresh(() => import("./pages/Tackle.jsx")));
+const Catches = lazy(() => fresh(() => import("./pages/Catches.jsx")));
+const Community = lazy(() => fresh(() => import("./pages/Community.jsx")));
+const Live = lazy(() => fresh(() => import("./pages/Live.jsx")));
+const CastAdvisor = lazy(() => fresh(() => import("./pages/CastAdvisor.jsx")));
+const Settings = lazy(() => fresh(() => import("./pages/Settings.jsx")));
+const Admin = lazy(() => fresh(() => import("./pages/Admin.jsx")));
+const Watch = lazy(() => fresh(() => import("./pages/Watch.jsx")));
+const TryLive = lazy(() => fresh(() => import("./pages/TryLive.jsx")));
+const Together = lazy(() => fresh(() => import("./pages/Together.jsx")));
+const Party = lazy(() => fresh(() => import("./pages/Party.jsx")));
+const SpotMap = lazy(() => fresh(() => import("./pages/SpotMap.jsx")));
+const GameMap = lazy(() => fresh(() => import("./pages/SpotMap.jsx")).then((m) => ({ default: m.GameMap })));
 
 const TABS = [
   { id: "home", label: "Home", icon: "home" },
