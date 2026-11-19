@@ -2470,7 +2470,7 @@
    "attribution": "Required: \"© Environment Agency copyright and/or database right 2022. All rights reserved.\" Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note)",
    "type": "elevation data (bare ground, metres above Ordnance Datum), GeoTIFF, British National Grid",
    "resolution": "1 m",
-   "use": "the ground round Whitby's piers: the East and West Cliffs at their surveyed heights (src/lib/world3d/terrain3d.js: each height the mean of the survey's 1 m cells over 5 m, every 5 m, 640 m each way round the mark, in centimetres)",
+   "use": "the ground round Whitby's piers: the East and West Cliffs at their surveyed heights (src/lib/world3d/terrain3d.js: each height the mean of the survey's 1 m cells over 5 m, every 5 m, 640 m each way round the mark, in centimetres); and from 19 November 2026 the survey's own 1 m relief over the East Cliff, the hillside, Henrietta Street and the sea cliff (x -81 to 450 m, z 51 to 330 m from the mark: each 1 m height less the 5 m terrain's, in 2 cm steps; public/textures/terrain_whitby_1m.bin, drawn on a 1 m mesh on High and Ultra)",
    "files": [
     {
      "file": "renders/dem_whitby/dtm_1m.tif",
