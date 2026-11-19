@@ -1972,17 +1972,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           }
         } else if (bank[k] && nb4(k).some((q) => cls[q] === 0 || cls[q] === 2)) {
           for (let c = 0; c < area * 0.03; c++) put("rock_moss_set_01", x0 + R() * cw, z0 + R() * ch, 0.5 + R() * 1.1, 1); // (fallen at the cliff's foot)
-          // (and the big ones: boulders a metre and more across, and now and then a slab of the cliff's own rock
-          // standing out of the foot of it; kit3, 19 November)
-          for (let c = 0; c < area * 0.012; c++) put("rock_moss_set_02", x0 + R() * cw, z0 + R() * ch, 0.6 + R() * 0.9, 1);
-          if (steep[k] > 0.35 && R() < area * 0.0025) put("coast_rocks_05", x0 + R() * cw, z0 + R() * ch, 1.2 + R() * 0.8, 1);
         }
         if (bank[k] || cls[k] === 3 || town[k]) {
           for (let c = 0; c < area * (bank[k] ? 0.05 : 0.02); c++) {
             const x = x0 + R() * cw, z = z0 + R() * ch, fi = fineInfo(x, z), soil = fi ? fi.soil : 0, slope = fi ? fi.slope : steep[k] * 1.5, r = R();
-            // (on a face too steep for plants, the rock itself stands out here and there: a scanned outcrop two to
-            // four metres high, sunk a third into the slope)
-            if (slope > 1.4) { if (bank[k] && r < 0.035) put(r < 0.018 ? "rock_face_01" : "rock_face_02", x, z, 2 + R() * 2.2, 1); continue; }
+            if (slope > 1.4) continue;
             if (bank[k]) {
               if (soil > 0.45 && r < 0.2) put("rock_moss_set_01", x, z, 0.3 + R() * 0.6, 1);
               else if (soil > 0.25 && r < 0.42) put("nettle_plant", x, z, 0.5 + R() * 0.5);
@@ -2014,7 +2008,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           }
         }
       }
-      kit = buildKit(group, Object.entries(S).map(([id, at]) => ({ id, at, flat: id === "wrack", sink: id === "wrack" ? 0 : /rock_face|coast_rocks/.test(id) ? 0.33 : /rock_moss_set_02/.test(id) ? 0.18 : undefined })));
+      kit = buildKit(group, Object.entries(S).map(([id, at]) => ({ id, at, flat: id === "wrack", sink: id === "wrack" ? 0 : undefined })));
       place.kitCounts = Object.fromEntries(Object.entries(S).map(([k, v]) => [k, v.length]));
     }
     if (field || tufts || kit) place.tuftsUpdate = (t, cam, wind, windDir) => { field?.update(t, cam, wind, windDir); tufts?.update(t, cam, wind, windDir); kit?.update(t, cam); };

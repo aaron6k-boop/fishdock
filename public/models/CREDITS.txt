@@ -188,9 +188,7 @@ The ground's clutter on High and Ultra (public/models/kit/*.glb, from 19 Novembe
 "Nettle Plant" by Rob Tuytel and Rico Cilliers; "Weed Plant 02" by Rob Tuytel and Rico Cilliers; "Shrub 02" by Rico
 Cilliers; "Shrub Sorrel 01" by Rico Cilliers; "Dandelion 01" by Rob Tuytel and Rico Cilliers; "Fern 02" by Rob Tuytel
 and Rico Cilliers; "Dead Tree Trunk" by Rob Tuytel; "Dry Branches Medium 01" by Rico Cilliers; "Grass Medium 01" by
-Rob Tuytel and Rico Cilliers; and the bigger rocks: "Rock Moss Set 02" by Kless Gyzen; "Rock Face 01" by Dario
-Barresi; "Rock Face 02" by Dario Barresi and Rico Cilliers; "Coast Rocks 05" by Rob Tuytel (each at
-https://polyhaven.com/a/<name>, e.g. https://polyhaven.com/a/nettle_plant),
+Rob Tuytel and Rico Cilliers (each at https://polyhaven.com/a/<name>, e.g. https://polyhaven.com/a/nettle_plant),
 split into their separate pieces and cut down in Blender for FishDock. The wrack (kit/wrack.glb), the grass blades
 (public/textures/grass_field.webp) and the trees' leaf cluster (public/textures/leaf_cluster.webp) are modelled in
 Blender for FishDock (source-assets/blender/build_kit.py, build_grass_field.py, build_leaves.py). Credited with
