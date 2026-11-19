@@ -51,10 +51,25 @@ export function reliefOf(name) { return reliefs.get(name) || null; }
 /** For the tests: unpack a relief from its bytes. */
 export function setRelief(name, rel) { reliefs.set(name, rel); }
 
+// ---- a place's 5 m grid kept in a file of its own (the environment system's places after Whitby) ----
+// Inline, each place's grid (about 100 kB) would ride in every player's download; a place with file instead of data has
+// its grid fetched before it is built (world.js preparePlace), the same dv16 bytes, raw. Made by
+// source-assets/tools/terrain_from_dtm.py from the Environment Agency's survey.
+const grids = new Map();
+/** Fetch a place's 5 m grid if it lives in a file (a promise; resolves either way). */
+export function loadTerrain(name, base = "") {
+  const T = TERRAIN[name]; if (!T || T.data || grids.has(name) || typeof fetch !== "function") return Promise.resolve();
+  return fetch(base + T.file).then((r) => (r.ok ? r.arrayBuffer() : null)).then((buf) => { if (buf) grids.set(name, new Uint8Array(buf)); }).catch(() => {});
+}
+/** For the tests: a place's grid from its bytes. */
+export function setTerrainBytes(name, bytes) { grids.set(name, bytes); cache.delete(name); }
+
 export function terrainHill(name) {
   if (cache.has(name)) return cache.get(name);
   const T = TERRAIN[name]; if (!T) return null;
-  const bin = typeof atob === "function" ? atob(T.data) : Buffer.from(T.data, "base64").toString("binary");
+  if (!T.data && !grids.has(name)) return null; // (its file not fetched: the place stands on its usual level)
+  const raw = grids.get(name);
+  const bin = raw ? { charCodeAt: (i) => raw[i] } : typeof atob === "function" ? atob(T.data) : Buffer.from(T.data, "base64").toString("binary");
   const H = new Float32Array(T.n * T.n);
   if (T.enc === "dv16") {
     // (centimetres, each row's first height then the change to the next, zigzag varints)

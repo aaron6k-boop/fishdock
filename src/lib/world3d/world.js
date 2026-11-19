@@ -25,15 +25,15 @@ import { createPost } from "./post.js";
 import { setPeopleDetail, prefetchPeople, holdDetail } from "./human3d.js";
 export { holdDetail };
 import { loadPart } from "./glbParts.js";
-import { loadRelief } from "./terrain3d.js";
+import { loadRelief, loadTerrain } from "./terrain3d.js";
 import { localFor } from "./localDetail.js";
 import { TEX_BASE } from "./textures3d.js";
 /** The files every place needs, asked for before the world is built so they come in while it is (World3D.jsx): the
  * people's own (human3d.js prefetchPeople), the rod and reel, the nets. */
-/** Before a real place is built: fetch what it needs first (a place's fine relief, terrain3d.js), at most 8 s. */
+/** Before a real place is built: fetch what it needs first (a place's surveyed ground and fine relief, terrain3d.js), at most 8 s. */
 export function preparePlace(real) {
   const l = real?.id ? localFor(real.id) : null; if (!l?.terrain) return Promise.resolve();
-  return Promise.race([loadRelief(l.terrain, TEX_BASE), new Promise((r) => setTimeout(r, 8000))]).catch(() => {});
+  return Promise.race([Promise.all([loadTerrain(l.terrain, TEX_BASE), loadRelief(l.terrain, TEX_BASE)]), new Promise((r) => setTimeout(r, 8000))]).catch(() => {});
 }
 export function prefetch(anglers) { prefetchPeople(anglers); for (const n of ["rodkit", "nets"]) loadPart(n).catch(() => {}); }
 import { FILM } from "./film.js";
