@@ -1110,7 +1110,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           const ya = groundAt(x1, z1) + y, yb = groundAt(x2, z2) + y, o = Bk.p.length / 3;
           // ends pushed a little past each node so consecutive pieces overlap at bends instead of leaving a notch
           const ex = ((x2 - x1) / len) * Math.min(0.6, w1 * 0.15), ez = ((z2 - z1) / len) * Math.min(0.6, w1 * 0.15); // (a short overlap: at 1.5 m the pavements' ends stuck out as a saw's teeth along a bending street)
-          Bk.p.push(x1 - ex + nx * a0, ya, z1 - ez + nz * a0, x2 + ex + nx * a0, yb, z2 + ez + nz * a0, x2 + ex + nx * a1, yb, z2 + ez + nz * a1, x1 - ex + nx * a1, ya, z1 - ez + nz * a1);
+          // (each corner on the ground where it is, not at the centre line's height: across a street on the hillside the
+          // ground falls, and the strip's downhill edge stood off the slope as a dark shelf seen from below it)
+          const gq = (x, z, yc) => { const g = groundAt(x, z); return g > 0 ? g + y : yc; };
+          const P0 = [x1 - ex + nx * a0, z1 - ez + nz * a0], P1 = [x2 + ex + nx * a0, z2 + ez + nz * a0], P2 = [x2 + ex + nx * a1, z2 + ez + nz * a1], P3q = [x1 - ex + nx * a1, z1 - ez + nz * a1];
+          Bk.p.push(P0[0], gq(...P0, ya), P0[1], P1[0], gq(...P1, yb), P1[1], P2[0], gq(...P2, yb), P2[1], P3q[0], gq(...P3q, ya), P3q[1]);
           Bk.uv.push(run / 6, 0, (run + len) / 6, 0, (run + len) / 6, (a1 - a0) / 6, run / 6, (a1 - a0) / 6);
           if (side > 0 || w0 === 0) Bk.i.push(o, o + 2, o + 1, o, o + 3, o + 2); else Bk.i.push(o, o + 1, o + 2, o, o + 2, o + 3);
           run += len;
@@ -1127,7 +1131,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         for (let k = 0; k < line.length - 1; k++) {
           const [x1, z1] = line[k], [x2, z2] = line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
           if (groundAt(x1, z1) === 0 && groundAt(x2, z2) === 0) { run += len; continue; }
-          const nx = -(z2 - z1) / len, nz = (x2 - x1) / len, a = side * w, ya = groundAt(x1, z1), yb = groundAt(x2, z2), o = Kb.p.length / 3;
+          const nx = -(z2 - z1) / len, nz = (x2 - x1) / len, a = side * w, ya = groundAt(x1 + nx * a, z1 + nz * a) || groundAt(x1, z1), yb = groundAt(x2 + nx * a, z2 + nz * a) || groundAt(x2, z2), o = Kb.p.length / 3; // (at the kerb's own line, as the strips' edges are)
           Kb.p.push(x1 + nx * a, ya + 0.03, z1 + nz * a, x2 + nx * a, yb + 0.03, z2 + nz * a, x2 + nx * a, yb + 0.125, z2 + nz * a, x1 + nx * a, ya + 0.125, z1 + nz * a);
           Kb.uv.push(run, 0, run + len, 0, run + len, 0.1, run, 0.1);
           if (side > 0) Kb.i.push(o, o + 1, o + 2, o, o + 2, o + 3); else Kb.i.push(o, o + 2, o + 1, o, o + 3, o + 2);
