@@ -1042,7 +1042,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               #else
                 soilC *= clamp(pow(lum / 0.06, 0.6), 0.5, 1.6);
               #endif
-              tinted = mix(tinted, soilC, clamp(vSoil * (0.75 + 0.5 * sm3), 0.0, 1.0));
+              // (its edge ragged and fairly sharp, the grass breaking off at it as on a slip: blended softly over the 1 m
+              // mesh it read from the harbour as brown smudges on a green baize)
+              float se = fdDN(vWPos.zy * 1.7) * tw.x + fdDN(vWPos.xz * 1.7) * tw.y + fdDN(vWPos.xy * 1.7) * tw.z;
+              tinted = mix(tinted, soilC, smoothstep(0.45, 0.66, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.22));
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)

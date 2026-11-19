@@ -91,9 +91,11 @@ export function buildKit(group, sets) {
     for (const L of live) {
       if (cam.position.distanceToSquared(L.at) < 25) continue; // (looked at again every 5 m)
       L.at.copy(cam.position);
-      let kn = 0, kf = 0; const cx = cam.position.x, cz = cam.position.z;
+      // (by the distance in three dimensions: from 45 m up, every plant within 90 m across the ground was drawn, and on
+      // the PC the towns with many lawns lost a third of their frame rate)
+      let kn = 0, kf = 0; const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
       for (let i = 0; i < L.mats.length; i++) {
-        const a = L.S.at[i], d2 = (a[0] - cx) ** 2 + (a[2] - cz) ** 2, [rn, rf] = L.reach[i];
+        const a = L.S.at[i], d2 = (a[0] - cx) ** 2 + (a[1] - cy) ** 2 + (a[2] - cz) ** 2, [rn, rf] = L.reach[i];
         if (d2 >= rf) continue;
         if (d2 < rn || L.far === L.near) { for (const m of L.near) m.setMatrixAt(kn, L.mats[i]); kn++; }
         else { for (const m of L.far) m.setMatrixAt(kf, L.mats[i]); kf++; }
