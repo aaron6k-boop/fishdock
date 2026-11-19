@@ -66,11 +66,32 @@ Cromer 84 to 85, Whitby 75 to 77; loading 21 to 26 s, as before. No page or shad
 - Trees are still leaf cards on simple branches.
 - Balanced still has no clutter (rocks, plants) and no windows in depth.
 
+## Stage 2, first part (19 November): Cromer and Brixham at their surveyed heights
+
+The environment system applied to the next two places: the Environment Agency's 1 m LIDAR made into each place's 5 m
+terrain and 1 m hillside by `source-assets/tools/terrain_from_dtm.py`.
+
+| Place | Before | After | Seen on the PC |
+|---|---|---|---|
+| Cromer Pier | The cliff an even 12 m bank, estimated | The cliff behind the promenade with its paths, terraces and retaining walls; the cliffs to the west at their real 39 m | Yes, six cameras |
+| Brixham Breakwater | The harbour on a flat | The town climbing its hills, to 59 m | Yes, six cameras |
+
+Measured (Ultra, 1920x1080, before and after): Cromer 81 frames a second, then 79 to 82 (2.26 to 3.36 million
+triangles a frame); Brixham 100, then 89 to 92 (3.46 to 4.05 million); loading 22 to 26 s, as before.
+
+Tried and taken out: four more photoscanned rock sets, for boulders at cliff feet and outcrops on steep faces. Placed
+and pictured on the PC they stood on the faces as brown lumps on grey rock. Rock on the cliffs wants to come from the
+cliff's own material and shape (as the East Cliff's beds now do), not from loose scans set on it.
+
+Still to do for these two: their own buildings from photographs (Brixham has none yet), Brixham's breakwater in its
+limestone, the harbour's quays, and trees.
+
 ## The phases, and where each stands
 
 1. Graphics engine audit: not started as a written audit. Measured so far: Whitby on Ultra 76 to 85 frames a second.
-2. Environment assets: Whitby rebuilt (PR #166); the other places not yet. Surveyed 1 m heights fetched for Brixham,
-   Cromer, Gorleston and Chesil; cliff, rock, shrub and street-furniture scans exported from Blender, not yet placed.
+2. Environment assets: Whitby rebuilt (PR #166); Cromer and Brixham at their surveyed heights (stage 2). Surveyed 1 m
+   heights also fetched for Gorleston and Chesil, not yet used; shrub and street-furniture scans exported from Blender,
+   not yet placed.
 3. Textures and materials: Whitby's stone, grass, sand, soil; others not yet.
 4. Water and weather: rain and the wet deck (this stage). Waves at walls and rocks, spray, sky and cloud not yet.
 5. First-person fishing: this stage. Rod and reel detail not yet.
