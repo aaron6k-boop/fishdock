@@ -57,9 +57,11 @@ Cromer 84 to 85, Whitby 75 to 77; loading 21 to 26 s, as before. No page or shad
 - Playing a fish with the hands drawn in, the left forearm comes in level from the left edge instead of from below.
 - A stall of one to three seconds when the catch card opens ("fish inspect" on the game's meter). It was there before
   this stage.
-- A dark patch about 10 m wide down the East Cliff's sea face, seen from the harbour mouth. It was there before this
-  stage. It is part of the ground itself (a ray through it meets the fine hillside at 229 to 249 m east, 93 to 121 m
-  south of the mark); it is not a wall, a flight of steps or a path, each of which was tried. Still being traced.
+- A dark patch about 10 m wide down the East Cliff's sea face, seen only from the camera 480 m out at sea off the
+  harbour mouth (not from the piers, nor from the sea to the east). It was there before this stage. A ray through it
+  meets nothing but the fine hillside (229 to 249 m east, 93 to 121 m south of the mark), whose heights, colours and
+  soil there are ordinary; it is not a wall, a flight of steps or a path, each of which was tried. So it is in the
+  lighting or the shadows from that one direction, not in the ground. Not found yet.
 - Trees are still leaf cards on simple branches.
 - Balanced still has no clutter (rocks, plants) and no windows in depth.
 
