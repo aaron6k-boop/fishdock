@@ -281,9 +281,9 @@ What walking in first person draws now is your own body, as everyone else sees i
 Seen on the PC (jobs h284 to h298; a phone-shaped screen on the phone setting at Gorleston, a wide one on Ultra at
 Whitby): standing, walking, jogging and sprinting looking ahead and down; a look to the side; the body coming round;
 backing away; a sideways push; back to the fishing spot (the fishing view's arms return); and from behind, where the
-head is there as before. Then as five people (h298): the bearded angler, the woman angler at two builds, the angler
-in the fishing jacket and the man with stubble at the slight build, each standing, walking and jogging, looking ahead
-and down. Your shadow lies on the ground ahead of you with its head on. No page errors. (Three of some forty runs
+head is there as before. Then as six people (h298, h299): the bearded angler, the woman angler at two builds, the
+woman with her hair tied back, the angler in the fishing jacket and the man with stubble at the slight build, each
+standing, walking and jogging, looking ahead and down. Your shadow lies on the ground ahead of you with its head on. No page errors. (Three of some forty runs
 came up as a blank page that never loaded, each a different person and each fine when run again: the filming
 harness, which has done it before on older builds.)
 
@@ -306,8 +306,8 @@ switched on and off in one session (h290) the GPU time moved by less than the sc
 Not done: fishing in first person still draws only your arms (look down while fishing and there is no body); your feet
 slide a little when your body comes round on the spot faster than the turning steps; backing away uses the walk run
 backwards, not a filmed backwards walk; at the steepest look down the collar of some jackets shows a ragged edge at
-the very bottom of the picture, and the jackets are plainly faceted that close; the woman with her hair tied back
-(f09) and the other eleven people were not filmed in this view.
+the very bottom of the picture, and the jackets are plainly faceted that close; fifteen of the twenty-one people
+were not filmed in this view.
 
 ## The phases, and where each stands
 
