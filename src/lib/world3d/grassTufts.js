@@ -24,7 +24,7 @@ const SQ = 8;
  * @param {(x:number,z:number)=>number} o.yAt       the ground's height as drawn
  * @param {(x:number,z:number)=>number[]|null} o.colourAt the ground's colour here (linear rgb), or null
  * @param {(x:number,z:number)=>boolean} o.avoid    true where no tuft goes (roads, buildings, piers)
- * @param {(x:number,z:number)=>number} [o.roughAt] how rough the grass is here, 0 (a mown lawn) to 1 (a bank)
+ * @param {(x:number,z:number)=>number} [o.roughAt] how rough the grass is here, 0 (a mown lawn) to 1 (a bank); 2 a dune's marram
  * @param {number} o.quality  0 Performance (none), 1 Balanced, 2 Ultra
  * @returns {{ mesh, update(t, cam, wind, windDir), dispose } | null}
  */
@@ -107,8 +107,9 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
       const c = colourAt(x, z); if (!c) continue;
       // (on a mown lawn mostly the short lawn tuft; on rough ground and banks the taller meadow and coarse coastal
       // ones; a dry, straw-coloured one now and then)
-      const rough = roughAt(x, z), pLawn = 0.8 - 0.6 * rough, pCoast = pLawn + 0.06 + 0.3 * rough;
-      const kind = kindR < pLawn ? 2 : kindR < pCoast ? 1 : kindR < 0.95 ? 0 : 3;
+      // (rough over 1: a dune's marram, the coarse coastal tuft mostly, some dried to straw)
+      const rough = roughAt(x, z), pLawn = 0.8 - 0.6 * Math.min(1, rough), pCoast = pLawn + 0.06 + 0.3 * Math.min(1, rough);
+      const kind = rough > 1.2 ? (kindR < 0.62 ? 1 : kindR < 0.82 ? 3 : 0) : kindR < pLawn ? 2 : kindR < pCoast ? 1 : kindR < 0.95 ? 0 : 3;
       out.push({ x, y: yAt(x, z), z, kind, s: 0.75 + s * 0.6, rot: rot * Math.PI * 2, ph: ph * 6.28, c });
     }
     if (memo.size > 4000) memo.clear();

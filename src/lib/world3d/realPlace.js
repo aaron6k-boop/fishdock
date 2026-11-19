@@ -19,6 +19,7 @@ import { WET_PREP, WET_DARKEN, WET_NORMAL, wetRough, WET_SPOTS } from "./wetLook
 import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
 import { buildGrassTufts } from "./grassTufts.js";
+import { buildChimneyCaps } from "./chimneys3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
 import { columnGeometry, lanternAt, lampPools, shadeFromOwnLantern, COLUMN } from "./lamps3d.js";
 import { buildOpenPier } from "./openPier.js";
@@ -457,6 +458,13 @@ const fract = (v) => v - Math.floor(v);
 function mudDH(x, y) { let qx = fract(x * 0.1031), qy = fract(y * 0.1031), qz = fract(x * 0.1031); const d = qx * (qy + 33.33) + qy * (qz + 33.33) + qz * (qx + 33.33); qx += d; qy += d; qz += d; return fract((qx + qy) * qz); }
 function mudDN(x, y) { const ix = Math.floor(x), iy = Math.floor(y); let fx = x - ix, fy = y - iy; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); const a = mudDH(ix, iy), b = mudDH(ix + 1, iy), c = mudDH(ix, iy + 1), d = mudDH(ix + 1, iy + 1); return a + (b - a) * fx + (c - a + (d - c - b + a) * fx) * fy; }
 function mudDF(x, y) { let a = 0.5, s = 0; for (let k = 0; k < 4; k++) { s += a * mudDN(x, y); x = x * 2.03 + 17.1; y = y * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }
+/** Where the dune's marram grows thick, 0..1, and how dried it is (0 green, 1 straw), as the dune shader draws it close
+ * to (face: the point's aFace, 0 the dune's top to 1 its bare face). */
+export function marramAt(x, z, face) {
+  const field = mudDF(x / 13, z / 13) * 0.62 + mudDF(x / 3.4 + 31, z / 3.4 + 31) * 0.44 + (mudDN(x * 2.3 + 7, z * 2.3 + 7) - 0.5) * 0.16;
+  const th = 0.385 + (0.64 - 0.385) * face, c = Math.min(1, Math.max(0, (field - (th - 0.035)) / 0.08)), d = Math.min(1, Math.max(0, (mudDF(x / 8 + 70, z / 8 + 70) - 0.34) / 0.28));
+  return { cover: c * c * (3 - 2 * c), dry: d * d * (3 - 2 * d) };
+}
 /** How worn to the mud the grass is here, 0..1, as the ground's shader draws it (town: the town's rough ground). */
 export function mudAt(x, z, town) {
   const v = mudDF(x / 9 + 7, z / 9 + 7) + (mudDN(x / 1.7, z / 1.7) - 0.5) * 0.16 + (town ? MUD.lift : 0), t = Math.min(1, Math.max(0, (v - 0.6) / 0.12));
@@ -772,8 +780,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // lawn; the photograph's own colour, a little darker, its edge ragged)
               vec2 wm = vWPos.xz; float town = step(0.08, vRuf) * step(vRuf, 0.3);
               float worn = smoothstep(0.6, 0.72, fdDF(wm / 9.0 + 7.0) + (fdDN(wm / 1.7) - 0.5) * 0.16 + town * ${MUD.lift.toFixed(3)}) * mix(${MUD.lawn.toFixed(2)}, ${MUD.town.toFixed(2)}, town);
-              vec3 mudC = texture2D(uMud, wm / 2.5).rgb * 0.85 * (0.9 + 0.2 * fdDN(wm / 13.0));
-              grass = mix(grass, mudC, worn);
+              // (the photograph's orange of fallen leaves taken down by half towards its own grey, so it reads as earth; and
+              // only well inside the grass, as at a lawn's edge it faded across the ground's triangles in straight lines)
+              vec3 mudP = texture2D(uMud, wm / 2.5).rgb, mudC = mix(mudP, vec3(dot(mudP, vec3(0.3, 0.55, 0.15))) * vec3(1.08, 1.0, 0.86), 0.5) * 0.8 * (0.9 + 0.2 * fdDN(wm / 13.0));
+              grass = mix(grass, mudC, worn * smoothstep(0.55, 0.95, vGrass));
             #endif
             diffuseColor.rgb = mix(diffuseColor.rgb, grass, vGrass);
           }
@@ -1395,6 +1405,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   });
   setTownStyle(null);
   place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; for (const m of res.meshes) m.userData.kind = "a building"; targets.push(...res.meshes);
+  { const caps = buildChimneyCaps(group, res.caps, res.brickMat); place.capsUpdate = caps.update; } // (the chimneys' modelled tops: chimneys3d.js)
   for (const c of res.colliders) {
     aoRings.push(c.ring);
     const cbp = [], cbi = [];
@@ -1613,12 +1624,20 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         if (!inGrid(x, z)) return 0;
         const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n;
         if (bank[k]) return 0.85 * (1 - Math.min(1, steep[k] * 1.7)); // (the banks: thinning out to none where the rock shows)
+        // (a dune: marram where its shader draws it growing thick, thinning on the bare face)
+        if (dune[k] > 0.05 && faceA[k] >= 0) return marramAt(x, z, faceA[k]).cover * Math.min(1, dune[k] * 2.5) * (1 - 0.6 * faceA[k]);
         // (not on the worn, muddy patches: the ground's shader draws them, so the tufts keep off them too)
         return onGrid(grs, 1, 0, x, z) * (1 - Math.min(1, mudAt(x, z, town[k]) * 2.2));
       },
-      roughAt: (x, z) => { if (!inGrid(x, z)) return 0.5; const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n; return bank[k] ? 1 : town[k] ? 0.6 : 0.15; },
+      roughAt: (x, z) => { if (!inGrid(x, z)) return 0.5; const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n; return dune[k] > 0.05 && faceA[k] >= 0 && !bank[k] ? 2 : bank[k] ? 1 : town[k] ? 0.6 : 0.15; },
       yAt: (x, z) => (inGrid(x, z) ? onGrid(pos, 3, 1, x, z) : LAND),
-      colourAt: (x, z) => (inGrid(x, z) ? [0, 1, 2].map((ch) => onGrid(col, 3, ch, x, z) * 0.95) : null),
+      colourAt: (x, z) => {
+        if (!inGrid(x, z)) return null;
+        const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n;
+        // (on a dune, the marram's own straw and grey-green, as its shader mixes them, not the sand's colour under it)
+        if (dune[k] > 0.05 && faceA[k] >= 0 && !bank[k]) { const d = marramAt(x, z, faceA[k]).dry; return [0.115 + (0.34 - 0.115) * d, 0.15 + (0.3 - 0.15) * d, 0.062 + (0.145 - 0.062) * d].map((v) => v * 1.25); }
+        return [0, 1, 2].map((ch) => onGrid(col, 3, ch, x, z) * 0.95);
+      },
       avoid: (x, z) => nearSpot(x, z, 3) || onRoad(x, z) || lots.some((b) => inB([x, z], b) && inside([x, z], b.r)) || drawnB.some((b) => inB([x, z], b) && inside([x, z], b.r)) || allPiers.some((b) => inB([x, z], b)),
     });
     if (tufts) place.tuftsUpdate = tufts.update;

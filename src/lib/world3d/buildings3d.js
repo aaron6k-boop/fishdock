@@ -109,6 +109,7 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   M.glass = new THREE.MeshStandardMaterial({ color: 0x7f97a8, roughness: 0.08, metalness: 0.35, emissive: 0xffd890, emissiveIntensity: 0, side: THREE.DoubleSide });
   const B = Object.fromEntries(Object.keys(M).map((k) => [k, bucket()]));
   const colliders = [], glow = [M.brick, M.render, M.cladding, M.stone, M.buff];
+  const caps = []; // (the chimneys' tops: [x, y, z, turn])
   const W1 = [1, 1, 1];
   const litHash = (id, k, st, q) => { let h = (Math.imul((id | 0) ^ 0x9e3779b9, 2654435761) ^ Math.imul(k + 1, 40503) ^ Math.imul(st + 1, 7919) ^ Math.imul(q + 1, 104729)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; };
   const tileUV = (t, u0 = 0, u1 = 1, v0 = 0, v1 = 1) => [(t + u0) / FACADE_N, v0, (t + u1) / FACADE_N, v0, (t + u1) / FACADE_N, v1, (t + u0) / FACADE_N, v1];
@@ -116,8 +117,11 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     const pts = [[x - s / 2, z - s / 2], [x - s / 2, z + s / 2], [x + s / 2, z + s / 2], [x + s / 2, z - s / 2]];
     for (let k = 0; k < 4; k++) { const [x1, z1] = pts[k], [x2, z2] = pts[(k + 1) % 4]; quad(B.tower, [x1, y0, z1], [x2, y0, z2], [x2, y0 + h, z2], [x1, y0 + h, z1], [0, 0, s / TU, 0, s / TU, h / TV, 0, h / TV], W1); }
     quad(B.dark, [pts[0][0], y0 + h, pts[0][1]], [pts[1][0], y0 + h, pts[1][1]], [pts[2][0], y0 + h, pts[2][1]], [pts[3][0], y0 + h, pts[3][1]], [0, 0, 1, 0, 1, 1, 0, 1], [0.6, 0.6, 0.6]);
-    for (const [dx, dz] of [[-0.12, 0], [0.12, 0]]) { const q = [[x + dx - 0.07, z - 0.07], [x + dx - 0.07, z + 0.07], [x + dx + 0.07, z + 0.07], [x + dx + 0.07, z - 0.07]]; for (let k = 0; k < 4; k++) { const [x1, z1] = q[k], [x2, z2] = q[(k + 1) % 4]; quad(B.roof_clay, [x1, y0 + h, z1], [x2, y0 + h, z2], [x2, y0 + h + 0.35, z2], [x1, y0 + h + 0.35, z1], [0, 0, 0.1, 0, 0.1, 0.1, 0, 0.1], [1.1, 0.8, 0.7]); } } // pots
+    // (its top: oversailing courses, flaunching and two clay pots, modelled in Blender (chimneys3d.js), a quarter turn
+    // either way)
+    caps.push([x, y0 + h, z, (Math.abs(Math.round(x * 7 + z * 13)) % 2)]);
   };
+
 
   // a box standing out from a wall: a along the wall (from A, unit u), y up, d outward (unit n); five faces (not the back)
   const wallBox = (Bk, A, u, nrm, a0, a1, y0, y1, d0, d1, col) => {
@@ -292,6 +296,6 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   }
   const meshes = [];
   for (const [k, mat] of Object.entries(M)) { const m = meshOf(B[k], mat); if (m) { group.add(m); meshes.push(m); } }
-  return { glow: [...glow, M.glass], colliders, meshes, count: buildings.length };
+  return { glow: [...glow, M.glass], colliders, meshes, count: buildings.length, caps, brickMat: M.tower };
 }
 export { footprintArea };
