@@ -38,12 +38,13 @@ How a stage is checked:
 | Whitby, first person at rest, Ultra | 86 frames a second, slowest 1% 56 | 85, 56 |
 | after landing a fish | 69, 47 | 75, 47 |
 | heavy rain | 86, 56 | 87, 56 |
-| Phone-shaped screen on Balanced, at rest | 165 | 139 |
-| the same, heavy rain | 202 | 184 |
+| Phone-shaped screen on Balanced, at rest | 165 | 139 with the hillside in the shadow pass; 190 as shipped, without |
+| the same, heavy rain | 202 | 184; 197 as shipped |
 
-The phone-shaped figures are from the PC's graphics card, not a phone: they show the cost of the fine hillside on
-Balanced (530,000 more triangles), not what a phone will draw. Aaron's iPhone showed 50 to 57 before; its own reading
-after this stage is the one that counts, and if it has fallen the hillside comes off Balanced or gets a lighter mesh.
+The phone-shaped figures are from the PC's graphics card, not a phone, and vary by a tenth from run to run. They
+showed the fine hillside costing a sixth of the frame rate on Balanced while it was also drawn for the shadows; it
+throws no shadow on Balanced now, and the cost is within the run-to-run difference. Aaron's iPhone showed 50 to 57
+before; its own reading after this stage is the one that counts.
 Other places on the same build, third person on Ultra: Great Yarmouth 90 to 99, Gorleston 88 to 92, Lowestoft 82 to 88,
 Cromer 84 to 85, Whitby 75 to 77; loading 21 to 26 s, as before. No page or shader errors in any run.
 
