@@ -21,6 +21,8 @@ import { buildTrees } from "./trees3d.js";
 import { buildGrassTufts } from "./grassTufts.js";
 import { buildGrassField } from "./grassField.js";
 import { buildChimneyCaps } from "./chimneys3d.js";
+import { buildWindowModules } from "./windows3d.js";
+import { buildKit } from "./kit3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
 import { columnGeometry, lanternAt, lampPools, shadeFromOwnLantern, COLUMN } from "./lamps3d.js";
 import { buildOpenPier } from "./openPier.js";
@@ -507,7 +509,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // shingle bank steeply, up to the promenade or the bank's crest. (Drawn level at 0.9 m, a hundred metres of beach read
   // as a table of sand with a step down into the sea.) toWater: metres from the water's edge, on the beach ----
   const BP = local?.beach || (place.venue === "beach" ? {} : null), toWater = new Float32Array(n * n).fill(-1);
-  if (BP) {
+  if (BP && BP.shape !== false) { // (shape false: the map's beaches drawn in the photographed sand but left at their own heights, as Whitby's small ones between walls)
     // (steeper for the first few metres, where the waves run up and back, then the beach's own slope: laid at one slope
     // all the way, the last few centimetres above the sea were metres wide and the waves ran over them, and over the anglers)
     const slope = BP.slope ?? 0.032, top = BP.top ?? LAND, foot = BP.foot ?? 0.12, swash = BP.swash ?? 0.075;
@@ -529,7 +531,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
       const k = j * n + i, c = cls[k];
       if (c !== 2 && c !== 0) continue;
-      if (BP && c === 2) continue; // (a beach mark's beach has its own slope, above: smoothed again it bulged at the water's edge)
+      if (BP && BP.shape !== false && c === 2) continue; // (a beach mark's beach has its own slope, above: smoothed again it bulged at the water's edge)
       const nb = [k - 1, k + 1, k - n, k + n];
       if (c === 0 && !nb.some((q) => cls[q] === 2)) continue;
       nh[k] = (h[k] * 2 + nb.reduce((s, q) => s + h[q], 0)) / 6;
@@ -544,7 +546,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const a = h[j * n + i], b = h[j * n + i + 1], c = h[(j + 1) * n + i], d = h[(j + 1) * n + i + 1];
     return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
   };
-  if (BP) for (const sp of spots) if (cls[cellOf(sp.at[2]) * n + cellOf(sp.at[0])] === 2 || place.venue === "beach") sp.at[1] = Math.round(hGrid(sp.at[0], sp.at[2]) * 100) / 100; // (only those standing on the sand: a pier's anglers keep its deck)
+  if (BP && BP.shape !== false) for (const sp of spots) if (cls[cellOf(sp.at[2]) * n + cellOf(sp.at[0])] === 2 || place.venue === "beach") sp.at[1] = Math.round(hGrid(sp.at[0], sp.at[2]) * 100) / 100; // (only those standing on the sand: a pier's anglers keep its deck)
   // (behind a solid parapet, localDetail.js concrete: the anglers stand its thickness further back, so their tripods and
   // chairs stand clear of it, and the edge in front of them is that much further)
   if (local?.concrete) place.parapet = true;
@@ -773,7 +775,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       const lap = (Yat(i + 2, j) + Yat(i - 2, j) + Yat(i, j + 2) + Yat(i, j - 2) - 4 * Y[p]) / 4;
       const w = sm(0, 6, dEdge[p]) * sm(0, 2.5, dFlat[p]);
       at.aSteep[v] = Math.max(at.aSteep[v], sm(0.85, 1.6, slope) * w);
-      soilA[v] = Math.min(1, sm(0.45, 0.95, slope) * 0.75 + sm(0.12, 0.45, lap) * 0.6) * w * Math.min(1, at.aRuf[v] * 1.6 + at.aGrass[v] * 0.25);
+      // (bare where it's steeper than about 38 degrees, and in the gullies' bottoms; the hillside's usual 25 to 35 degrees
+      // stay grassed, as the East Cliff's slopes mostly are: from 24 degrees most of the slope came out bare)
+      soilA[v] = Math.min(1, sm(0.78, 1.25, slope) * 0.85 + sm(0.18, 0.55, lap) * 0.55) * w * Math.min(1, at.aRuf[v] * 1.6 + at.aGrass[v] * 0.25);
       soilP[p] = soilA[v]; slopeP[p] = slope * w;
     }
     const ix = [];
@@ -876,8 +880,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             vec3 wetC = uSandK.rgb * vec3(0.52, 0.48, 0.42) * mix(clamp(pow(lw, 0.7), 0.6, 1.4), 1.0, far * 0.6);
             float reach = 0.42 + 0.14 * fdDN(wp * vec2(0.09, 0.03)) + 0.08 * fdDN(wp * 0.31);
             fdWet = 1.0 - smoothstep(reach - 0.12, reach + 0.04, vWPos.y);
-            diffuseColor.rgb = mix(diffuseColor.rgb, mix(dry, wetC, fdWet), vSand);
-            fdWet *= vSand;
+            // (the sand's edge broken up by noise, not the ground grid's 3 m staircase)
+            float sW = smoothstep(0.28, 0.72, vSand + (fdDN(wp / 2.3) - 0.5) * 0.55 + (fdDN(wp * 1.7) - 0.5) * 0.15);
+            diffuseColor.rgb = mix(diffuseColor.rgb, mix(dry, wetC, fdWet), sW);
+            fdWet *= sW;
           }
           #endif
           if (vGrass > 0.01) {
@@ -905,7 +911,8 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               vec3 mudP = texture2D(uMud, wm / 2.5).rgb, mudC = mix(mudP, vec3(dot(mudP, vec3(0.3, 0.55, 0.15))) * vec3(1.08, 1.0, 0.86), 0.5) * 0.8 * (0.9 + 0.2 * fdDN(wm / 13.0));
               grass = mix(grass, mudC, worn * smoothstep(0.55, 0.95, vGrass));
             #endif
-            diffuseColor.rgb = mix(diffuseColor.rgb, grass, vGrass);
+            // (the lawn's edge broken up by noise as well)
+            diffuseColor.rgb = mix(diffuseColor.rgb, grass, smoothstep(0.25, 0.75, vGrass + (fdDN(vWPos.xz / 2.1 + 5.0) - 0.5) * 0.5 + (fdDN(vWPos.xz * 1.9) - 0.5) * 0.14));
           }
           if (vRuf > 0.01) {
             // (two scales of the photograph mixed, so its tile doesn't repeat visibly across a 50 m slope)
@@ -1050,7 +1057,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   place.deckMat = deckMat; // world.js darkens it in the rain
 
   const hillAt = (x, z, c) => (hill && (c === 1 || c === 3) ? hill(x, z) : 0);
-  const groundAt = (x, z) => { const c = cAt(x, z); if (c === 0) return 0; const f = fineAt(x, z); if (f !== null) return f; return BP && c === 2 ? Math.max(0.05, hGrid(x, z)) : H_OF[c] + hillAt(x, z, c); }; // (on the fine hillside, its own height)
+  const groundAt = (x, z) => { const c = cAt(x, z); if (c === 0) return 0; const f = fineAt(x, z); if (f !== null) return f; return BP && BP.shape !== false && c === 2 ? Math.max(0.05, hGrid(x, z)) : H_OF[c] + hillAt(x, z, c); }; // (on the fine hillside, its own height)
   // ---- streets: tarmac with a pale pavement and kerb either side (from the map's roads) ----
   {
     const T = { p: [], uv: [], i: [] }, Pv = { p: [], uv: [], i: [] };
@@ -1536,10 +1543,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // nothing on a fishing spot, the deck round it or in front of it
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
     near: (x, z) => nearSpot(x, z, NEAR_SOLID + 30),
+    modules: quality >= 2 || (typeof window !== "undefined" && !!window.__fdFine), // (the openings in depth near the camera: windows3d.js)
   });
   setTownStyle(null);
   place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; for (const m of res.meshes) m.userData.kind = "a building"; targets.push(...res.meshes);
-  { const caps = buildChimneyCaps(group, res.caps, res.brickMat); place.capsUpdate = caps.update; } // (the chimneys' modelled tops: chimneys3d.js)
+  { const caps = buildChimneyCaps(group, res.caps, res.brickMat), wins = buildWindowModules(group, res.mods); place.capsUpdate = (t, cam) => { caps.update(t, cam); wins.update(t, cam); }; if (wins.glass) place.buildingGlow = [...(place.buildingGlow || []), wins.glass]; } // (the chimneys' modelled tops, chimneys3d.js; the openings in depth, windows3d.js)
   for (const c of res.colliders) {
     aoRings.push(c.ring);
     const cbp = [], cbi = [];
@@ -1751,6 +1759,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       return fx + fz <= 1 ? A + fx * (B - A) + fz * (C - A) : D + (1 - fx) * (C - D) + (1 - fz) * (B - D);
     };
     const inGrid = (x, z) => x > xs[0] && x < xs[n - 1] && z > xs[0] && z < xs[n - 1];
+    const nearestVertex = (x, z) => { const [i, fx] = cell(x), [j, fz] = cell(z); return (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n; };
     const lots = (place.parking || []).filter((r) => r.length >= 3).map(bb);
     const grassOpts = {
       quality, seed: 7 + (place.spots?.length || 0),
@@ -1779,7 +1788,66 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // (the thick layer of grass blades, grassField.js, and the taller clumps among it, grassTufts.js, from the same
     // lookups)
     const field = buildGrassField(group, grassOpts), tufts = buildGrassTufts(group, { ...grassOpts, sparse: !!field });
-    if (field || tufts) place.tuftsUpdate = (t, cam, wind, windDir) => { field?.update(t, cam, wind, windDir); tufts?.update(t, cam, wind, windDir); };
+    // ---- the ground's clutter from real photoscans (kit3d.js; High and Ultra): along the beaches the tide's wrack, a
+    // stray branch of driftwood, stones and pebbles gathered at the back against the walls and the cliff's foot, rocks
+    // fallen at the foot of the cliff; on the banks shrubs, docks and ferns, mossy rocks where the soil is bare, nettles
+    // and weeds where the ground's been disturbed; at the foot of the buildings' walls and along the paths, weeds and
+    // nettles; dandelions in the rough grass. Each from the place's own ground, never on a road, a pier or a spot ----
+    let kit = null;
+    if (quality >= 2 || (typeof window !== "undefined" && window.__fdFine)) {
+      let hs = (7919 * (3 + (place.spots?.length || 0))) >>> 0; const R = () => { hs ^= hs << 13; hs >>>= 0; hs ^= hs >>> 17; hs ^= hs << 5; hs >>>= 0; return hs / 4294967296; };
+      const S = {}; const put = (id, x, z, size, tilt = 0) => { if (grassOpts.avoid(x, z)) return; (S[id] ||= []).push([x, grassOpts.yAt(x, z), z, R() * Math.PI * 2, size, tilt]); };
+      const nb4 = (k) => [k - 1, k + 1, k - n, k + n];
+      for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+        const k = j * n + i, cw = xs[i + 1] - xs[i], ch = xs[j + 1] - xs[j]; if (cw > 7 || ch > 7) continue;
+        const x0 = xs[i], z0 = xs[j], area = cw * ch;
+        if (cls[k] === 2) {
+          const atBack = nb4(k).some((q) => cls[q] === 1 || cls[q] === 3 || bank[q]), atSea = nb4(k).some((q) => cls[q] === 0);
+          for (let c = 0; c < area * 0.5; c++) {
+            const x = x0 + R() * cw, z = z0 + R() * ch, y = grassOpts.yAt(x, z);
+            if (y > 0.5 && y < 0.95 && R() < 0.5) put("wrack", x, z, 0.6 + R() * 0.7); // (the strand line: where the last tide left it)
+            if (atBack && R() < 0.45) put(R() < 0.6 ? "sand_rocks_small_01" : "stone_01", x, z, R() < 0.6 ? 0.25 + R() * 0.3 : 0.12 + R() * 0.2);
+            if (atSea && R() < 0.04) put("coast_rocks_02", x, z, 0.5 + R() * 0.9);
+            if (y > 0.5 && R() < 0.006) put(R() < 0.5 ? "dead_tree_trunk" : "dry_branches_medium_01", x, z, 0.35 + R() * 0.3);
+          }
+        } else if (bank[k] && nb4(k).some((q) => cls[q] === 0 || cls[q] === 2)) {
+          for (let c = 0; c < area * 0.03; c++) put(R() < 0.7 ? "coast_rocks_02" : "boulder_01", x0 + R() * cw, z0 + R() * ch, 0.8 + R() * 1.6, 1); // (fallen at the cliff's foot)
+        }
+        if (bank[k] || cls[k] === 3 || town[k]) {
+          for (let c = 0; c < area * (bank[k] ? 0.05 : 0.02); c++) {
+            const x = x0 + R() * cw, z = z0 + R() * ch, fi = fineInfo(x, z), soil = fi ? fi.soil : 0, slope = fi ? fi.slope : steep[k] * 1.5, r = R();
+            if (slope > 1.4) continue;
+            if (bank[k]) {
+              if (soil > 0.45 && r < 0.25) put("rock_moss_set_01", x, z, 0.4 + R() * 0.8, 1);
+              else if (soil > 0.25 && r < 0.5) put("nettle_plant", x, z, 0.45 + R() * 0.45);
+              else if (r < 0.62) put("shrub_02", x, z, 0.7 + R() * 0.9);
+              else if (r < 0.78) put("shrub_sorrel_01", x, z, 0.35 + R() * 0.45);
+              else if (r < 0.9) put("fern_02", x, z, 0.4 + R() * 0.5);
+              else put("weed_plant_02", x, z, 0.3 + R() * 0.35);
+            } else if (r < 0.5) put("dandelion_01", x, z, 0.12 + R() * 0.18);
+            else if (r < 0.65) put("weed_plant_02", x, z, 0.25 + R() * 0.3);
+          }
+        }
+      }
+      // (along the foot of the buildings' walls on soft ground: weeds and nettles, now and then)
+      for (const b of place.buildings || []) {
+        const r = b.ring; if (!r || r.length < 3) continue;
+        let cx = 0, cz = 0; for (const [x, z] of r) { cx += x / r.length; cz += z / r.length; }
+        for (let q = 0; q < r.length; q++) {
+          const [x1, z1] = r[q], [x2, z2] = r[(q + 1) % r.length], L = Math.hypot(x2 - x1, z2 - z1); if (L < 1) continue;
+          let ox = -(z2 - z1) / L, oz = (x2 - x1) / L; if (ox * ((x1 + x2) / 2 - cx) + oz * ((z1 + z2) / 2 - cz) < 0) { ox = -ox; oz = -oz; }
+          for (let u = 0.5; u < L; u += 1.6) {
+            if (R() > 0.3) continue;
+            const x = x1 + (x2 - x1) * (u / L) + ox * 0.3, z = z1 + (z2 - z1) * (u / L) + oz * 0.3, c = cAt(x, z); if (c !== 1 && c !== 3) continue;
+            const kk = nearestVertex(x, z); if (!(bank[kk] || town[kk] || cls[kk] === 3)) continue;
+            put(R() < 0.35 ? "nettle_plant" : "weed_plant_02", x, z, 0.25 + R() * 0.35);
+          }
+        }
+      }
+      kit = buildKit(group, Object.entries(S).map(([id, at]) => ({ id, at, flat: id === "wrack", sink: id === "wrack" ? 0 : undefined })));
+      place.kitCounts = Object.fromEntries(Object.entries(S).map(([k, v]) => [k, v.length]));
+    }
+    if (field || tufts || kit) place.tuftsUpdate = (t, cam, wind, windDir) => { field?.update(t, cam, wind, windDir); tufts?.update(t, cam, wind, windDir); kit?.update(t, cam); };
   }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }

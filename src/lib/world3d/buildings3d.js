@@ -6,6 +6,7 @@
 import * as THREE from "three";
 import { styleFor, pitchedRoof, obb, footprintArea, splitRow } from "./architecture.js";
 import { facade, roof, bricks, FACADE_TILE, FACADE_N, photoTex } from "./textures3d.js";
+import { OPENINGS, CUT } from "./windows3d.js";
 
 // (the roofs photographed (Poly Haven, CC0), and how many times each repeats across the roof's 3 m tile: "Clay Roof
 // Tiles 02" is 2.5 m across, "Roof Slates 03" 3 m)
@@ -30,7 +31,7 @@ const BAKED_FRONTS = ["brick", "render", "stone"]; // (buff and cladding join on
  * Adds the buildings to `group`. groundAt(x, z) gives the ground's height; avoid(x, z) is true where nothing may stand
  * (a fishing spot and the deck round it). Returns { materials (glowing windows after dark), colliders: [{ ring, base, top }] }.
  */
-export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = () => false, near = () => false } = {}) {
+export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = () => false, near = () => false, modules = false } = {}) {
   const tex = { brick: facade("brick", 7), render: facade("render", 3), cladding: facade("cladding", 5), stone: facade("stone", 9) };
 
   // ---- the house fronts modelled in Blender (source-assets/blender/build_facades.py) ----
@@ -97,6 +98,23 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     m.onBeforeCompile = (sh, r) => { prev?.call(m, sh, r); sh.fragmentShader = sh.fragmentShader.replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n#ifdef USE_EMISSIVEMAP\n  totalEmissiveRadiance *= step(vEmissiveMapUv.x, 1.0);\n#endif"); };
     m.customProgramCacheKey = () => (key ? key.call(m) : "fdwall0" + k) + "lit1";
   }
+  // ---- near the camera, each opening's picture cut out of the wall, where it is built in depth (windows3d.js) ----
+  // (which opening: from the wall's texture coordinates, the atlas's bay and where in it; the openings' rectangles the
+  // bake's own, OPENINGS; nearer than CUT metres, inside the distance the built openings are drawn to)
+  if (modules) for (const k of ["brick", "render", "stone", "buff"]) {
+    const m = M[k]; if (!m) continue; const prev = m.onBeforeCompile, key = m.customProgramCacheKey;
+    const O = OPENINGS, r = (a) => a.map((v) => (v / 3).toFixed(4));
+    m.onBeforeCompile = (sh, rr) => {
+      prev?.call(m, sh, rr);
+      sh.fragmentShader = sh.fragmentShader.replace("#include <map_fragment>", `{
+          float fu = vMapUv.x * ${FACADE_N.toFixed(1)}, tt = mod(floor(fu), ${FACADE_N.toFixed(1)}); vec2 bq = vec2(fract(fu), vMapUv.y);
+          vec4 o = tt < 0.5 ? vec4(${r(O[0]).join(", ")}) : tt < 1.5 ? vec4(${r(O[1]).join(", ")}) : tt < 2.5 ? vec4(${r(O[2]).join(", ")}) : tt > 3.5 ? vec4(${r(O[4]).join(", ")}) : vec4(2.0);
+          if (bq.x > o.x && bq.x < o.y && bq.y > o.z - 0.001 && bq.y < o.w && length(vViewPosition) < ${CUT.toFixed(1)}) discard;
+        }
+        #include <map_fragment>`);
+    };
+    m.customProgramCacheKey = () => (key ? key.call(m) : "") + "cut1";
+  }
   for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1, vertexColors: true });
   // (chimneys and brick towers in the photoscanned red brick of the house fronts (Poly Haven Red Brick 03, CC0), at the
   // same 1.5 m a tile, where it's published; else the drawn brick, 1.2 m by 0.6 m a tile)
@@ -110,6 +128,9 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   const B = Object.fromEntries(Object.keys(M).map((k) => [k, bucket()]));
   const colliders = [], glow = [M.brick, M.render, M.cladding, M.stone, M.buff];
   const caps = []; // (the chimneys' tops: [x, y, z, turn])
+  const mods = []; // (the openings built in depth near the camera, windows3d.js: High and Ultra)
+  const WALLC = { brick: [0.5, 0.27, 0.2], buff: [0.66, 0.56, 0.42], render: [0.86, 0.84, 0.8], stone: [0.52, 0.46, 0.37] };
+  const DOORS = [[0.06, 0.12, 0.22], [0.24, 0.05, 0.06], [0.07, 0.14, 0.09], [0.05, 0.05, 0.05], [0.42, 0.42, 0.4], [0.1, 0.22, 0.25]];
   const W1 = [1, 1, 1];
   const litHash = (id, k, st, q) => { let h = (Math.imul((id | 0) ^ 0x9e3779b9, 2654435761) ^ Math.imul(k + 1, 40503) ^ Math.imul(st + 1, 7919) ^ Math.imul(q + 1, 104729)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; };
   const tileUV = (t, u0 = 0, u1 = 1, v0 = 0, v1 = 1) => [(t + u0) / FACADE_N, v0, (t + u1) / FACADE_N, v0, (t + u1) / FACADE_N, v1, (t + u0) / FACADE_N, v1];
@@ -218,9 +239,13 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
           // (which windows are lit after dark: about one in three, the same ones every time for this building)
           const unlit = (t === FACADE_TILE.window || t === FACADE_TILE.window2) && litHash(b.id, k, s, q) > 0.34;
           quad(wallB, A, Bp, [Bp[0], y1, Bp[2]], [A[0], y1, A[2]], unlit ? tileUV(t).map((v, i) => (i % 2 === 0 ? v + 1 : v)) : tileUV(t), tint);
+          if (modules && WALLC[st.walls] && t !== FACADE_TILE.plain && st.type !== "warehouse") {
+            const bw = Math.hypot(Bp[0] - A[0], Bp[2] - A[2]), wc = WALLC[st.walls];
+            mods.push({ t, x: A[0], y: y0, z: A[2], ux: (Bp[0] - A[0]) / bw, uz: (Bp[2] - A[2]) / bw, sx: bw / 3, sy: sh / 3, trim: trimCol, wall: [wc[0] * tint[0], wc[1] * tint[1], wc[2] * tint[2]], door: DOORS[Math.abs(b.id | 0) % DOORS.length] });
+          }
           // ---- built detail on the near houses: the drawn facade's frames, sills, lintels, door cases and steps stand out
           // from the wall as geometry too, so they catch the sun and throw shadows close to ----
-          if (fine && (t === FACADE_TILE.window || t === FACADE_TILE.window2 || t === FACADE_TILE.door) && st.walls !== "cladding") {
+          if (fine && !modules && (t === FACADE_TILE.window || t === FACADE_TILE.window2 || t === FACADE_TILE.door) && st.walls !== "cladding") {
             const bw = len / nb, ux = (x2 - x1) / len, uz = (z2 - z1) / len, u = [ux, uz], nrm = [-uz, ux], tileM = 3; // (the tile is 3 m across; the bay is stretched to its width)
             const kx = bw / tileM, ky = sh / 3; // metres in the world per metre of the drawn tile, along the wall and up it
             if (t === FACADE_TILE.door) {
@@ -328,6 +353,6 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
   }
   const meshes = [];
   for (const [k, mat] of Object.entries(M)) { const m = meshOf(B[k], mat); if (m) { group.add(m); meshes.push(m); } }
-  return { glow: [...glow, M.glass], colliders, meshes, count: buildings.length, caps, brickMat: M.tower };
+  return { glow: [...glow, M.glass], colliders, meshes, count: buildings.length, caps, brickMat: M.tower, mods };
 }
 export { footprintArea };

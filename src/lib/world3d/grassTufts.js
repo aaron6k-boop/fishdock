@@ -44,8 +44,8 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(UV, 2)); geo.setIndex(I);
-  const aKind = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1), aPhase = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1);
-  geo.setAttribute("aKind", aKind); geo.setAttribute("aPhase", aPhase);
+  const aKind = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1), aPhase = new THREE.InstancedBufferAttribute(new Float32Array(cap), 1), aSlope = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2);
+  geo.setAttribute("aKind", aKind); geo.setAttribute("aPhase", aPhase); geo.setAttribute("aSlope", aSlope);
 
   // (none drawn until the picture has arrived: before it, the cards would be drawn as black squares)
   let ready = false;
@@ -56,9 +56,10 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
   const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.92, metalness: 0, color: 0xffffff });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind; sh.uniforms.uWindDir = U.uWindDir;
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime, uWind; uniform vec2 uWindDir; attribute float aKind; attribute float aPhase;")
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTime, uWind; uniform vec2 uWindDir; attribute float aKind; attribute float aPhase; attribute vec2 aSlope;")
       .replace("#include <uv_vertex>", "#include <uv_vertex>\nvMapUv.x = (vMapUv.x * 0.996 + 0.002 + aKind) * 0.25;")
       .replace("#include <begin_vertex>", `#include <begin_vertex>
+        { vec3 fdO = (instanceMatrix * vec4(transformed.x, 0.0, transformed.z, 0.0)).xyz; transformed.y += dot(fdO.xz, aSlope) / max(length(instanceMatrix[1].xyz), 1e-3); } // (the foot along the slope)
         // (towards the edge of the patch they sink into the ground, so its edge isn't a line across the lawn)
         float fdD = distance((modelMatrix * instanceMatrix[3]).xyz, cameraPosition);
         transformed *= smoothstep(${reach.toFixed(1)}, ${(reach * 0.62).toFixed(1)}, fdD);
@@ -85,7 +86,7 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
       // (lit as the ground is, from either side: the cards' normals point up, and aren't turned over on their backs)
       .replace("#include <normal_fragment_begin>", "#include <normal_fragment_begin>\nnormal = normalize(vNormal); nonPerturbedNormal = normal;");
   };
-  mat.customProgramCacheKey = () => "fdtuft1";
+  mat.customProgramCacheKey = () => "fdtuft2";
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.name = "fdGrassTufts"; mesh.castShadow = false; mesh.receiveShadow = true; mesh.noReflect = true; mesh.frustumCulled = false;
   mesh.count = 0; mesh.userData.kind = "grass";
@@ -111,7 +112,7 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
       // (rough over 1: a dune's marram, the coarse coastal tuft mostly, some dried to straw)
       const rough = roughAt(x, z), pLawn = 0.8 - 0.6 * Math.min(1, rough), pCoast = pLawn + 0.06 + 0.3 * Math.min(1, rough);
       const kind = rough > 1.2 ? (kindR < 0.62 ? 1 : kindR < 0.82 ? 3 : 0) : kindR < pLawn ? 2 : kindR < pCoast ? 1 : kindR < 0.95 ? 0 : 3;
-      out.push({ x, y: yAt(x, z), z, kind, s: 0.75 + s * 0.6, rot: rot * Math.PI * 2, ph: ph * 6.28, c });
+      out.push({ x, y: yAt(x, z), z, kind, s: 0.75 + s * 0.6, rot: rot * Math.PI * 2, ph: ph * 6.28, c, gx: yAt(x + 0.5, z) - yAt(x - 0.5, z), gz: yAt(x, z + 0.5) - yAt(x, z - 0.5) });
     }
     if (memo.size > 4000) memo.clear();
     memo.set(key, out);
@@ -130,10 +131,10 @@ export function buildGrassTufts(group, { grassAt, yAt, colourAt, avoid, roughAt 
         if (k >= cap) break;
         const ddx = t.x - px, ddz = t.z - pz; if (ddx * ddx + ddz * ddz > r2) continue;
         e.set(0, t.rot, 0); q.setFromEuler(e); m4.compose(p.set(t.x, t.y, t.z), q, sc.set(t.s, t.s * (0.85 + 0.3 * ((t.ph * 7.3) % 1)), t.s)); mesh.setMatrixAt(k, m4);
-        mesh.setColorAt(k, col.setRGB(t.c[0], t.c[1], t.c[2])); aKind.array[k] = t.kind; aPhase.array[k] = t.ph; k++;
+        mesh.setColorAt(k, col.setRGB(t.c[0], t.c[1], t.c[2])); aKind.array[k] = t.kind; aPhase.array[k] = t.ph; aSlope.array[k * 2] = t.gx; aSlope.array[k * 2 + 1] = t.gz; k++;
       }
     }
-    mesh.count = k; mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true; aKind.needsUpdate = true; aPhase.needsUpdate = true;
+    mesh.count = k; mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true; aKind.needsUpdate = true; aPhase.needsUpdate = true; aSlope.needsUpdate = true;
   }
   function update(t, cam, wind = 0.3, windDir = null) {
     U.uTime.value = t; U.uWind.value = Math.max(0.1, Math.min(1.2, wind)); if (windDir) U.uWindDir.value.set(windDir[0] ?? windDir.x, windDir[1] ?? windDir.y);

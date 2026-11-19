@@ -28,7 +28,7 @@ const SQ = 4;
  */
 export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt = () => 0.5, quality = 1, seed = 1, atlas = FIELD } = {}) {
   if (quality < 1 || typeof document === "undefined") return null;
-  const ultra = quality >= 2, reach = ultra ? 30 : quality >= 1.5 ? 22 : 15, dens = ultra ? 11 : quality >= 1.5 ? 8 : 6, cap = ultra ? 30000 : 12000;
+  const ultra = quality >= 2, reach = ultra ? 30 : quality >= 1.5 ? 22 : 15, dens = ultra ? 15 : quality >= 1.5 ? 10 : 7, cap = ultra ? 36000 : 14000;
   // ---- one clump: two cards crossed, each the cell's width, 1 tall (the kind's height is set in the shader) ----
   const P = [], N = [], UV = [], I = [];
   for (let c = 0; c < 2; c++) {
@@ -40,9 +40,9 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(P, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3));
   geo.setAttribute("uv", new THREE.Float32BufferAttribute(UV, 2)); geo.setIndex(I);
-  const aAttr = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3), aTint = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
-  aAttr.setUsage(THREE.DynamicDrawUsage); aTint.setUsage(THREE.DynamicDrawUsage);
-  geo.setAttribute("aAttr", aAttr); geo.setAttribute("aTint", aTint); // (aAttr: kind, phase, rank)
+  const aAttr = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3), aTint = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3), aSlope = new THREE.InstancedBufferAttribute(new Float32Array(cap * 2), 2);
+  aAttr.setUsage(THREE.DynamicDrawUsage); aTint.setUsage(THREE.DynamicDrawUsage); aSlope.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute("aAttr", aAttr); geo.setAttribute("aTint", aTint); geo.setAttribute("aSlope", aSlope); // (aAttr: kind, phase, rank; aSlope: the ground's rise a metre east and south)
 
   let ready = false, cx = 1e9, cz = 1e9;
   const tex = new THREE.TextureLoader().load(TEX_BASE + atlas.file, () => { ready = true; cx = 1e9; });
@@ -53,7 +53,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = U.uTime; sh.uniforms.uWind = U.uWind; sh.uniforms.uWindDir = U.uWindDir;
     sh.vertexShader = sh.vertexShader.replace("#include <common>", `#include <common>
-        uniform float uTime, uWind; uniform vec2 uWindDir; attribute vec3 aAttr; attribute vec3 aTint; varying vec3 vTint; varying float vUp, vGust;
+        uniform float uTime, uWind; uniform vec2 uWindDir; attribute vec3 aAttr; attribute vec3 aTint; attribute vec2 aSlope; varying vec3 vTint; varying float vUp, vGust;
         float fdKH(float k) { return k < 0.5 ? ${kh[0]} : k < 1.5 ? ${kh[1]} : k < 2.5 ? ${kh[2]} : ${kh[3]}; }`)
       .replace("#include <uv_vertex>", `#include <uv_vertex>
         { float k = aAttr.x, cu = mod(k, ${atlas.cols.toFixed(1)}), cv = floor(k / ${atlas.cols.toFixed(1)});
@@ -61,6 +61,8 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
           vMapUv = vec2((cu + 0.003 + vMapUv.x * 0.994) / ${atlas.cols.toFixed(1)}, (cv + vMapUv.y * fdKH(k) / ${atlas.h.toFixed(3)}) / ${atlas.rows.toFixed(1)}); }`)
       .replace("#include <begin_vertex>", `#include <begin_vertex>
         transformed.y *= fdKH(aAttr.x);
+        // (on a slope the card's foot follows the ground, not a level line half in the air and half buried)
+        { vec3 fdO = (instanceMatrix * vec4(transformed.x, 0.0, transformed.z, 0.0)).xyz; transformed.y += dot(fdO.xz, aSlope) / max(length(instanceMatrix[1].xyz), 1e-3); }
         vUp = position.y; vTint = aTint;
         vec3 fdW = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
         // (thinning out with distance: each clump, by its rank, sinks into the ground somewhere short of the reach)
@@ -108,7 +110,7 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
   function square(ix, iz) {
     const key = ix * 65536 + iz; let s = memo.get(key);
     if (s) return s;
-    const r = rng(ix, iz), n0 = dens * SQ * SQ, M = new Float32Array(n0 * 16), T = new Float32Array(n0 * 3), A = new Float32Array(n0 * 3);
+    const r = rng(ix, iz), n0 = dens * SQ * SQ, M = new Float32Array(n0 * 16), T = new Float32Array(n0 * 3), A = new Float32Array(n0 * 3), G = new Float32Array(n0 * 2);
     let n = 0;
     for (let k = 0; k < n0; k++) {
       const x = (ix + r()) * SQ, z = (iz + r()) * SQ, roll = r(), kr = r(), sw = r(), shh = r(), rot = r(), ph = r(), rank = r();
@@ -119,13 +121,14 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
       // (which kind: a mown lawn mostly lawn, some flowers; rough ground rough grass with lawn and flowers; banks rough
       // and meadow grass; a dune's marram, rough and meadow grass in its straw and grey-green)
       const kind = rough > 1.2 ? (kr < 0.6 ? 1 : 2) : rough >= 0.9 ? (kr < 0.45 ? 1 : kr < 0.85 ? 2 : kr < 0.95 ? 3 : 0) : rough >= 0.4 ? (kr < 0.5 ? 1 : kr < 0.8 ? 0 : kr < 0.93 ? 3 : 2) : (kr < 0.9 ? 0 : 3);
-      const w = 0.55 + sw * 0.5, h = (0.75 + shh * 0.5) * (rough >= 0.9 ? 1.1 : 1);
-      e.set(0, rot * Math.PI * 2, 0); q.setFromEuler(e); m4.compose(pv.set(x, yAt(x, z) - 0.015, z), q, sv.set(w, h, w)); m4.toArray(M, n * 16);
+      const w = 0.38 + sw * 0.32, h = (0.75 + shh * 0.5) * (rough >= 0.9 ? 1.1 : 1), y = yAt(x, z);
+      e.set(0, rot * Math.PI * 2, 0); q.setFromEuler(e); m4.compose(pv.set(x, y - 0.035, z), q, sv.set(w, h, w)); m4.toArray(M, n * 16);
+      G[n * 2] = yAt(x + 0.5, z) - yAt(x - 0.5, z); G[n * 2 + 1] = yAt(x, z + 0.5) - yAt(x, z - 0.5);
       T[n * 3] = c[0]; T[n * 3 + 1] = c[1]; T[n * 3 + 2] = c[2];
       A[n * 3] = kind; A[n * 3 + 1] = ph * 6.283; A[n * 3 + 2] = rank;
       n++;
     }
-    s = { n, M: M.subarray(0, n * 16), T: T.subarray(0, n * 3), A: A.subarray(0, n * 3) };
+    s = { n, M: M.subarray(0, n * 16), T: T.subarray(0, n * 3), A: A.subarray(0, n * 3), G: G.subarray(0, n * 2) };
     if (memo.size > 3000) memo.clear();
     memo.set(key, s);
     return s;
@@ -138,10 +141,10 @@ export function buildGrassField(group, { grassAt, yAt, colourAt, avoid, roughAt 
     for (const [, ix, iz] of order) {
       const s = square(ix, iz); if (!s.n) continue;
       const n = Math.min(s.n, cap - k); if (n <= 0) break;
-      MI.set(n === s.n ? s.M : s.M.subarray(0, n * 16), k * 16); aTint.array.set(n === s.n ? s.T : s.T.subarray(0, n * 3), k * 3); aAttr.array.set(n === s.n ? s.A : s.A.subarray(0, n * 3), k * 3);
+      MI.set(n === s.n ? s.M : s.M.subarray(0, n * 16), k * 16); aTint.array.set(n === s.n ? s.T : s.T.subarray(0, n * 3), k * 3); aAttr.array.set(n === s.n ? s.A : s.A.subarray(0, n * 3), k * 3); aSlope.array.set(n === s.n ? s.G : s.G.subarray(0, n * 2), k * 2);
       k += n;
     }
-    mesh.count = k; mesh.instanceMatrix.needsUpdate = true; aTint.needsUpdate = true; aAttr.needsUpdate = true;
+    mesh.count = k; mesh.instanceMatrix.needsUpdate = true; aTint.needsUpdate = true; aAttr.needsUpdate = true; aSlope.needsUpdate = true;
   }
   function update(t, cam, wind = 0.3, windDir = null) {
     U.uTime.value = t; U.uWind.value = Math.max(0.12, Math.min(1.3, wind)); if (windDir) U.uWindDir.value.set(windDir[0] ?? windDir.x, windDir[1] ?? windDir.y);

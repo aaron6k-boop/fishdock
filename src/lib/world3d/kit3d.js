@@ -1,0 +1,75 @@
+// FishDock: the ground's clutter from real photoscans (High and Ultra): rocks and stones, pebbles, driftwood, the tide's
+// wrack, nettles, docks and weeds at the foot of walls, shrubs and ferns on the banks. The models are Poly Haven's
+// (CC0), cut down in Blender to a near and a far level each (source h203: exports/kit/<id>.glb, shipped as
+// public/models/kit/<id>.glb); the wrack is modelled there. Each kind is one instanced mesh per level and material:
+// within NEAR metres of the camera its near level, out to FAR its far one, none beyond; looked at again as the camera
+// moves. Where each goes is the place's (realPlace.js): this only draws them, each at its spot, turned and sized.
+import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MODELS_BASE } from "./glbParts.js";
+
+const NEAR = 45, FAR = 170;
+let loader = null;
+const kits = new Map();
+function loadKit(id) {
+  if (!kits.has(id)) {
+    loader ||= new GLTFLoader();
+    kits.set(id, loader.loadAsync(MODELS_BASE + "kit/" + id + ".glb").then((g) => {
+      const lv = { near: [], far: [] };
+      g.scene.updateMatrixWorld(true);
+      g.scene.traverse((o) => {
+        if (!o.isMesh) return; const l = /_far/.test(o.name) || /_far/.test(o.parent?.name || "") ? "far" : "near";
+        const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld);
+        const m = o.material.clone(); if (m.map) m.map.anisotropy = 4;
+        // (plants' leaves are cut out of their pictures: drawn from both sides, cut at half)
+        if (m.transparent || m.alphaTest > 0 || /leaf|plant|grass|fern|nettle|weed|shrub|sorrel|dandelion/i.test(id)) { m.transparent = false; m.alphaTest = Math.max(0.5, m.alphaTest || 0); m.side = THREE.DoubleSide; }
+        lv[l].push({ geo, mat: m });
+      });
+      if (!lv.far.length) lv.far = lv.near; // (the wrack: one level)
+      // (how big it is as modelled, for sizing it: its height and its widest)
+      const bb = new THREE.Box3(); for (const p of lv.near) { p.geo.computeBoundingBox(); bb.union(p.geo.boundingBox); }
+      lv.size = bb.getSize(new THREE.Vector3()); lv.base = bb.min.y;
+      return lv;
+    }).catch(() => null));
+  }
+  return kits.get(id);
+}
+
+/**
+ * @param {THREE.Group} group
+ * @param {{ id: string, at: number[][] }[]} sets  each kind and where it goes: [x, y, z, turn (radians), size (metres
+ *   tall, or across for flat things), tilt (0..1, how far it leans to the slope)]
+ * @returns {{ update(t, cam), ready: Promise }}
+ */
+export function buildKit(group, sets) {
+  if (typeof document === "undefined" || !sets?.length) return { update() {}, ready: Promise.resolve() };
+  const live = [];
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
+  const ready = Promise.all(sets.filter((S) => S.at.length).map((S) => loadKit(S.id).then((lv) => {
+    if (!lv) return;
+    const cap = S.at.length, mk = (parts) => parts.map(({ geo, mat }) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.name = "fdKit_" + S.id; group.add(m); return m; });
+    // (each one's matrix once: its spot, its turn and size; set into the levels as the camera moves)
+    const k = S.flat ? 1 : 1 / Math.max(1e-3, lv.size.y);
+    const mats = S.at.map(([x, y, z, turn = 0, size = 1, tilt = 0]) => {
+      const sc = size * k; e.set(tilt * 0.12, turn, tilt * 0.08); q.setFromEuler(e);
+      return m4.compose(p.set(x, y - lv.base * sc - (S.sink ?? 0.03) * size, z), q, s.set(sc, sc, sc)).clone();
+    });
+    live.push({ S, near: mk(lv.near), far: mk(lv.far), mats, at: new THREE.Vector3(1e9, 0, 1e9) });
+  })));
+  function update(t, cam) {
+    if (!cam) return;
+    for (const L of live) {
+      if (cam.position.distanceToSquared(L.at) < 25) continue; // (looked at again every 5 m)
+      L.at.copy(cam.position);
+      let kn = 0, kf = 0; const cx = cam.position.x, cz = cam.position.z;
+      for (let i = 0; i < L.mats.length; i++) {
+        const a = L.S.at[i], d2 = (a[0] - cx) ** 2 + (a[2] - cz) ** 2;
+        if (d2 < NEAR * NEAR) { for (const m of L.near) m.setMatrixAt(kn, L.mats[i]); kn++; }
+        else if (d2 < FAR * FAR) { for (const m of L.far) m.setMatrixAt(kf, L.mats[i]); kf++; }
+      }
+      for (const m of L.near) { m.count = kn; m.instanceMatrix.needsUpdate = true; }
+      if (L.far !== L.near) for (const m of L.far) { m.count = kf; m.instanceMatrix.needsUpdate = true; }
+    }
+  }
+  return { update, ready };
+}
