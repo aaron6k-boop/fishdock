@@ -18,7 +18,7 @@ import { TEX_BASE } from "./textures3d.js";
 
 // ---- the picture: two by two cells, each 1.2 m across and 0.6 m tall, the ground along its foot ----
 // (KH: each kind's tallest blades, the height of its card)
-export const FIELD = { file: "grass_field.webp", cols: 2, rows: 2, w: 1.2, h: 0.6, KH: [0.15, 0.38, 0.56, 0.3], lum: 0.18 };
+export const FIELD = { file: "grass_field.webp", cols: 2, rows: 2, w: 1.2, h: 0.6, KH: [0.15, 0.38, 0.56, 0.3], lum: 0.184 };
 const SQ = 4;
 
 /**

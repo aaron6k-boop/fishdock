@@ -1799,13 +1799,16 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const field = buildGrassField(group, grassOpts), tufts = buildGrassTufts(group, { ...grassOpts, sparse: !!field });
     // ---- the ground's clutter from real photoscans (kit3d.js; High and Ultra): along the beaches the tide's wrack, a
     // stray branch of driftwood, stones and pebbles gathered at the back against the walls and the cliff's foot, rocks
-    // fallen at the foot of the cliff; on the banks shrubs, docks and ferns, mossy rocks where the soil is bare, nettles
-    // and weeds where the ground's been disturbed; at the foot of the buildings' walls and along the paths, weeds and
-    // nettles; dandelions in the rough grass. Each from the place's own ground, never on a road, a pier or a spot ----
+    // fallen at the foot of the cliff; on the banks willowherb, docks, grass clumps and ferns, mossy rocks where the soil
+    // is bare, nettles where the ground's been disturbed; at the foot of the buildings' walls, docks, nettles, grass and
+    // hart's-tongue fern; dandelions and clumps in the rough grass. Each from the place's own ground, never on a road, a
+    // pier or a spot ----
     let kit = null;
     if (quality >= 2 || (typeof window !== "undefined" && window.__fdFine)) {
       let hs = (7919 * (3 + (place.spots?.length || 0))) >>> 0; const R = () => { hs ^= hs << 13; hs >>>= 0; hs ^= hs >>> 17; hs ^= hs << 5; hs >>>= 0; return hs / 4294967296; };
-      const S = {}; const put = (id, x, z, size, tilt = 0) => { if (grassOpts.avoid(x, z)) return; (S[id] ||= []).push([x, grassOpts.yAt(x, z), z, R() * Math.PI * 2, size, tilt]); };
+      // (plants only above the reach of the tides: never in the water or on the wet foot of a bank)
+      const PLANT = /plant|shrub|grass|fern|dandelion/;
+      const S = {}; const put = (id, x, z, size, tilt = 0) => { if (grassOpts.avoid(x, z)) return; const y = grassOpts.yAt(x, z); if (PLANT.test(id) && y < 1.4) return; (S[id] ||= []).push([x, y, z, R() * Math.PI * 2, size, tilt]); };
       const nb4 = (k) => [k - 1, k + 1, k - n, k + n];
       for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
         const k = j * n + i, cw = xs[i + 1] - xs[i], ch = xs[j + 1] - xs[j]; if (cw > 7 || ch > 7) continue;
@@ -1815,26 +1818,28 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           for (let c = 0; c < area * 0.5; c++) {
             const x = x0 + R() * cw, z = z0 + R() * ch, y = grassOpts.yAt(x, z);
             if (y > 0.5 && y < 0.95 && R() < 0.5) put("wrack", x, z, 0.6 + R() * 0.7); // (the strand line: where the last tide left it)
-            if (atBack && R() < 0.45) put(R() < 0.6 ? "sand_rocks_small_01" : "stone_01", x, z, R() < 0.6 ? 0.25 + R() * 0.3 : 0.12 + R() * 0.2);
-            if (atSea && R() < 0.04) put("coast_rocks_02", x, z, 0.5 + R() * 0.9);
+            if (atBack && R() < 0.45) { const fl = R() < 0.55; put(fl ? "rock_09" : "stone_01", x, z, fl ? 0.05 + R() * 0.1 : 0.07 + R() * 0.13, 1); }
+            if (atSea && R() < 0.04) put("rock_moss_set_01", x, z, 0.35 + R() * 0.65, 1);
             if (y > 0.5 && R() < 0.006) put(R() < 0.5 ? "dead_tree_trunk" : "dry_branches_medium_01", x, z, 0.35 + R() * 0.3);
           }
         } else if (bank[k] && nb4(k).some((q) => cls[q] === 0 || cls[q] === 2)) {
-          for (let c = 0; c < area * 0.03; c++) put(R() < 0.7 ? "coast_rocks_02" : "boulder_01", x0 + R() * cw, z0 + R() * ch, 0.8 + R() * 1.6, 1); // (fallen at the cliff's foot)
+          for (let c = 0; c < area * 0.03; c++) put("rock_moss_set_01", x0 + R() * cw, z0 + R() * ch, 0.5 + R() * 1.1, 1); // (fallen at the cliff's foot)
         }
         if (bank[k] || cls[k] === 3 || town[k]) {
           for (let c = 0; c < area * (bank[k] ? 0.05 : 0.02); c++) {
             const x = x0 + R() * cw, z = z0 + R() * ch, fi = fineInfo(x, z), soil = fi ? fi.soil : 0, slope = fi ? fi.slope : steep[k] * 1.5, r = R();
             if (slope > 1.4) continue;
             if (bank[k]) {
-              if (soil > 0.45 && r < 0.25) put("rock_moss_set_01", x, z, 0.4 + R() * 0.8, 1);
-              else if (soil > 0.25 && r < 0.5) put("nettle_plant", x, z, 0.45 + R() * 0.45);
-              else if (r < 0.62) put("shrub_02", x, z, 0.7 + R() * 0.9);
-              else if (r < 0.78) put("shrub_sorrel_01", x, z, 0.35 + R() * 0.45);
-              else if (r < 0.9) put("fern_02", x, z, 0.4 + R() * 0.5);
-              else put("weed_plant_02", x, z, 0.3 + R() * 0.35);
-            } else if (r < 0.5) put("dandelion_01", x, z, 0.12 + R() * 0.18);
-            else if (r < 0.65) put("weed_plant_02", x, z, 0.25 + R() * 0.3);
+              if (soil > 0.45 && r < 0.2) put("rock_moss_set_01", x, z, 0.3 + R() * 0.6, 1);
+              else if (soil > 0.25 && r < 0.42) put("nettle_plant", x, z, 0.5 + R() * 0.5);
+              else if (r < 0.52) put("shrub_02", x, z, 0.6 + R() * 0.6);
+              else if (r < 0.72) put("grass_medium_01", x, z, 0.35 + R() * 0.3);
+              else if (r < 0.8) put("shrub_sorrel_01", x, z, 0.08 + R() * 0.08);
+              else if (r < 0.9) put("fern_02", x, z, 0.3 + R() * 0.3);
+              else put("weed_plant_02", x, z, 0.2 + R() * 0.15);
+            } else if (r < 0.35) put("dandelion_01", x, z, 0.15 + R() * 0.15);
+            else if (r < 0.6) put("grass_medium_01", x, z, 0.25 + R() * 0.2);
+            else if (r < 0.7) put("weed_plant_02", x, z, 0.18 + R() * 0.15);
           }
         }
       }
@@ -1849,7 +1854,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             if (R() > 0.3) continue;
             const x = x1 + (x2 - x1) * (u / L) + ox * 0.3, z = z1 + (z2 - z1) * (u / L) + oz * 0.3, c = cAt(x, z); if (c !== 1 && c !== 3) continue;
             const kk = nearestVertex(x, z); if (!(bank[kk] || town[kk] || cls[kk] === 3)) continue;
-            put(R() < 0.35 ? "nettle_plant" : "weed_plant_02", x, z, 0.25 + R() * 0.35);
+            const w = R(); // (nettles, docks, grass and the hart's-tongue fern that grows from damp wall foots)
+            if (w < 0.25) put("nettle_plant", x, z, 0.4 + R() * 0.4); else if (w < 0.55) put("weed_plant_02", x, z, 0.18 + R() * 0.15);
+            else if (w < 0.8) put("grass_medium_01", x, z, 0.25 + R() * 0.15); else put("fern_02", x, z, 0.25 + R() * 0.2);
           }
         }
       }

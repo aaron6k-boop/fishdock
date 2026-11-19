@@ -1,7 +1,9 @@
-// FishDock: the ground's clutter from real photoscans (High and Ultra): rocks and stones, pebbles, driftwood, the tide's
-// wrack, nettles, docks and weeds at the foot of walls, shrubs and ferns on the banks. The models are Poly Haven's
-// (CC0), cut down in Blender to a near and a far level each (source h203: exports/kit/<id>.glb, shipped as
-// public/models/kit/<id>.glb); the wrack is modelled there. Each kind is one instanced mesh per level and material:
+// FishDock: the ground's clutter from real photoscans (High and Ultra): rocks and stones, driftwood, the tide's wrack,
+// nettles, docks and weeds at the foot of walls, grass clumps, willowherb and ferns on the banks. The models are Poly
+// Haven's (CC0): each set split in Blender into its separate plants or rocks (variants), each cut down to a near and a
+// far level (source h207: exports/kit2/<id>.glb, objects <id>_v<k>_near and _far, shipped as public/models/kit/<id>.glb
+// with their pictures at 512 px); the wrack is modelled there. Each placement is one of its model's variants, sized by
+// the set's tallest. Each variant is one instanced mesh per level and material:
 // within NEAR metres of the camera its near level, out to FAR its far one, none beyond; looked at again as the camera
 // moves. Where each goes is the place's (realPlace.js): this only draws them, each at its spot, turned and sized.
 import * as THREE from "three";
@@ -15,21 +17,30 @@ function loadKit(id) {
   if (!kits.has(id)) {
     loader ||= new GLTFLoader();
     kits.set(id, loader.loadAsync(MODELS_BASE + "kit/" + id + ".glb").then((g) => {
-      const lv = { near: [], far: [] };
+      // (its variants: objects named <id>_v<k>_near and _far; a model without them is one variant)
+      const V = new Map();
       g.scene.updateMatrixWorld(true);
       g.scene.traverse((o) => {
-        if (!o.isMesh) return; const l = /_far/.test(o.name) || /_far/.test(o.parent?.name || "") ? "far" : "near";
+        if (!o.isMesh) return;
+        const nm = o.name + " " + (o.parent?.name || ""), vm = nm.match(/_v(\d+)_/), v = vm ? +vm[1] : 0, l = /_far/.test(nm) ? "far" : "near";
         const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld);
         const m = o.material.clone(); if (m.map) m.map.anisotropy = 4;
         // (plants' leaves are cut out of their pictures: drawn from both sides, cut at half)
-        if (m.transparent || m.alphaTest > 0 || /leaf|plant|grass|fern|nettle|weed|shrub|sorrel|dandelion/i.test(id)) { m.transparent = false; m.alphaTest = Math.max(0.5, m.alphaTest || 0); m.side = THREE.DoubleSide; }
-        lv[l].push({ geo, mat: m });
+        if (m.transparent || m.alphaTest > 0 || /plant|grass|fern|nettle|weed|shrub|sorrel|dandelion/i.test(id)) { m.transparent = false; m.alphaTest = Math.max(0.5, m.alphaTest || 0); m.side = THREE.DoubleSide; }
+        if (!V.has(v)) V.set(v, { near: [], far: [] });
+        V.get(v)[l].push({ geo, mat: m });
       });
-      if (!lv.far.length) lv.far = lv.near; // (the wrack: one level)
-      // (how big it is as modelled, for sizing it: its height and its widest)
-      const bb = new THREE.Box3(); for (const p of lv.near) { p.geo.computeBoundingBox(); bb.union(p.geo.boundingBox); }
-      lv.size = bb.getSize(new THREE.Vector3()); lv.base = bb.min.y;
-      return lv;
+      const variants = [...V.values()].filter((x) => x.near.length || x.far.length);
+      for (const x of variants) {
+        if (!x.far.length) x.far = x.near; if (!x.near.length) x.near = x.far;
+        // (how big it is as modelled, for sizing it: its height and its widest)
+        const bb = new THREE.Box3(); for (const q of x.near) { q.geo.computeBoundingBox(); bb.union(q.geo.boundingBox); }
+        x.size = bb.getSize(new THREE.Vector3()); x.base = bb.min.y;
+      }
+      // (sized by the tallest: a set's seedlings and low rosettes stay that much smaller than its tall plants)
+      const top = Math.max(...variants.map((x) => x.size.y));
+      for (const x of variants) x.top = top;
+      return variants.length ? variants : null;
     }).catch(() => null));
   }
   return kits.get(id);
@@ -45,16 +56,25 @@ export function buildKit(group, sets) {
   if (typeof document === "undefined" || !sets?.length) return { update() {}, ready: Promise.resolve() };
   const live = [];
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
-  const ready = Promise.all(sets.filter((S) => S.at.length).map((S) => loadKit(S.id).then((lv) => {
-    if (!lv) return;
-    const cap = S.at.length, mk = (parts) => parts.map(({ geo, mat }) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.name = "fdKit_" + S.id; group.add(m); return m; });
-    // (each one's matrix once: its spot, its turn and size; set into the levels as the camera moves)
-    const k = S.flat ? 1 : 1 / Math.max(1e-3, lv.size.y);
-    const mats = S.at.map(([x, y, z, turn = 0, size = 1, tilt = 0]) => {
-      const sc = size * k; e.set(tilt * 0.12, turn, tilt * 0.08); q.setFromEuler(e);
-      return m4.compose(p.set(x, y - lv.base * sc - (S.sink ?? 0.03) * size, z), q, s.set(sc, sc, sc)).clone();
+  const ready = Promise.all(sets.filter((S) => S.at.length).map((S) => loadKit(S.id).then((vars) => {
+    if (!vars) return;
+    // (each placement one of the model's variants, by its place, the same every time)
+    const byV = vars.map(() => []);
+    S.at.forEach((a, i) => { byV[Math.abs(Math.floor(a[0] * 7.31 + a[2] * 3.17 + i)) % vars.length].push(a); });
+    vars.forEach((lv, vi) => {
+      const at = byV[vi]; if (!at.length) return;
+      // (shadows from the near level only, and from rocks and wood at both: a far plant's shadow is lost in the grass)
+      const solid = !/plant|shrub|grass|fern|dandelion/.test(S.id);
+      const cap = at.length, mk = (parts, near) => parts.map(({ geo, mat }) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.castShadow = near || solid; m.receiveShadow = true; m.frustumCulled = false; m.name = "fdKit_" + S.id; m.userData.at = at; group.add(m); return m; });
+      // (each one's matrix once: its spot, its turn and size; set into the levels as the camera moves)
+      const k = S.flat ? 1 : 1 / Math.max(1e-3, lv.top);
+      const mats = at.map(([x, y, z, turn = 0, size = 1, tilt = 0]) => {
+        const sc = size * k; e.set(tilt * 0.12, turn, tilt * 0.08); q.setFromEuler(e);
+        return m4.compose(p.set(x, y - lv.base * sc - (S.sink ?? 0.03) * (S.flat ? sc * lv.size.y : size), z), q, s.set(sc, sc, sc)).clone();
+      });
+      const near = mk(lv.near, true), far = lv.far === lv.near ? near : mk(lv.far, false);
+      live.push({ S: { ...S, at }, near, far, mats, at: new THREE.Vector3(1e9, 0, 1e9) });
     });
-    live.push({ S, near: mk(lv.near), far: mk(lv.far), mats, at: new THREE.Vector3(1e9, 0, 1e9) });
   })));
   function update(t, cam) {
     if (!cam) return;
@@ -64,7 +84,8 @@ export function buildKit(group, sets) {
       let kn = 0, kf = 0; const cx = cam.position.x, cz = cam.position.z;
       for (let i = 0; i < L.mats.length; i++) {
         const a = L.S.at[i], d2 = (a[0] - cx) ** 2 + (a[2] - cz) ** 2;
-        if (d2 < NEAR * NEAR) { for (const m of L.near) m.setMatrixAt(kn, L.mats[i]); kn++; }
+        const same = L.far === L.near;
+        if (d2 < NEAR * NEAR || (same && d2 < FAR * FAR)) { for (const m of L.near) m.setMatrixAt(kn, L.mats[i]); kn++; }
         else if (d2 < FAR * FAR) { for (const m of L.far) m.setMatrixAt(kf, L.mats[i]); kf++; }
       }
       for (const m of L.near) { m.count = kn; m.instanceMatrix.needsUpdate = true; }

@@ -2759,6 +2759,620 @@
      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/brick_wall_003/brick_wall_003_rough_2k.jpg"
     }
    ]
+  },
+  {
+   "id": "polyhaven:rock_09",
+   "name": "Rock 09",
+   "source": "https://polyhaven.com/a/rock_09",
+   "author": "Jenelle van Heerden",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "flat stones gathered at the back of the beaches, High and Ultra (public/models/kit/rock_09.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/rock_09/model/rock_09_1k.gltf",
+     "bytes": 2745,
+     "sha256": "636e57eb0090889627da18edaec202ff9f65f83101b94f91b7da4d21dc080ab9",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_09/rock_09_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/rock_09/model/textures/rock_09_arm_1k.jpg",
+     "bytes": 322950,
+     "sha256": "594e2cec49e6bb40bd9bab2649e37dcc261079456cf4d6f680f56770c19db5ea",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_09/rock_09_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_09/model/textures/rock_09_nor_gl_1k.jpg",
+     "bytes": 757031,
+     "sha256": "2195b5c7da3a23af2a5f93dbb20f38bc069028509b106397bc8d2aee0bc55729",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_09/rock_09_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_09/model/textures/rock_09_diff_1k.jpg",
+     "bytes": 595103,
+     "sha256": "afb7ae5ae82238d304aba589391ac6bc87f7cf1dbfe50980c21f762cfdd87efd",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_09/rock_09_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_09/model/rock_09.bin",
+     "bytes": 286592,
+     "sha256": "780c37d6fc11ca3a01c3763535ef883908b6007271a46bd446d2289ded820751",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_09/rock_09.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:rock_moss_set_01",
+   "name": "Rock Moss Set 01",
+   "source": "https://polyhaven.com/a/rock_moss_set_01",
+   "author": "Kless Gyzen",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "rocks fallen at the cliff's foot, on the scars by the sea and on the banks (six rocks), High and Ultra (public/models/kit/rock_moss_set_01.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/rock_moss_set_01/model/rock_moss_set_01_1k.gltf",
+     "bytes": 9987,
+     "sha256": "c36675aca9c6b2be7785c2534cf413b03ec82a5a2a5407a2b1c0cdb0346c9727",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_moss_set_01/rock_moss_set_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_01/model/textures/rock_moss_set_01_nor_gl_1k.jpg",
+     "bytes": 209975,
+     "sha256": "eb4aad3f207f1dc5b624d74ae240372171626a66912bd71adf7bd3e518181d6e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_01/rock_moss_set_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_01/model/rock_moss_set_01.bin",
+     "bytes": 1466380,
+     "sha256": "de8360e6175879aaf02c171911069cf5f1852547f9ca7f10e440085dbcc3315e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_moss_set_01/rock_moss_set_01.bin"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_01/model/textures/rock_moss_set_01_rough_1k.jpg",
+     "bytes": 82624,
+     "sha256": "4d6ec46623abd8e2cdb855f59c7ce31873ad61b36b60e4de579e9e776a497c6b",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_01/rock_moss_set_01_rough_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/rock_moss_set_01/model/textures/rock_moss_set_01_diff_1k.jpg",
+     "bytes": 168099,
+     "sha256": "40cea65d8aa4ee73a93b04af19963834d061eee9779c3fc2c1cba76eef812ccc",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_moss_set_01/rock_moss_set_01_diff_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:stone_01",
+   "name": "Stone 01",
+   "source": "https://polyhaven.com/a/stone_01",
+   "author": "Dario Barresi (photography), Rico Cilliers (photography, processing)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "stones at the back of the beaches, High and Ultra (public/models/kit/stone_01.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/stone_01/model/stone_01_1k.gltf",
+     "bytes": 2750,
+     "sha256": "e06d59972ef910acde1cc64f9450ddb9c12dcd052031bc9982a7c46e108f6111",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/stone_01/stone_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/stone_01/model/textures/stone_01_arm_1k.jpg",
+     "bytes": 846334,
+     "sha256": "1cb342823b2883e9885bf7bfe0ed12cd897d2f99a49d3c25b5e2c8f30f38263e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/stone_01/stone_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/stone_01/model/stone_01.bin",
+     "bytes": 1213536,
+     "sha256": "ad037d15be3619be6aa3ddb144d450aea43b5efb66b670ba756272bf839418e3",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/stone_01/stone_01.bin"
+    },
+    {
+     "file": "downloads/polyhaven/stone_01/model/textures/stone_01_diff_1k.jpg",
+     "bytes": 649135,
+     "sha256": "c3171a6108bf1b3656b4a3576b329065d7acf6e337506a9e1a15511300c8fc88",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/stone_01/stone_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/stone_01/model/textures/stone_01_nor_gl_1k.jpg",
+     "bytes": 1012665,
+     "sha256": "4d08a934f846913e96152260c824f7d5e642350ede76569ce82d6dc50c45f535",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/stone_01/stone_01_nor_gl_1k.jpg"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:nettle_plant",
+   "name": "Nettle Plant",
+   "source": "https://polyhaven.com/a/nettle_plant",
+   "author": "Rob Tuytel (photography), Rico Cilliers (modeling)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "nettles on the banks and at the foot of walls (six plants), High and Ultra (public/models/kit/nettle_plant.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/nettle_plant/model/nettle_plant_1k.gltf",
+     "bytes": 10450,
+     "sha256": "45baafa16feb0017e6a46712e2aa7afe7841fd00905075ead8316a5fc8314b0e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/nettle_plant/nettle_plant_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/nettle_plant/model/textures/nettle_plant_arm_1k.jpg",
+     "bytes": 467172,
+     "sha256": "8fb33e5e939b4e089f08c867bf449d9e27aa32af94990c3cad1a89dcabd44f14",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/nettle_plant/nettle_plant_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/nettle_plant/model/textures/nettle_plant_nor_gl_1k.jpg",
+     "bytes": 654754,
+     "sha256": "ab5d0cdc9a487a8874b6e9a11bf67ef90319f02bbd74579576198aca90b0fa85",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/nettle_plant/nettle_plant_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/nettle_plant/model/textures/nettle_plant_diff_1k.jpg",
+     "bytes": 388629,
+     "sha256": "7172a9971818a18a7cb7ebaa144d9d2313b83d2a6180c9582000f7260542ea7b",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/nettle_plant/nettle_plant_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/nettle_plant/model/nettle_plant.bin",
+     "bytes": 956560,
+     "sha256": "24810f9d80b5fafdd71e1599b0cc81afa3eb9b744cfa8bf388c5e9f30271ba46",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/nettle_plant/nettle_plant.bin"
+    },
+    {
+     "file": "downloads/polyhaven/nettle_plant/model/textures/nettle_plant_alpha_1k.png",
+     "bytes": 189288,
+     "sha256": "61d98e886a20e401f7eb6e2d64e8513b2409e54feb41e83ecbf3b10aaa035810",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/nettle_plant/nettle_plant_alpha_1k.png"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:weed_plant_02",
+   "name": "Weed Plant 02",
+   "source": "https://polyhaven.com/a/weed_plant_02",
+   "author": "Rob Tuytel (photography), Rico Cilliers (modeling)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "docks and broad-leaved weeds on the banks, lawns and wall foots (five plants), High and Ultra (public/models/kit/weed_plant_02.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/weed_plant_02/model/weed_plant_02_1k.gltf",
+     "bytes": 9128,
+     "sha256": "20fe9aa14ec8160de54d8027422ce6db93bcc6211299509067ee3edbceff218b",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/weed_plant_02/weed_plant_02_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/weed_plant_02/model/textures/weed_plant_02_nor_gl_1k.jpg",
+     "bytes": 679362,
+     "sha256": "53e277362656eaea87a59bc7c5b551e73d2cdb5b852b21d0ffb84becfc7b941d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/weed_plant_02/weed_plant_02_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/weed_plant_02/model/textures/weed_plant_02_diff_1k.jpg",
+     "bytes": 457595,
+     "sha256": "6bcbf7f0b8eaf5156b9021f998dd9233ba4b095aa590f3621b94f47550e21eb9",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/weed_plant_02/weed_plant_02_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/weed_plant_02/model/textures/weed_plant_02_arm_1k.jpg",
+     "bytes": 571490,
+     "sha256": "82dd00b135a605aecf09d46bdaa6e71cdfc221d7b53e20e6f446da6e9e5bf942",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/weed_plant_02/weed_plant_02_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/weed_plant_02/model/weed_plant_02.bin",
+     "bytes": 330884,
+     "sha256": "2b77b91a881055365a56156e8a131277187f72b82c1d55806bb5b0a5053e5e9d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/weed_plant_02/weed_plant_02.bin"
+    },
+    {
+     "file": "downloads/polyhaven/weed_plant_02/model/textures/weed_plant_02_alpha_1k.png",
+     "bytes": 182453,
+     "sha256": "ceb47162756cba3d8306ce8aa7097f81786c9cd98785b7da5b191806a88ae44e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/weed_plant_02/weed_plant_02_alpha_1k.png"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:shrub_02",
+   "name": "Shrub 02",
+   "source": "https://polyhaven.com/a/shrub_02",
+   "author": "Rico Cilliers",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "willowherb-like weeds on the banks (four plants), High and Ultra (public/models/kit/shrub_02.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/shrub_02/model/shrub_02_1k.gltf",
+     "bytes": 8083,
+     "sha256": "99de0a70fe88ad414615cc8d8e020617c8512e2abfe08b911b153a6fcc40d93e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/shrub_02/shrub_02_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_02/model/textures/shrub_02_arm_1k.jpg",
+     "bytes": 313715,
+     "sha256": "7186bf604d5c02f873aef6de2346cc06b6fa48f47d054edbef36d2c3772c0890",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_02/shrub_02_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_02/model/textures/shrub_02_nor_gl_1k.jpg",
+     "bytes": 490815,
+     "sha256": "54c24e433365d5410223b7ebd2b33042b80831f80976e10768114db5ef6911d7",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_02/shrub_02_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_02/model/shrub_02.bin",
+     "bytes": 758692,
+     "sha256": "5c1b79da1cfdbac90599542ccd1f75ba433a3a4d356b1ea03655adb39b0e2c96",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/shrub_02/shrub_02.bin"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_02/model/textures/shrub_02_diff_1k.jpg",
+     "bytes": 395120,
+     "sha256": "9956eff294034d70516d867e9668428a23d782feb3d4c34061dce5e44bacd5a8",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_02/shrub_02_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_02/model/textures/shrub_02_alpha_1k.png",
+     "bytes": 91741,
+     "sha256": "5c2c31bac311051db77443e1780078403c2df0a832c40fe6ed7bcd982695cdf0",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/shrub_02/shrub_02_alpha_1k.png"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:shrub_sorrel_01",
+   "name": "Shrub Sorrel 01",
+   "source": "https://polyhaven.com/a/shrub_sorrel_01",
+   "author": "Rico Cilliers",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "wood sorrel on the banks (six plants), High and Ultra (public/models/kit/shrub_sorrel_01.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/shrub_sorrel_01/model/shrub_sorrel_01_1k.gltf",
+     "bytes": 17428,
+     "sha256": "97e2c9b564610a1077de9e15de07acbf19f2e66619016aeebb7987e191ad3ce1",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/shrub_sorrel_01/shrub_sorrel_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_sorrel_01/model/textures/shrub_sorrel_01_nor_gl_1k.jpg",
+     "bytes": 470891,
+     "sha256": "0bb2e2aba7831a4e642ad6b1985ad82b0a574930ec6982f9a1a66ad8b41a94b3",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_sorrel_01/shrub_sorrel_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_sorrel_01/model/shrub_sorrel_01.bin",
+     "bytes": 110936,
+     "sha256": "725f46bf6d330486bf22d4b897fa1d8ef01cdc77a72f1400a3939f86740b4e5d",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/shrub_sorrel_01/shrub_sorrel_01.bin"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_sorrel_01/model/textures/shrub_sorrel_01_arm_1k.jpg",
+     "bytes": 201949,
+     "sha256": "a1b49322e2b0ea988336fca959145dbb53b483b8f9ff2ec5f23dda20c486bdb8",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_sorrel_01/shrub_sorrel_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_sorrel_01/model/textures/shrub_sorrel_01_diff_1k.jpg",
+     "bytes": 385129,
+     "sha256": "9aa62e57767f5b964b8d52e6406ebadb0205fa469d5a369a946fba13a3bc950f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/shrub_sorrel_01/shrub_sorrel_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/shrub_sorrel_01/model/textures/shrub_sorrel_01_alpha_1k.png",
+     "bytes": 64408,
+     "sha256": "4788b2a1e8a53cf6f706b1e75bc4007afec3fc823fd3ccaf9b48a52dc1eb04da",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/shrub_sorrel_01/shrub_sorrel_01_alpha_1k.png"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:dandelion_01",
+   "name": "Dandelion 01",
+   "source": "https://polyhaven.com/a/dandelion_01",
+   "author": "Rob Tuytel (photography), Rico Cilliers (modeling)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "dandelions in the rough grass (five plants), High and Ultra (public/models/kit/dandelion_01.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/dandelion_01/model/dandelion_01_1k.gltf",
+     "bytes": 8915,
+     "sha256": "68f804fe29f641f37b03c470cf9065d34aacd1b4f580ed6f35385626c2bb42b7",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dandelion_01/dandelion_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/dandelion_01/model/dandelion_01.bin",
+     "bytes": 1676648,
+     "sha256": "ccff5a564f56a69374c09c25ae86c3684c46329309b4eef4569255b1ad54bdd0",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dandelion_01/dandelion_01.bin"
+    },
+    {
+     "file": "downloads/polyhaven/dandelion_01/model/textures/dandelion_01_nor_gl_1k.jpg",
+     "bytes": 495857,
+     "sha256": "fd69513a4803145f634b5ace49fed8709e454b3026d060687071757a72c33250",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dandelion_01/dandelion_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dandelion_01/model/textures/dandelion_01_diff_1k.jpg",
+     "bytes": 470035,
+     "sha256": "17e49d535dfce890e539038a80eaa77d90dab5f1781350266dd8f736ee7370d6",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dandelion_01/dandelion_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dandelion_01/model/textures/dandelion_01_arm_1k.jpg",
+     "bytes": 448489,
+     "sha256": "dad70c20756581fd795548f52a23580d94a2af538664dbbfe64e66a76e4eebb6",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dandelion_01/dandelion_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dandelion_01/model/textures/dandelion_01_alpha_1k.png",
+     "bytes": 130962,
+     "sha256": "8fa462009b79d58741ba058418cd0ac7e9ec61b049b601f1351179204256c8eb",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/dandelion_01/dandelion_01_alpha_1k.png"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:fern_02",
+   "name": "Fern 02",
+   "source": "https://polyhaven.com/a/fern_02",
+   "author": "Rob Tuytel (scanning), Rico Cilliers (modeling)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "hart's-tongue ferns on the banks and at wall foots (four plants), High and Ultra (public/models/kit/fern_02.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/fern_02/model/fern_02_1k.gltf",
+     "bytes": 6899,
+     "sha256": "33974295ee19670af4877705fc7d91f33f42d6302f0d44a625e072271223031f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/fern_02/fern_02_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/fern_02/model/textures/fern_02_arm_1k.jpg",
+     "bytes": 280359,
+     "sha256": "ebfb5d76ce9cbdaec20bcd22dce9b755f0b1b8650ef29ca13555e3e6961025d7",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/fern_02/fern_02_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/fern_02/model/textures/fern_02_diff_1k.jpg",
+     "bytes": 315705,
+     "sha256": "a828a6e7b4c01c826911e2eac4b3afc7457dab7b3b392a31c681ed88b7d50029",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/fern_02/fern_02_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/fern_02/model/textures/fern_02_nor_gl_1k.jpg",
+     "bytes": 367222,
+     "sha256": "45bce132c6e96a0864bc89ab5da51361ab3f4afa83a6669ae499ab5ca811f621",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/fern_02/fern_02_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/fern_02/model/fern_02.bin",
+     "bytes": 176176,
+     "sha256": "fe1abb762bcbbc7ad9e86925c8080437a62add257d9280e9142fdc85c226e64c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/fern_02/fern_02.bin"
+    },
+    {
+     "file": "downloads/polyhaven/fern_02/model/textures/fern_02_alpha_1k.png",
+     "bytes": 114589,
+     "sha256": "ea3c64284c7ebdeedf484d2d816eae92825ec526140c3bb83859ddc7a64001f9",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/fern_02/fern_02_alpha_1k.png"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:dead_tree_trunk",
+   "name": "Dead Tree Trunk",
+   "source": "https://polyhaven.com/a/dead_tree_trunk",
+   "author": "Rob Tuytel",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "driftwood on the beaches, High and Ultra (public/models/kit/dead_tree_trunk.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/dead_tree_trunk/model/dead_tree_trunk_1k.gltf",
+     "bytes": 2812,
+     "sha256": "8baaf1ff66ba1f79acdceed0dc3797a882990a3abb10b18abe56762f34c26e39",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dead_tree_trunk/dead_tree_trunk_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/dead_tree_trunk/model/textures/dead_tree_trunk_arm_1k.jpg",
+     "bytes": 724384,
+     "sha256": "0e0f7d64ac4ee3a7e7861a48f4bbd1ec2c026facd8f48b756f6b5d4557af3fd3",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dead_tree_trunk/dead_tree_trunk_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dead_tree_trunk/model/textures/dead_tree_trunk_nor_gl_1k.jpg",
+     "bytes": 1053075,
+     "sha256": "b7c393204c93f0c67535ff3b5d723b26598f9dbb2b5110b74249ab88189f026f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dead_tree_trunk/dead_tree_trunk_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dead_tree_trunk/model/textures/dead_tree_trunk_diff_1k.jpg",
+     "bytes": 713480,
+     "sha256": "bc31d7d23db90d90cfb568c583914eeec11b29716b79096818b706a9e3e0216c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dead_tree_trunk/dead_tree_trunk_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dead_tree_trunk/model/dead_tree_trunk.bin",
+     "bytes": 2293788,
+     "sha256": "c1ac6b3195246e8647a28eee2fbfdd4712a045c7cf2dcb4f5abcc2d40a446ca6",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dead_tree_trunk/dead_tree_trunk.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:dry_branches_medium_01",
+   "name": "Dry Branches Medium 01",
+   "source": "https://polyhaven.com/a/dry_branches_medium_01",
+   "author": "Rico Cilliers",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "driftwood branches on the beaches (three), High and Ultra (public/models/kit/dry_branches_medium_01.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/dry_branches_medium_01/model/dry_branches_medium_01_1k.gltf",
+     "bytes": 5844,
+     "sha256": "23f328ded9be1e151ccd7994b303c70221551544c4857a71474c1c01a14b8a22",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/dry_branches_medium_01/dry_branches_medium_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/dry_branches_medium_01/model/textures/dry_branches_medium_01_arm_1k.jpg",
+     "bytes": 831180,
+     "sha256": "6d1ba6f4763d2815301a15bf62eaf68c345cecafb107e2681d12f26fbc657f5a",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dry_branches_medium_01/dry_branches_medium_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dry_branches_medium_01/model/textures/dry_branches_medium_01_diff_1k.jpg",
+     "bytes": 778799,
+     "sha256": "1fbaf810a9ca29d2faf0a179834e8dce10cf4854bafe13f63af111030b3ec660",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dry_branches_medium_01/dry_branches_medium_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dry_branches_medium_01/model/textures/dry_branches_medium_01_nor_gl_1k.jpg",
+     "bytes": 1170647,
+     "sha256": "62f5205bfec599000bb7a430e003bbada939bc8d7976a7d3ab7709fd5893413c",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/dry_branches_medium_01/dry_branches_medium_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/dry_branches_medium_01/model/dry_branches_medium_01.bin",
+     "bytes": 465172,
+     "sha256": "969da1e8cbb2d8201e7fa0fc0dac5b19ef354b32c3d8c62dd9faa7cb3833d8ca",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/dry_branches_medium_01/dry_branches_medium_01.bin"
+    }
+   ]
+  },
+  {
+   "id": "polyhaven:grass_medium_01",
+   "name": "Grass Medium 01",
+   "source": "https://polyhaven.com/a/grass_medium_01",
+   "author": "Rob Tuytel (photography), Rico Cilliers (modeling)",
+   "licence": "CC0 1.0",
+   "attribution": "Not required (credited anyway in CREDITS)",
+   "type": "models",
+   "resolution": "1k",
+   "use": "grass clumps on the banks, lawns and wall foots (six clumps), High and Ultra (public/models/kit/grass_medium_01.glb: split into its separate pieces, cut down to a near and a far level, pictures at 512 px; source-assets/blender/build_kit.py; kit3d.js)",
+   "downloaded": "2026-11-19",
+   "files": [
+    {
+     "file": "downloads/polyhaven/grass_medium_01/model/grass_medium_01_1k.gltf",
+     "bytes": 27110,
+     "sha256": "3e5e2a314c94e16de54fd7c28e41709731fbd2b1613ab539f1544f622ddb6a85",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/grass_medium_01/grass_medium_01_1k.gltf"
+    },
+    {
+     "file": "downloads/polyhaven/grass_medium_01/model/textures/grass_medium_01_nor_gl_1k.jpg",
+     "bytes": 956166,
+     "sha256": "cae298d3d1d7ff7c7e210ad8ac772b96706e356f9315a6b04fde373ce01ccf1e",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_01/grass_medium_01_nor_gl_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/grass_medium_01/model/textures/grass_medium_01_diff_1k.jpg",
+     "bytes": 395673,
+     "sha256": "71495bd6a11fddcab0aaff38246fea1a7b802a705483f1c7cbca53955daa8050",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_01/grass_medium_01_diff_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/grass_medium_01/model/textures/grass_medium_01_arm_1k.jpg",
+     "bytes": 679518,
+     "sha256": "9a3a30f72bc02f4398967c5b08f2d20cce30bd423a2613b42a727034296fa3ae",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/grass_medium_01/grass_medium_01_arm_1k.jpg"
+    },
+    {
+     "file": "downloads/polyhaven/grass_medium_01/model/grass_medium_01.bin",
+     "bytes": 1006632,
+     "sha256": "f4587cabdb96a2e96d8be644923dc954a248edfaaa717a0ff224cacb898bee1f",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/grass_medium_01/grass_medium_01.bin"
+    },
+    {
+     "file": "downloads/polyhaven/grass_medium_01/model/textures/grass_medium_01_alpha_1k.png",
+     "bytes": 648718,
+     "sha256": "711a8e49af758d6a6ce1f610db858899a27be19da6d1866bd35c13bc7b8ffeff",
+     "url": "https://dl.polyhaven.org/file/ph-assets/Models/png/1k/grass_medium_01/grass_medium_01_alpha_1k.png"
+    }
+   ]
+  },
+  {
+   "id": "fishdock:wrack",
+   "name": "Wrack (seaweed on the strand line)",
+   "source": "source-assets/blender/build_kit.py",
+   "author": "FishDock (made in Blender)",
+   "licence": "FishDock's own",
+   "attribution": "None needed",
+   "type": "models",
+   "use": "the tide's wrack along the beaches, High and Ultra (public/models/kit/wrack.glb), modelled in Blender: olive-brown fronds of bladderwrack and kelp",
+   "made": "2026-11-19"
+  },
+  {
+   "id": "fishdock:grass-cards",
+   "name": "Grass blades and tufts",
+   "source": "source-assets/blender/build_grass_field.py, build_grass.py",
+   "author": "FishDock (made in Blender)",
+   "licence": "FishDock's own",
+   "attribution": "None needed",
+   "type": "textures",
+   "use": "the thick layer of grass blades (public/textures/grass_field.webp, grassField.js) and the taller tufts among it (public/textures/grass_tufts.webp, grassTufts.js), modelled and rendered in Blender",
+   "made": "2026-11-19"
+  },
+  {
+   "id": "fishdock:leaf-cluster",
+   "name": "Leaf cluster",
+   "source": "source-assets/blender/build_leaves.py",
+   "author": "FishDock (made in Blender)",
+   "licence": "FishDock's own",
+   "attribution": "None needed",
+   "type": "textures",
+   "use": "the trees' leaf cards (public/textures/leaf_cluster.webp, trees3d.js): twigs with toothed, cupped leaves, modelled and rendered in grey in Blender",
+   "made": "2026-11-19"
+  },
+  {
+   "id": "fishdock:chimney-caps",
+   "name": "Chimney caps",
+   "source": "source-assets/blender/build_chimneys.py",
+   "author": "FishDock (made in Blender)",
+   "licence": "FishDock's own",
+   "attribution": "None needed",
+   "type": "models",
+   "use": "the tops of the town's chimney stacks (public/models/chimney_caps.glb, chimneys3d.js): oversailing brick courses, flaunching and clay pots, modelled in Blender",
+   "made": "2026-11-19"
   }
  ]
 }

@@ -25,7 +25,7 @@ function meshOf(B, mat) {
 }
 
 // the house fronts published in public/textures (facade_<kind>_*.jpg)
-const BAKED_FRONTS = ["brick", "render", "stone"]; // (buff and cladding join once their baked fronts are published)
+const BAKED_FRONTS = ["brick", "render", "stone", "buff"]; // (cladding joins once its baked front is published)
 
 /**
  * Adds the buildings to `group`. groundAt(x, z) gives the ground's height; avoid(x, z) is true where nothing may stand
