@@ -2,8 +2,11 @@
 #   ashlar   the piers' walls: courses of squared sandstone blocks, each its own size, bevelled, worn and pitted, a
 #            little proud of or back from its neighbours, in recessed mortar joints (the photographs of the West and
 #            East Piers' walls)
-#   flags    the piers' decks: big sandstone flags of differing sizes in rough rows, worn round their edges, some a
-#            little higher than others, with dark joints (the photographs along the East Pier)
+#   flags    the piers' decks: sandstone flags of differing sizes in rough rows, worn round their edges, some a
+#            little higher than others, close-jointed, the joints packed with sand and dirt (the photographs along
+#            the East Pier). A 4.8 m tile of some fifty flags, each close to its neighbours' shade: the first, sixteen
+#            flags to a 3 m tile from near-white to dark olive with black joints, read as a chequerboard under your
+#            feet (Aaron's phone screenshots, 19 November)
 # Each is modelled block by block in Blender, every block given its own patch of a photoscanned stone surface (STONE,
 # Poly Haven's "Sandstone Cracks", CC0: a face with no joints of its own, so none show inside a block) and its own
 # shade, then baked by Cycles onto a flat tile: colour (with the joints' shadowing), tangent-space normals and
@@ -25,6 +28,7 @@ def find(base, kinds):
                 if p.lower().endswith((f"_{k}_{res}.jpg", f"_{k}_{res}.png")): return p
     raise FileNotFoundError(f"{base}: no {kinds}")
 RES = globals().get("RES", 2048)
+KINDS = globals().get("KINDS", ("ashlar", "flags"))
 for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
 for coll in (bpy.data.meshes, bpy.data.materials, bpy.data.images): [coll.remove(x) for x in list(coll) if x.users == 0]
 col = bpy.context.scene.collection
@@ -63,7 +67,7 @@ def mix(nt, fac, a, b, amount=1.0):
         if isinstance(v, tuple): sock.default_value = (*v, 1)
         else: nt.links.new(v, sock)
     return mx.outputs[2]
-def scan_material(name, W, H, stone_rgb, seed):
+def scan_material(name, W, H, stone_rgb, seed, deck=False):
     # the scan's light and shade (over its own average) as the stone's grain, times the block's own shade ("tint") and
     # Whitby's buff-grey; then dark lichen and old staining in broad patches, pale crust lichen in small spots
     m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree; b = nt.nodes["Principled BSDF"]
@@ -73,19 +77,21 @@ def scan_material(name, W, H, stone_rgb, seed):
     mean = float((px[:, 0] * 0.2126 + px[:, 1] * 0.7152 + px[:, 2] * 0.0722).mean()) or 0.2
     bw = nt.nodes.new("ShaderNodeRGBToBW"); nt.links.new(t.outputs["Color"], bw.inputs[0])
     det = nt.nodes.new("ShaderNodeMapRange"); det.inputs["From Min"].default_value = 0; det.inputs["From Max"].default_value = mean
-    det.inputs["To Min"].default_value = 0.25; det.inputs["To Max"].default_value = 1.0; det.clamp = False; nt.links.new(bw.outputs[0], det.inputs["Value"])
+    det.inputs["To Min"].default_value = 0.5 if deck else 0.25; det.inputs["To Max"].default_value = 1.0; det.clamp = False; nt.links.new(bw.outputs[0], det.inputs["Value"])
     a = nt.nodes.new("ShaderNodeVertexColor"); a.layer_name = "tint"
     c1 = nt.nodes.new("ShaderNodeVectorMath"); c1.operation = "MULTIPLY"; c1.inputs[1].default_value = stone_rgb; nt.links.new(a.outputs["Color"], c1.inputs[0])
     c2 = nt.nodes.new("ShaderNodeVectorMath"); c2.operation = "SCALE"; nt.links.new(c1.outputs[0], c2.inputs[0]); nt.links.new(det.outputs[0], c2.inputs["Scale"])
     lichen = ramp(nt, periodic_noise(nt, W, H, 1.6, 6, 0.62, seed), 0.52, 0.72)
-    col = mix(nt, lichen, c2.outputs[0], (0.075, 0.075, 0.055), 0.55)
+    # (a deck is walked clean: its dark growth faint, and broad paler patches where feet have worn it)
+    col = mix(nt, lichen, c2.outputs[0], (0.075, 0.075, 0.055), 0.22 if deck else 0.55)
+    if deck: col = mix(nt, ramp(nt, periodic_noise(nt, W, H, 0.9, 4, 0.55, seed + 23), 0.42, 0.7), col, (0.5, 0.47, 0.41), 0.22)
     crust = ramp(nt, periodic_noise(nt, W, H, 7.0, 3, 0.5, seed + 11), 0.7, 0.76)
-    col = mix(nt, crust, col, (0.48, 0.47, 0.42), 0.55)
+    col = mix(nt, crust, col, (0.48, 0.47, 0.42), 0.3 if deck else 0.55)
     nt.links.new(col, b.inputs["Base Color"])
     r = nt.nodes.new("ShaderNodeTexImage"); r.image = bpy.data.images.load(find(STONE, ["rough"]), check_existing=True); r.image.colorspace_settings.name = "Non-Color"
     nt.links.new(r.outputs["Color"], b.inputs["Roughness"])
     n = nt.nodes.new("ShaderNodeTexImage"); n.image = bpy.data.images.load(find(STONE, ["nor_gl", "nor"]), check_existing=True); n.image.colorspace_settings.name = "Non-Color"
-    nm = nt.nodes.new("ShaderNodeNormalMap"); nm.inputs["Strength"].default_value = 0.8; nt.links.new(n.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
+    nm = nt.nodes.new("ShaderNodeNormalMap"); nm.inputs["Strength"].default_value = 0.6 if deck else 0.8; nt.links.new(n.outputs["Color"], nm.inputs["Color"]); nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
     print("SCAN", os.path.basename(t.image.filepath), "mean", round(mean, 3), flush=True)
     return m
 def plain(name, rgb, rough):
@@ -115,7 +121,7 @@ def block(bm, uv, tint, x0, x1, y0, y1, depth, bev, scan_tile, seed, sx=0.0, sy=
 
 def build(kind):
     rnd = random.Random(1814 if kind == "ashlar" else 1854)
-    W = H = 2.4 if kind == "ashlar" else 3.0
+    W = H = 2.4 if kind == "ashlar" else 4.8
     bm = bmesh.new(); uv = {"uv": bm.loops.layers.uv.verify(), "tint": bm.loops.layers.color.new("tint")}
     if kind == "ashlar":
         rows, rowH = 5, W / 5
@@ -137,29 +143,30 @@ def build(kind):
         # flags in rows of differing depths, each row's flags of differing lengths
         y = 0.0; rowsY = []
         while y < H - 0.4:
-            h = rnd.uniform(0.55, 0.9)
+            h = rnd.uniform(0.42, 0.72)
             if H - (y + h) < 0.4: h = H - y
             rowsY.append((y, y + h)); y += h
         for (y0, y1) in rowsY:
             x = rnd.uniform(0, 0.8); cuts = [x]
             while True:
-                x += rnd.uniform(0.6, 1.25)
+                x += rnd.uniform(0.5, 1.15)
                 if x >= cuts[0] + W - 0.45: break
                 cuts.append(x)
             cuts.append(cuts[0] + W)
             for a, b in zip(cuts, cuts[1:]):
-                d = 0.05 + rnd.uniform(-0.008, 0.008); g = 0.008; bev = 0.012 + rnd.uniform(0, 0.01); seed = rnd.randrange(1 << 30)
-                tint = [0.78 + rnd.random() * 0.3] * 3; tint = (tint[0] * rnd.uniform(0.97, 1.03), tint[1], tint[2] * rnd.uniform(0.9, 1.0))
+                d = 0.05 + rnd.uniform(-0.005, 0.005); g = 0.0045; bev = 0.009 + rnd.uniform(0, 0.008); seed = rnd.randrange(1 << 30)
+                # (each close to its neighbours: one in nine a newer or an older stone, a little paler or darker)
+                tint = [0.9 + rnd.random() * 0.12 + (rnd.choice((-0.09, 0.07)) if rnd.random() < 0.11 else 0)] * 3; tint = (tint[0] * rnd.uniform(0.985, 1.015), tint[1], tint[2] * rnd.uniform(0.95, 1.0))
                 for sx in (-W, 0, W):
                     for sy in (-H, 0, H):
                         block(bm, uv, tint, a + g + sx, b - g + sx, y0 + g + sy, y1 - g + sy, d, bev, 2.0, seed, sx, sy)
     me = bpy.data.meshes.new(kind + "_hi"); bm.to_mesh(me); bm.free()
-    hi = bpy.data.objects.new(kind + "_hi", me); col.objects.link(hi); hi.data.materials.append(scan_material(kind + "_scan", W, H, (0.43, 0.37, 0.27) if kind == "ashlar" else (0.4, 0.36, 0.29), 3 if kind == "ashlar" else 5))
+    hi = bpy.data.objects.new(kind + "_hi", me); col.objects.link(hi); hi.data.materials.append(scan_material(kind + "_scan", W, H, (0.43, 0.37, 0.27) if kind == "ashlar" else (0.4, 0.36, 0.29), 3 if kind == "ashlar" else 5, kind == "flags"))
     for p in hi.data.polygons: p.use_smooth = False
     # the joints: mortar, set back behind the stones
     bpy.ops.mesh.primitive_plane_add(size=1.0); jp = bpy.context.active_object; jp.name = kind + "_joints"
     jp.scale = (W * 3, H * 3, 1); jp.location = (W / 2, H / 2, 0.0)
-    jp.data.materials.append(plain(kind + "_mortar", (0.32, 0.29, 0.25) if kind == "ashlar" else (0.2, 0.19, 0.17), 0.95))
+    jp.data.materials.append(plain(kind + "_mortar", (0.32, 0.29, 0.25) if kind == "ashlar" else (0.27, 0.245, 0.2), 0.95))
     # the tile the maps are baked onto
     bpy.ops.mesh.primitive_plane_add(size=1.0); lo = bpy.context.active_object; lo.name = kind + "_tile"
     lo.scale = (W, H, 1); lo.location = (W / 2, H / 2, 0.12); bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
@@ -188,11 +195,11 @@ def save(arr, path, srgb=True):
     px = np.ones((arr.shape[0], arr.shape[1], 4), dtype=np.float32); px[:, :, :3] = np.clip(arr, 0, 1); im.pixels.foreach_set(px.ravel())
     im.filepath_raw = path; im.file_format = "JPEG"; sc.render.image_settings.quality = 88; im.save()
 os.makedirs(OUT + "/exports/whitby_stone", exist_ok=True)
-for kind in ("ashlar", "flags"):
+for kind in KINDS:
     hi, jp, lo, W = build(kind)
     maps = bake(hi, jp, lo, kind)
     ao = maps["AO"][:, :, :1] ** 0.8
-    colour = maps["DIFFUSE"] * (0.35 + 0.65 * ao)
+    colour = maps["DIFFUSE"] * ((0.62 + 0.38 * ao) if kind == "flags" else (0.35 + 0.65 * ao))  # (a deck's close joints are shaded, not black)
     base = OUT + f"/exports/whitby_stone/whitby_{kind}"
     save(colour, base + "_diff.jpg"); save(maps["NORMAL"], base + "_nor.jpg", False); save(maps["ROUGHNESS"], base + "_rough.jpg", False)
     print("STONE", kind, "tile", W, "m", flush=True)

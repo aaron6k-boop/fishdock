@@ -28,7 +28,9 @@ export function rainPlan(amount = 0, wind = 0, q = 1) {
   return {
     drops, on, fall,
     drift: 12.5 * w * 0.8, // m/s across the ground: the wind's own speed (45 km/h is 12.5 m/s) less a little
-    len: 0.055 + 0.03 * a, // seconds of travel a streak shows (the eye's blur as much as the drop's speed)
+    // (short: at 0.055 to 0.085 s a drop near you drew a line a sixth of the screen long, and the rain read as white
+    // scratches over the picture (Aaron's phone screenshots, 19 November); each fainter too)
+    len: 0.024 + 0.012 * a, // seconds of travel a streak shows (the eye's blur as much as the drop's speed)
     width: 0.003 + 0.002 * a, // m: a drop and the blur round it
     curtains: Q < 1.5 ? 1 : 2, // (one on a phone: each is a pass over the whole picture)
     sheet: on ? 0.05 + 0.32 * a * a : 0, // how much the curtains show
@@ -102,9 +104,11 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
         vec3 wp = p + ax * len * aCorner.y + side * w * aCorner.x * 0.5;
         // (faint within a couple of metres of your eye, where a streak crosses half the view in a blink, and none within a
         // hand's length; thinned out towards the box's edges, so the drops never show it)
-        float hz = length(toC.xz), fade = smoothstep(0.45, 2.4, d) * (1.0 - smoothstep(uBox.x * 0.3, uBox.x * 0.48, hz)) * (1.0 - smoothstep(uBox.y * 0.3, uBox.y * 0.46, abs(p.y - uCam.y - uBox.y * 0.08)));
+        float hz = length(toC.xz), fade = smoothstep(1.0, 4.2, d) * (1.0 - smoothstep(uBox.x * 0.3, uBox.x * 0.48, hz)) * (1.0 - smoothstep(uBox.y * 0.3, uBox.y * 0.46, abs(p.y - uCam.y - uBox.y * 0.08)));
         vec3 view = toC / max(d, 1e-3);
-        vCol = dropLight(p, view); vA = uAlpha * fade * thin * (0.55 + 0.45 * r3); vC = aCorner;
+        // (a drop is clear water, not paint: it shows a little over half the sky's light, each its own share of it, so
+        // against a dark sea or cliff the rain is a fine grey and against the sky it is nearly lost, as rain is)
+        vCol = dropLight(p, view) * (0.42 + 0.3 * r2); vA = uAlpha * fade * thin * (0.4 + 0.6 * r3 * r3); vC = aCorner;
         vec4 mvPosition = viewMatrix * vec4(wp, 1.0); gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
       }`,
@@ -249,7 +253,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
       const l = Math.hypot(dir[0], dir[1]) || 1; windV.set((dir[0] / l) * plan.drift, (dir[1] / l) * plan.drift);
       group.visible = plan.on > 0;
       shared.uAmount.value = plan.on; shared.uFall.value = plan.fall; shared.uWind.value.copy(windV);
-      dropMat.uniforms.uLen.value = plan.len; dropMat.uniforms.uWidth.value = plan.width; dropMat.uniforms.uAlpha.value = 0.55 + 0.4 * amount;
+      dropMat.uniforms.uLen.value = plan.len; dropMat.uniforms.uWidth.value = plan.width; dropMat.uniforms.uAlpha.value = 0.42 + 0.3 * amount;
       for (const c of curtains) c.material.uniforms.uSheet.value = plan.sheet;
       sMat.uniforms.uAlphaS.value = 0.2 + 0.25 * amount;
     },
