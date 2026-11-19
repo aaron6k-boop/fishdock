@@ -665,12 +665,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     if (!(sa && sb && sc) && !soft) return;
     (soft ? idxSoft : idxDeck).push(a, b, c);
   };
-  // ---- the fine hillside (High and Ultra): where the place has the survey's 1 m relief (terrain3d.js RELIEF), the soft
+  // ---- the fine hillside (Balanced and up): where the place has the survey's 1 m relief (terrain3d.js RELIEF), the soft
   // ground's 3 m cells over it are drawn instead as a 1 m mesh carrying that relief (Whitby's East Cliff, the slope
   // under St Mary's and Henrietta Street: their paths, terraces, walls, slips and gullies, which the 5 m terrain
   // smoothed into one green ramp). Its edges meet the coarse ground exactly (the relief fades in over 6 m from where
   // the fine mesh stops), and it lies smooth along the streets and round the buildings, which stand on it ----
-  const REL = (quality >= 2 || (typeof window !== "undefined" && window.__fdFine)) && local0?.terrain && hill ? reliefOf(local0.terrain) : null; // (__fdFine: the local checks, drawn at Balanced)
+  // (Balanced too, since 19 November: it is one mesh, some 300,000 triangles and nothing more to draw each frame, and
+  // without it a phone showed the East Cliff as smooth green ramps, Aaron's screenshots)
+  const REL = quality >= 1 && local0?.terrain && hill ? reliefOf(local0.terrain) : null;
   let fineCell = null, F = null;
   if (REL) {
     const fi0 = xs.indexOf(REL.x0), fi1 = xs.indexOf(REL.x0 + REL.nx - 1), fj0 = xs.indexOf(REL.z0), fj1 = xs.indexOf(REL.z0 + REL.nz - 1);

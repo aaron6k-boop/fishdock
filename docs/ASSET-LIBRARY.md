@@ -109,9 +109,9 @@ it goes in (an asset site's other assets may be under other terms).
 | whitby_ashlar_diff.jpg | 186 KB | 1024x1024 | jpeg |
 | whitby_ashlar_nor.jpg | 345 KB | 1024x1024 | jpeg |
 | whitby_ashlar_rough.jpg | 37 KB | 512x512 | jpeg |
-| whitby_flags_diff.jpg | 189 KB | 1024x1024 | jpeg |
-| whitby_flags_nor.jpg | 355 KB | 1024x1024 | jpeg |
-| whitby_flags_rough.jpg | 39 KB | 512x512 | jpeg |
+| whitby_flags_diff.jpg | 328 KB | 2048x2048 | jpeg |
+| whitby_flags_nor.jpg | 386 KB | 1536x1536 | jpeg |
+| whitby_flags_rough.jpg | 32 KB | 512x512 | jpeg |
 
 ## Third-party sources (the licence register)
 
@@ -220,7 +220,7 @@ it goes in (an asset site's other assets may be under other terms).
 | Roof Slates 03 | Rob Tuytel | https://polyhaven.com/a/roof_slates_03 | CC0 1.0 | Not required (credited anyway in CREDITS) | slate roofs in every town (public/textures/roof_slate_*.jpg, 1024 px colour and normal, 512 px roughness) | `roof_slates_03_diff_2k.jpg` (2.0 MB), `roof_slates_03_nor_gl_2k.jpg` (2.6 MB), `roof_slates_03_rough_2k.jpg` (48 KB) |
 | Sandstone Cracks | Rob Tuytel | https://polyhaven.com/a/sandstone_cracks | CC0 1.0 | Not required (credited anyway in CREDITS) | the grain, pits and cracks of every block of Whitby's baked stonework (source-assets/blender/build_whitby_stone.py: public/textures/whitby_ashlar_*.jpg and whitby_flags_*.jpg); its light and dark only, the colour Whitby's own | `sandstone_cracks_diff_1k.jpg` (680 KB), `sandstone_cracks_nor_gl_1k.jpg` (1.2 MB), `sandstone_cracks_rough_1k.jpg` (344 KB) |
 | White Plaster 02 | Rob Tuytel | https://polyhaven.com/a/white_plaster_02 | CC0 1.0 | Not required (credited anyway in CREDITS) | the painted render of the baked house fronts (source-assets/blender/build_facades.py: public/textures/facade_render_*.jpg); its light and dark only, each house's colour the game's | `white_plaster_02_diff_1k.jpg` (515 KB), `white_plaster_02_nor_gl_1k.jpg` (637 KB), `white_plaster_02_rough_1k.jpg` (289 KB) |
-| Whitby's stonework (ashlar and flags), baked | FishDock (modelled block by block from the photographs of the piers) | made for FishDock in Blender: source-assets/blender/build_whitby_stone.py | FishDock's own; made from CC0 scans (Poly Haven Sandstone Cracks) | Not required | Whitby's piers' walls (ashlar, a tile every 2.4 m) and decks (flags, every 3 m), the lighthouses, the Abbey's ruins and St Mary's Church (public/textures/whitby_ashlar_*.jpg, whitby_flags_*.jpg) |  |
+| Whitby's stonework (ashlar and flags), baked | FishDock (modelled block by block from the photographs of the piers) | made for FishDock in Blender: source-assets/blender/build_whitby_stone.py | FishDock's own; made from CC0 scans (Poly Haven Sandstone Cracks) | Not required | Whitby's piers' walls (ashlar, a tile every 2.4 m) and decks (flags, every 4.8 m; re-baked 19 November as some fifty close-jointed flags near each other's shade), the lighthouses, the Abbey's ruins and St Mary's Church (public/textures/whitby_ashlar_*.jpg, whitby_flags_*.jpg) |  |
 | Whitby's pier lighthouses, modelled | FishDock (proportions from photographs on Wikimedia Commons, docs/REFERENCE-PHOTOS.md; sizes estimated) | made for FishDock in Blender: source-assets/blender/build_whitby_lights.py | FishDock's own | Not required | the West Pier (1831) and East Pier (1855) lighthouses at Whitby (public/models/whitby_lights.glb) |  |
 | House fronts, modelled and baked | FishDock | made for FishDock in Blender: source-assets/blender/build_facades.py | FishDock's own; made from CC0 scans (Poly Haven Red Brick 03, White Plaster 02, Large Sandstone Blocks 01) | Not required | every town's brick, render and stone houses (public/textures/facade_{brick,render,stone}_*.jpg; src/lib/world3d/buildings3d.js) |  |
 | Brown Mud Leaves 01 | Rob Tuytel | https://polyhaven.com/a/brown_mud_leaves_01 | CC0 1.0 | Not required (credited anyway in CREDITS) | worn, muddy patches on every place's town ground and lawns (public/textures/ground_mud_diff.jpg, 1024 px colour, its own colour a little darker) | `brown_mud_leaves_01_diff_2k.jpg` (4.3 MB) |
