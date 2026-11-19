@@ -1424,11 +1424,11 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       carry.run += (clamp((walking.speed - WALK.speed - 0.2) / (WALK.sprint - WALK.speed - 0.2), 0, 1) - carry.run) * (1 - Math.exp(-dt * 3));
       carry.lift += (clamp(Math.abs(walking.turnRate || 0) / 3, 0, 1) - carry.lift) * (1 - Math.exp(-dt * (Math.abs(walking.turnRate || 0) / 3 > carry.lift ? 14 : 2)));
       // (from your own eyes it comes up less at a run: held as high as it looks right from outside, it stood above the top of the view)
-      const raise = Math.min(bodyView ? 0.2 : 0.52, carry.run * 0.45 + carry.lift * 0.35) * (1 - clamp(carry.up / 0.6, 0, 1));
+      const raise = Math.min(bodyView ? 0.12 : 0.52, carry.run * 0.45 + carry.lift * 0.35) * (1 - clamp(carry.up / 0.6, 0, 1));
       // (the rod's weight: it comes round after the body, not rigidly with it, a short moment behind as you turn)
       if (carry.wy == null) carry.wy = walking.face;
       carry.wy += wrapR(walking.face - carry.wy) * (1 - Math.exp(-dt * 7)); const lagAz = clamp(wrapR(walking.face - carry.wy), -0.5, 0.5);
-      const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + raise + carry.d.y * 0.6, az = (bodyView ? 0.05 + raise * 0.35 : -0.086) + carry.trail + carry.sway * 0.35 + lagAz; // (seen from your own eyes it leans a little in across you, more as it comes up at a run: square ahead it stood off the side of a phone's narrow picture)
+      const el = Math.asin(0.58 / Math.hypot(0.07, 0.58, 0.81)) + carry.tilt + carry.up + raise + carry.d.y * 0.6, az = (bodyView ? 0.06 + raise * 0.5 : -0.086) + carry.trail + carry.sway * 0.35 + lagAz; // (seen from your own eyes it leans a little in across you, more as it comes up at a run: square ahead it stood off the side of a phone's narrow picture)
       dir = new THREE.Vector3(-Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el)).normalize();
       // (and held a little further out from your side while you turn: stepping round, the right leg came out under the
       // rod and the hand holding it went into the thigh)
