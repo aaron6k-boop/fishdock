@@ -168,6 +168,8 @@ Whitby's two pier lighthouses (public/models/whitby_lights.glb) are modelled in 
 The roofs (public/textures/roof_clay_*.jpg and roof_slate_*.jpg, from 19 November 2026) are "Clay Roof Tiles 02" by
 Amal Kumar (https://polyhaven.com/a/clay_roof_tiles_02) and "Roof Slates 03" by Rob Tuytel
 (https://polyhaven.com/a/roof_slates_03), from Poly Haven, CC0 1.0. Whitby's cliffs (public/textures/cliff_rock_*.jpg
-and cliff_grass_*.jpg) are "Cliff Side" by James Ray Cock, Jenelle van Heerden and Dario Barresi
+and grass_leafy_*.jpg) are "Cliff Side" by James Ray Cock, Jenelle van Heerden and Dario Barresi
 (https://polyhaven.com/a/cliff_side) and "Leafy Grass" by Charlotte Baglioni (https://polyhaven.com/a/leafy_grass),
-from Poly Haven, CC0 1.0. Credited with thanks.
+from Poly Haven, CC0 1.0. Every place's grass is that "Leafy Grass"; the worn, muddy patches on the
+town's ground and lawns (public/textures/ground_mud_diff.jpg) are "Brown Mud Leaves 01" by Rob Tuytel
+(https://polyhaven.com/a/brown_mud_leaves_01), Poly Haven, CC0 1.0. Credited with thanks.

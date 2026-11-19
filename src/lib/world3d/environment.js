@@ -1071,6 +1071,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       real?.skyline?.update(t);
       if (real?.deckWet?.clock) real.deckWet.clock.value = t % 600; // (the rain's rings in the puddles, wetLook.js)
       real?.treesUpdate?.(t, cam, wind, windDir); // (the trees' level of detail by distance, and their wind)
+      real?.tuftsUpdate?.(t, cam, wind, windDir); // (the tufts of grass near the camera, and their wind: grassTufts.js)
       if (real?.beacons) { const nt = cur ? Math.min(1, cur.night + cur.dusk * 0.6) : 0; for (const b of real.beacons) b(t, nt); }
       U.uTime.value = t; wU.uCam.value.set(Math.round(cam.position.x / 4) * 4, 0, Math.round(cam.position.z / 4) * 4);
       // the shadows' box round the camera, moved a 2 m step at a time (with the near map on, which covers your feet, a

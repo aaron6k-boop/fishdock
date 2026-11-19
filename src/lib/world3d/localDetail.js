@@ -68,7 +68,7 @@ export const LOCAL = {
     industry: (x, z) => z < -120 && x > -450,
     // the town round the harbour mouth (photographs from the pier, the harbour and Pier Road): Victorian and Edwardian
     // houses and hotels, most of them painted render in white and cream, three storeys and more, some brick
-    town: { render: 0.68, tall: true },
+    town: { render: 0.68, tall: true, buff: 0.3 }, // (buff: pale "Suffolk white" gault brick, common in the Yarmouth area's Victorian building)
     // the ground the town stands on: the quay, Pier Gardens and the beach are low; from the foot of the grassy cliff
     // behind them it rises to Cliff Hill, Marine Parade and the old town, about 15 m up (approximate, from the map's
     // streets and photographs: no survey heights)
@@ -104,7 +104,7 @@ export const LOCAL = {
     // and the parish church's tower (48 m, the tallest in Norfolk: Norfolk Heritage Explorer, NHER 6475)
     landmarks: { 345723596: "cromerPavilion", 345720938: "cromerLifeboat", 1105720160: "cromerGates", 1105721360: "pierShelter", 1105721359: "pierShelter", 345720803: "hotelDeParis", 30047775: "cromerChurch" },
     // the town on the cliff: Victorian and Edwardian, most of it red brick, some painted render, three storeys and more
-    town: { render: 0.3, tall: true },
+    town: { render: 0.3, tall: true, buff: 0.06 }, // (Cromer's brick is mostly red, with flint)
     // the cliff behind the promenade: the retaining walls along its foot (OSM), the town on top about 12 m up
     // (estimated: no survey heights)
     hill: cromerHill,
@@ -122,7 +122,7 @@ export const LOCAL = {
     // a wide sandy beach, rising gently from the water to the promenade (realPlace.js beach): its sand a pale gold
     beach: { slope: 0.03, tint: [0.56, 0.46, 0.31] },
     // the town behind: Marine Parade's hotels and arcades, most of them painted white or cream (the photographs)
-    town: { render: 0.65 },
+    town: { render: 0.65, buff: 0.3 },
     note: "Britannia Pier, its theatre, sheds and entrance are modelled from photographs and OpenStreetMap's outlines; their sizes and the beach's slope are estimates. The rest of the town is drawn from the map, not modelled building by building.",
   },
   // Lowestoft's South Pier (added 18 November 2026): the solid southern arm of the harbour mouth, about 400 m from the
@@ -131,6 +131,7 @@ export const LOCAL = {
   // (photographs on Wikimedia Commons, 2005 to 2026, listed in docs/REFERENCE-PHOTOS.md: the pier along its length,
   // its head and light, the plaza at its root, the yacht club, the pavilion, the beach and its groynes)
   "lowestoft-south-pier": {
+    town: { buff: 0.35 }, // (the pale "Suffolk white" gault brick of much of Lowestoft's Victorian building)
     pier: { fishFrom: [[0, -3], [12, 14]] },
     // its sides: plain concrete walls with a solid concrete parapet along both edges, not railings (the photographs
     // along the pier and from the beach)
@@ -199,12 +200,12 @@ export const LOCAL = {
     bankTrees: 0.15,
     // (the cliffs' own surface, realPlace.js: photoscanned grass on the slopes and photoscanned rock showing through on
     // the steep faces, laid from three sides)
-    cliff: { grass: "cliff_grass", rock: "cliff_rock", grassTile: 2, rockTile: 4, rockTint: [0.17, 0.152, 0.125] },
+    cliff: { grass: "grass_leafy", rock: "cliff_rock", grassTile: 2, rockTile: 4, rockTint: [0.17, 0.152, 0.125] },
     // St Mary's Church on its outline, at the top of the 199 Steps
     landmarks: { 158276579: "stMarys" },
     // the old town under the cliffs: brick, stone and painted render under red pantile roofs (the photographs from the
     // cliffs and the piers); up on the Abbey's headland, Cholmley House, the mansion and the farm are stone under slate
-    town: { render: 0.4, clay: 0.75, stoneAt: (x, z) => (x > 100 && z > 280) || (x > 260 && z > 150) },
+    town: { render: 0.4, clay: 0.75, buff: 0, stoneAt: (x, z) => (x > 100 && z > 280) || (x > 260 && z > 150) },
     note: "Whitby's piers, their lighthouses and beacons, the timber extensions, the Abbey's ruins and St Mary's Church are modelled from photographs and descriptions on OpenStreetMap's outlines; their sizes and the decks' heights are estimates. The cliffs stand at their surveyed heights (Environment Agency LIDAR, Open Government Licence). The rest of the town is drawn from the map, not modelled building by building.",
   },
 };

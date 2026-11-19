@@ -18,6 +18,7 @@ import { LANDMARK_BUILDERS } from "./landmarks3d.js";
 import { WET_PREP, WET_DARKEN, WET_NORMAL, wetRough, WET_SPOTS } from "./wetLook.js";
 import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
+import { buildGrassTufts } from "./grassTufts.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
 import { columnGeometry, lanternAt, lampPools, shadeFromOwnLantern, COLUMN } from "./lamps3d.js";
 import { buildOpenPier } from "./openPier.js";
@@ -673,17 +674,19 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // ---- a place's own cliffs (localDetail.js cliff): photoscanned grass over the bank at two scales, and on its steep
   // faces photoscanned rock laid from three sides by world position (so it doesn't smear down a face), showing through
   // the grass in ragged outcrops where the slope passes about 30 degrees ----
-  const CL = local?.cliff || null;
-  const clG = CL ? photoTex(CL.grass + "_diff") : null, clGN = clG && photoTex(CL.grass + "_nor", { srgb: false });
+  // (and every place's grass is photographed (Poly Haven Leafy Grass, CC0) rather than drawn, its lawns, verges and
+  // banks; worn, muddy patches on the town's ground and lawns from a photograph of mud and leaves (Brown Mud Leaves 01))
+  const CL = local?.cliff || null, GRASS = CL?.grass || "grass_leafy";
+  const clG = photoTex(GRASS + "_diff"), clGN = clG && photoTex(GRASS + "_nor", { srgb: false }), grOn = !!clG;
   const clR = CL ? photoTex(CL.rock + "_diff") : null, clRN = clR && photoTex(CL.rock + "_nor", { srgb: false });
-  const clOn = !!(CL && clG && clR);
+  const clOn = !!(CL && grOn && clR), mudT = photoTex("ground_mud_diff"), mudOn = !!mudT;
   if (rufMap) {
     softMat.onBeforeCompile = (sh) => {
       sh.uniforms.uRuf = { value: rufMap }; sh.uniforms.uRufN = { value: rufNor }; sh.uniforms.uTurf = { value: turfT.map }; sh.uniforms.uTurfN = { value: turfT.normalMap };
       sh.uniforms.uSand = { value: sandMap || rufMap }; sh.uniforms.uSandN = { value: sandNor || rufNor }; sh.uniforms.uSandW = { value: wetMap || rufMap }; sh.uniforms.uSandWN = { value: wetNor || rufNor };
       sh.uniforms.uSandK = { value: new THREE.Vector4(...(BP?.tint || [0.56, 0.46, 0.31]), BP?.tile || 3.5) }; sh.uniforms.uSandL = { value: new THREE.Vector3(BP?.lum || 0.283, BP?.lumWet || 0.122, BP?.tileWet || 2.2) };
       sh.uniforms.uClG = { value: clG || rufMap }; sh.uniforms.uClGN = { value: clGN || rufNor }; sh.uniforms.uClR = { value: clR || rufMap }; sh.uniforms.uClRN = { value: clRN || rufNor };
-      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2.5, 0, 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: CL && clG && clR ? 1 : 0 };
+      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, 0, 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; attribute float aSteep; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;")
         .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vSteep = aSteep; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);");
       // (only the samplers this place uses are declared: with the sand's four, the cliff's four and the turf's two all in
@@ -691,12 +694,20 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       // it, and drew none of the soft ground: Whitby's cliffs were missing on the PC)
       sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
           ${BP ? "#define FD_SAND" : ""}
+          ${grOn ? "#define FD_PGRASS" : ""}
           ${clOn ? "#define FD_CLIFF" : ""}
+          ${mudOn ? "#define FD_MUD" : ""}
           uniform sampler2D uRuf, uRufN;
-          #ifdef FD_CLIFF
-            uniform sampler2D uClG, uClGN, uClR, uClRN;
+          #ifdef FD_PGRASS
+            uniform sampler2D uClG, uClGN;
           #else
             uniform sampler2D uTurf, uTurfN;
+          #endif
+          #ifdef FD_CLIFF
+            uniform sampler2D uClR, uClRN;
+          #endif
+          #ifdef FD_MUD
+            uniform sampler2D uMud;
           #endif
           #ifdef FD_SAND
             uniform sampler2D uSand, uSandN, uSandW, uSandWN;
@@ -730,8 +741,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           }
           #endif
           if (vGrass > 0.01) {
-            #ifdef FD_CLIFF
-              // (where the place has its photographed grass (local.cliff), the lawns are that too, not the drawn turf)
+            #ifdef FD_PGRASS
+              // (the photographed grass, at two scales so its tile doesn't show across a lawn, its light and dark kept and its
+              // colour the ground's own)
               vec2 wq = vWPos.xz; vec3 q1 = texture2D(uClG, wq / uClK.y).rgb, q2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wq / (uClK.y * 3.7) + 0.31).rgb;
               float ql = dot(mix(q1, q2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02);
               vec3 grass = vColor.rgb * 0.95 * mix(clamp(ql, 0.35, 2.0), 1.0, smoothstep(60.0, 260.0, length(vViewPosition)) * 0.6) * (0.9 + 0.2 * fdDN(wq / 19.0));
@@ -740,6 +752,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               vec2 tuv = vRufUv * 4.0;
               vec3 t1 = texture2D(uTurf, tuv).rgb, t2 = texture2D(uTurf, tuv * 0.29 + 0.41).rgb;
               vec3 grass = vColor.rgb * mix(t1, t2, 0.45) * 2.05;
+            #endif
+            #ifdef FD_MUD
+              // (worn to the mud in patches: often on the town's rough ground (its vRuf a little above 0), now and then on a
+              // lawn; the photograph's own colour, a little darker, its edge ragged)
+              vec2 wm = vWPos.xz; float town = step(0.08, vRuf) * step(vRuf, 0.3);
+              float worn = smoothstep(0.6, 0.72, fdDF(wm / 9.0 + 7.0) + (fdDN(wm / 1.7) - 0.5) * 0.16 + town * 0.1) * mix(0.35, 0.85, town);
+              vec3 mudC = texture2D(uMud, wm / 2.5).rgb * 0.85 * (0.9 + 0.2 * fdDN(wm / 13.0));
+              grass = mix(grass, mudC, worn);
             #endif
             diffuseColor.rgb = mix(diffuseColor.rgb, grass, vGrass);
           }
@@ -753,9 +773,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             // scaled by 2.2 the ground came out at an eighth of its colour, and the dune's sand read as dark olive scrub)
             // (its stones' light and dark softened: at full contrast the sand read as a heap of pebbles)
             vec3 tinted = vColor.rgb * clamp(pow(lum / 0.06, 0.55), 0.45, 1.7) + (ph - lum) * 0.12;
-            #ifdef FD_CLIFF
+            #ifdef FD_PGRASS
             if (vFace < 0.0) {
-              // the cliff (local.cliff): grass from a photograph at two scales (the second turned, so neither repeats
+              // the bank (and a cliff's, local.cliff): grass from a photograph at two scales (the second turned, so neither repeats
               // across the slope), its light and dark kept and its colour the bank's tint; darker patches of scrub
               vec2 wp = vWPos.xz; float dist = length(vViewPosition);
               vec3 g1 = texture2D(uClG, wp / uClK.y).rgb, g2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wp / (uClK.y * 3.7) + 0.31).rgb;
@@ -763,6 +783,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               vec3 grassC = vColor.rgb * mix(clamp(gl, 0.35, 2.0), 1.0, smoothstep(60.0, 260.0, dist) * 0.6) * (0.86 + 0.28 * fdDN(wp / 23.0));
               // (patches of darker, browner scrub, broken up, not a stain)
               grassC = mix(grassC, grassC * vec3(0.74, 0.72, 0.6), smoothstep(0.62, 0.74, fdDF(wp / 17.0 + 9.0) + (fdDN(wp / 3.1) - 0.5) * 0.18) * 0.6);
+              #ifndef FD_CLIFF
+              // (no cliff of its own: the photographed rough ground shows through where the bank is steep)
+              tinted = mix(grassC, tinted, 0.25 + 0.55 * vSteep);
+              #else
               // the rock: the photograph laid from the three sides, each weighted by how squarely the ground faces it
               vec3 an = pow(abs(vWNrm), vec3(4.0)); an /= (an.x + an.y + an.z); fdTriW = an;
               // (at two scales, the second turned and three times the size, so the photograph's tile doesn't show as a
@@ -784,6 +808,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // (and even on the steep faces, scrub and grass hold on in patches and along the ledges)
               fdRock *= 1.0 - 0.7 * smoothstep(0.58, 0.7, fdDF(vec2(wp.x + wp.y, vWPos.y * 2.2) / 9.0 + 3.0));
               tinted = mix(grassC, rockC, fdRock);
+              #endif
             }
             #endif
             if (vFace >= 0.0) {
@@ -828,13 +853,13 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           #ifdef FD_SAND
           if (vSand > 0.01) { vec3 sn = mix(texture2D(uSandN, vWPos.xz / uSandK.w).xyz, texture2D(uSandWN, vWPos.xz / uSandL.z).xyz, fdWet) * 2.0 - 1.0; float sk = 1.0 - smoothstep(12.0, 45.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(sn.x, sn.y, 0.0) * 0.6 * sk), vSand)); }
           #endif
-          #ifdef FD_CLIFF
+          #ifdef FD_PGRASS
             #define FD_GRASS_N texture2D(uClGN, vWPos.xz / uClK.y).xyz
           #else
             #define FD_GRASS_N texture2D(uTurfN, vRufUv * 4.0).xyz
           #endif
           if (vGrass > 0.01) { vec3 gn = FD_GRASS_N * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
-          #ifdef FD_CLIFF
+          #ifdef FD_PGRASS
           if (vRuf > 0.01 && vFace < 0.0) {
             // (the cliff's relief, in the world's own axes: the grass photograph's laid flat (across x, along z), the
             // rock's from whichever side it's laid from most; then into the view. The usual shortcut of adding the map's
@@ -842,9 +867,13 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             float far = smoothstep(30.0, 140.0, length(vViewPosition));
             vec3 gn = texture2D(uClGN, vWPos.xz / uClK.y).xyz * 2.0 - 1.0;
             vec3 nw = vWNrm + vec3(gn.x, 0.0, -gn.y) * 0.55 * (1.0 - fdRock) * (1.0 - far);
+            #ifdef FD_CLIFF
             vec3 rz = texture2D(uClRN, vWPos.xy / uClK.x).xyz * 2.0 - 1.0, rx = texture2D(uClRN, vWPos.zy / uClK.x).xyz * 2.0 - 1.0;
             vec3 rw = vec3(rz.x, rz.y, 0.0) * fdTriW.z + vec3(0.0, rx.y, rx.x) * fdTriW.x;
             nw += rw * 0.9 * fdRock * (1.0 - far * 0.6);
+            #else
+            vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; nw += vec3(rn.x, 0.0, -rn.y) * 0.6 * vSteep * (1.0 - far * 0.6);
+            #endif
             normal = normalize(mix(normal, normalize(mat3(viewMatrix) * normalize(nw)), vRuf));
           } else
           #endif
@@ -856,7 +885,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
           }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf15" + (BP ? "s" : "") + (clOn ? "c" : "");
+    softMat.customProgramCacheKey = () => "fdruf16" + (BP ? "s" : "") + (grOn ? "g" : "") + (clOn ? "c" : "") + (mudOn ? "m" : "");
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
@@ -1553,6 +1582,30 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const allPiers = (place.piers || []).filter((p) => p.ring).map((p) => bb(p.ring));
     const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || allPiers.some((b) => inB([x, z], b) || (x > b.x0 - 4 && x < b.x1 + 4 && z > b.z0 - 4 && z < b.z1 + 4 && b.r.some((q, i) => segDist([x, z], q, b.r[(i + 1) % b.r.length]) < 4))) /* (never on a pier, or within 4 m of one: the map's coastline often runs round them, so they count as land) */ || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, bankTrees: local?.bankTrees ?? 1, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
     if (trees) { place.trees = trees.count; place.treesBuilt = trees.built; place.treesUpdate = trees.update; }
+    // ---- tufts of grass standing up out of the lawns, verges and banks near the camera (grassTufts.js): where the ground
+    // is drawn as grass (aGrass), and on the banks but not where their rock shows; not on a road, a car park, a pier or in
+    // a building, nor at your feet where you fish. Their height and colour are the ground's as drawn, read off its grid ----
+    const cell = (v) => { let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m; else hi = m; } return [lo, Math.min(1, Math.max(0, (v - xs[lo]) / Math.max(1e-6, xs[lo + 1] - xs[lo])))]; };
+    // (the triangle of the grid's square the point is in, as the ground's triangles are cut (a, c, b) and (b, c, d))
+    const onGrid = (arr, stride, off, x, z) => {
+      const [i, fx] = cell(x), [j, fz] = cell(z), a = j * n + i, b = a + 1, c = a + n, d = c + 1, A = arr[a * stride + off], B = arr[b * stride + off], C = arr[c * stride + off], D = arr[d * stride + off];
+      return fx + fz <= 1 ? A + fx * (B - A) + fz * (C - A) : D + (1 - fx) * (C - D) + (1 - fz) * (B - D);
+    };
+    const inGrid = (x, z) => x > xs[0] && x < xs[n - 1] && z > xs[0] && z < xs[n - 1];
+    const lots = (place.parking || []).filter((r) => r.length >= 3).map(bb);
+    const tufts = buildGrassTufts(group, {
+      quality, seed: 7 + (place.spots?.length || 0),
+      grassAt: (x, z) => {
+        if (!inGrid(x, z)) return 0;
+        const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n;
+        if (bank[k]) return 0.85 * (1 - Math.min(1, steep[k] * 1.7)); // (the banks: thinning out to none where the rock shows)
+        return onGrid(grs, 1, 0, x, z);
+      },
+      yAt: (x, z) => (inGrid(x, z) ? onGrid(pos, 3, 1, x, z) : LAND),
+      colourAt: (x, z) => (inGrid(x, z) ? [0, 1, 2].map((ch) => onGrid(col, 3, ch, x, z) * 0.95) : null),
+      avoid: (x, z) => nearSpot(x, z, 3) || onRoad(x, z) || lots.some((b) => inB([x, z], b) && inside([x, z], b.r)) || drawnB.some((b) => inB([x, z], b) && inside([x, z], b.r)) || allPiers.some((b) => inB([x, z], b)),
+    });
+    if (tufts) place.tuftsUpdate = tufts.update;
   }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }

@@ -23,22 +23,27 @@ function meshOf(B, mat) {
   const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
 }
 
+// the house fronts published in public/textures (facade_<kind>_*.jpg)
+const BAKED_FRONTS = ["brick", "render", "stone"];
+
 /**
  * Adds the buildings to `group`. groundAt(x, z) gives the ground's height; avoid(x, z) is true where nothing may stand
  * (a fishing spot and the deck round it). Returns { materials (glowing windows after dark), colliders: [{ ring, base, top }] }.
  */
 export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = () => false, near = () => false } = {}) {
   const tex = { brick: facade("brick", 7), render: facade("render", 3), cladding: facade("cladding", 5), stone: facade("stone", 9) };
+
   // ---- the house fronts modelled in Blender (source-assets/blender/build_facades.py) ----
   // The same five bays at full size: the wall in a photoscanned brick, render or sandstone (Poly Haven, CC0) with its
   // openings cut into it, box-sash windows set back in their reveals (frames, sashes, glazing bars, a stone sill, a
   // brick arch or lintel over), a panelled door in its case under a fanlight, a shop front with its fascia, a downpipe;
   // baked by Cycles into colour (with the reveals' shading), normals, roughness and a mask of the glass (lit after
   // dark), 512 px a bay where the drawn ones are 256. They replace the drawn atlas where they're published.
-  for (const k of ["brick", "render", "stone"]) {
+  for (const k of BAKED_FRONTS) {
     const map = photoTex(`facade_${k}_diff`); if (!map) continue;
     tex[k] = { map, normalMap: photoTex(`facade_${k}_nor`, { srgb: false }), roughnessMap: photoTex(`facade_${k}_rough`, { srgb: false }), emissiveMap: photoTex(`facade_${k}_glass`, { srgb: false }), baked: true };
   }
+  if (!tex.buff) tex.buff = tex.brick; // (pale buff brick: the red until its own front is published)
   const roofs = { slate: roof("slate", 11), clay: roof("clay", 12), felt: roof("felt", 13) };
   // ---- roofs from photoscans where they're published (public/textures/roof_<kind>_*): ROOF_SCANS gives how many times
   // the photograph repeats across the drawn roof's 3 m tile ----
@@ -93,19 +98,23 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     m.customProgramCacheKey = () => (key ? key.call(m) : "fdwall0" + k) + "lit1";
   }
   for (const [k, t] of Object.entries(roofs)) M["roof_" + k] = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1, vertexColors: true });
-  M.tower = new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.85 });
+  // (chimneys and brick towers in the photoscanned red brick of the house fronts (Poly Haven Red Brick 03, CC0), at the
+  // same 1.5 m a tile, where it's published; else the drawn brick, 1.2 m by 0.6 m a tile)
+  const brPh = photoTex("brick_red_diff"), TU = brPh ? 1.5 : 1.2, TV = brPh ? 1.5 : 0.6;
+  M.tower = brPh ? new THREE.MeshStandardMaterial({ map: brPh, normalMap: photoTex("brick_red_nor", { srgb: false }), roughnessMap: photoTex("brick_red_rough", { srgb: false }), roughness: 1 })
+    : new THREE.MeshStandardMaterial({ map: brk.map, normalMap: brk.normalMap, roughness: 0.85 });
   M.trim = new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.6, vertexColors: true, side: THREE.DoubleSide });
   M.dark = new THREE.MeshStandardMaterial({ color: 0x2a2e33, roughness: 0.5, metalness: 0.3, vertexColors: true, side: THREE.DoubleSide });
   // glazing: tinted and reflective, not see-through (an empty shell behind clear glass looked wrong)
   M.glass = new THREE.MeshStandardMaterial({ color: 0x7f97a8, roughness: 0.08, metalness: 0.35, emissive: 0xffd890, emissiveIntensity: 0, side: THREE.DoubleSide });
   const B = Object.fromEntries(Object.keys(M).map((k) => [k, bucket()]));
-  const colliders = [], glow = [M.brick, M.render, M.cladding, M.stone];
+  const colliders = [], glow = [M.brick, M.render, M.cladding, M.stone, M.buff];
   const W1 = [1, 1, 1];
   const litHash = (id, k, st, q) => { let h = (Math.imul((id | 0) ^ 0x9e3779b9, 2654435761) ^ Math.imul(k + 1, 40503) ^ Math.imul(st + 1, 7919) ^ Math.imul(q + 1, 104729)) >>> 0; h ^= h >>> 15; h = Math.imul(h, 2246822519) >>> 0; h ^= h >>> 13; return (h >>> 0) / 4294967296; };
   const tileUV = (t, u0 = 0, u1 = 1, v0 = 0, v1 = 1) => [(t + u0) / FACADE_N, v0, (t + u1) / FACADE_N, v0, (t + u1) / FACADE_N, v1, (t + u0) / FACADE_N, v1];
   const chimneyBox = (x, z, y0, h, s = 0.6) => {
     const pts = [[x - s / 2, z - s / 2], [x - s / 2, z + s / 2], [x + s / 2, z + s / 2], [x + s / 2, z - s / 2]];
-    for (let k = 0; k < 4; k++) { const [x1, z1] = pts[k], [x2, z2] = pts[(k + 1) % 4]; quad(B.tower, [x1, y0, z1], [x2, y0, z2], [x2, y0 + h, z2], [x1, y0 + h, z1], [0, 0, s / 1.2, 0, s / 1.2, h / 0.6, 0, h / 0.6], W1); }
+    for (let k = 0; k < 4; k++) { const [x1, z1] = pts[k], [x2, z2] = pts[(k + 1) % 4]; quad(B.tower, [x1, y0, z1], [x2, y0, z2], [x2, y0 + h, z2], [x1, y0 + h, z1], [0, 0, s / TU, 0, s / TU, h / TV, 0, h / TV], W1); }
     quad(B.dark, [pts[0][0], y0 + h, pts[0][1]], [pts[1][0], y0 + h, pts[1][1]], [pts[2][0], y0 + h, pts[2][1]], [pts[3][0], y0 + h, pts[3][1]], [0, 0, 1, 0, 1, 1, 0, 1], [0.6, 0.6, 0.6]);
     for (const [dx, dz] of [[-0.12, 0], [0.12, 0]]) { const q = [[x + dx - 0.07, z - 0.07], [x + dx - 0.07, z + 0.07], [x + dx + 0.07, z + 0.07], [x + dx + 0.07, z - 0.07]]; for (let k = 0; k < 4; k++) { const [x1, z1] = q[k], [x2, z2] = q[(k + 1) % 4]; quad(B.roof_clay, [x1, y0 + h, z1], [x2, y0 + h, z2], [x2, y0 + h + 0.35, z2], [x1, y0 + h + 0.35, z1], [0, 0, 0.1, 0, 0.1, 0.1, 0, 0.1], [1.1, 0.8, 0.7]); } } // pots
   };
@@ -140,10 +149,11 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
     if (st.type === "lighthouse") {
       // a tapered brick tower, a white gallery with railings, a glazed lantern and a dark cap
       const box = obb(ring), r = Math.max(2, Math.min(5, Math.min(box.L, box.W) / 2)), h = st.h, seg = 20;
+      const TA = brPh ? Math.max(1, Math.round((Math.PI * 2 * r * 0.86) / TU)) : 12, TVL = brPh ? TV : 1.2; // (whole tiles round its middle)
       for (let k = 0; k < seg; k++) {
         const a0 = (k / seg) * Math.PI * 2, a1 = ((k + 1) / seg) * Math.PI * 2, rt = r * 0.72;
         const P = (a, rr, y) => [box.c[0] + Math.cos(a) * rr, y, box.c[1] - Math.sin(a) * rr];
-        quad(B.tower, P(a0, r, base), P(a1, r, base), P(a1, rt, base + h), P(a0, rt, base + h), [k / seg * 12, 0, (k + 1) / seg * 12, 0, (k + 1) / seg * 12, h / 1.2, k / seg * 12, h / 1.2], W1);
+        quad(B.tower, P(a0, r, base), P(a1, r, base), P(a1, rt, base + h), P(a0, rt, base + h), [k / seg * TA, 0, (k + 1) / seg * TA, 0, (k + 1) / seg * TA, h / TVL, k / seg * TA, h / TVL], W1);
         // windows up the tower: dark slots on two sides
         if (k % 5 === 0) for (let y = 4; y < h - 3; y += 5) quad(B.dark, P(a0 + 0.06, r * (1 - 0.28 * (y / h)) + 0.02, base + y), P(a1 - 0.06, r * (1 - 0.28 * (y / h)) + 0.02, base + y), P(a1 - 0.06, r * (1 - 0.28 * ((y + 1.4) / h)) + 0.02, base + y + 1.4), P(a0 + 0.06, r * (1 - 0.28 * ((y + 1.4) / h)) + 0.02, base + y + 1.4), [0, 0, 1, 0, 1, 1, 0, 1], W1);
         const gr = r * 0.95, ytop = base + h;
@@ -205,8 +215,8 @@ export function buildBuildings(group, buildings, { groundAt = () => 0, avoid = (
               wallBox(B.trim, A, u, nrm, x - f, x, yBot, yTop, 0, 0.045, trimCol); wallBox(B.trim, A, u, nrm, x + w, x + w + f, yBot, yTop, 0, 0.045, trimCol); // the box frame's sides
               wallBox(B.trim, A, u, nrm, x - f, x + w + f, yTop, yTop + 0.05, 0, 0.045, trimCol); // its head
               wallBox(B.trim, A, u, nrm, x, x + w, yTop - h * 0.47 - 0.03, yTop - h * 0.47 + 0.03, 0, 0.035, trimCol); // the meeting rail
-              wallBox(B.trim, A, u, nrm, x - 0.12 * kx, x + w + 0.12 * kx, yBot - 0.11, yBot - 0.02, 0, 0.1, st.walls === "brick" ? [0.84, 0.82, 0.76] : [0.9, 0.88, 0.84]); // the sill
-              if (st.walls !== "brick") wallBox(B.trim, A, u, nrm, x - 0.14 * kx, x + w + 0.14 * kx, yTop + 0.1, yTop + 0.3, 0, 0.04, [0.89, 0.87, 0.81]); // a stone lintel
+              wallBox(B.trim, A, u, nrm, x - 0.12 * kx, x + w + 0.12 * kx, yBot - 0.11, yBot - 0.02, 0, 0.1, st.walls === "brick" || st.walls === "buff" ? [0.84, 0.82, 0.76] : [0.9, 0.88, 0.84]); // the sill
+              if (st.walls !== "brick" && st.walls !== "buff") wallBox(B.trim, A, u, nrm, x - 0.14 * kx, x + w + 0.14 * kx, yTop + 0.1, yTop + 0.3, 0, 0.04, [0.89, 0.87, 0.81]); // a stone lintel
             }
           }
         }

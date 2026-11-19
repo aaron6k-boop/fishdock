@@ -34,7 +34,7 @@ test("building styles: the lighthouse, the lookout, huts, houses and warehouses;
   assert.equal(styleFor({ id: 2, ring: sq(8), use: "lookout", h: 7 }).type, "lookout");
   assert.equal(styleFor({ id: 3, ring: sq(4), kind: "shed", h: 3 }).storeys, 1);
   const house = styleFor({ id: 4, ring: [[0, 0], [12, 0], [12, 7], [0, 7]], kind: "house", h: 7 });
-  assert.equal(house.type, "house"); assert.ok(["brick", "render"].includes(house.walls)); assert.ok(house.storeys >= 2);
+  assert.equal(house.type, "house"); assert.ok(["brick", "buff", "render"].includes(house.walls)); assert.ok(house.storeys >= 2);
   assert.equal(styleFor({ id: 5, ring: sq(40), kind: "industrial", h: 8 }).type, "warehouse");
   assert.equal(styleFor({ id: 6, ring: [[0, 0], [12, 0], [12, 7], [0, 7]], kind: "yes", h: 16, tall: true }).h, 16, "a mapped height is used");
   // the same building always gets the same style

@@ -23,6 +23,7 @@ export function styleFor(b) {
   const tinted = (list) => list[Math.floor(r2 * list.length)];
   const RENDER = [[1, 1, 1], [0.98, 0.94, 0.84], [0.9, 0.95, 1], [0.98, 0.96, 0.9], [0.95, 0.9, 0.82]];
   const BRICK = [[1, 1, 1], [0.9, 0.86, 0.84], [1.05, 0.95, 0.9], [0.82, 0.78, 0.76]];
+  const BUFF = [[1, 1, 1], [0.96, 0.95, 0.92], [1.03, 1, 0.94], [0.9, 0.89, 0.86]];
   if (b.use === "lighthouse") return { type: "lighthouse", walls: "brick", roof: "dome", storeys: 0, h: b.tall ? Math.max(12, b.h) : 21, tint: [1, 1, 1] };
   // (a port's sheds, where a place says so (localDetail.js `sheds`): profiled steel, one tall storey, no windows, a low
   // roof. Drawn as houses or brick mills by their size alone, with a lit window in every bay, they were not what stands
@@ -45,10 +46,13 @@ export function styleFor(b) {
   // mansion and the farm by the Abbey: stone walls under slate)
   if (town?.stoneAt) { let cx = 0, cz = 0; for (const [x, z] of b.ring) { cx += x / b.ring.length; cz += z / b.ring.length; } if (town.stoneAt(cx, cz)) { const roofShape = b.roof === "flat" ? "flat" : r2 < 0.5 ? "hip" : "gable"; return { type: "house", walls: "stone", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : "slate", storeys, h: b.tall ? Math.max(3, b.h) : storeys * storeyH, shop: false, chimneys: roofShape !== "flat" ? (A > 60 ? 2 : 1) : 0, tint: [1, 1, 1], wide: false }; } }
   const roofShape = b.roof === "flat" ? "flat" : b.roof === "gabled" ? "gable" : b.roof === "hipped" ? "hip" : k === "terrace" ? "gable" : r2 < 0.55 ? "hip" : "gable";
+  // (of the brick houses, some in pale buff brick rather than red: town.buff, how many (East Anglia's "Suffolk white"
+  // gault brick); a few anywhere else)
+  const buff = brick && hashOf((b.id ?? 5) * 13 + 3) < (town?.buff ?? 0.12);
   return {
-    type: "house", walls: brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < (town?.clay != null ? 1 - town.clay : 0.62) ? "slate" : "clay", // (town.clay: how many of a town's roofs are red clay tiles, Whitby's pantiles)
+    type: "house", walls: buff ? "buff" : brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < (town?.clay != null ? 1 - town.clay : 0.62) ? "slate" : "clay", // (town.clay: how many of a town's roofs are red clay tiles, Whitby's pantiles)
     storeys, h: b.tall ? Math.max(3, b.h) : storeys * storeyH, shop: b.use === "shop", chimneys: roofShape !== "flat" ? (A > 60 ? 2 : 1) : 0,
-    tint: brick ? tinted(BRICK) : tinted(RENDER),
+    tint: buff ? tinted(BUFF) : brick ? tinted(BRICK) : tinted(RENDER),
     wide: r2 > 0.45, // (the wider three-light windows of a seafront house on its upper storeys, on about half of them)
   };
 }

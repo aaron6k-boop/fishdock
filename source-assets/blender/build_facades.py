@@ -1,5 +1,5 @@
 # FishDock: the town's house fronts, baked from modelled bays onto the facade atlases the game lays on its buildings
-#   facade_<kind>_{diff,nor,rough,glass}.jpg  for kind in brick, render, stone
+#   facade_<kind>_{diff,nor,rough,glass}.jpg  for kind in brick, render, stone, buff
 # The game's buildings (buildings3d.js) are walled with an atlas of five bays, each one storey of 3 m by 3 m: a window,
 # a door, a shop front, plain wall and a wide window (textures3d.js FACADE_TILE, in that order). Until now those were
 # drawn in code at 85 pixels a metre. Here each bay is modelled in Blender at its real size: the wall in a photoscanned
@@ -19,6 +19,10 @@ KINDS = {
     # softened)
     "render": dict(scan=PH + "/white_plaster_02", tile=1.5, tint=(0.8, 0.79, 0.76), norm=0.55, trim=(0.9, 0.9, 0.87), lintel="stone", door=(0.24, 0.05, 0.06)),
     "stone": dict(scan=OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01", tile=1.5, tint=(0.46, 0.41, 0.32), norm=0.7, trim=(0.88, 0.87, 0.83), lintel="stone", door=(0.07, 0.14, 0.09)),
+    # (buff: the pale "Suffolk white" (gault) brick of many of Great Yarmouth's and Lowestoft's Victorian houses, from
+    # Poly Haven's Brick Wall 003, its pink-beige drawn towards cream; its arches in red brick, as the Victorians often
+    # set them)
+    "buff": dict(scan=PH + "/brick_wall_003", tile=1.5, tint=(1.12, 1.2, 1.16), trim=(0.88, 0.87, 0.83), lintel="arch", door=(0.05, 0.16, 0.12)),
 }
 def find(base, kind):
     # a Poly Haven map: base is the asset's folder (searched through) or a file prefix; kind a list of names to try
@@ -86,7 +90,17 @@ def box(name, x0, x1, y0, y1, z0, z1, m, bevel=0.0, tile=1.0):
     uv_world(bm, tile); me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(name, me); col.objects.link(o); o.data.materials.append(m); return o
 
-def bay_window(K, M, x0, w=1.05, h=1.55, sill_y=0.9, panes=(2, 2)):
+def pleat(name, x0, x1, y0, y1, zc, amp, folds, m, nx=32):
+    # a hanging curtain: a sheet folding in and out (amp metres) folds times across, its face at zc
+    bm = bmesh.new(); rows = []
+    for y in (y0, y1):
+        rows.append([bm.verts.new((x0 + (x1 - x0) * i / nx, -(zc + amp * math.sin(2 * math.pi * folds * i / nx)), y)) for i in range(nx + 1)])
+    for i in range(nx): bm.faces.new((rows[0][i], rows[0][i + 1], rows[1][i + 1], rows[1][i]))
+    bm.normal_update(); me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    for poly in me.polygons: poly.use_smooth = True
+    o = bpy.data.objects.new(name, me); col.objects.link(o); o.data.materials.append(m); return o
+
+def bay_window(K, M, x0, w=1.05, h=1.55, sill_y=0.9, panes=(2, 2), curtain="curtain", blind=False):
     # cut: the opening, 12 cm deep into the wall; inside it the box frame, two sashes with their bars, the glass, curtains
     xc = x0 + 1.5; xa, xb, ya, yb = xc - w / 2, xc + w / 2, sill_y, sill_y + h
     cuts = [box("cut", xa, xb, ya, yb, -0.6, 0.2, M["trim"])]
@@ -98,8 +112,14 @@ def bay_window(K, M, x0, w=1.05, h=1.55, sill_y=0.9, panes=(2, 2)):
         for k in range(1, panes[0]): xx = xa + 0.07 + (w - 0.14) * k / panes[0]; box("bar", xx - 0.013, xx + 0.013, s0, s1, dz - 0.03, dz, M["trim"])
         for k in range(1, panes[1]): yy = s0 + (s1 - s0) * k / panes[1]; box("bar", xa + 0.07, xb - 0.07, yy - 0.013, yy + 0.013, dz - 0.03, dz, M["trim"])
     box("glass", xa + 0.06, xb - 0.06, ya + 0.05, yb - 0.06, D - 0.075, D - 0.07, M["glass"])
-    for s in (-1, 1): box("curtain", xc + s * (w / 2 - 0.2) - 0.13, xc + s * (w / 2 - 0.2) + 0.13, ya + 0.08, yb - 0.1, D - 0.069, D - 0.066, M["curtain"])
+    # (curtains drawn back to either side, hanging in folds; on the wide window a blind part way down. Behind the glass,
+    # the room: its back wall, a dim ceiling and a chair back, seen through the glass in the colour bake)
+    for s in (-1, 1): pleat("curtain", xc + s * (w / 2 - 0.21) - 0.15, xc + s * (w / 2 - 0.21) + 0.15, ya + 0.07, yb - 0.08, D - 0.115, 0.012, 3, M[curtain])  # (inside, behind the glass)
+    box("curtain_rail", xa + 0.05, xb - 0.05, yb - 0.085, yb - 0.07, D - 0.14, D - 0.125, M["trim"])
+    if blind: box("blind", xa + 0.08, xb - 0.08, yb - 0.08 - h * 0.3, yb - 0.08, D - 0.092, D - 0.088, M["blind"], 0.002); box("blind_bar", xa + 0.08, xb - 0.08, yb - 0.1 - h * 0.3, yb - 0.08 - h * 0.3, D - 0.095, D - 0.085, M["trim"])
     box("room", xa - 0.1, xb + 0.1, ya - 0.1, yb + 0.1, -0.62, -0.6, M["room"])
+    box("ceiling", xa - 0.1, xb + 0.1, yb + 0.05, yb + 0.1, -0.62, -0.1, M["ceiling"])
+    box("chair", xc - 0.34, xc + 0.06, ya - 0.1, ya + 0.38, -0.45, -0.38, M["chair"], 0.03)
     # the sill, standing out from the wall; over the head an arch of bricks set on end, or a stone lintel
     box("sill", xa - 0.12, xb + 0.12, ya - 0.11, ya + 0.0, -0.04, 0.07, M["sill"], 0.012, 0.6)
     if K["lintel"] == "arch":
@@ -130,16 +150,33 @@ def bay_shop(K, M, x0):
     box("transom", x0 + 0.25, x0 + 2.75, 2.05, 2.1, -0.12, -0.04, M["fascia"])
     box("glass", x0 + 0.3, x0 + 2.7, 0.47, 2.43, -0.1, -0.095, M["glass"])
     box("room", x0 + 0.2, x0 + 2.8, 0.4, 2.5, -0.62, -0.6, M["shoproom"])
+    # (inside, seen through the glass in the colour bake: shelves of goods along the back, a display table in the window)
+    rnd = random.Random(31)
+    for y in (0.95, 1.45, 1.95):
+        box("shelf", x0 + 0.3, x0 + 2.7, y - 0.03, y, -0.6, -0.42, M["shelf"])
+        x = x0 + 0.32
+        while x < x0 + 2.62:
+            gw = rnd.uniform(0.06, 0.16); gh = rnd.uniform(0.1, 0.34)
+            box("goods", x, min(x + gw, x0 + 2.68), y, y + gh, -0.58, -0.47 - rnd.uniform(0, 0.04), M["goods%d" % rnd.randrange(6)], 0.004)
+            x += gw + rnd.uniform(0.0, 0.05)
+    box("display", x0 + 0.5, x0 + 2.5, 0.42, 0.62, -0.32, -0.14, M["shelf"], 0.01)
+    for k in range(7):
+        gx = x0 + 0.6 + k * 0.26 + rnd.uniform(-0.04, 0.04)
+        box("goods", gx, gx + rnd.uniform(0.1, 0.18), 0.62, 0.62 + rnd.uniform(0.12, 0.4), -0.28, -0.18, M["goods%d" % rnd.randrange(6)], 0.006)
     return cuts
 def bay_wide(K, M, x0):
-    return bay_window(K, M, x0, w=1.7, h=1.55, panes=(3, 2))
+    return bay_window(K, M, x0, w=1.7, h=1.55, panes=(3, 2), curtain="curtain2", blind=True)
 
 def build(kind):
     K = KINDS[kind]
     M = {"wall": scanned(kind + "_wall", K["scan"], K["tint"], K.get("norm")), "trim": principled(kind + "_trim", K["trim"], 0.4), "sill": scanned(kind + "_sill", OUT + "/downloads/polyhaven-stone/large_sandstone_blocks_01", (0.95, 0.94, 0.9)),
          "glass": principled("glass", (0.035, 0.045, 0.055), 0.04, 0.0, 1.0), "curtain": principled("curtain", (0.62, 0.58, 0.5), 0.9), "room": principled("room", (0.025, 0.025, 0.028), 0.9),
          "shoproom": principled("shoproom", (0.09, 0.085, 0.08), 0.8), "door": principled(kind + "_door", K["door"], 0.35), "brass": principled("brass", (0.75, 0.55, 0.2), 0.3, 1.0),
-         "fascia": principled(kind + "_fascia", (0.1, 0.16, 0.24), 0.4), "archbrick": scanned("archbrick", PH + "/red_brick_03", (0.8, 0.72, 0.68))}
+         "fascia": principled(kind + "_fascia", (0.1, 0.16, 0.24), 0.4), "archbrick": scanned("archbrick", PH + "/red_brick_03", (0.8, 0.72, 0.68)),
+         "curtain2": principled("curtain2", (0.2, 0.27, 0.26), 0.9), "blind": principled("blind", (0.72, 0.69, 0.6), 0.85), "ceiling": principled("ceiling", (0.09, 0.085, 0.08), 0.9),
+         "chair": principled("chair", (0.07, 0.045, 0.035), 0.7), "shelf": principled("shelf", (0.3, 0.22, 0.15), 0.6)}
+    for i, c in enumerate(((0.55, 0.12, 0.08), (0.12, 0.28, 0.5), (0.72, 0.6, 0.2), (0.15, 0.38, 0.18), (0.75, 0.72, 0.66), (0.35, 0.18, 0.32))): M["goods%d" % i] = principled("goods%d" % i, c, 0.6)
+    M["room"] = principled("room", (0.05, 0.046, 0.042), 0.9); M["shoproom"] = principled("shoproom", (0.2, 0.19, 0.17), 0.8)
     # the wall: five bays, 15 m by 3 m, 30 cm thick, its face at z = 0
     wall = box("wall", 0, 15, 0, 3, -0.3, 0.0, M["wall"], 0.0, K["tile"])
     cuts = []
@@ -170,8 +207,14 @@ def bake(lo, kind):
         im = bpy.data.images.new(f"{kind}_{t}", W, H)
         if t != "DIFFUSE": im.colorspace_settings.name = "Non-Color"
         node.image = im
+        # (the glass left out of the colour and shading bakes, so the room and the shop's goods behind it are baked in:
+        # the game's glass is its low roughness over them, mirroring the sky; kept for the relief, roughness and glow)
+        see_in = t in ("DIFFUSE", "AO")
+        for o in hi:
+            if o.name.split(".")[0] in ("glass", "fan_glass"): o.hide_render = see_in
         bpy.ops.object.select_all(action="DESELECT")
-        for o in hi: o.select_set(True)
+        for o in hi:
+            if not (see_in and o.name.split(".")[0] in ("glass", "fan_glass")): o.select_set(True)
         lo.select_set(True); bpy.context.view_layer.objects.active = lo
         if t == "DIFFUSE": sc.render.bake.use_pass_direct = False; sc.render.bake.use_pass_indirect = False; sc.render.bake.use_pass_color = True
         if t == "NORMAL": bpy.ops.object.bake(type=t, normal_space="TANGENT")
