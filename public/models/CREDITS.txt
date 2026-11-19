@@ -148,8 +148,9 @@ until the baked stonework below replaced it; kept for a stone pier without its o
 (https://polyhaven.com/a/large_sandstone_blocks_01), from Poly Haven, CC0 1.0. Credited with thanks.
 
 The shape of the ground round Whitby's piers (src/lib/world3d/terrain3d.js, and the hillside's 1 m relief,
-public/textures/terrain_whitby_1m.bin), round Cromer Pier and round Brixham's harbour (from 19 November 2026:
-public/textures/terrain_cromer_*.bin, terrain_brixham_*.bin) is from the Environment Agency's LIDAR
+public/textures/terrain_whitby_1m.bin), round Cromer Pier, round Brixham's harbour and round Gorleston's pier
+(from 19 November 2026: public/textures/terrain_cromer_*.bin, terrain_brixham_*.bin, terrain_gorleston_*.bin) is from
+the Environment Agency's LIDAR
 Composite DTM 2022, 1 m (https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc):
 © Environment Agency copyright and/or database right 2022. All rights reserved. Contains public sector information
 licensed under the Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).

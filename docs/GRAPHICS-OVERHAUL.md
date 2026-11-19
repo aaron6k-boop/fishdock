@@ -165,11 +165,29 @@ now load the page again once when that happens (`src/lib/staleReload.js`).
 - In the cast's wind-up your left sleeve still fills the lower left of the picture for about half a second.
 - Everything listed after stage 1 that isn't named here.
 
+## Stage 4, first part (19 November): Gorleston's ground at its surveyed heights
+
+The same survey and tool as Cromer and Brixham (`terrain_from_dtm.py`, the Environment Agency's 1 m LIDAR), for the
+second place on the brief's list.
+
+| What | Before | After | Seen on the PC |
+|---|---|---|---|
+| The cliff south of the pier's root | A slope shaped by hand to about 15 m, with roads draped over it as dark slabs | The survey's cliff: 9 m high in 30 m, Marine Parade at 13 to 16 m | Yes, eight cameras |
+| The spit across the harbour mouth | A sand bank about 8 m above the quay, estimated from one photograph | The survey's 5 to 6.5 m above datum (2 to 2.5 m above the pier's head) with marram hummocks on top; no scattered trees on it or on the port's yards | Yes |
+| The pier's head | Flat | Flat (set 0.3 m proud by the first attempt, it came through its own deck as sand: caught on the PC, fixed by taking the ground's usual level as 4.0 m) | Yes |
+
+This changes little that you see from the pier: the spit is lower and truer, and the cliff is the right height. The town
+is still two photographs standing on bare ground, with no buildings drawn and nowhere to walk past the pier's root.
+That is Gorleston's real fault and the next piece of work: its buildings drawn as Whitby's are, on this ground.
+
+Measured (Ultra, 1920x1080, read a few seconds after the place appears): 66 frames a second before, 67 to 68 after;
+loading 21 s, then 22 s; no page errors.
+
 ## The phases, and where each stands
 
 1. Graphics engine audit: not started as a written audit. Measured so far: Whitby on Ultra 76 to 85 frames a second.
-2. Environment assets: Whitby rebuilt (PR #166); Cromer and Brixham at their surveyed heights (stage 2). Surveyed 1 m
-   heights also fetched for Gorleston and Chesil, not yet used; shrub and street-furniture scans exported from Blender,
+2. Environment assets: Whitby rebuilt (PR #166); Cromer, Brixham (stage 2) and Gorleston (stage 4) at their surveyed
+   heights. Surveyed 1 m heights also fetched for Chesil, not yet used; shrub and street-furniture scans exported from Blender,
    not yet placed.
 3. Textures and materials: Whitby's stone, grass, sand, soil; others not yet.
 4. Water and weather: rain and the wet deck (this stage). Waves at walls and rocks, spray, sky and cloud not yet.

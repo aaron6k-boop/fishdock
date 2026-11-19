@@ -2502,6 +2502,27 @@
    "downloaded": "2026-11-19"
   },
   {
+   "id": "ea:lidar-composite-dtm-1m-2022:gorleston",
+   "name": "LIDAR Composite DTM 2022, 1 m (Gorleston)",
+   "source": "Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs)",
+   "page": "https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc",
+   "author": "Environment Agency",
+   "licence": "Open Government Licence v3.0",
+   "attribution": "Required: \"© Environment Agency copyright and/or database right 2022. All rights reserved.\" Contains public sector information licensed under the Open Government Licence v3.0 (credited in public/models/CREDITS.txt and the place's info note)",
+   "type": "elevation data (bare ground, metres above Ordnance Datum), GeoTIFF, British National Grid",
+   "resolution": "1 m",
+   "use": "the ground round Gorleston South Pier: the cliff south of the pier's root, the old town behind the quay and the spit north of the harbour mouth at their surveyed heights (src/lib/world3d/terrain3d.js \"gorleston\": each height the mean of the survey's 1 m cells over 5 m, every 5 m, 640 m each way round the mark; public/textures/terrain_gorleston_5m.bin), and the survey's own 1 m relief over the cliff and the town west of the pier (x -600 to -300 m, z -120 to 480 m from the mark; public/textures/terrain_gorleston_1m.bin); made by source-assets/tools/terrain_from_dtm.py",
+   "files": [
+    {
+     "file": "renders/dem_gorleston/dtm_1m.tif",
+     "bytes": 16777763,
+     "sha256": "c417ee37404f03c1cb8c410a434ad2f57047dcc912452114728bc62752a6a2fe",
+     "url": "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs?service=WCS&version=2.0.1&request=GetCoverage&CoverageId=13787b9a-26a4-4775-8523-806d13af58fc__Lidar_Composite_Elevation_DTM_1m&format=image/tiff&subset=E(652440,654140)&subset=N(302820,304520)"
+    }
+   ],
+   "downloaded": "2026-11-19"
+  },
+  {
    "id": "ea:lidar-composite-dtm-1m-2022:brixham",
    "name": "LIDAR Composite DTM 2022, 1 m (Brixham)",
    "source": "Environment Agency (WCS: environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m-2022/wcs)",
