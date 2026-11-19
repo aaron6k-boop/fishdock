@@ -882,7 +882,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
 
   // ---- rain: streaks round you, curtains further off, splashes on the deck (rain3d.js) ----
   const rain3 = createRain(group, { quality, floorAt: (x, z) => floorAt(x, z) }), rain = rain3.group, rainLight = new THREE.Color(), rainSun = { d: new THREE.Vector3(), c: new THREE.Color() };
-  let screenH = 900;
+  let screenH = 900, screenK = 1; // (the screen's height in its own pixels, and how many are drawn for each)
 
   let rainAmt = 0, wind = 0.3, windDir = [0.3, -1], fft = null;
   // gulls and a few boats at the coast (wildlife.js): where the anglers are, the water to put boats on, lamps to perch on
@@ -1016,7 +1016,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
     get rockEdge() { return real?.rockEdge || null; },
     floorAt: (x, z) => floorAt(x, z),
     /** the screen's height in drawn pixels (how fine a far raindrop is: rain3d.js) */
-    setScreen(h) { screenH = h || screenH; },
+    setScreen(h, k = 1) { screenH = h || screenH; screenK = k || 1; },
     /** your head torch's light (nightKit.js), for the rain in its beam */
     rainTorch(spot) { rain3.torch(spot); },
     ground,
@@ -1104,7 +1104,7 @@ export function createEnvironment(scene, { venue = "pier", quality = 1, real = n
       } else bolt.next = null;
       { let f = 0; for (const [at, k] of bolt.pulses) { const a = t - at; if (a >= 0 && a < 0.6) f += k * Math.exp(-a * 14); } bolt.flash = Math.min(1.4, f);
         if (Math.abs(bolt.flash - U.uFlash.value) > 1e-3 || bolt.flash > 0) { U.uFlash.value = bolt.flash; hemi.intensity = look.skyIntensity * (1 + bolt.flash * 3); } }
-      if (rainAmt > 0.02) { rain3.flash(bolt.flash); rain3.update(t, dt, cam, screenH); }
+      if (rainAmt > 0.02) { rain3.flash(bolt.flash); rain3.update(t, dt, cam, screenH, screenK); }
     },
     dispose() { fft?.dispose(); envSky.dispose(); rain3.dispose(); scene.remove(group); group.traverse((o) => { o.geometry?.dispose?.(); if (o.material) [].concat(o.material).forEach((m) => { m.map?.dispose?.(); m.dispose?.(); }); }); scene.fog = null; },
   };

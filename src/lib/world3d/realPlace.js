@@ -64,8 +64,27 @@ function offPiers(hill, piers) {
   return (x, z) => (rs.some((b) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && inside([x, z], b.r)) ? 0 : hill(x, z));
 }
 
+// ---- a paved deck in the rain (wetLook.js): darker, a satin sheen, shallow puddles that mirror the sky with the
+// rain's rings in them, the patches where a dripping net was put down. For a material weather() has been over (its
+// world position, vFdW, places the puddles: nothing here goes by the deck's own uv). wet: the place's deckWet ----
+function wetPaving(mat, wet, quality = 1) {
+  if (!wet) return mat;
+  const prev = mat.onBeforeCompile, own = (t) => t.replaceAll("fdWet", "fdWt").replaceAll("vMapUv * 8.", "vFdW.xz").replaceAll("vMapUv", "(vFdW.xz * .125)"); // (weather's own uniform is called fdWet)
+  mat.onBeforeCompile = (sh, r) => {
+    prev?.(sh, r);
+    sh.uniforms.uWetSpots = WET_SPOTS; sh.uniforms.uWet = wet; sh.uniforms.uWetT = wet.clock; sh.uniforms.uWetRain = wet.rain;
+    sh.fragmentShader = (quality < 1 ? "" : "#define FD_WET_RINGS\n") + "#define FD_WET_SPOTS\nuniform vec4 uWetSpots[4];\nuniform float uWet;\nuniform float uWetT;\nuniform float uWetRain;\n" + sh.fragmentShader
+      .replace("#include <map_fragment>", `#include <map_fragment>\n${own(WET_PREP)}\ndiffuseColor.rgb *= ${own(WET_DARKEN)};`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\nroughnessFactor = ${wetRough("roughnessFactor")};`)
+      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${WET_NORMAL}`);
+  };
+  const prevKey = mat.customProgramCacheKey?.bind(mat);
+  mat.customProgramCacheKey = () => (prevKey ? prevKey() : "") + "fdWetPaving" + (quality < 1 ? 0 : 1);
+  return mat;
+}
+
 // ---- sandstone ashlar (Whitby's piers): the photographed blocks, honey-brown, darker and weedy towards the sea ----
-function stoneWall(st, h, part = "wall") {
+function stoneWall(st, h, part = "wall", wet = null, quality = 1) {
   // (st.kit: the stonework modelled block by block in Blender and baked to seamless maps (source-assets/blender/
   // build_whitby_stone.py): <kit>_ashlar for walls, <kit>_flags for decks, each a tile of st.wallTile or st.deckTile
   // metres; their own joints, wear and shading in them. Without one, the photographed blocks)
@@ -73,7 +92,7 @@ function stoneWall(st, h, part = "wall") {
     const name = `${st.kit}_${part === "deck" ? "flags" : "ashlar"}`, rep = 1 / (part === "deck" ? st.deckTile ?? 3 : st.wallTile ?? 2.4);
     const d = photoTex(name + "_diff", { repeat: rep }), nn = d && photoTex(name + "_nor", { srgb: false, repeat: rep }), rr = d && photoTex(name + "_rough", { srgb: false, repeat: rep });
     const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1, 1), roughnessMap: rr, roughness: 1, color: part === "deck" ? st.deckTint ?? 0xffffff : st.tint ?? 0xffffff });
-    return part === "deck" ? weather(m, { scale: 1.6, mottle: 0.18, rough: [0.92, 1.06] }) : weather(m, { scale: 0.9, mottle: 0.16, grime: [WALL_BOTTOM, 1.1, 0.8], streaks: [h, 3.5, 0.28], rough: [0.94, 1.06] });
+    return part === "deck" ? wetPaving(weather(m, { scale: 1.6, mottle: 0.18, rough: [0.92, 1.06] }), wet, quality) : weather(m, { scale: 0.9, mottle: 0.16, grime: [WALL_BOTTOM, 1.1, 0.8], streaks: [h, 3.5, 0.28], rough: [0.94, 1.06], wet: wet || undefined });
   }
   const tile = st.tile ?? 0.4, d = photoTex("sandstone_wall_diff", { repeat: tile }), nn = d && photoTex("sandstone_wall_nor", { srgb: false, repeat: tile });
   const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1.2, 1.2), color: st.tint ?? 0xf0d8ac, roughness: 0.93 });
@@ -817,7 +836,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   }
   const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
   let concSide = null; // (a mark's concrete pier sides and parapets: localDetail.js concrete)
-  let stoneSide = null, stoneTop = null; // (a mark's sandstone pier walls and decks: localDetail.js stone)
+  let stoneSide = null, stoneTop = null, stoneCope = null; // (a mark's sandstone pier walls and decks: localDetail.js stone)
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
   // the pier's own direction (its longest run of wall near the fishing spots), for the deck's slab joints: square across
   // it, not across the map's north and south
@@ -1712,7 +1731,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (local?.stone) batter(geo, ring, p.h, local.stone.batter ?? 0.14);
       const sideMat = local?.stone ? (stoneSide ||= stoneWall(local.stone, p.h)) : local?.concrete ? (concSide ||= weather(new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb9b5ad, roughness: 0.95 }), { scale: 0.7, mottle: 0.3, grime: [WALL_BOTTOM, 0.6, 0.45], streaks: [p.h, 2.5, 0.2], rough: [0.9, 1.1] })) : new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 });
       // (and its top: sandstone flags where the walls are sandstone)
-      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall(local.stone.kit ? local.stone : { ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h, "deck")) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall(local.stone.kit ? local.stone : { ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h, "deck", place.deckWet, quality)) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
       // the coping: a course of big squared stones along its edges over the water, a little proud of the wall and of the
       // deck (Whitby's piers: the photographs along them), in the same stone
       if (local?.stone?.coping) {
@@ -1739,7 +1758,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           g2.translate(mid[0] - nx * (C.d / 2 - C.out), p.h + C.up - C.h / 2, mid[1] - nz * (C.d / 2 - C.out)); cg.push(g2);
         }
         if (cg.length) {
-          const cm = new THREE.Mesh(mergeGeometries(cg), stoneSide); cg.forEach((q) => q.dispose());
+          // (weathered nearer the deck's grey than the wall's face below it: in the wall's own warm tint the course ran
+          // round the pier as a yellow band)
+          const cm = new THREE.Mesh(mergeGeometries(cg), (stoneCope ||= stoneWall({ ...local.stone, tint: C.tint ?? 0xe2dbcc }, p.h, "wall", place.deckWet))); cg.forEach((q) => q.dispose());
           cm.castShadow = cm.receiveShadow = true; cm.userData.kind = `a ${p.kind}`; group.add(cm); targets.push(cm);
         }
       }

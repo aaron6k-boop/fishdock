@@ -1040,7 +1040,7 @@ export function createWorld(canvas, { venue = "pier", quality = "balanced", shed
     // drawing buffer away and makes a new one, and a step in resolution had already done that once)
     const pr = renderer.getPixelRatio(); if (canvas.width !== Math.floor(w * pr) || canvas.height !== Math.floor(h * pr)) renderer.setSize(w, h, false);
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    post?.setSize(w, h); env?.resizeReflections?.(renderer); env?.setScreen?.(renderer.domElement.height);
+    post?.setSize(w, h); env?.resizeReflections?.(renderer); env?.setScreen?.(renderer.domElement.clientHeight || renderer.domElement.height, renderer.domElement.clientHeight ? renderer.domElement.height / renderer.domElement.clientHeight : 1); // (the screen's own pixels, not the drawing's: drawn at two or three times the screen's and scaled down, a rain streak one drawn pixel wide all but vanished, the PC's footage of 19 November)
   }
   resize();
   raf = requestAnimationFrame(frame);

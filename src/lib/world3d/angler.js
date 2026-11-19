@@ -47,6 +47,11 @@ const n1 = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
 // (and 5 cm nearer you, in: at the resting hold's distance a surge, which takes the hands 5.5 cm out, locked the left
 // arm straight)
 export const FP_FIGHT = { de: -0.2, sw: 0.08, run: 0.12, left: 0.08, in: 0.04, surge: 0.18, pump: 0.16, pumpIn: 0.03 }; // (run: how far a run takes the rod to the right; left: to the left, where it already leans)
+// (bringing the fish to the net or the beach: the rod a little above its resting angle. It was 0.3 below, from the
+// hold as Blender made it: from the resting hold that lay the rod almost along your line of sight as you looked down
+// at the fish, the reel on its side under your nose and your left elbow lifted across the picture: the PC's footage,
+// 19 November)
+export const FP_LAND = { de: 0.1 };
 
 // ---- your hands on the drop net's rope, first person (see ropeFp) ----
 // (58 cm out along your line of sight to the net. Tried, 15 November: 46 cm along it and 12 out level, with each hand
@@ -1051,7 +1056,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const surf = tech === "dropnet" ? (() => { const g0 = dropGeo(Math.max(1, (fishLen * 0.62) / 0.35)), [fx, fz] = dirOf(face); return g0.col.clone().add(new THREE.Vector3(fz * 1.1 + fx * 0.95, 0, -fx * 1.1 + fz * 0.95)); })() /* (on the far side of the net from you: the net shot looks along the wall from that side) */ : nearAt.clone();
       surf.y = wh(surf.x, surf.z);
       const tip = tipWorld();
-      bendT = 0.25 * load; pitch = 1.05; slack = 0; fpE = 0.6; fpYaw = 0;
+      bendT = 0.25 * load; pitch = 1.05; slack = 0; fpE = 0.9 + FP_LAND.de; fpYaw = -0.03; // (FP_LAND, above: the rod kept up, not pointed down the line of your eye)
       if (age < T1) { const f = ease(age / T1); rigAt = start.clone().lerp(surf, f); rigAt.y = lerp(start.y, surf.y - 0.15, f); }
       else if (crossed(T1)) { splashCb?.(surf, 0.9 + prof.splashy * 0.5); rippleCb?.(surf, 0.8); onSound?.("bigsplash", surf); }
       // the fish is there all along: a shape coming up through the water, then breaking the surface (never popping in)
