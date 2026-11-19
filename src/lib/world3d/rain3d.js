@@ -28,7 +28,9 @@ export function rainPlan(amount = 0, wind = 0, q = 1) {
   return {
     drops, on, fall,
     drift: 12.5 * w * 0.8, // m/s across the ground: the wind's own speed (45 km/h is 12.5 m/s) less a little
-    len: 0.055 + 0.03 * a, // seconds of travel a streak shows (the eye's blur as much as the drop's speed)
+    // (short: at 0.055 to 0.085 s a drop near you drew a line a sixth of the screen long, and the rain read as white
+    // scratches over the picture (Aaron's phone screenshots, 19 November); each fainter too)
+    len: 0.028 + 0.016 * a, // seconds of travel a streak shows (the eye's blur as much as the drop's speed)
     width: 0.003 + 0.002 * a, // m: a drop and the blur round it
     curtains: Q < 1.5 ? 1 : 2, // (one on a phone: each is a pass over the whole picture)
     sheet: on ? 0.05 + 0.32 * a * a : 0, // how much the curtains show
@@ -57,6 +59,7 @@ const HASH_GLSL = /* glsl */`
   float rh(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
   float rn(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(rh(i), rh(i + vec2(1.0, 0.0)), f.x), mix(rh(i + vec2(0.0, 1.0)), rh(i + vec2(1.0, 1.0)), f.x), f.y); }`;
 
+const _fw = new THREE.Vector3();
 export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
   const group = new THREE.Group(); group.name = "fdRain"; group.visible = false; parent.add(group);
   const P0 = rainPlan(1, 0, quality), N = P0.drops;
@@ -65,7 +68,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
     uLight: { value: new THREE.Color(0.5, 0.5, 0.5) }, uSunD: { value: new THREE.Vector3(0, 1, 0) }, uSunC: { value: new THREE.Color(0, 0, 0) },
     uLampC: { value: new THREE.Color(1.0, 0.72, 0.42) }, uLamps: { value: [0, 1, 2, 3].map(() => new THREE.Vector4()) },
     uTorchP: { value: new THREE.Vector3() }, uTorchD: { value: new THREE.Vector3(0, 0, -1) }, uTorchC: { value: new THREE.Color(0, 0, 0) },
-    uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uAmount: { value: 0 }, uFall: { value: 7 }, uWind: { value: new THREE.Vector2() },
+    uTime: { value: 0 }, uCam: { value: new THREE.Vector3() }, uFwd: { value: new THREE.Vector2(0, -1) }, uAmount: { value: 0 }, uFall: { value: 7 }, uWind: { value: new THREE.Vector2() },
   };
   const fogU = () => ({ ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), fdSunDir: { value: SCATTER.dir }, fdSunCol: { value: SCATTER.col } });
 
@@ -81,7 +84,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
     transparent: true, depthWrite: false, fog: true, side: THREE.DoubleSide, // (a streak drawn down its path from the drop turns its back to you: both faces drawn)
     vertexShader: /* glsl */`
       attribute vec2 aCorner; attribute vec4 aSeed;
-      uniform float uTime, uAmount, uFall, uLen, uWidth, uPix, uAlpha; uniform vec3 uCam, uBox; uniform vec2 uWind;
+      uniform float uTime, uAmount, uFall, uLen, uWidth, uPix, uAlpha; uniform vec3 uCam, uBox; uniform vec2 uWind, uFwd;
       varying vec2 vC; varying float vA; varying vec3 vCol;
       ${LIGHT_GLSL}
       #include <fog_pars_vertex>
@@ -91,20 +94,25 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
         // (each drop its own size: the big ones fall faster and are carried less by the wind)
         float sz = 0.7 + 0.6 * r1;
         vec3 vel = vec3(uWind.x * (1.15 - 0.3 * r1), -uFall * (0.8 + 0.3 * r1), uWind.y * (1.15 - 0.3 * r1));
-        vec3 lo = uCam - uBox * vec3(0.5, 0.42, 0.5);
+        // (the box of drops lies ahead of you, not round you: round you five in six fell behind your back or off to
+        // the side, and a downpour showed as a few dozen streaks, the PC's footage of 19 November. Each drop keeps
+        // its place in the world; only which of them are drawn moves as you turn)
+        vec3 lo = uCam + vec3(uFwd.x, 0.0, uFwd.y) * (uBox.x * 0.36) - uBox * vec3(0.5, 0.42, 0.5);
         vec3 p = mod(aSeed.xyz * uBox + vel * uTime - lo, uBox) + lo;
         // (a little sway from the gusts, each drop out of step with its neighbours)
         p.xz += vec2(sin(uTime * 1.3 + r2 * 6.28), cos(uTime * 1.1 + r3 * 6.28)) * length(uWind) * 0.02;
         vec3 toC = p - cameraPosition; float d = length(toC);
         vec3 ax = normalize(vel), side = normalize(cross(ax, toC));
         float len = length(vel) * uLen * (0.75 + 0.5 * r2);
-        float w = max(uWidth * sz, d * uPix * 1.15), thin = pow(uWidth * sz / w, 0.65);
+        float w = max(uWidth * sz, d * uPix * 1.35), thin = pow(uWidth * sz / w, 0.6);
         vec3 wp = p + ax * len * aCorner.y + side * w * aCorner.x * 0.5;
         // (faint within a couple of metres of your eye, where a streak crosses half the view in a blink, and none within a
         // hand's length; thinned out towards the box's edges, so the drops never show it)
-        float hz = length(toC.xz), fade = smoothstep(0.45, 2.4, d) * (1.0 - smoothstep(uBox.x * 0.3, uBox.x * 0.48, hz)) * (1.0 - smoothstep(uBox.y * 0.3, uBox.y * 0.46, abs(p.y - uCam.y - uBox.y * 0.08)));
+        vec3 q = (p - lo) / uBox; float fade = smoothstep(1.0, 4.2, d) * smoothstep(0.0, 0.12, q.x) * (1.0 - smoothstep(0.88, 1.0, q.x)) * smoothstep(0.0, 0.12, q.z) * (1.0 - smoothstep(0.88, 1.0, q.z)) * smoothstep(0.0, 0.14, q.y) * (1.0 - smoothstep(0.86, 1.0, q.y));
         vec3 view = toC / max(d, 1e-3);
-        vCol = dropLight(p, view); vA = uAlpha * fade * thin * (0.55 + 0.45 * r3); vC = aCorner;
+        // (a drop is clear water, not paint: it shows about three quarters of the sky's light, each its own share of it, so
+        // against a dark sea or cliff the rain is a fine grey and against the sky it is nearly lost, as rain is)
+        vCol = dropLight(p, view) * (0.66 + 0.3 * r2); vA = uAlpha * fade * thin * (0.45 + 0.55 * r3); vC = aCorner;
         vec4 mvPosition = viewMatrix * vec4(wp, 1.0); gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
       }`,
@@ -130,7 +138,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
   for (const R of RADII) {
     const H = R * 1.6, geo = new THREE.CylinderGeometry(R, R, H, Math.round(24 + R), 1, true);
     const mat = new THREE.ShaderMaterial({
-      uniforms: { ...shared, ...fogU(), uR: { value: R }, uSheet: { value: 0 }, uPix: { value: 0.0012 } },
+      uniforms: { ...shared, ...fogU(), uR: { value: R }, uSheet: { value: 0 }, uPix: { value: 0.0012 }, uDrawn: { value: 1 } },
       transparent: true, depthWrite: false, fog: true, side: THREE.BackSide,
       vertexShader: /* glsl */`
         varying vec3 vW;
@@ -139,7 +147,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
           #include <fog_vertex>
         }`,
       fragmentShader: /* glsl */`
-        uniform float uTime, uFall, uR, uSheet, uPix; uniform vec3 uCam; uniform vec2 uWind;
+        uniform float uTime, uFall, uR, uSheet, uPix, uDrawn; uniform vec3 uCam; uniform vec2 uWind;
         varying vec3 vW;
         ${LIGHT_GLSL}
         ${HASH_GLSL}
@@ -148,7 +156,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
         // one set of falling streaks: columns sp metres apart along the curtain, each with its own streak length, gap and speed
         float streaks(float s, float y, float sp, float seed) {
           float cx = s / sp, ci = floor(cx), h = rh(vec2(ci, seed)), h2 = rh(vec2(ci, seed + 7.0));
-          float fx = fract(cx) - 0.5 - (h - 0.5) * 0.6, aa = max(fwidth(cx), 1e-4);
+          float fx = fract(cx) - 0.5 - (h - 0.5) * 0.6, aa = max(fwidth(cx) * uDrawn, 1e-4); // (a screen pixel across, however many are drawn for it)
           float per = 2.2 + 3.0 * h2, len = 0.35 + 0.5 * h, yy = (y + uTime * uFall * (0.85 + 0.3 * h2) + h * 31.0) / per;
           float fy = fract(yy), seg = smoothstep(0.0, 0.05, fy) * (1.0 - smoothstep(len / per - 0.05, len / per, fy));
           float line = 1.0 - smoothstep(0.0, aa * 1.2, abs(fx));
@@ -249,7 +257,7 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
       const l = Math.hypot(dir[0], dir[1]) || 1; windV.set((dir[0] / l) * plan.drift, (dir[1] / l) * plan.drift);
       group.visible = plan.on > 0;
       shared.uAmount.value = plan.on; shared.uFall.value = plan.fall; shared.uWind.value.copy(windV);
-      dropMat.uniforms.uLen.value = plan.len; dropMat.uniforms.uWidth.value = plan.width; dropMat.uniforms.uAlpha.value = 0.55 + 0.4 * amount;
+      dropMat.uniforms.uLen.value = plan.len; dropMat.uniforms.uWidth.value = plan.width; dropMat.uniforms.uAlpha.value = 0.5 + 0.35 * amount;
       for (const c of curtains) c.material.uniforms.uSheet.value = plan.sheet;
       sMat.uniforms.uAlphaS.value = 0.2 + 0.25 * amount;
     },
@@ -269,14 +277,15 @@ export function createRain(parent, { quality = 1, floorAt = () => 0 } = {}) {
       shared.uTorchP.value.copy(spot.position); shared.uTorchD.value.copy(spot.target.position).sub(spot.position).normalize();
       shared.uTorchC.value.copy(spot.color).multiplyScalar(spot.intensity * 0.05);
     },
-    /** the screen's height in pixels and the camera (for how wide a pixel is at a distance) */
-    update(t, dt, cam, hPx = 900) {
+    /** the screen's height in its own pixels, how many are drawn for each, and the camera (for how wide a pixel is at a distance) */
+    update(t, dt, cam, hPx = 900, drawn = 1) {
       if (!group.visible || !cam) return;
       tw = t % 600; shared.uTime.value = tw; shared.uCam.value.copy(cam.position);
+      { cam.getWorldDirection(_fw); const l = Math.hypot(_fw.x, _fw.z); if (l > 0.05) shared.uFwd.value.set(_fw.x / l, _fw.z / l); } // (looking straight up or down: where you last looked along the ground)
       if (tw < lastTw) { for (let i = 0; i < S; i++) { sNext[i] = tw + Math.random() * 0.5; sPos[i * 4 + 3] = -99; } } lastTw = tw; // (the clock comes round every ten minutes)
       const pix = (2 * Math.tan(((cam.fov || 60) * Math.PI) / 360)) / Math.max(200, hPx);
       dropMat.uniforms.uPix.value = pix;
-      for (const c of curtains) { c.position.set(cam.position.x, cam.position.y, cam.position.z); c.material.uniforms.uPix.value = pix; }
+      for (const c of curtains) { c.position.set(cam.position.x, cam.position.y, cam.position.z); c.material.uniforms.uPix.value = pix; c.material.uniforms.uDrawn.value = drawn; }
       // the splashes: each place, when its last splash is over, waits its turn and then splashes somewhere new on the
       // deck round you, more of them ahead where you look, none on the water
       if (S && plan.every < Infinity) {

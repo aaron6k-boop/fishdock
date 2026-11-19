@@ -19,7 +19,7 @@ import { buildChair, CHAIR, SEAT, SIT_EYE, wantsSit, sitStep, sitEase } from "./
 import { WALK } from "./walker.js";
 import { createPerson } from "./human3d.js";
 import { lookFor, SKINS, COATS } from "./people.js";
-import { createFpRig, castAt as rigCastAt, rodFrame, holdView, bodyUp } from "./fpRig.js";
+import { createFpRig, castAt as rigCastAt, rodFrame, holdView, holdMade, bodyUp, CAST_FOLLOW } from "./fpRig.js";
 import { loadPart, fitNet } from "./glbParts.js";
 import { fitRodReel, buildRod, rodWet, handleProfile, KNOB_PROFILE } from "./rodKit.js";
 import { stepHandle, handleState, halfTurnsPassed } from "../reelHandle.js";
@@ -37,8 +37,21 @@ function hashSeed(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { 
 function rng(seed) { let a = seed || 1; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const n1 = (x) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); const h = (k) => { const s = Math.sin(k * 127.1) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }; return h(i) * (1 - u) + h(i + 1) * u; };
 
-// ---- the rod in your hands while you play a fish, first person: lowered in your view and turned across (radians) ----
-export const FP_FIGHT = { de: 0.82, sw: -0.12 };
+// ---- the rod in your hands while you play a fish, first person: its angle from the resting hold's (radians) ----
+// (until 19 November de 0.82, sw -0.12: measured from the hold as Blender made it, the rod 74 degrees up the middle of
+// the view. From the resting hold of that day, 34 degrees up and leaning in from the right, the same numbers pointed
+// the rod below the view and far off to the left, the hands open on it: the footage on Aaron's PC. A fish is played
+// with the rod where you hold it, a little higher; the pump, the surge and a run move it from there)
+// (a little higher still, about 46 degrees, and less across; a surge drags it down 0.18, back to the resting angle: dragged down by a surge from the resting angle itself the
+// left wrist, on the reel's handle, turned 30 degrees past its range; a run takes the rod 0.12 to the right and 0.08 to the left, not 0.22 either way)
+// (and 5 cm nearer you, in: at the resting hold's distance a surge, which takes the hands 5.5 cm out, locked the left
+// arm straight)
+export const FP_FIGHT = { de: -0.2, sw: 0.08, run: 0.12, left: 0.08, in: 0.04, surge: 0.18, pump: 0.16, pumpIn: 0.03 }; // (run: how far a run takes the rod to the right; left: to the left, where it already leans)
+// (bringing the fish to the net or the beach: the rod a little above its resting angle. It was 0.3 below, from the
+// hold as Blender made it: from the resting hold that lay the rod almost along your line of sight as you looked down
+// at the fish, the reel on its side under your nose and your left elbow lifted across the picture: the PC's footage,
+// 19 November)
+export const FP_LAND = { de: 0.1 };
 
 // ---- your hands on the drop net's rope, first person (see ropeFp) ----
 // (58 cm out along your line of sight to the net. Tried, 15 November: 46 cm along it and 12 out level, with each hand
@@ -911,7 +924,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
         fpCast = fp ? rigCastAt(age, K0) : mix(mix(mix(mix(K0, KB, back), KF, fwd), KH, ease(seg(age, 0.85, 1.25))), K0, ease(seg(age, 1.9, 2.4)));
         fpCast.k = ease(seg(age, 0, 0.3)) * (1 - ease(seg(age, 1.0, 1.6))); // (how far into the cast: the wrist is cocked back then as it never is just holding the rod)
         fpCast.trigger = ease(seg(age, 0.8, 0.9)) * (1 - ease(seg(age, 2.1, 2.4))); // (the first finger lets the line go at the release and stays out over the spool until the lead is down)
-        fpCast.both = age < 1.95; }
+        fpCast.both = age < CAST_FOLLOW.leftToReel; } // (the left hand on the butt through the cast, then to the reel's handle for the follow-through, ready to close the bail)
       bendT = age < 0.5 ? 0.05 : age < 0.84 ? 0.55 : age < 0.98 ? -0.06 : 0.04; // (loaded by the lead as the rod's driven forward, springing back past straight as it lets go, then still)
       if (age < 0.85) { /* (the lead hangs on its drop under the tip and swings with the wind-up: fishLine.js) */ }
       else if (age < 2.15) { const f = (age - 0.85) / 1.3, tip = tipWorld(); rigAt = tip.clone().lerp(castAt, f); rigAt.y = lerp(tip.y, 0, f) + Math.sin(f * Math.PI) * (castAt.distanceTo(at) * 0.35); slack = 0.05; }
@@ -1004,15 +1017,15 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       // between surges you lean back against it and lift, pumping it in, then drop the rod forwards and wind
       const tk = clamp(tension, 0, 1.4), pump = Math.max(0, Math.sin(age * 0.85 * prof.tempo + P.s1)) ** 2 * clamp((tk - 0.35) / 0.6, 0, 1) * (1 - surge);
       fpPull = 0.055 * surge * tk; P.tk = tk; P.pump = pump; P.surge = surge; // (and for the body, seen from outside)
-      fpArm = { up: 0.05 * pump - 0.03 * surge * tk + 0.006 * shake * Math.sin(t * 19 + P.s1), right: 0.03 * run * st.runWidth * tk, fwd: -0.05 * pump }; // (and through the rod into your hands; a run drags them its way)
+      const fightK = ease(clamp((age - 0.4) / 0.8, 0, 1));
+      fpArm = { up: 0.05 * pump - 0.03 * surge * tk + 0.006 * shake * Math.sin(t * 19 + P.s1), right: 0.03 * run * st.runWidth * tk, fwd: -FP_FIGHT.in * fightK - FP_FIGHT.pumpIn * pump }; // (and through the rod into your hands; a run drags them its way)
       bodyTo = { x: clamp(run * 0.05 * st.runWidth, -0.05, 0.05), y: -0.012 * tk - 0.025 * surge * tk, z: 0.03 * tk + 0.03 * pump - 0.08 * surge * tk };
       pitch = 0.82 + 0.15 * surge; yawOff = clamp(run * 0.35 * st.runWidth, -0.5, 0.5); // (seen from outside: the rod at about 47 degrees, as a fish is played on a long rod, the butt down by the hip; it stood at 54, nearer a flagpole than a bent rod)
       // (in your own view, once the strike is over, lowered towards the fish and a little across to your left, so the top
       // of the rod, its bend and the line off the tip are in the picture above the reel. Held as it was, nearly upright
       // in your view, the top half was always above the picture and the rod read as a straight pole through the whole
       // fight, Aaron's recordings of 18 November: filmed at five angles on his PC, this one showed the tip bowed over)
-      const fightK = ease(clamp((age - 0.4) / 0.8, 0, 1));
-      fpE = 0.95 - FP_FIGHT.de * fightK - 0.22 * surge * tk + 0.22 * pump; fpYaw = -0.08 + FP_FIGHT.sw * fightK + clamp(run * 0.15 * st.runWidth, -0.22, 0.22); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
+      fpE = 0.9 - FP_FIGHT.de * fightK - FP_FIGHT.surge * Math.min(1, surge * tk) + FP_FIGHT.pump * pump; fpYaw = -0.03 + FP_FIGHT.sw * fightK + clamp(run * 0.15 * st.runWidth, -FP_FIGHT.left, FP_FIGHT.run); // (the rod held up at about 40 degrees and a little across you, as you'd fight a fish: the line pulls its top half round in an arc towards the fish, a surge drags the tip down and you pump it back up. Held low and straight out at the fish it had nothing to bend against and read as straight)
       // the strike: a sharp lift of the rod as the hook goes in, then down into the fight
       const strikeK = age < 0.55 ? Math.sin(Math.min(1, age / 0.16) * Math.PI / 2) * (1 - seg(age, 0.16, 0.55)) : 0;
       pitch += 0.38 * strikeK; fpStrike = 0.32 * strikeK; bendT += 0.25 * strikeK;
@@ -1043,7 +1056,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
       const surf = tech === "dropnet" ? (() => { const g0 = dropGeo(Math.max(1, (fishLen * 0.62) / 0.35)), [fx, fz] = dirOf(face); return g0.col.clone().add(new THREE.Vector3(fz * 1.1 + fx * 0.95, 0, -fx * 1.1 + fz * 0.95)); })() /* (on the far side of the net from you: the net shot looks along the wall from that side) */ : nearAt.clone();
       surf.y = wh(surf.x, surf.z);
       const tip = tipWorld();
-      bendT = 0.25 * load; pitch = 1.05; slack = 0; fpE = 0.6; fpYaw = 0;
+      bendT = 0.25 * load; pitch = 1.05; slack = 0; fpE = 0.9 + FP_LAND.de; fpYaw = -0.03; // (FP_LAND, above: the rod kept up, not pointed down the line of your eye)
       if (age < T1) { const f = ease(age / T1); rigAt = start.clone().lerp(surf, f); rigAt.y = lerp(start.y, surf.y - 0.15, f); }
       else if (crossed(T1)) { splashCb?.(surf, 0.9 + prof.splashy * 0.5); rippleCb?.(surf, 0.8); onSound?.("bigsplash", surf); }
       // the fish is there all along: a shape coming up through the water, then breaking the surface (never popping in)
@@ -1923,7 +1936,7 @@ export function createAngler(world, { id, name = "", spot, venue = "pier", outfi
     if (fp && fpv) {
       const vw = fpView || viewVecs();
       const perf = FILM && typeof window !== "undefined" && window.__fdPerfOn ? performance.now() : 0; // (film only: what posing the arms costs each frame)
-      fpv.pose({ hands: walking ? [null, hands[1]] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt, castT: ph === "cast" ? age : null });
+      fpv.pose({ hands: walking ? [null, hands[1]] : hands, eye: fpEye(), vr: vw.vr, vu: vw.vu, vf: vw.vf, dt, castT: ph === "cast" ? age : null, holdTurn: fpRest && dir && !walking ? (() => { const hm = holdMade(), made = vw.vf.clone().multiplyScalar(Math.cos(hm.e) * Math.cos(hm.sw)).addScaledVector(vw.vu, Math.sin(hm.e)).addScaledVector(vw.vr, Math.cos(hm.e) * Math.sin(hm.sw)).normalize(); return rodFrame(dir, fpRest, fpUp).multiply(rodFrame(made, made, fpUp).invert()); })() : null }); // (holdTurn: the rod's turn from the hold the grips were made at)
       if (FILM) fpSpecs = walking ? [null, hands[1]?.kind || null] : hands.map((h) => (h ? h.kind || "?" : null)); // (film checks: what each hand was given to hold)
       if (perf) { const P = (window.__fdPerf ||= { n: 0, ms: 0, max: 0 }), d = performance.now() - perf; P.n++; P.ms += d; if (d > P.max) P.max = d; }
     }

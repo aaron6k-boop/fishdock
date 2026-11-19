@@ -167,7 +167,7 @@ export const LOCAL = {
     // the sea, white-painted railings along both sides (the photographs)
     // (kit: the stonework modelled in Blender and baked, source-assets/blender/build_whitby_stone.py; coping: the
     // edge's course of big stones, h tall, d deep, standing out over the wall's face and up from the deck)
-    stone: { batter: 0.14, kit: "whitby", wallTile: 2.4, deckTile: 3.0, tint: 0xf6e4c4, deckTint: 0xe9e1d2, coping: { h: 0.42, d: 0.78, out: 0.12, up: 0.05 } },
+    stone: { batter: 0.14, kit: "whitby", wallTile: 2.4, deckTile: 4.8, tint: 0xf6e4c4, deckTint: 0xe9e1d2, coping: { h: 0.42, d: 0.78, out: 0.12, up: 0.05 } },
     // (the West Pier's own lamps are modelled below; none of the usual ones along the stone piers' edges, and none on the
     // East Pier, where the photographs show none)
     pierLamps: false,
@@ -203,7 +203,12 @@ export const LOCAL = {
     // (its beaches, Tate Hill Sands by the East Pier and the sands under the West Cliff: the photographed sand, dry and
     // wet, in Whitby's darker, browner gold, at the map's own heights)
     beach: { shape: false, tint: [0.5, 0.415, 0.3] },
-    cliff: { grass: "grass_leafy", rock: "cliff_rock", grassTile: 2, rockTile: 4, rockTint: [0.17, 0.152, 0.125], rockFaces: [0.707, -0.707] }, // (rockFaces: the East Cliff faces the sea to the north-east; its slopes over the harbour are grassed)
+    // (the East Cliff: its lower third the shales of the Alum Shale Member (Whitby Mudstone), then the thin Dogger
+    // ironstone and some 30 m of the Saltwick Formation's sandstones, shales and siltstones, orange-weathering sandstone
+    // at the top (British Geological Survey, Earthwise: "Lower-Middle Jurassic sequences between Whitby and Saltwick,
+    // an excursion", locality 1). Drawn as dark grey shale under buff sandstone from a third of the way up; the
+    // colours are from photographs of the cliff. cap: [the height the upper rock starts, its colour])
+    cliff: { grass: "grass_leafy", rock: "cliff_rock", grassTile: 2, rockTile: 4, rockTint: [0.145, 0.14, 0.13], cap: [19, 0.3, 0.245, 0.165], rockFaces: [0.707, -0.707] }, // (rockFaces: the East Cliff faces the sea to the north-east; its slopes over the harbour are grassed)
     // St Mary's Church on its outline, at the top of the 199 Steps
     landmarks: { 158276579: "stMarys" },
     // the old town under the cliffs: brick, stone and painted render under red pantile roofs (the photographs from the

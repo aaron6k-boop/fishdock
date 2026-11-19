@@ -64,8 +64,27 @@ function offPiers(hill, piers) {
   return (x, z) => (rs.some((b) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && inside([x, z], b.r)) ? 0 : hill(x, z));
 }
 
+// ---- a paved deck in the rain (wetLook.js): darker, a satin sheen, shallow puddles that mirror the sky with the
+// rain's rings in them, the patches where a dripping net was put down. For a material weather() has been over (its
+// world position, vFdW, places the puddles: nothing here goes by the deck's own uv). wet: the place's deckWet ----
+function wetPaving(mat, wet, quality = 1) {
+  if (!wet) return mat;
+  const prev = mat.onBeforeCompile, own = (t) => t.replaceAll("fdWet", "fdWt").replaceAll("vMapUv * 8.", "vFdW.xz").replaceAll("vMapUv", "(vFdW.xz * .125)"); // (weather's own uniform is called fdWet)
+  mat.onBeforeCompile = (sh, r) => {
+    prev?.(sh, r);
+    sh.uniforms.uWetSpots = WET_SPOTS; sh.uniforms.uWet = wet; sh.uniforms.uWetT = wet.clock; sh.uniforms.uWetRain = wet.rain;
+    sh.fragmentShader = (quality < 1 ? "" : "#define FD_WET_RINGS\n") + "#define FD_WET_SPOTS\nuniform vec4 uWetSpots[4];\nuniform float uWet;\nuniform float uWetT;\nuniform float uWetRain;\n" + sh.fragmentShader
+      .replace("#include <map_fragment>", `#include <map_fragment>\n${own(WET_PREP)}\ndiffuseColor.rgb *= ${own(WET_DARKEN)};`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>\nroughnessFactor = ${wetRough("roughnessFactor")};`)
+      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>\n${WET_NORMAL}`);
+  };
+  const prevKey = mat.customProgramCacheKey?.bind(mat);
+  mat.customProgramCacheKey = () => (prevKey ? prevKey() : "") + "fdWetPaving" + (quality < 1 ? 0 : 1);
+  return mat;
+}
+
 // ---- sandstone ashlar (Whitby's piers): the photographed blocks, honey-brown, darker and weedy towards the sea ----
-function stoneWall(st, h, part = "wall") {
+function stoneWall(st, h, part = "wall", wet = null, quality = 1) {
   // (st.kit: the stonework modelled block by block in Blender and baked to seamless maps (source-assets/blender/
   // build_whitby_stone.py): <kit>_ashlar for walls, <kit>_flags for decks, each a tile of st.wallTile or st.deckTile
   // metres; their own joints, wear and shading in them. Without one, the photographed blocks)
@@ -73,20 +92,11 @@ function stoneWall(st, h, part = "wall") {
     const name = `${st.kit}_${part === "deck" ? "flags" : "ashlar"}`, rep = 1 / (part === "deck" ? st.deckTile ?? 3 : st.wallTile ?? 2.4);
     const d = photoTex(name + "_diff", { repeat: rep }), nn = d && photoTex(name + "_nor", { srgb: false, repeat: rep }), rr = d && photoTex(name + "_rough", { srgb: false, repeat: rep });
     const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1, 1), roughnessMap: rr, roughness: 1, color: part === "deck" ? st.deckTint ?? 0xffffff : st.tint ?? 0xffffff });
-    return part === "deck" ? weather(m, { scale: 1.6, mottle: 0.18, rough: [0.92, 1.06] }) : weather(m, { scale: 0.9, mottle: 0.16, grime: [WALL_BOTTOM, 1.1, 0.8], streaks: [h, 3.5, 0.28], rough: [0.94, 1.06] });
+    return part === "deck" ? wetPaving(weather(m, { scale: 1.6, mottle: 0.18, rough: [0.92, 1.06] }), wet, quality) : weather(m, { scale: 0.9, mottle: 0.16, grime: [WALL_BOTTOM, 1.1, 0.8], streaks: [h, 3.5, 0.28], rough: [0.94, 1.06], wet: wet || undefined });
   }
   const tile = st.tile ?? 0.4, d = photoTex("sandstone_wall_diff", { repeat: tile }), nn = d && photoTex("sandstone_wall_nor", { srgb: false, repeat: tile });
   const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1.2, 1.2), color: st.tint ?? 0xf0d8ac, roughness: 0.93 });
   return weather(m, { scale: 0.55, mottle: 0.35, grime: [WALL_BOTTOM, 1.1, 0.75], streaks: [h, 3.5, 0.3], rough: [0.9, 1.1] });
-}
-// a box's faces mapped at world scale, each in its own plane (for a tiling texture laid at its real size)
-function worldUV(geo) {
-  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
-  for (let i = 0; i < p.count; i++) {
-    const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
-    if (ny >= nx && ny >= nz) uv.setXY(i, p.getX(i), p.getZ(i)); else if (nx >= nz) uv.setXY(i, p.getZ(i), p.getY(i)); else uv.setXY(i, p.getX(i), p.getY(i));
-  }
-  uv.needsUpdate = true; return geo;
 }
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
@@ -665,12 +675,14 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     if (!(sa && sb && sc) && !soft) return;
     (soft ? idxSoft : idxDeck).push(a, b, c);
   };
-  // ---- the fine hillside (High and Ultra): where the place has the survey's 1 m relief (terrain3d.js RELIEF), the soft
+  // ---- the fine hillside (Balanced and up): where the place has the survey's 1 m relief (terrain3d.js RELIEF), the soft
   // ground's 3 m cells over it are drawn instead as a 1 m mesh carrying that relief (Whitby's East Cliff, the slope
   // under St Mary's and Henrietta Street: their paths, terraces, walls, slips and gullies, which the 5 m terrain
   // smoothed into one green ramp). Its edges meet the coarse ground exactly (the relief fades in over 6 m from where
   // the fine mesh stops), and it lies smooth along the streets and round the buildings, which stand on it ----
-  const REL = (quality >= 2 || (typeof window !== "undefined" && window.__fdFine)) && local0?.terrain && hill ? reliefOf(local0.terrain) : null; // (__fdFine: the local checks, drawn at Balanced)
+  // (Balanced too, since 19 November: it is one mesh, some 300,000 triangles and nothing more to draw each frame, and
+  // without it a phone showed the East Cliff as smooth green ramps, Aaron's screenshots)
+  const REL = quality >= 1 && local0?.terrain && hill ? reliefOf(local0.terrain) : null;
   let fineCell = null, F = null;
   if (REL) {
     const fi0 = xs.indexOf(REL.x0), fi1 = xs.indexOf(REL.x0 + REL.nx - 1), fj0 = xs.indexOf(REL.z0), fj1 = xs.indexOf(REL.z0 + REL.nz - 1);
@@ -824,7 +836,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   }
   const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
   let concSide = null; // (a mark's concrete pier sides and parapets: localDetail.js concrete)
-  let stoneSide = null, stoneTop = null; // (a mark's sandstone pier walls and decks: localDetail.js stone)
+  let stoneSide = null, stoneTop = null, stoneCope = null; // (a mark's sandstone pier walls and decks: localDetail.js stone)
   const deckMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: cTex.map, normalMap: cTex.normalMap, roughnessMap: cTex.roughnessMap, roughness: 1, normalScale: new THREE.Vector2(0.45, 0.45) });
   // the pier's own direction (its longest run of wall near the fishing spots), for the deck's slab joints: square across
   // it, not across the map's north and south
@@ -857,7 +869,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       sh.uniforms.uSand = { value: sandMap || rufMap }; sh.uniforms.uSandN = { value: sandNor || rufNor }; sh.uniforms.uSandW = { value: wetMap || rufMap }; sh.uniforms.uSandWN = { value: wetNor || rufNor };
       sh.uniforms.uSandK = { value: new THREE.Vector4(...(BP?.tint || [0.56, 0.46, 0.31]), BP?.tile || 3.5) }; sh.uniforms.uSandL = { value: new THREE.Vector3(BP?.lum || 0.283, BP?.lumWet || 0.122, BP?.tileWet || 2.2) };
       sh.uniforms.uClG = { value: clG || rufMap }; sh.uniforms.uClGN = { value: clGN || rufNor }; sh.uniforms.uClR = { value: clR || rufMap }; sh.uniforms.uClRN = { value: clRN || rufNor };
-      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, CL?.rockFaces?.[0] || 0, CL?.rockFaces?.[1] || 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
+      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, CL?.rockFaces?.[0] || 0, CL?.rockFaces?.[1] || 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClCap = { value: new THREE.Vector4(CL?.cap?.[0] || 0, ...(CL?.cap?.slice(1) || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
       sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; attribute float aSteep; attribute float aSoil; varying float vSoil; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;")
         .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vSteep = aSteep; vSoil = aSoil; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);");
       // (only the samplers this place uses are declared: with the sand's four, the cliff's four and the turf's two all in
@@ -883,7 +895,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           #ifdef FD_SAND
             uniform sampler2D uSand, uSandN, uSandW, uSandWN;
           #endif
-          uniform vec4 uSandK, uClK; uniform vec3 uSandL, uClRock; uniform float uClOn; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying float vSoil; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;
+          uniform vec4 uSandK, uClK, uClCap; uniform vec3 uSandL, uClRock; uniform float uClOn; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying float vSoil; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;
           float fdDuneH = 0.0, fdWet = 0.0, fdRock = 0.0; vec3 fdTriW = vec3(0.0, 1.0, 0.0);
           float fdDH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float fdDN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fdDH(i), fdDH(i + vec2(1.0, 0.0)), f.x), mix(fdDH(i + vec2(0.0, 1.0)), fdDH(i + vec2(1.0, 1.0)), f.x), f.y); }
@@ -987,7 +999,13 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               float bedY = vWPos.y + fdDN(wp / 40.0) * 3.0;
               float beds = fdDN(vec2(bedY * 0.62, (wp.x + wp.y) * 0.015)) * 0.65 + fdDN(vec2(bedY * 2.3, (wp.x + wp.y) * 0.05)) * 0.35; // (thick beds and thin ones within them)
               float runs = fdDN(vec2((wp.x - wp.y) * 0.35, vWPos.y * 0.04));
-              vec3 rockC = uClRock * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.7 + 0.52 * beds) * (1.0 - 0.1 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
+              // (local.cliff.cap: the rock above a level is another: Whitby's dark grey shale under buff sandstone, the
+              // join wavering a few metres along the face; and every three metres or so a ledge's shadow, a thin dark
+              // line under the harder beds)
+              vec3 rockT = uClRock;
+              if (uClCap.x > 0.0) rockT = mix(uClRock, uClCap.yzw, smoothstep(-1.2, 1.2, vWPos.y + (fdDN(wp / 23.0) - 0.5) * 6.0 - uClCap.x));
+              float lf = fract(bedY * 0.31 + fdDN(wp / 17.0) * 0.6), ledge = smoothstep(0.4, 0.47, lf) * (1.0 - smoothstep(0.5, 0.6, lf));
+              vec3 rockC = rockT * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.7 + 0.52 * beds) * (1.0 - 0.28 * ledge) * (1.0 - 0.1 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
               // (it shows through in ragged outcrops: the slope's steepness, broken up by noise at two scales)
               fdRock = smoothstep(0.4, 0.62, vSteep + (fdDF(wp / 11.0) - 0.5) * 0.6 + (fdDN(wp / 2.7) - 0.5) * 0.12);
               // (local.cliff.rockFaces: the way the sea faces, where the waves have bared the rock; slopes turned away
@@ -1059,7 +1077,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               // (its edge ragged and fairly sharp, the grass breaking off at it as on a slip: blended softly over the 1 m
               // mesh it read from the harbour as brown smudges on a green baize)
               float se = (fdDN(vWPos.zy * 1.1) * tw.x + fdDN(vWPos.xz * 1.1) * tw.y + fdDN(vWPos.xy * 1.1) * tw.z) * 0.65 + (fdDN(vWPos.zy * 3.7) * tw.x + fdDN(vWPos.xz * 3.7) * tw.y + fdDN(vWPos.xy * 3.7) * tw.z) * 0.35;
-              tinted = mix(tinted, soilC, smoothstep(0.44, 0.68, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.36)); // (two scales of noise: one alone left the 1 m mesh's blocks showing)
+              // (where the cliff's own rock shows, the soil lies only in its gullies and on its ledges: over all of a steep
+              // face it made the East Cliff one smooth brown wall, the PC's footage of 19 November)
+              tinted = mix(tinted, soilC, smoothstep(0.44, 0.68, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.36) * (1.0 - 0.8 * fdRock)); // (two scales of noise: one alone left the 1 m mesh's blocks showing)
             }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
@@ -1106,7 +1126,9 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
-  if (gF) { const gm = new THREE.Mesh(gF, softMat); gm.receiveShadow = true; gm.castShadow = true; gm.name = "fdFineGround"; gm.userData.kind = "the ground"; group.add(gm); targets.push(gm); }
+  // (on Balanced it throws no shadow: its one mesh was drawn whole a second time for the shadows round you, hundreds of
+  // metres from it, half a million triangles a frame for nothing a phone would show)
+  if (gF) { const gm = new THREE.Mesh(gF, softMat); gm.receiveShadow = true; gm.castShadow = quality >= 2; gm.name = "fdFineGround"; gm.userData.kind = "the ground"; group.add(gm); targets.push(gm); }
   place.deckMat = deckMat; // world.js darkens it in the rain
 
   const hillAt = (x, z, c) => (hill && (c === 1 || c === 3) ? hill(x, z) : 0);
@@ -1225,19 +1247,35 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const stoneWalls = local?.stone?.kit === "whitby", WT = stoneWalls ? 2.4 : 1.5;
     const wallPh = photoTex(stoneWalls ? "whitby_ashlar_diff" : "brick_red_diff"), wallPhN = wallPh && photoTex(stoneWalls ? "whitby_ashlar_nor" : "brick_red_nor", { srgb: false });
     const okHere = (mx, mz) => !(nearSpot(mx, mz, 25) || !landAt([mx, mz]) || PR.some((bx) => inB([mx, mz], bx)));
+    // (each run follows the ground: cut into lengths of 2.5 m or less, each one's foot and top sloping with the ground
+    // between its ends and its foot sunk 0.35 m. As one level box from the lower end's ground to the higher end's top,
+    // a wall running down a bank stood as a dark slab many metres tall: the East Cliff's on Aaron's phone, 19 November)
+    const SUNK = 0.35;
     for (const b of (local?.generated === false ? [] : place.barriers || [])) {
       for (let k = 0; k + 1 < b.line.length; k++) {
-        const [x1, z1] = b.line[k], [x2, z2] = b.line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
-        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2; if (!okHere(mx, mz)) continue;
-        const y1 = groundAt(x1, z1) || LAND, y2 = groundAt(x2, z2) || LAND, y0 = Math.min(y1, y2), top = Math.max(y1, y2) + b.h, ang = -Math.atan2(z2 - z1, x2 - x1);
-        const box = (w, h, d, dy, bucket, uvScale) => { const g2 = new THREE.BoxGeometry(w, h, d); if (uvScale) { const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uvScale[0], uv.getY(i) * uvScale[1]); } g2.translate(0, dy + h / 2, 0); g2.rotateY(ang); g2.translate(mx, y0 - 0.02, mz); bucket.push(g2); };
-        if (b.kind === "hedge") box(len + 0.05, top - y0, 0.8, 0, parts.hedge);
-        else if (b.kind === "fence") { // close-boarded panels between posts (the common garden fence)
-          box(len + 0.02, top - y0, 0.035, 0.08, parts.fence, [len / 1.8, (top - y0) / 1.8]);
-          for (let q = 0; q <= len; q += 1.8) { const f = q / len, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f; const g2 = new THREE.BoxGeometry(0.1, top - y0 + 0.08, 0.1); g2.translate(0, (top - y0 + 0.08) / 2, 0); g2.translate(px, y0 - 0.02, pz); parts.post.push(g2); }
-        } else { // a brick wall with a coping on top
-          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, wallPh ? [len / WT, (top - y0) / WT] : [len / 0.9, (top - y0) / 0.6]); // (the drawn brick tile is four bricks by eight courses: 0.9 m by 0.6 m; the photographs' tiles are WT)
-          box(len + 0.07, 0.07, 0.3, top - y0 - 0.06, parts.coping);
+        const [xa, za] = b.line[k], [xb, zb] = b.line[k + 1], run = Math.hypot(xb - xa, zb - za); if (run < 0.3) continue;
+        if (!okHere((xa + xb) / 2, (za + zb) / 2)) continue;
+        const ang = -Math.atan2(zb - za, xb - xa), nP = Math.max(1, Math.ceil(run / 2.5));
+        for (let q = 0; q < nP; q++) {
+          const f1 = q / nP, f2 = (q + 1) / nP, x1 = xa + (xb - xa) * f1, z1 = za + (zb - za) * f1, x2 = xa + (xb - xa) * f2, z2 = za + (zb - za) * f2, len = run / nP;
+          const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2, y1 = groundAt(x1, z1) || LAND, y2 = groundAt(x2, z2) || LAND, H = b.h;
+          if (Math.abs(y2 - y1) > len * 1.2) continue; // (no wall runs down a cliff: a mapped line a metre or two over the edge of one stood on its face as a dark slab)
+          // (a box w long, h tall and d thick, its foot dy above the ground, leaning with the ground from y1 to y2)
+          const box = (w, h, d, dy, bucket, uvScale, sunk = 0) => {
+            const g2 = new THREE.BoxGeometry(w, h + sunk, d);
+            if (uvScale) { const uv = g2.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uvScale[0], uv.getY(i) * uvScale[1]); }
+            const P = g2.attributes.position;
+            for (let i = 0; i < P.count; i++) P.setY(i, P.getY(i) + dy + (h - sunk) / 2 + y1 + (P.getX(i) / w + 0.5) * (y2 - y1));
+            g2.rotateY(ang); g2.translate(mx, -0.02, mz); g2.computeVertexNormals(); bucket.push(g2);
+          };
+          if (b.kind === "hedge") box(len + 0.05, H, 0.8, 0, parts.hedge, null, SUNK);
+          else if (b.kind === "fence") { // close-boarded panels between posts (the common garden fence)
+            box(len + 0.02, H, 0.035, 0.08, parts.fence, [len / 1.8, H / 1.8]);
+            for (let d = 0; d <= len + 0.01; d += 1.8) { const f = d / len, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f, py = y1 + (y2 - y1) * f; const g2 = new THREE.BoxGeometry(0.1, H + 0.08 + SUNK, 0.1); g2.translate(px, py - 0.02 + (H + 0.08 - SUNK) / 2, pz); parts.post.push(g2); }
+          } else { // a wall with a coping on top
+            box(len + 0.05, H - 0.06, 0.24, 0, parts.wall, wallPh ? [len / WT, H / WT] : [len / 0.9, H / 0.6], SUNK); // (the drawn brick tile is four bricks by eight courses: 0.9 m by 0.6 m; the photographs' tiles are WT)
+            box(len + 0.07, 0.07, 0.3, H - 0.06, parts.coping);
+          }
         }
       }
     }
@@ -1259,17 +1297,22 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // ---- flights of steps (the map's highway=steps): treads where the ground falls along the line, 17 cm a riser ----
   {
     const treads = [];
+    // (each flight follows its mapped line and the ground under it, tread by tread; one too steep to be stairs, a line
+    // mapped straight down a cliff, isn't drawn. Drawn straight from its first point to its last at an even pitch, the
+    // path down Whitby's East Cliff was a dark ramp 40 m tall standing off the face: seen from the harbour mouth on
+    // Aaron's PC, 19 November)
     for (const st of place.steps || []) {
       const L = st.line; if (L.length < 2) continue;
       const [xa, za] = L[0], [xb, zb] = L[L.length - 1]; if (!landAt([xa, za]) || !landAt([xb, zb]) || nearSpot(xa, za, 25) || nearSpot(xb, zb, 25)) continue;
-      let ya = groundAt(xa, za) || LAND, yb = groundAt(xb, zb) || LAND;
-      let from = [xa, za, ya], to = [xb, zb, yb]; if (ya > yb) { from = [xb, zb, yb]; to = [xa, za, ya]; }
-      const rise = to[2] - from[2]; if (rise < 0.3) continue; // (steps on the flat: the map says so, the ground here doesn't)
-      const n = Math.max(2, Math.round(rise / 0.17)), run = Math.hypot(to[0] - from[0], to[1] - from[1]), tread = Math.max(0.26, Math.min(0.45, run / n));
-      const ax = (to[0] - from[0]) / run, az = (to[1] - from[1]) / run, ang = -Math.atan2(az, ax);
+      const ya = groundAt(xa, za) || LAND, yb = groundAt(xb, zb) || LAND, rise = Math.abs(yb - ya); if (rise < 0.3) continue; // (steps on the flat: the map says so, the ground here doesn't)
+      const cum = [0]; for (let k = 1; k < L.length; k++) cum.push(cum[k - 1] + Math.hypot(L[k][0] - L[k - 1][0], L[k][1] - L[k - 1][1]));
+      const run = cum[cum.length - 1]; if (run < 0.5 || rise > run * 0.85) continue;
+      const n = Math.max(2, Math.round(rise / 0.17)), tread = Math.max(0.26, Math.min(0.6, run / n));
       for (let i = 0; i < n; i++) {
-        const d = (i + 0.5) * (run / n), cx = from[0] + ax * d, cz = from[1] + az * d, yTop = from[2] + (i + 1) * (rise / n);
-        const g2 = new THREE.BoxGeometry(tread, 0.17 + 0.02, st.w); g2.translate(0, -0.095, 0); g2.rotateY(ang); g2.translate(cx, yTop, cz); treads.push(g2);
+        const d = (i + 0.5) * (run / n); let k = 1; while (k < L.length - 1 && cum[k] < d) k++;
+        const f = (d - cum[k - 1]) / Math.max(1e-6, cum[k] - cum[k - 1]), cx = L[k - 1][0] + (L[k][0] - L[k - 1][0]) * f, cz = L[k - 1][1] + (L[k][1] - L[k - 1][1]) * f;
+        const ang = -Math.atan2(L[k][1] - L[k - 1][1], L[k][0] - L[k - 1][0]), yTop = Math.round(((groundAt(cx, cz) || LAND) + 0.06) / 0.17) * 0.17;
+        const g2 = new THREE.BoxGeometry(tread, 0.17 + 0.1, st.w); g2.translate(0, -0.135, 0); g2.rotateY(ang); g2.translate(cx, yTop, cz); treads.push(g2);
       }
     }
     if (treads.length) { const g2 = mergeGeometries(treads); treads.forEach((q) => q.dispose()); const m = new THREE.Mesh(g2, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb4b0a8, roughness: 0.9 })); m.castShadow = m.receiveShadow = true; m.userData.kind = "steps"; group.add(m); }
@@ -1704,21 +1747,36 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (local?.stone) batter(geo, ring, p.h, local.stone.batter ?? 0.14);
       const sideMat = local?.stone ? (stoneSide ||= stoneWall(local.stone, p.h)) : local?.concrete ? (concSide ||= weather(new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb9b5ad, roughness: 0.95 }), { scale: 0.7, mottle: 0.3, grime: [WALL_BOTTOM, 0.6, 0.45], streaks: [p.h, 2.5, 0.2], rough: [0.9, 1.1] })) : new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 });
       // (and its top: sandstone flags where the walls are sandstone)
-      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall(local.stone.kit ? local.stone : { ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h, "deck")) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall(local.stone.kit ? local.stone : { ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h, "deck", place.deckWet, quality)) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
       // the coping: a course of big squared stones along its edges over the water, a little proud of the wall and of the
       // deck (Whitby's piers: the photographs along them), in the same stone
       if (local?.stone?.coping) {
         const cg = [], C = local.stone.coping;
+        // (each coping stone one whole block of the wall's stonework, the full depth of the course, its joints square
+        // to the edge: laid by the world's axes as the walls are, the course was cut from the blocks at whatever
+        // angle the pier ran, two part-rows with skewed joints. row: the height of a course in the kit's tile, 0.48 m
+        // of Whitby's 2.4 m; the stones drawn C.d / row times their size, 1.2 to 2.2 m long)
+        const row = C.row ?? 0.48, ks = row / C.d; let along = 0;
+        const copeUV = (g2, len) => {
+          const P = g2.attributes.position, N = g2.attributes.normal, uv = g2.attributes.uv;
+          for (let i = 0; i < P.count; i++) {
+            const top = Math.abs(N.getY(i)) > 0.5, end = Math.abs(N.getX(i)) > 0.5;
+            uv.setXY(i, (along + (end ? P.getZ(i) : P.getX(i) + len / 2)) * ks, row * (1 + (top || end ? P.getZ(i) / C.d + 0.5 : P.getY(i) / C.h + 0.5)));
+          }
+          along += len; return g2;
+        };
         for (let k = 0; k < ring.length; k++) {
           const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
           let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
           if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) { nx = -nx; nz = -nz; }
           if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) continue;
-          const g2 = new THREE.BoxGeometry(len + C.d * 0.9, C.h, C.d); g2.rotateY(-Math.atan2(z2 - z1, x2 - x1));
-          g2.translate(mid[0] - nx * (C.d / 2 - C.out), p.h + C.up - C.h / 2, mid[1] - nz * (C.d / 2 - C.out)); cg.push(worldUV(g2));
+          const g2 = copeUV(new THREE.BoxGeometry(len + C.d * 0.9, C.h, C.d), len); g2.rotateY(-Math.atan2(z2 - z1, x2 - x1));
+          g2.translate(mid[0] - nx * (C.d / 2 - C.out), p.h + C.up - C.h / 2, mid[1] - nz * (C.d / 2 - C.out)); cg.push(g2);
         }
         if (cg.length) {
-          const cm = new THREE.Mesh(mergeGeometries(cg), stoneSide); cg.forEach((q) => q.dispose());
+          // (weathered nearer the deck's grey than the wall's face below it: in the wall's own warm tint the course ran
+          // round the pier as a yellow band)
+          const cm = new THREE.Mesh(mergeGeometries(cg), (stoneCope ||= stoneWall({ ...local.stone, tint: C.tint ?? 0xe2dbcc }, p.h, "wall", place.deckWet))); cg.forEach((q) => q.dispose());
           cm.castShadow = cm.receiveShadow = true; cm.userData.kind = `a ${p.kind}`; group.add(cm); targets.push(cm);
         }
       }
