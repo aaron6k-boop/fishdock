@@ -185,7 +185,7 @@ def save(arr, path, srgb=True):
     px = np.ones((arr.shape[0], arr.shape[1], 4), dtype=np.float32); px[:, :, :3] = np.clip(arr, 0, 1); im.pixels.foreach_set(px.ravel())
     im.filepath_raw = path; im.file_format = "JPEG"; im.save()
 os.makedirs(OUT + "/exports/facades", exist_ok=True)
-for kind in KINDS:
+for kind in globals().get("ONLY") or KINDS:  # (ONLY: just these kinds again)
     for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
     lo = build(kind); maps = bake(lo, kind)
     ao = maps["AO"][:, :, :1] ** 0.85
