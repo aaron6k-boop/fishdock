@@ -13,6 +13,7 @@
 // town's trees are a handful of draws. (All of it drawn in code: no photographs, no downloaded models.)
 import * as THREE from "three";
 import { mergeGeometries as mergeAttr } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { TEX_BASE } from "./textures3d.js";
 
 // ---- the species: what grows along a British seafront and in its parks ----
 // h: height range (m); crown: [width/height, where the crown's centre sits as a share of height, roundness 0 flat-topped
@@ -174,11 +175,12 @@ function windy(mat, U) {
  * @param o.cls ground classes (0 water, 1 land, 2 beach, 3 grass), o.xs the grid axis, o.n its size
  * @param o.heightAt (x, z) => ground height; o.avoid (x, z) => true where nothing may grow (spots, roads, buildings)
  * @param o.bank (x, z) => 0..1 how much the cliff's grassy bank is here (scrub and a few trees on it)
+ * @param o.bankTrees how many trees the bank grows, against the usual (a place's own: Whitby's cliffs are grass)
  * @param o.wood (x, z) => true inside a wood on the map (dense, tall)
  * @param o.quality 0.5 | 1 | 2 (how many, and whether trees are built close to: from 1 up)
  * @returns { mesh (the cards), count, update(t, cam, wind), dispose }
  */
-export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, bank = () => 0, wood = () => false, quality = 1, seed = 3 } = {}) {
+export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, bank = () => 0, bankTrees = 1, wood = () => false, quality = 1, seed = 3 } = {}) {
   const cardTex = cardTexture(seed); if (!cardTex) return null;
   let s = seed * 104729 + 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   const hash = (x, z) => { const v = Math.sin(x * 127.1 + z * 311.7 + seed) * 43758.5453; return v - Math.floor(v); };
@@ -193,7 +195,7 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
     if (!grass && bk < 0.3) continue;
     let deep = 0; if (grass) { deep = 1; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (cls[(j + dj) * n + i + di] !== 3) deep = 0; }
     const inWood = grass && wood(x, z);
-    const p = inWood ? 0.95 : grass ? (deep ? 0.5 : 0.12) : 0.035 * bk;
+    const p = inWood ? 0.95 : grass ? (deep ? 0.5 : 0.12) : 0.035 * bk * bankTrees;
     if (hash(i, j) > p * density) continue;
     const px = x + (rnd() - 0.5) * cw * 0.8, pz = z + (rnd() - 0.5) * cw * 0.8;
     if (avoid(px, pz) || tooClose(px, pz, inWood ? 3.5 : grass ? 5.5 : 5)) continue;
@@ -227,7 +229,7 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
   const built = quality >= 1;
   const U = { uTime: { value: 0 }, uWind: { value: 0.3 }, uWindDir: { value: new THREE.Vector2(0.3, -1) } };
   const near = quality >= 2 ? 150 : 90;
-  let woodMesh = null, leaves = null; const grown = {}; // sp -> [variant, variant, variant]
+  let woodMesh = null, leaves = null, leafPh = null, leafHh = null; const grown = {}; // sp -> [variant, variant, variant]
   let woodMat = null;
   if (built) {
     const bark = barkTextures(seed + 1), leafTex = leafTexture(seed + 2);
@@ -256,28 +258,37 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
     woodMat = new THREE.MeshStandardMaterial({ map: bark.map, normalMap: bark.normalMap, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 0.95, color: 0xffffff, vertexColors: true });
     // (a little light through the leaves: the shaded side of a real crown is not black, light scatters through it)
     const leafMat = windy(new THREE.MeshStandardMaterial({ map: leafTex, alphaTest: 0.5, side: THREE.FrontSide, roughness: 0.8, metalness: 0, color: 0xffffff, emissive: 0x334422, emissiveIntensity: 0.18, emissiveMap: leafTex }), U);
-    const ph = new Float32Array(nL), hh = new Float32Array(nL);
-    for (const t of placed) t.vt.clusters.forEach((c, ci) => { ph[t.l0 + ci] = t.phase + c.phase; hh[t.l0 + ci] = c.p.y; });
-    leafGeo.setAttribute("aPhase", new THREE.InstancedBufferAttribute(ph, 1)); leafGeo.setAttribute("aHeight", new THREE.InstancedBufferAttribute(hh, 1));
+    // (where it's published, the leaves modelled on their twigs in Blender, build_leaves.py, in place of the drawn ones:
+    // swapped in once it has arrived, the drawn cluster meanwhile)
+    if (typeof document !== "undefined") new THREE.TextureLoader().load(TEX_BASE + "leaf_cluster.webp", (lt) => { lt.colorSpace = THREE.SRGBColorSpace; lt.anisotropy = 8; leafMat.map = lt; leafMat.emissiveMap = lt; leafMat.needsUpdate = true; disposables.push(lt); }, undefined, () => {});
+    // (only the near trees' clusters are drawn, packed at the front of the list (packLeaves): every cluster of every tree
+    // in the place, 28,000 at Whitby and most of them shrunk to nothing, was 224,000 triangles a frame and as many again
+    // in the sun's shadow maps)
+    leafPh = new THREE.InstancedBufferAttribute(new Float32Array(nL), 1); leafHh = new THREE.InstancedBufferAttribute(new Float32Array(nL), 1);
+    leafGeo.setAttribute("aPhase", leafPh); leafGeo.setAttribute("aHeight", leafHh);
     leaves = new THREE.InstancedMesh(leafGeo, leafMat, nL); leaves.castShadow = true; leaves.receiveShadow = false; leaves.name = "fdTreeLeaves"; leaves.noReflect = true;
-    for (let k = 0; k < nL; k++) { m.makeScale(0, 0, 0); leaves.setMatrixAt(k, m); leaves.setColorAt(k, col.setRGB(1, 1, 1)); }
-    leaves.instanceMatrix.needsUpdate = true; leaves.instanceColor.needsUpdate = true;
+    for (let k = 0; k < nL; k++) leaves.setColorAt(k, col.setRGB(1, 1, 1));
+    leaves.count = 0; leaves.instanceMatrix.needsUpdate = true; leaves.instanceColor.needsUpdate = true;
     group.add(leaves); disposables.push(leafGeo, leafMat, leafTex, bark.map, bark.normalMap, woodMat);
     for (const vs of Object.values(grown)) for (const v of vs) disposables.push(v.wood);
   }
   const zAxis = new THREE.Vector3(0, 0, 1), q2 = new THREE.Quaternion(), m2 = new THREE.Matrix4(), tp = new THREE.Vector3(), tn = new THREE.Vector3(), qr = new THREE.Quaternion();
-  // a tree's leaf clusters on (placed and tinted) or off (scale 0)
-  function setLeaves(t, on) {
-    const S = SPECIES[t.sp], vt = t.vt;
-    e.set(t.lean, t.rot, 0); q.setFromEuler(e); v3.set(t.x, t.y - 0.03, t.z);
-    vt.clusters.forEach((c, ci) => {
-      const k = t.l0 + ci;
-      if (!on) { m2.makeScale(0, 0, 0); leaves.setMatrixAt(k, m2); return; }
-      tp.copy(c.p).multiplyScalar(t.h).applyQuaternion(q).add(v3); tn.copy(c.n).applyQuaternion(q);
-      q2.setFromUnitVectors(zAxis, tn); e.set(0, 0, c.rot); qr.setFromEuler(e); q2.multiply(qr);
-      const size = c.s * t.h; m2.compose(tp, q2, sc.set(size, size, size)); leaves.setMatrixAt(k, m2);
-      const g = c.tint * t.tint * 1.45; col.setRGB(S.leaf[0] * g, S.leaf[1] * g * (0.96 + 0.08 * (t.tint - 0.85)), S.leaf[2] * g * 0.9); leaves.setColorAt(k, col);
-    });
+  // the near trees' leaf clusters, placed and tinted, packed at the front of the instances; the rest not drawn
+  function packLeaves() {
+    let k = 0;
+    for (const t of placed) {
+      if (!t.built) continue;
+      const S = SPECIES[t.sp], vt = t.vt;
+      e.set(t.lean, t.rot, 0); q.setFromEuler(e); v3.set(t.x, t.y - 0.03, t.z);
+      for (const c of vt.clusters) {
+        tp.copy(c.p).multiplyScalar(t.h).applyQuaternion(q).add(v3); tn.copy(c.n).applyQuaternion(q);
+        q2.setFromUnitVectors(zAxis, tn); e.set(0, 0, c.rot); qr.setFromEuler(e); q2.multiply(qr);
+        const size = c.s * t.h; m2.compose(tp, q2, sc.set(size, size, size)); leaves.setMatrixAt(k, m2);
+        const g = c.tint * t.tint * 1.45; col.setRGB(S.leaf[0] * g, S.leaf[1] * g * (0.96 + 0.08 * (t.tint - 0.85)), S.leaf[2] * g * 0.9); leaves.setColorAt(k, col);
+        leafPh.array[k] = t.phase + c.phase; leafHh.array[k] = c.p.y; k++;
+      }
+    }
+    leaves.count = k; leaves.instanceMatrix.needsUpdate = true; leaves.instanceColor.needsUpdate = true; leafPh.needsUpdate = true; leafHh.needsUpdate = true; leaves.computeBoundingSphere();
   }
   // the wood of every near tree as one geometry (merged with each tree's own transform and bark tint)
   function rebuildWood(nearTrees) {
@@ -298,8 +309,8 @@ export function buildTrees(group, { cls, xs, n, heightAt, avoid = () => false, b
     let changed = false;
     // (hysteresis: a tree is built inside `near` and goes back to its card only beyond near + 12 m, so one standing at
     // the edge doesn't flicker between the two as you sway)
-    placed.forEach((tr, i) => { const d = Math.hypot(tr.x - cam.position.x, tr.z - cam.position.z); const want = tr.built ? d < near + 12 : d < near; if (want === !!tr.built) return; tr.built = want; setLeaves(tr, want); setCard(tr, i, !want); changed = true; });
-    if (changed) { leaves.instanceMatrix.needsUpdate = true; leaves.instanceColor.needsUpdate = true; leaves.computeBoundingSphere(); cards.instanceMatrix.needsUpdate = true; cards.computeBoundingSphere(); rebuildWood(placed.filter((tr) => tr.built)); }
+    placed.forEach((tr, i) => { const d = Math.hypot(tr.x - cam.position.x, tr.z - cam.position.z); const want = tr.built ? d < near + 12 : d < near; if (want === !!tr.built) return; tr.built = want; setCard(tr, i, !want); changed = true; });
+    if (changed) { packLeaves(); cards.instanceMatrix.needsUpdate = true; cards.computeBoundingSphere(); rebuildWood(placed.filter((tr) => tr.built)); }
   }
   return {
     mesh: cards, count: placed.length, built: built ? 1 : 0, update,

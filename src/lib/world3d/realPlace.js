@@ -18,10 +18,15 @@ import { LANDMARK_BUILDERS } from "./landmarks3d.js";
 import { WET_PREP, WET_DARKEN, WET_NORMAL, wetRough, WET_SPOTS } from "./wetLook.js";
 import { contactShadows } from "./contactShadow.js";
 import { buildTrees } from "./trees3d.js";
+import { buildGrassTufts } from "./grassTufts.js";
+import { buildGrassField } from "./grassField.js";
+import { buildChimneyCaps } from "./chimneys3d.js";
+import { buildWindowModules } from "./windows3d.js";
+import { buildKit } from "./kit3d.js";
 import { buildBackdrops, backdropCovers } from "./backdrop3d.js";
 import { columnGeometry, lanternAt, lampPools, shadeFromOwnLantern, COLUMN } from "./lamps3d.js";
 import { buildOpenPier } from "./openPier.js";
-import { terrainHill } from "./terrain3d.js";
+import { terrainHill, reliefOf } from "./terrain3d.js";
 import { deckHeight } from "./pierDeck.js";
 
 const H_OF = [GROUND.water, GROUND.land, GROUND.beach, GROUND.grass];
@@ -60,10 +65,28 @@ function offPiers(hill, piers) {
 }
 
 // ---- sandstone ashlar (Whitby's piers): the photographed blocks, honey-brown, darker and weedy towards the sea ----
-function stoneWall(st, h) {
+function stoneWall(st, h, part = "wall") {
+  // (st.kit: the stonework modelled block by block in Blender and baked to seamless maps (source-assets/blender/
+  // build_whitby_stone.py): <kit>_ashlar for walls, <kit>_flags for decks, each a tile of st.wallTile or st.deckTile
+  // metres; their own joints, wear and shading in them. Without one, the photographed blocks)
+  if (st.kit) {
+    const name = `${st.kit}_${part === "deck" ? "flags" : "ashlar"}`, rep = 1 / (part === "deck" ? st.deckTile ?? 3 : st.wallTile ?? 2.4);
+    const d = photoTex(name + "_diff", { repeat: rep }), nn = d && photoTex(name + "_nor", { srgb: false, repeat: rep }), rr = d && photoTex(name + "_rough", { srgb: false, repeat: rep });
+    const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1, 1), roughnessMap: rr, roughness: 1, color: part === "deck" ? st.deckTint ?? 0xffffff : st.tint ?? 0xffffff });
+    return part === "deck" ? weather(m, { scale: 1.6, mottle: 0.18, rough: [0.92, 1.06] }) : weather(m, { scale: 0.9, mottle: 0.16, grime: [WALL_BOTTOM, 1.1, 0.8], streaks: [h, 3.5, 0.28], rough: [0.94, 1.06] });
+  }
   const tile = st.tile ?? 0.4, d = photoTex("sandstone_wall_diff", { repeat: tile }), nn = d && photoTex("sandstone_wall_nor", { srgb: false, repeat: tile });
   const m = new THREE.MeshStandardMaterial({ map: d, normalMap: nn, normalScale: new THREE.Vector2(1.2, 1.2), color: st.tint ?? 0xf0d8ac, roughness: 0.93 });
   return weather(m, { scale: 0.55, mottle: 0.35, grime: [WALL_BOTTOM, 1.1, 0.75], streaks: [h, 3.5, 0.3], rough: [0.9, 1.1] });
+}
+// a box's faces mapped at world scale, each in its own plane (for a tiling texture laid at its real size)
+function worldUV(geo) {
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const nx = Math.abs(n.getX(i)), ny = Math.abs(n.getY(i)), nz = Math.abs(n.getZ(i));
+    if (ny >= nx && ny >= nz) uv.setXY(i, p.getX(i), p.getZ(i)); else if (nx >= nz) uv.setXY(i, p.getZ(i), p.getY(i)); else uv.setXY(i, p.getX(i), p.getY(i));
+  }
+  uv.needsUpdate = true; return geo;
 }
 // what's within this distance of a fishing spot is also a solid for the camera (the rest is never close enough)
 const NEAR_SOLID = 45;
@@ -430,6 +453,33 @@ export function contactShade({ cx, cz, size = 140, mpp = 0.1, rings = [], discs 
   return { tex, data, n, x0, z0, size };
 }
 
+// ---- the worn, muddy patches in the grass (the soft ground's shader, FD_MUD), and the same worked out here so no tuft
+// of grass stands on them (grassTufts.js): the shader's own noise, fdDH / fdDN / fdDF, in JavaScript ----
+// (lift: how much more of the town's rough ground is worn than a lawn; town, lawn: how far to the mud each goes)
+// (lawnLess: how much rarer the worn patches are on a lawn: at the town's rate the Abbey's lawns were blotched brown)
+const MUD = { lift: 0.02, town: 0.45, lawn: 0.22, lawnLess: 0.07 }; // (town 0.45: from above, the Abbey's headland was blotched brown)
+// (the grass drier and yellower in broad patches: its tint there, the noise's scale in metres, where it starts and is
+// full, and how far towards the tint)
+const GRASS_DRY = { tint: ["1.14", "1.02", "0.68"], scale: 37, lo: 0.5, hi: 0.78, k: 0.55 };
+const fract = (v) => v - Math.floor(v);
+function mudDH(x, y) { let qx = fract(x * 0.1031), qy = fract(y * 0.1031), qz = fract(x * 0.1031); const d = qx * (qy + 33.33) + qy * (qz + 33.33) + qz * (qx + 33.33); qx += d; qy += d; qz += d; return fract((qx + qy) * qz); }
+function mudDN(x, y) { const ix = Math.floor(x), iy = Math.floor(y); let fx = x - ix, fy = y - iy; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); const a = mudDH(ix, iy), b = mudDH(ix + 1, iy), c = mudDH(ix, iy + 1), d = mudDH(ix + 1, iy + 1); return a + (b - a) * fx + (c - a + (d - c - b + a) * fx) * fy; }
+function mudDF(x, y) { let a = 0.5, s = 0; for (let k = 0; k < 4; k++) { s += a * mudDN(x, y); x = x * 2.03 + 17.1; y = y * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }
+/** Where the dune's marram grows thick, 0..1, and how dried it is (0 green, 1 straw), as the dune shader draws it close
+ * to (face: the point's aFace, 0 the dune's top to 1 its bare face). */
+export function marramAt(x, z, face) {
+  const field = mudDF(x / 13, z / 13) * 0.62 + mudDF(x / 3.4 + 31, z / 3.4 + 31) * 0.44 + (mudDN(x * 2.3 + 7, z * 2.3 + 7) - 0.5) * 0.16;
+  const th = 0.385 + (0.64 - 0.385) * face, c = Math.min(1, Math.max(0, (field - (th - 0.035)) / 0.08)), d = Math.min(1, Math.max(0, (mudDF(x / 8 + 70, z / 8 + 70) - 0.34) / 0.28));
+  return { cover: c * c * (3 - 2 * c), dry: d * d * (3 - 2 * d) };
+}
+/** How dried the grass is here in its broad patches, 0..1 times GRASS_DRY.k, as the ground's shader draws it. */
+export function dryAt(x, z) { const t = Math.min(1, Math.max(0, (mudDF(x / GRASS_DRY.scale + 3, z / GRASS_DRY.scale + 3) - GRASS_DRY.lo) / (GRASS_DRY.hi - GRASS_DRY.lo))); return t * t * (3 - 2 * t) * GRASS_DRY.k; }
+/** How worn to the mud the grass is here, 0..1, as the ground's shader draws it (town: the town's rough ground). */
+export function mudAt(x, z, town) {
+  const v = mudDF(x / 9 + 7, z / 9 + 7) + (mudDN(x / 1.7, z / 1.7) - 0.5) * 0.16 + (town ? MUD.lift : -MUD.lawnLess), t = Math.min(1, Math.max(0, (v - 0.6) / 0.12));
+  return t * t * (3 - 2 * t) * (town ? MUD.town : MUD.lawn);
+}
+
 export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const local0 = localFor(place.id); // what photographs show at this mark (localDetail.js), or null
   // (and a survey's heights for its ground, where a mark has them (terrain3d.js): never under a pier's deck, which a
@@ -460,7 +510,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // shingle bank steeply, up to the promenade or the bank's crest. (Drawn level at 0.9 m, a hundred metres of beach read
   // as a table of sand with a step down into the sea.) toWater: metres from the water's edge, on the beach ----
   const BP = local?.beach || (place.venue === "beach" ? {} : null), toWater = new Float32Array(n * n).fill(-1);
-  if (BP) {
+  if (BP && BP.shape !== false) { // (shape false: the map's beaches drawn in the photographed sand but left at their own heights, as Whitby's small ones between walls)
     // (steeper for the first few metres, where the waves run up and back, then the beach's own slope: laid at one slope
     // all the way, the last few centimetres above the sea were metres wide and the waves ran over them, and over the anglers)
     const slope = BP.slope ?? 0.032, top = BP.top ?? LAND, foot = BP.foot ?? 0.12, swash = BP.swash ?? 0.075;
@@ -482,7 +532,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
       const k = j * n + i, c = cls[k];
       if (c !== 2 && c !== 0) continue;
-      if (BP && c === 2) continue; // (a beach mark's beach has its own slope, above: smoothed again it bulged at the water's edge)
+      if (BP && BP.shape !== false && c === 2) continue; // (a beach mark's beach has its own slope, above: smoothed again it bulged at the water's edge)
       const nb = [k - 1, k + 1, k - n, k + n];
       if (c === 0 && !nb.some((q) => cls[q] === 2)) continue;
       nh[k] = (h[k] * 2 + nb.reduce((s, q) => s + h[q], 0)) / 6;
@@ -497,7 +547,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const a = h[j * n + i], b = h[j * n + i + 1], c = h[(j + 1) * n + i], d = h[(j + 1) * n + i + 1];
     return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
   };
-  if (BP) for (const sp of spots) sp.at[1] = Math.round(hGrid(sp.at[0], sp.at[2]) * 100) / 100;
+  if (BP && BP.shape !== false) for (const sp of spots) if (cls[cellOf(sp.at[2]) * n + cellOf(sp.at[0])] === 2 || place.venue === "beach") sp.at[1] = Math.round(hGrid(sp.at[0], sp.at[2]) * 100) / 100; // (only those standing on the sand: a pier's anglers keep its deck)
   // (behind a solid parapet, localDetail.js concrete: the anglers stand its thickness further back, so their tripods and
   // chairs stand clear of it, and the edge in front of them is that much further)
   if (local?.concrete) place.parapet = true;
@@ -530,13 +580,18 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const k = j * n + i; X[k] = xs[i]; Z[k] = xs[j]; }
   // the town's rising ground (localDetail.js hill): built-up land and grass climb with it; the grassy face of the slope
   // is drawn as grass, not paving
-  const hill = local?.hill || null, bank = new Uint8Array(n * n);
+  const hill = local?.hill || null, bank = new Uint8Array(n * n), steep = new Float32Array(n * n);
   if (hill) for (let k = 0; k < n * n; k++) {
     if (cls[k] !== 1 && cls[k] !== 3) continue;
     const up = hill(X[k], Z[k]); if (up <= 0) continue;
     h[k] += up;
     const dx = Math.abs(hill(X[k] - 2, Z[k]) - hill(X[k] + 2, Z[k])), dz = Math.abs(hill(X[k], Z[k] - 2) - hill(X[k], Z[k] + 2));
     if (Math.max(dx, dz) > 0.3) bank[k] = Math.max(dx, dz) > 2.6 ? 2 : 1; // (2: a cliff's face, steeper than about 33° on the survey's grid: bare rock and earth)
+    // (how steep, smoothly: from about 32° (none) to 50° and over (all), where bare rock shows through the grass. Taken
+    // across 16 m, two of the survey's steps: across 4 m its slope jumped at every step, and rock and grass ran in
+    // stripes along the contours)
+    const sx = hill(X[k] + 8, Z[k]) - hill(X[k] - 8, Z[k]), sz = hill(X[k], Z[k] + 8) - hill(X[k], Z[k] - 8);
+    const t = Math.min(1, Math.max(0, (Math.hypot(sx, sz) / 16 - 0.62) / 0.58)); steep[k] = t * t * (3 - 2 * t);
   }
   // ---- the town's ground: the map's unmarked land away from the water, the piers and the streets is not the pier's
   // concrete (it was drawn so, slab joints and all, out to the horizon) but yards, gardens, verges and waste ground:
@@ -546,7 +601,10 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   for (let k = 0; k < n * n; k++) {
     if (cls[k] !== 1 || bank[k] || dune[k] > 0.05 || inland) continue;
     const q = [X[k], Z[k]]; if (PR.some((b) => inB(q, b))) continue;
-    const w = nearestWall(X[k], Z[k]); if (w && w.d < 26) continue;
+    // (near a harbour wall the land is its quay, concrete; but not where it lies between a beach and a bank, as at the back
+    // of Whitby's Tate Hill Sands: drawn as the quay's concrete, its puddles shone white as snow on Aaron's PC)
+    const w = nearestWall(X[k], Z[k]);
+    if (w && w.d < 26) { const i = k % n; if (w.d < 5 || i < 1 || i > n - 2 || k < n || k >= n * n - n) continue; let soft = 0; for (const q of [k - 1, k + 1, k - n, k + n]) if (cls[q] === 2 || cls[q] === 3 || bank[q]) soft++; if (!soft) continue; }
     town[k] = 1; // (the streets draw their own tarmac and pavements over it, so no margin is kept for them)
   }
   // along every wall: a vertex on the water side within a cell of it moves onto the wall's line, at the deck's height;
@@ -607,16 +665,51 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     if (!(sa && sb && sc) && !soft) return;
     (soft ? idxSoft : idxDeck).push(a, b, c);
   };
-  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) { const a = j * n + i, b = a + 1, c = a + n, d = c + 1; addTri(a, c, b); addTri(b, c, d); }
+  // ---- the fine hillside (High and Ultra): where the place has the survey's 1 m relief (terrain3d.js RELIEF), the soft
+  // ground's 3 m cells over it are drawn instead as a 1 m mesh carrying that relief (Whitby's East Cliff, the slope
+  // under St Mary's and Henrietta Street: their paths, terraces, walls, slips and gullies, which the 5 m terrain
+  // smoothed into one green ramp). Its edges meet the coarse ground exactly (the relief fades in over 6 m from where
+  // the fine mesh stops), and it lies smooth along the streets and round the buildings, which stand on it ----
+  const REL = (quality >= 2 || (typeof window !== "undefined" && window.__fdFine)) && local0?.terrain && hill ? reliefOf(local0.terrain) : null; // (__fdFine: the local checks, drawn at Balanced)
+  let fineCell = null, F = null;
+  if (REL) {
+    const fi0 = xs.indexOf(REL.x0), fi1 = xs.indexOf(REL.x0 + REL.nx - 1), fj0 = xs.indexOf(REL.z0), fj1 = xs.indexOf(REL.z0 + REL.nz - 1);
+    if (fi0 >= 0 && fi1 > fi0 && fj0 >= 0 && fj1 > fj0) {
+      const softQ = (a, b, c) => [a, b, c].some((q) => cls[q] === 3 || bank[q] || dune[q] > 0.05) || (town[a] && town[b] && town[c]);
+      fineCell = new Uint8Array((n - 1) * (n - 1)); let any = 0;
+      for (let j = fj0; j < fj1; j++) for (let i = fi0; i < fi1; i++) {
+        const a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+        if ([a, b, c, d].some((q) => cls[q] === 2) || [a, b, c, d].every((q) => cls[q] === 0)) continue; // (not the beaches, nor out in the water; a cliff's foot in the sea, yes)
+        if (softQ(a, c, b) && softQ(b, c, d)) { fineCell[j * (n - 1) + i] = 1; any++; }
+      }
+      if (any) F = { fi0, fj0, fi1, fj1 }; else fineCell = null;
+    }
+  }
+  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) { if (fineCell && fineCell[j * (n - 1) + i]) continue; const a = j * n + i, b = a + 1, c = a + n, d = c + 1; addTri(a, c, b); addTri(b, c, d); }
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   g.setAttribute("aDamp", new THREE.BufferAttribute(wet, 1)); // (the deck's shader: damp along the walls)
   // rough ground (the cliff's face, the dune): how much of the photographed scrubby ground shows there (soft shader)
   const ruf = new Float32Array(n * n); for (let k = 0; k < n * n; k++) ruf[k] = bank[k] ? 1 : town[k] ? 0.18 : Math.min(1, dune[k] * 1.4);
   g.setAttribute("aRuf", new THREE.BufferAttribute(ruf, 1));
+  g.setAttribute("aSteep", new THREE.BufferAttribute(steep, 1)); // (the bank's steepness: where its rock shows, local.cliff)
   // turf: the lawns and the town's ground are grass (drawn turf, textures3d.js) rather than the deck's concrete tinted green
   const grs = new Float32Array(n * n); for (let k = 0; k < n * n; k++) grs[k] = bank[k] || dune[k] > 0.05 ? 0 : cls[k] === 3 || town[k] ? 1 : 0;
   g.setAttribute("aGrass", new THREE.BufferAttribute(grs, 1));
+  // (plain land at the edge of the soft ground: a quay's or a promenade's corner that a bank's or a lawn's triangle
+  // reaches. Drawn by the soft ground's shader with nothing of its own, it took the concrete's pale grey, and along the
+  // foot of Whitby's East Cliff the strip shone white on Aaron's PC. It takes its neighbour's ground instead: rough by a
+  // bank, grass by a lawn, its colour most of the way to theirs; the concrete's own triangles only take the tint, a
+  // dirty edge where the bank comes down onto it)
+  for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+    const k = j * n + i; if (cls[k] !== 1 || town[k] || bank[k] || dune[k] > 0.05) continue;
+    const nb = [k - 1, k + 1, k - n, k + n], bq = nb.find((q) => bank[q]), lq = nb.find((q) => cls[q] === 3 || town[q]), q = bq ?? lq; if (q === undefined) continue;
+    if (bq !== undefined) ruf[k] = Math.max(ruf[k], 0.75); else grs[k] = 1;
+    // (less of the neighbour's colour where the point is mostly among the concrete's own, so a promenade's edge isn't
+    // stained green along every lawn)
+    const plain = nb.filter((p) => cls[p] === 1 && !town[p] && !bank[p] && dune[p] <= 0.05).length, f = plain >= 2 ? 0.35 : 0.75;
+    for (let ch = 0; ch < 3; ch++) col[k * 3 + ch] += (col[q * 3 + ch] - col[k * 3 + ch]) * f;
+  }
   for (let k = 0; k < n * n; k++) if (bank[k] || dune[k] <= 0) faceA[k] = -1; // (-1: not the dune, no scrub drawn)
   // the beach's sand (a beach mark's: localDetail.js beach), drawn from a photograph of sand, wet below the last waves
   const sandA = new Float32Array(n * n); if (BP) for (let k = 0; k < n * n; k++) sandA[k] = (cls[k] === 2 || (cls[k] === 0 && h[k] > GROUND.water + 0.05)) && !dune[k] ? 1 : 0;
@@ -626,6 +719,109 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   g.setIndex(n * n > 65535 ? new THREE.Uint32BufferAttribute(all, 1) : new THREE.Uint16BufferAttribute(all, 1));
   g.addGroup(0, idxDeck.length, 0); g.addGroup(idxDeck.length, idxSoft.length, 1);
   g.computeVertexNormals();
+  g.setAttribute("aSoil", new THREE.BufferAttribute(new Float32Array(n * n), 1)); // (bare soil: only on the fine hillside)
+  // (the fine hillside's mesh, its heights and the lookups for what stands on it: fineAt(x, z) its height, or null)
+  let gF = null, fineAt = () => null, fineInfo = () => null;
+  if (F) {
+    const nx = REL.nx, nz = REL.nz, X0 = REL.x0, Z0 = REL.z0, NP = nx * nz;
+    // which 1 m quads it covers (those inside a replaced cell) and which points
+    const qc = new Uint8Array((nx - 1) * (nz - 1)), pc = new Uint8Array(NP);
+    for (let j = F.fj0; j < F.fj1; j++) for (let i = F.fi0; i < F.fi1; i++) {
+      if (!fineCell[j * (n - 1) + i]) continue;
+      for (let zz = xs[j]; zz < xs[j + 1]; zz++) for (let xx = xs[i]; xx < xs[i + 1]; xx++) {
+        const qi = xx - X0, qj = zz - Z0; qc[qj * (nx - 1) + qi] = 1;
+        pc[qj * nx + qi] = pc[qj * nx + qi + 1] = pc[(qj + 1) * nx + qi] = pc[(qj + 1) * nx + qi + 1] = 1;
+      }
+    }
+    // the coarse cell a point is in (for the coarse ground's own height and attributes there, its triangle as drawn)
+    const coarse = (arr, stride, off, x, z) => {
+      let i = F.fi0; while (i < n - 2 && xs[i + 1] <= x) i++; let j = F.fj0; while (j < n - 2 && xs[j + 1] <= z) j++;
+      const fx = (x - xs[i]) / (xs[i + 1] - xs[i]), fz = (z - xs[j]) / (xs[j + 1] - xs[j]), a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+      const A = arr[a * stride + off], B = arr[b * stride + off], C = arr[c * stride + off], D = arr[d * stride + off];
+      return fx + fz <= 1 ? A + fx * (B - A) + fz * (C - A) : D + (1 - fx) * (C - D) + (1 - fz) * (B - D);
+    };
+    // distance (metres, chamfer) from the fine mesh's edge, and from the streets and buildings it lies smooth round
+    const chamfer = (seed) => {
+      const dd = new Float32Array(NP); for (let p = 0; p < NP; p++) dd[p] = seed[p] ? 0 : 1e4;
+      const s2 = Math.SQRT2;
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const p = j * nx + i; let v = dd[p]; if (i) v = Math.min(v, dd[p - 1] + 1); if (j) { v = Math.min(v, dd[p - nx] + 1); if (i) v = Math.min(v, dd[p - nx - 1] + s2); if (i < nx - 1) v = Math.min(v, dd[p - nx + 1] + s2); } dd[p] = v; }
+      for (let j = nz - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) { const p = j * nx + i; let v = dd[p]; if (i < nx - 1) v = Math.min(v, dd[p + 1] + 1); if (j < nz - 1) { v = Math.min(v, dd[p + nx] + 1); if (i < nx - 1) v = Math.min(v, dd[p + nx + 1] + s2); if (i) v = Math.min(v, dd[p + nx - 1] + s2); } dd[p] = v; }
+      return dd;
+    };
+    const edge = new Uint8Array(NP);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const p = j * nx + i; if (!pc[p]) { edge[p] = 1; continue; }
+      const q = (ii, jj) => ii >= 0 && jj >= 0 && ii < nx - 1 && jj < nz - 1 && qc[jj * (nx - 1) + ii];
+      if (!(q(i - 1, j - 1) && q(i, j - 1) && q(i - 1, j) && q(i, j))) edge[p] = 1;
+    }
+    const flat = new Uint8Array(NP);
+    const stamp = (x, z) => { const i = Math.round(x - X0), j = Math.round(z - Z0); if (i >= 0 && j >= 0 && i < nx && j < nz) flat[j * nx + i] = 1; };
+    for (const r of place.roads || []) for (let s = 0; s + 1 < r.line.length; s++) {
+      const [ax, az] = r.line[s], [bx, bz] = r.line[s + 1], L = Math.hypot(bx - ax, bz - az), hw = r.w / 2 + 1.2;
+      for (let u = 0; u <= L; u += 0.7) for (let v = -hw; v <= hw; v += 0.7) { const f = L ? u / L : 0; stamp(ax + (bx - ax) * f + (-(bz - az) / (L || 1)) * v, az + (bz - az) * f + ((bx - ax) / (L || 1)) * v); }
+    }
+    for (const b of place.buildings || []) { const B = bb(b.ring); if (B.x1 < X0 || B.x0 > X0 + nx || B.z1 < Z0 || B.z0 > Z0 + nz) continue; for (let z = Math.floor(B.z0) - 1; z <= B.z1 + 1; z++) for (let x = Math.floor(B.x0) - 1; x <= B.x1 + 1; x++) if (inB([x, z], { ...B, x0: B.x0 - 1.5, x1: B.x1 + 1.5, z0: B.z0 - 1.5, z1: B.z1 + 1.5 }) && (inside([x, z], B.r) || B.r.some((q, k) => segDist([x, z], q, B.r[(k + 1) % B.r.length]) < 1.5))) stamp(x, z); }
+    // (the buildings' own footprints, for the shade at their feet: the ground darker within a couple of metres of a wall,
+    // where the sky's light is half shut out; without it every house stood on the slope as if pasted on)
+    const foot = new Uint8Array(NP);
+    for (const b of place.buildings || []) { const B = bb(b.ring); if (B.x1 < X0 || B.x0 > X0 + nx || B.z1 < Z0 || B.z0 > Z0 + nz) continue; for (let z = Math.floor(B.z0); z <= B.z1; z++) for (let x = Math.floor(B.x0); x <= B.x1; x++) if (inside([x, z], B.r)) { const i = Math.round(x - X0), j = Math.round(z - Z0); if (i >= 0 && j >= 0 && i < nx && j < nz) foot[j * nx + i] = 1; } }
+    const dFoot = chamfer(foot);
+    const dEdge = chamfer(edge), dFlat = chamfer(flat), sm = (e0, e1, v) => { const tt = Math.min(1, Math.max(0, (v - e0) / (e1 - e0))); return tt * tt * (3 - 2 * tt); };
+    // the heights: the coarse ground's own at the edge, the 5 m terrain's smooth surface inside, and the relief on it
+    const Y = new Float32Array(NP), base = GROUND.land;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const p = j * nx + i; if (!pc[p]) continue;
+      const x = X0 + i, z = Z0 + j, lin = coarse(pos, 3, 1, x, z), w = sm(0, 6, dEdge[p]);
+      Y[p] = lin + w * (base + hill(x, z) - lin + REL.D[p] * sm(0, 2.5, dFlat[p]));
+    }
+    fineAt = (x, z) => {
+      const u = x - X0, v = z - Z0; if (u < 0 || v < 0 || u >= nx - 1 || v >= nz - 1) return null;
+      const i = Math.floor(u), j = Math.floor(v); if (!qc[j * (nx - 1) + i]) return null;
+      const fx = u - i, fz = v - j, a = j * nx + i, A = Y[a], B = Y[a + 1], C = Y[a + nx], D = Y[a + nx + 1];
+      return fx + fz <= 1 ? A + fx * (B - A) + fz * (C - A) : D + (1 - fx) * (C - D) + (1 - fz) * (B - D);
+    };
+    // the mesh: every covered point, its attributes the coarse ground's there; bare soil where the fine slope is steep or
+    // runs in a gully, on the banks
+    const idx = new Int32Array(NP).fill(-1); let nv = 0; for (let p = 0; p < NP; p++) if (pc[p]) idx[p] = nv++;
+    const P3 = new Float32Array(nv * 3), C3 = new Float32Array(nv * 3), UVf = new Float32Array(nv * 2), at = {}, names = { aDamp: wet, aRuf: ruf, aSteep: steep, aGrass: grs, aSand: sandA, aFace: faceA };
+    for (const k of Object.keys(names)) at[k] = new Float32Array(nv);
+    const soilA = new Float32Array(nv), soilP = new Float32Array(NP), slopeP = new Float32Array(NP);
+    const Yat = (i, j) => Y[Math.max(0, Math.min(nz - 1, j)) * nx + Math.max(0, Math.min(nx - 1, i))];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const p = j * nx + i, v = idx[p]; if (v < 0) continue;
+      const x = X0 + i, z = Z0 + j;
+      P3[v * 3] = x; P3[v * 3 + 1] = Y[p]; P3[v * 3 + 2] = z; UVf[v * 2] = x / 8; UVf[v * 2 + 1] = z / 8;
+      for (let ch = 0; ch < 3; ch++) C3[v * 3 + ch] = coarse(col, 3, ch, x, z);
+      for (const k of Object.keys(names)) at[k][v] = coarse(names[k], 1, 0, x, z);
+      // (the fine slope over 2 m, and the hollow or crest over 4 m: steep faces show rock or soil, gullies collect soil)
+      const sx = (Yat(i + 1, j) - Yat(i - 1, j)) / 2, sz = (Yat(i, j + 1) - Yat(i, j - 1)) / 2, slope = Math.hypot(sx, sz);
+      const lap = (Yat(i + 2, j) + Yat(i - 2, j) + Yat(i, j + 2) + Yat(i, j - 2) - 4 * Y[p]) / 4;
+      const w = sm(0, 6, dEdge[p]) * sm(0, 2.5, dFlat[p]);
+      at.aSteep[v] = Math.max(at.aSteep[v], sm(0.85, 1.6, slope) * w);
+      // (bare where it's steeper than about 38 degrees, and in the gullies' bottoms; the hillside's usual 25 to 35 degrees
+      // stay grassed, as the East Cliff's slopes mostly are: from 24 degrees most of the slope came out bare)
+      soilA[v] = Math.min(1, sm(0.78, 1.25, slope) * 0.85 + sm(0.18, 0.55, lap) * 0.55) * w * Math.min(1, at.aRuf[v] * 1.6 + at.aGrass[v] * 0.25);
+      soilP[p] = soilA[v]; slopeP[p] = slope * w;
+      // (the light the ground gets from the sky: less in a hollow and at the foot of a wall, a little more on a crest; the
+      // relief read flat in an even light, as if lit from everywhere at once)
+      const ao = (1 - 0.32 * (1 - sm(0.5, 2.6, dFoot[p]))) * (1 - 0.22 * sm(0.06, 0.5, lap) * w) * (1 + 0.06 * sm(0.06, 0.4, -lap) * w);
+      for (let ch = 0; ch < 3; ch++) C3[v * 3 + ch] *= ao;
+    }
+    const ix = [];
+    for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      if (!qc[j * (nx - 1) + i]) continue;
+      const a = idx[j * nx + i], b = idx[j * nx + i + 1], c = idx[(j + 1) * nx + i], d = idx[(j + 1) * nx + i + 1];
+      ix.push(a, c, b, b, c, d);
+    }
+    gF = new THREE.BufferGeometry();
+    gF.setAttribute("position", new THREE.BufferAttribute(P3, 3)); gF.setAttribute("color", new THREE.BufferAttribute(C3, 3)); gF.setAttribute("uv", new THREE.BufferAttribute(UVf, 2));
+    for (const k of Object.keys(names)) gF.setAttribute(k, new THREE.BufferAttribute(at[k], 1));
+    gF.setAttribute("aSoil", new THREE.BufferAttribute(soilA, 1));
+    gF.setIndex(nv > 65535 ? new THREE.Uint32BufferAttribute(ix, 1) : new THREE.Uint16BufferAttribute(ix, 1));
+    gF.computeVertexNormals(); gF.computeBoundingSphere();
+    place.fineGround = { verts: nv, tris: ix.length / 3, at: fineAt };
+    fineInfo = (x, z) => { const i = Math.round(x - X0), j = Math.round(z - Z0); if (i < 0 || j < 0 || i >= nx || j >= nz || !pc[j * nx + i]) return null; return { soil: soilP[j * nx + i], slope: slopeP[j * nx + i] }; };
+  }
   const cTex = concrete({ seed: 3, joints: false }), dTex = detail(13);
   let concSide = null; // (a mark's concrete pier sides and parapets: localDetail.js concrete)
   let stoneSide = null, stoneTop = null; // (a mark's sandstone pier walls and decks: localDetail.js stone)
@@ -646,20 +842,54 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   const sandMap = BP ? photoTex(sandName + "_diff") : null, sandNor = BP ? photoTex(sandName + "_nor", { srgb: false }) : null;
   const wetMap = BP ? photoTex(wetName + "_diff") : null, wetNor = BP ? photoTex(wetName + "_nor", { srgb: false }) : null;
   const turfT = turf();
+  // ---- a place's own cliffs (localDetail.js cliff): photoscanned grass over the bank at two scales, and on its steep
+  // faces photoscanned rock laid from three sides by world position (so it doesn't smear down a face), showing through
+  // the grass in ragged outcrops where the slope passes about 30 degrees ----
+  // (and every place's grass is photographed (Poly Haven Leafy Grass, CC0) rather than drawn, its lawns, verges and
+  // banks; worn, muddy patches on the town's ground and lawns from a photograph of mud and leaves (Brown Mud Leaves 01))
+  const CL = local?.cliff || null, GRASS = CL?.grass || "grass_leafy";
+  const clG = photoTex(GRASS + "_diff"), clGN = clG && photoTex(GRASS + "_nor", { srgb: false }), grOn = !!clG;
+  const clR = CL ? photoTex(CL.rock + "_diff") : null, clRN = clR && photoTex(CL.rock + "_nor", { srgb: false });
+  const clOn = !!(CL && grOn && clR), mudT = photoTex("ground_mud_diff"), mudOn = !!mudT;
   if (rufMap) {
     softMat.onBeforeCompile = (sh) => {
       sh.uniforms.uRuf = { value: rufMap }; sh.uniforms.uRufN = { value: rufNor }; sh.uniforms.uTurf = { value: turfT.map }; sh.uniforms.uTurfN = { value: turfT.normalMap };
       sh.uniforms.uSand = { value: sandMap || rufMap }; sh.uniforms.uSandN = { value: sandNor || rufNor }; sh.uniforms.uSandW = { value: wetMap || rufMap }; sh.uniforms.uSandWN = { value: wetNor || rufNor };
       sh.uniforms.uSandK = { value: new THREE.Vector4(...(BP?.tint || [0.56, 0.46, 0.31]), BP?.tile || 3.5) }; sh.uniforms.uSandL = { value: new THREE.Vector3(BP?.lum || 0.283, BP?.lumWet || 0.122, BP?.tileWet || 2.2) };
-      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying vec2 vRufUv; varying vec3 vWPos;")
-        .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz;");
+      sh.uniforms.uClG = { value: clG || rufMap }; sh.uniforms.uClGN = { value: clGN || rufNor }; sh.uniforms.uClR = { value: clR || rufMap }; sh.uniforms.uClRN = { value: clRN || rufNor };
+      sh.uniforms.uClK = { value: new THREE.Vector4(CL?.rockTile || 7, CL?.grassTile || 2, CL?.rockFaces?.[0] || 0, CL?.rockFaces?.[1] || 0) }; sh.uniforms.uClRock = { value: new THREE.Color(...(CL?.rockTint || [1, 1, 1])) }; sh.uniforms.uClOn = { value: clOn ? 1 : 0 }; sh.uniforms.uMud = { value: mudT || rufMap };
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aRuf; attribute float aFace; attribute float aGrass; attribute float aSand; attribute float aSteep; attribute float aSoil; varying float vSoil; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;")
+        .replace("#include <uv_vertex>", "#include <uv_vertex>\nvRuf = aRuf; vFace = aFace; vGrass = aGrass; vSand = aSand; vSteep = aSteep; vSoil = aSoil; vRufUv = uv * 1.33; vWPos = (modelMatrix * vec4(position, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * normal);");
+      // (only the samplers this place uses are declared: with the sand's four, the cliff's four and the turf's two all in
+      // one shader it needed seventeen, and a graphics card allowing sixteen (most PCs through Direct3D) failed to build
+      // it, and drew none of the soft ground: Whitby's cliffs were missing on the PC)
       sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
-          uniform sampler2D uRuf, uRufN, uTurf, uTurfN, uSand, uSandN, uSandW, uSandWN; uniform vec4 uSandK; uniform vec3 uSandL; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying vec2 vRufUv; varying vec3 vWPos;
-          float fdDuneH = 0.0, fdWet = 0.0;
+          ${BP ? "#define FD_SAND" : ""}
+          ${grOn ? "#define FD_PGRASS" : ""}
+          ${clOn ? "#define FD_CLIFF" : ""}
+          ${mudOn ? "#define FD_MUD" : ""}
+          uniform sampler2D uRuf, uRufN;
+          #ifdef FD_PGRASS
+            uniform sampler2D uClG, uClGN;
+          #else
+            uniform sampler2D uTurf, uTurfN;
+          #endif
+          #ifdef FD_CLIFF
+            uniform sampler2D uClR, uClRN;
+          #endif
+          #ifdef FD_MUD
+            uniform sampler2D uMud;
+          #endif
+          #ifdef FD_SAND
+            uniform sampler2D uSand, uSandN, uSandW, uSandWN;
+          #endif
+          uniform vec4 uSandK, uClK; uniform vec3 uSandL, uClRock; uniform float uClOn; varying float vRuf; varying float vFace; varying float vGrass; varying float vSand; varying float vSteep; varying float vSoil; varying vec2 vRufUv; varying vec3 vWPos; varying vec3 vWNrm;
+          float fdDuneH = 0.0, fdWet = 0.0, fdRock = 0.0; vec3 fdTriW = vec3(0.0, 1.0, 0.0);
           float fdDH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
           float fdDN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(fdDH(i), fdDH(i + vec2(1.0, 0.0)), f.x), mix(fdDH(i + vec2(0.0, 1.0)), fdDH(i + vec2(1.0, 1.0)), f.x), f.y); }
           float fdDF(vec2 p) { float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++) { s += a * fdDN(p); p = p * 2.03 + 17.1; a *= 0.5; } return s / 0.9375; }`)
         .replace("#include <color_fragment>", `#include <color_fragment>
+          #ifdef FD_SAND
           if (vSand > 0.01) {
             // the beach: a photograph of dry sand at two scales (so its tile doesn't show across a hundred metres), its
             // light and dark kept and its colour the beach's own; and where the waves have wet it, from the water's edge
@@ -677,15 +907,42 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             vec3 wetC = uSandK.rgb * vec3(0.52, 0.48, 0.42) * mix(clamp(pow(lw, 0.7), 0.6, 1.4), 1.0, far * 0.6);
             float reach = 0.42 + 0.14 * fdDN(wp * vec2(0.09, 0.03)) + 0.08 * fdDN(wp * 0.31);
             fdWet = 1.0 - smoothstep(reach - 0.12, reach + 0.04, vWPos.y);
-            diffuseColor.rgb = mix(diffuseColor.rgb, mix(dry, wetC, fdWet), vSand);
-            fdWet *= vSand;
+            // (the sand's edge broken up by noise, not the ground grid's 3 m staircase)
+            float sW = smoothstep(0.28, 0.72, vSand + (fdDN(wp / 2.3) - 0.5) * 0.55 + (fdDN(wp * 1.7) - 0.5) * 0.15);
+            // (never wet against the grass or the bank's foot: in a hollow at the back of the beach the wet film shone white
+            // as snow on Aaron's PC, though no wave reaches there)
+            fdWet *= 1.0 - smoothstep(0.04, 0.35, vGrass + vRuf);
+            diffuseColor.rgb = mix(diffuseColor.rgb, mix(dry, wetC, fdWet), sW);
+            fdWet *= sW;
           }
+          #endif
           if (vGrass > 0.01) {
-            // turf at two scales (2 m and about 7 m) so the blades don't repeat visibly across a lawn; the tint is the ground's
-            vec2 tuv = vRufUv * 4.0;
-            vec3 t1 = texture2D(uTurf, tuv).rgb, t2 = texture2D(uTurf, tuv * 0.29 + 0.41).rgb;
-            vec3 grass = vColor.rgb * mix(t1, t2, 0.45) * 2.05;
-            diffuseColor.rgb = mix(diffuseColor.rgb, grass, vGrass);
+            #ifdef FD_PGRASS
+              // (the photographed grass, at two scales so its tile doesn't show across a lawn, its light and dark kept and its
+              // colour the ground's own)
+              vec2 wq = vWPos.xz; vec3 q1 = texture2D(uClG, wq / uClK.y).rgb, q2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wq / (uClK.y * 3.7) + 0.31).rgb;
+              float ql = dot(mix(q1, q2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02);
+              vec3 grass = vColor.rgb * 0.95 * mix(clamp(ql, 0.35, 2.0), 1.0, smoothstep(60.0, 260.0, length(vViewPosition)) * 0.6) * (0.9 + 0.2 * fdDN(wq / 19.0));
+              // (and in broad patches tens of metres across, drier and yellower: GRASS_DRY, the same in the grass layer)
+              grass *= mix(vec3(1.0), vec3(${GRASS_DRY.tint.join(", ")}), smoothstep(${GRASS_DRY.lo.toFixed(2)}, ${GRASS_DRY.hi.toFixed(2)}, fdDF(wq / ${GRASS_DRY.scale.toFixed(1)} + 3.0)) * ${GRASS_DRY.k.toFixed(2)});
+            #else
+              // turf at two scales (2 m and about 7 m) so the blades don't repeat visibly across a lawn; the tint is the ground's
+              vec2 tuv = vRufUv * 4.0;
+              vec3 t1 = texture2D(uTurf, tuv).rgb, t2 = texture2D(uTurf, tuv * 0.29 + 0.41).rgb;
+              vec3 grass = vColor.rgb * mix(t1, t2, 0.45) * 2.05;
+            #endif
+            #ifdef FD_MUD
+              // (worn to the mud in patches: often on the town's rough ground (its vRuf a little above 0), now and then on a
+              // lawn; the photograph's own colour, a little darker, its edge ragged)
+              vec2 wm = vWPos.xz; float town = step(0.08, vRuf) * step(vRuf, 0.3);
+              float worn = smoothstep(0.6, 0.72, fdDF(wm / 9.0 + 7.0) + (fdDN(wm / 1.7) - 0.5) * 0.16 + town * ${MUD.lift.toFixed(3)} - (1.0 - town) * ${MUD.lawnLess.toFixed(3)}) * mix(${MUD.lawn.toFixed(2)}, ${MUD.town.toFixed(2)}, town);
+              // (the photograph's orange of fallen leaves taken down by half towards its own grey, so it reads as earth; and
+              // only well inside the grass, as at a lawn's edge it faded across the ground's triangles in straight lines)
+              vec3 mudP = texture2D(uMud, wm / 2.5).rgb, mudC = mix(mudP, vec3(dot(mudP, vec3(0.3, 0.55, 0.15))) * vec3(1.08, 1.0, 0.86), 0.5) * 0.8 * (0.9 + 0.2 * fdDN(wm / 13.0));
+              grass = mix(grass, mudC, worn * smoothstep(0.55, 0.95, vGrass));
+            #endif
+            // (the lawn's edge broken up by noise as well)
+            diffuseColor.rgb = mix(diffuseColor.rgb, grass, smoothstep(0.25, 0.75, vGrass + (fdDN(vWPos.xz / 2.1 + 5.0) - 0.5) * 0.5 + (fdDN(vWPos.xz * 1.9) - 0.5) * 0.14));
           }
           if (vRuf > 0.01) {
             // (two scales of the photograph mixed, so its tile doesn't repeat visibly across a 50 m slope)
@@ -697,6 +954,51 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             // scaled by 2.2 the ground came out at an eighth of its colour, and the dune's sand read as dark olive scrub)
             // (its stones' light and dark softened: at full contrast the sand read as a heap of pebbles)
             vec3 tinted = vColor.rgb * clamp(pow(lum / 0.06, 0.55), 0.45, 1.7) + (ph - lum) * 0.12;
+            #ifdef FD_PGRASS
+            if (vFace < 0.0) {
+              // the bank (and a cliff's, local.cliff): grass from a photograph at two scales (the second turned, so neither repeats
+              // across the slope), its light and dark kept and its colour the bank's tint; darker patches of scrub
+              vec2 wp = vWPos.xz; float dist = length(vViewPosition);
+              vec3 g1 = texture2D(uClG, wp / uClK.y).rgb, g2 = texture2D(uClG, mat2(0.8, 0.6, -0.6, 0.8) * wp / (uClK.y * 3.7) + 0.31).rgb;
+              float gl = dot(mix(g1, g2, 0.4), vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02); // (over the photograph's own average)
+              vec3 grassC = vColor.rgb * mix(clamp(gl, 0.35, 2.0), 1.0, smoothstep(60.0, 260.0, dist) * 0.6) * (0.86 + 0.28 * fdDN(wp / 23.0));
+              grassC *= mix(vec3(1.0), vec3(${GRASS_DRY.tint.join(", ")}), smoothstep(${GRASS_DRY.lo.toFixed(2)}, ${GRASS_DRY.hi.toFixed(2)}, fdDF(wp / ${GRASS_DRY.scale.toFixed(1)} + 3.0)) * ${GRASS_DRY.k.toFixed(2)});
+              // (patches of darker, browner scrub, broken up, not a stain)
+              grassC = mix(grassC, grassC * vec3(0.74, 0.72, 0.6), smoothstep(0.62, 0.74, fdDF(wp / 17.0 + 9.0) + (fdDN(wp / 3.1) - 0.5) * 0.18) * 0.6);
+              #ifndef FD_CLIFF
+              // (no cliff of its own: the photographed rough ground shows through where the bank is steep)
+              tinted = mix(grassC, tinted, 0.25 + 0.55 * vSteep);
+              #else
+              // the rock: the photograph laid from the three sides, each weighted by how squarely the ground faces it
+              vec3 an = pow(abs(vWNrm), vec3(4.0)); an /= (an.x + an.y + an.z); fdTriW = an;
+              // (at two scales, the second turned and three times the size, so the photograph's tile doesn't show as a
+              // chequer across a 50 m face; only its light and dark over its own average are kept, the colour is the
+              // cliff's own)
+              // (on the faces the photograph is turned a quarter, so its grain runs along the beds, level, as a sedimentary
+              // cliff's does: the right way up its cracks ran down the face, and the cliff read as a hanging curtain)
+              vec3 rX = texture2D(uClR, vWPos.yz / uClK.x).rgb, rY = texture2D(uClR, vWPos.xz / uClK.x).rgb, rZ = texture2D(uClR, vWPos.yx / uClK.x).rgb;
+              mat2 tw = mat2(0.97, 0.24, -0.24, 0.97); float k2 = uClK.x * 3.3;
+              vec3 sX = texture2D(uClR, tw * vWPos.yz / k2 + 0.37).rgb, sY = texture2D(uClR, tw * vWPos.xz / k2 + 0.37).rgb, sZ = texture2D(uClR, tw * vWPos.yx / k2 + 0.37).rgb;
+              vec3 rk = mix(rX * an.x + rY * an.y + rZ * an.z, sX * an.x + sY * an.y + sZ * an.z, 0.45);
+              float rAvg = dot(texture2D(uClR, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15));
+              float rl = dot(rk, vec3(0.3, 0.55, 0.15)) / max(rAvg, 0.02);
+              // (the beds of a sedimentary cliff: paler and darker layers a metre or two thick, wavering along the face,
+              // and darker streaks where water runs down it)
+              float bedY = vWPos.y + fdDN(wp / 40.0) * 3.0;
+              float beds = fdDN(vec2(bedY * 0.62, (wp.x + wp.y) * 0.015)) * 0.65 + fdDN(vec2(bedY * 2.3, (wp.x + wp.y) * 0.05)) * 0.35; // (thick beds and thin ones within them)
+              float runs = fdDN(vec2((wp.x - wp.y) * 0.35, vWPos.y * 0.04));
+              vec3 rockC = uClRock * clamp(pow(rl, 0.85), 0.35, 1.9) * (0.7 + 0.52 * beds) * (1.0 - 0.1 * smoothstep(0.55, 0.85, runs)) * (0.9 + 0.2 * fdDN(wp / 31.0));
+              // (it shows through in ragged outcrops: the slope's steepness, broken up by noise at two scales)
+              fdRock = smoothstep(0.4, 0.62, vSteep + (fdDF(wp / 11.0) - 0.5) * 0.6 + (fdDN(wp / 2.7) - 0.5) * 0.12);
+              // (local.cliff.rockFaces: the way the sea faces, where the waves have bared the rock; slopes turned away
+              // from it, inland or over the harbour, stay grassed: Whitby's bank under St Mary's was a dark blotch)
+              if (dot(uClK.zw, uClK.zw) > 0.0) fdRock *= smoothstep(-0.4, 0.05, dot(normalize(vWNrm.xz + vec2(1e-5)), uClK.zw));
+              // (and even on the steep faces, scrub and grass hold on in patches and along the ledges)
+              fdRock *= 1.0 - 0.7 * smoothstep(0.58, 0.7, fdDF(vec2(wp.x + wp.y, vWPos.y * 2.2) / 9.0 + 3.0));
+              tinted = mix(grassC, rockC, fdRock);
+              #endif
+            }
+            #endif
             if (vFace >= 0.0) {
               // the dune, drawn from where each point is on the ground (not from the tiled photograph, whose pebbles
               // read from the pier as an even yellow stipple): pale sand; marram grass in drifts metres across, straw
@@ -725,19 +1027,73 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
               marram *= 0.78 + 0.44 * mix(0.5, fdDN(wp * vec2(5.0, 1.6) + 11.0), nearK) + 0.25 * (clump - 0.47) * midK;
               float scrubK = smoothstep(0.56, 0.66, fdDF(wp / 19.0 + 5.0)) * (1.0 - vFace);
               vec3 growth = mix(marram, vec3(0.04, 0.052, 0.027) * (0.8 + 0.6 * clump), scrubK * 0.85);
+              #ifdef FD_PGRASS
+              // (close to, the photographed grass's own light and dark in the marram and scrub, so they read as blades and
+              // not as smooth blots of colour)
+              { float gq = dot(texture2D(uClG, wp / 1.3).rgb, vec3(0.3, 0.55, 0.15)) / max(dot(texture2D(uClG, vec2(0.5), 12.0).rgb, vec3(0.3, 0.55, 0.15)), 0.02);
+                growth *= mix(1.0, clamp(gq, 0.45, 1.7), nearK * 0.85); }
+              #endif
               // (thicker growth is darker inside: the stems shade each other)
               growth *= mix(1.0, 0.8, smoothstep(th + 0.03, th + 0.2, field));
               tinted = mix(sand, growth, cover * 0.96);
               fdDuneH = cover * 0.5 + field * 0.25;
             }
+            // (bare soil on the fine hillside, where its slope is steep or runs in a gully: Whitby's brown clay and shale,
+            // the rough photograph's stones and hollows in it)
+            // (on a steep face the photograph is laid on each of the three planes and blended by the slope's facing, so it
+            // isn't smeared down the face in streaks; Whitby's earth, from the mud photograph taken towards its own grey)
+            if (vSoil > 0.01) {
+              vec3 tw = pow(abs(vWNrm), vec3(4.0)); tw /= tw.x + tw.y + tw.z;
+              // (its slow changes of tone on the three planes too: taken from above alone they ran down a steep face as stripes)
+              float sn3 = fdDN(vWPos.zy / 3.0) * tw.x + fdDN(vWPos.xz / 3.0) * tw.y + fdDN(vWPos.xy / 3.0) * tw.z;
+              float sm3 = fdDN(vWPos.zy / 1.3) * tw.x + fdDN(vWPos.xz / 1.3) * tw.y + fdDN(vWPos.xy / 1.3) * tw.z;
+              vec3 soilC = mix(vec3(0.15, 0.115, 0.082), vec3(0.235, 0.185, 0.13), sn3);
+              #ifdef FD_MUD
+                vec3 sp = texture2D(uMud, vWPos.zy / 2.2).rgb * tw.x + texture2D(uMud, vWPos.xz / 2.2).rgb * tw.y + texture2D(uMud, vWPos.xy / 2.2).rgb * tw.z;
+                float sl = dot(sp, vec3(0.3, 0.55, 0.15));
+                soilC *= clamp(pow(sl / 0.1, 0.75), 0.45, 1.8); // (the photograph averages 0.1 in linear light)
+                soilC = mix(soilC, mix(sp, vec3(sl) * vec3(1.1, 0.98, 0.82), 0.6) * 0.95, 0.35);
+              #else
+                soilC *= clamp(pow(lum / 0.06, 0.6), 0.5, 1.6);
+              #endif
+              // (its edge ragged and fairly sharp, the grass breaking off at it as on a slip: blended softly over the 1 m
+              // mesh it read from the harbour as brown smudges on a green baize)
+              float se = (fdDN(vWPos.zy * 1.1) * tw.x + fdDN(vWPos.xz * 1.1) * tw.y + fdDN(vWPos.xy * 1.1) * tw.z) * 0.65 + (fdDN(vWPos.zy * 3.7) * tw.x + fdDN(vWPos.xz * 3.7) * tw.y + fdDN(vWPos.xy * 3.7) * tw.z) * 0.35;
+              tinted = mix(tinted, soilC, smoothstep(0.44, 0.68, vSoil * (0.8 + 0.4 * sm3) + (se - 0.5) * 0.36)); // (two scales of noise: one alone left the 1 m mesh's blocks showing)
+            }
             diffuseColor.rgb = mix(diffuseColor.rgb, tinted, vRuf);
           }`)
         // (wet sand shines: a film of water over it)
-        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.46, fdWet);")
+        .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\n roughnessFactor = mix(roughnessFactor, 0.56, fdWet);")
         .replace("#include <normal_fragment_maps>", `vec3 fdFlatN = normal;
           #include <normal_fragment_maps>
+          #ifdef FD_SAND
           if (vSand > 0.01) { vec3 sn = mix(texture2D(uSandN, vWPos.xz / uSandK.w).xyz, texture2D(uSandWN, vWPos.xz / uSandL.z).xyz, fdWet) * 2.0 - 1.0; float sk = 1.0 - smoothstep(12.0, 45.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(sn.x, sn.y, 0.0) * 0.6 * sk), vSand)); }
-          if (vGrass > 0.01) { vec3 gn = texture2D(uTurfN, vRufUv * 4.0).xyz * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
+          #endif
+          #ifdef FD_PGRASS
+            #define FD_GRASS_N texture2D(uClGN, vWPos.xz / uClK.y).xyz
+          #else
+            #define FD_GRASS_N texture2D(uTurfN, vRufUv * 4.0).xyz
+          #endif
+          if (vGrass > 0.01) { vec3 gn = FD_GRASS_N * 2.0 - 1.0; float gk = 1.0 - smoothstep(20.0, 70.0, length(vViewPosition)); normal = normalize(mix(normal, normalize(fdFlatN + vec3(gn.x, gn.y, 0.0) * 0.7 * gk), vGrass)); } // (the deck's relief taken out under grass: it read as a weave)
+          #ifdef FD_PGRASS
+          if (vRuf > 0.01 && vFace < 0.0) {
+            // (the cliff's relief, in the world's own axes: the grass photograph's laid flat (across x, along z), the
+            // rock's from whichever side it's laid from most; then into the view. The usual shortcut of adding the map's
+            // tilt in screen axes lit the grass as crumpled paper)
+            float far = smoothstep(30.0, 140.0, length(vViewPosition));
+            vec3 gn = texture2D(uClGN, vWPos.xz / uClK.y).xyz * 2.0 - 1.0;
+            vec3 nw = vWNrm + vec3(gn.x, 0.0, -gn.y) * 0.55 * (1.0 - fdRock) * (1.0 - far);
+            #ifdef FD_CLIFF
+            vec3 rz = texture2D(uClRN, vWPos.yx / uClK.x).xyz * 2.0 - 1.0, rx = texture2D(uClRN, vWPos.yz / uClK.x).xyz * 2.0 - 1.0;
+            vec3 rw = vec3(rz.y, rz.x, 0.0) * fdTriW.z + vec3(0.0, rx.x, rx.y) * fdTriW.x; // (turned a quarter, as the colour is)
+            nw += rw * 0.9 * fdRock * (1.0 - far * 0.6);
+            #else
+            vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; nw += vec3(rn.x, 0.0, -rn.y) * 0.6 * vSteep * (1.0 - far * 0.6);
+            #endif
+            normal = normalize(mix(normal, normalize(mat3(viewMatrix) * normalize(nw)), vRuf));
+          } else
+          #endif
           if (vRuf > 0.01) { vec3 rn = texture2D(uRufN, vRufUv).xyz * 2.0 - 1.0; float nk = vFace >= 0.0 ? 1.0 - smoothstep(10.0, 35.0, length(vViewPosition)) : 1.0; normal = normalize(mix(normal, normalize(normal + vec3(rn.x, rn.y, 0.0) * 0.9), vRuf * nk * (vFace >= 0.0 ? 0.3 : 1.0))); }
           if (vFace >= 0.0 && fdDuneH > 0.0) {
             // the clumps stand up from the sand: the light catches their sunward side (their height's slope across the screen)
@@ -746,14 +1102,15 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
             normal = normalize(mix(normal, normalize(abs(det) * normal - grad * 0.8), vRuf * (1.0 - smoothstep(90.0, 260.0, length(vViewPosition)))));
           }`); // (the dune's fine relief fades with distance too: lit from 100 m it was the stipple)
     };
-    softMat.customProgramCacheKey = () => "fdruf11";
+    softMat.customProgramCacheKey = () => "fdruf18" + (BP ? "s" : "") + (grOn ? "g" : "") + (clOn ? "c" : "") + (mudOn ? "m" : "");
   }
   const ground = new THREE.Mesh(g, [deckMat, softMat]);
   ground.receiveShadow = true; group.add(ground); ground.userData.kind = "the ground"; targets.push(ground);
+  if (gF) { const gm = new THREE.Mesh(gF, softMat); gm.receiveShadow = true; gm.castShadow = true; gm.name = "fdFineGround"; gm.userData.kind = "the ground"; group.add(gm); targets.push(gm); }
   place.deckMat = deckMat; // world.js darkens it in the rain
 
   const hillAt = (x, z, c) => (hill && (c === 1 || c === 3) ? hill(x, z) : 0);
-  const groundAt = (x, z) => { const c = cAt(x, z); return c === 0 ? 0 : BP && c === 2 ? Math.max(0.05, hGrid(x, z)) : H_OF[c] + hillAt(x, z, c); };
+  const groundAt = (x, z) => { const c = cAt(x, z); if (c === 0) return 0; const f = fineAt(x, z); if (f !== null) return f; return BP && BP.shape !== false && c === 2 ? Math.max(0.05, hGrid(x, z)) : H_OF[c] + hillAt(x, z, c); }; // (on the fine hillside, its own height)
   // ---- streets: tarmac with a pale pavement and kerb either side (from the map's roads) ----
   {
     const T = { p: [], uv: [], i: [] }, Pv = { p: [], uv: [], i: [] };
@@ -770,7 +1127,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           const ya = groundAt(x1, z1) + y, yb = groundAt(x2, z2) + y, o = Bk.p.length / 3;
           // ends pushed a little past each node so consecutive pieces overlap at bends instead of leaving a notch
           const ex = ((x2 - x1) / len) * Math.min(0.6, w1 * 0.15), ez = ((z2 - z1) / len) * Math.min(0.6, w1 * 0.15); // (a short overlap: at 1.5 m the pavements' ends stuck out as a saw's teeth along a bending street)
-          Bk.p.push(x1 - ex + nx * a0, ya, z1 - ez + nz * a0, x2 + ex + nx * a0, yb, z2 + ez + nz * a0, x2 + ex + nx * a1, yb, z2 + ez + nz * a1, x1 - ex + nx * a1, ya, z1 - ez + nz * a1);
+          // (each corner on the ground where it is, not at the centre line's height: across a street on the hillside the
+          // ground falls, and the strip's downhill edge stood off the slope as a dark shelf seen from below it)
+          const gq = (x, z, yc) => { const g = groundAt(x, z); return g > 0 ? g + y : yc; };
+          const P0 = [x1 - ex + nx * a0, z1 - ez + nz * a0], P1 = [x2 + ex + nx * a0, z2 + ez + nz * a0], P2 = [x2 + ex + nx * a1, z2 + ez + nz * a1], P3q = [x1 - ex + nx * a1, z1 - ez + nz * a1];
+          Bk.p.push(P0[0], gq(...P0, ya), P0[1], P1[0], gq(...P1, yb), P1[1], P2[0], gq(...P2, yb), P2[1], P3q[0], gq(...P3q, ya), P3q[1]);
           Bk.uv.push(run / 6, 0, (run + len) / 6, 0, (run + len) / 6, (a1 - a0) / 6, run / 6, (a1 - a0) / 6);
           if (side > 0 || w0 === 0) Bk.i.push(o, o + 2, o + 1, o, o + 3, o + 2); else Bk.i.push(o, o + 1, o + 2, o, o + 2, o + 3);
           run += len;
@@ -787,7 +1148,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         for (let k = 0; k < line.length - 1; k++) {
           const [x1, z1] = line[k], [x2, z2] = line[k + 1], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
           if (groundAt(x1, z1) === 0 && groundAt(x2, z2) === 0) { run += len; continue; }
-          const nx = -(z2 - z1) / len, nz = (x2 - x1) / len, a = side * w, ya = groundAt(x1, z1), yb = groundAt(x2, z2), o = Kb.p.length / 3;
+          const nx = -(z2 - z1) / len, nz = (x2 - x1) / len, a = side * w, ya = groundAt(x1 + nx * a, z1 + nz * a) || groundAt(x1, z1), yb = groundAt(x2 + nx * a, z2 + nz * a) || groundAt(x2, z2), o = Kb.p.length / 3; // (at the kerb's own line, as the strips' edges are)
           Kb.p.push(x1 + nx * a, ya + 0.03, z1 + nz * a, x2 + nx * a, yb + 0.03, z2 + nz * a, x2 + nx * a, yb + 0.125, z2 + nz * a, x1 + nx * a, ya + 0.125, z1 + nz * a);
           Kb.uv.push(run, 0, run + len, 0, run + len, 0.1, run, 0.1);
           if (side > 0) Kb.i.push(o, o + 1, o + 2, o, o + 2, o + 3); else Kb.i.push(o, o + 2, o + 1, o, o + 3, o + 2);
@@ -800,7 +1161,19 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
         }
       }
     };
-    for (const r of place.roads || []) { if (r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(r.kind === "tarmac" ? T : Pa, r.line, 0, r.w / 2, r.kind === "tarmac" ? 0.035 : 0.06); if (r.kind === "tarmac") { ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); kerb(r.line, r.w / 2); } }
+    // (a footpath across grass or a bank, not a paved way through the town: worn earth and grit, its edges ragged where the
+    // grass grows over them (the uv across it 0 to 1, for the shader); drawn as paving, every path on Whitby's East
+    // Cliff read as a strip of brown card laid on the slope)
+    const Pg = { p: [], uv: [], i: [] };
+    const nearV = (x, z) => { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; if (i < n - 1 && x - xs[i] > xs[i + 1] - x) i++; if (j < n - 1 && z - xs[j] > xs[j + 1] - z) j++; return j * n + i; };
+    const onSoft = (line) => { let s = 0, m = 0; for (let k = 0; k + 1 < line.length; k++) { const x = (line[k][0] + line[k + 1][0]) / 2, z = (line[k][1] + line[k + 1][1]) / 2, c = cAt(x, z), v = nearV(x, z); m++; if (c === 3 || bank[v] || (c === 1 && town[v])) s++; } return m > 0 && s / m > 0.6; };
+    for (const r of place.roads || []) {
+      if (r.kind !== "path" || r.line.some(([x, z]) => nearSpot(x, z, 25)) || !onSoft(r.line)) continue;
+      const half = r.w / 2 + 0.35, v0 = Pg.uv.length; ribbon(Pg, r.line, 0, half, 0.025);
+      for (let q = v0 + 1; q < Pg.uv.length; q += 2) Pg.uv[q] /= (2 * half) / 6;
+      r.soft = true;
+    }
+    for (const r of place.roads || []) { if (r.soft || r.line.some(([x, z]) => nearSpot(x, z, 25))) continue; ribbon(r.kind === "tarmac" ? T : Pa, r.line, 0, r.w / 2, r.kind === "tarmac" ? 0.035 : 0.06); if (r.kind === "tarmac") { ribbon(Pv, r.line, r.w / 2, r.w / 2 + 1.8, 0.11); kerb(r.line, r.w / 2); } }
     // car parks (the map's amenity=parking): a sheet of tarmac on the ground, bays painted on it
     for (const ring of place.parking || []) {
       if (ring.length < 3 || ring.some(([x, z]) => nearSpot(x, z, 25))) continue;
@@ -818,11 +1191,39 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     mk(Gl, new THREE.MeshStandardMaterial({ map: grateTex(), roughness: 0.75, metalness: 0.3, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     mk(Pv, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb8b4ac, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
     mk(Pa, new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xaaa69c, roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide }));
+    {
+      // (the footpaths' earth: the mud photograph laid by the world's own axes (not along the path, where its tile ran on
+      // in lines), taken half to grey and lightened as trodden grit, paler down the middle where most feet go; the edges
+      // cut away by noise, so the grass under shows through them)
+      const mud = photoTex("ground_mud_diff");
+      const pm = new THREE.MeshStandardMaterial({ map: mud || cTex.map, color: 0xffffff, roughness: 0.95, alphaTest: 0.5, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, side: THREE.DoubleSide });
+      pm.onBeforeCompile = (sh) => {
+        sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vPgW; varying float vPgA;").replace("#include <uv_vertex>", "#include <uv_vertex>\nvPgA = uv.y; vPgW = (modelMatrix * vec4(position, 1.0)).xyz;");
+        sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+          varying vec3 vPgW; varying float vPgA;
+          float pgH(vec2 p) { vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+          float pgN(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(pgH(i), pgH(i + vec2(1.0, 0.0)), f.x), mix(pgH(i + vec2(0.0, 1.0)), pgH(i + vec2(1.0, 1.0)), f.x), f.y); }`)
+          .replace("#include <map_fragment>", `
+          vec3 pgP = texture2D(map, vPgW.xz / 2.4).rgb; float pgL = dot(pgP, vec3(0.3, 0.55, 0.15));
+          float pgE = abs(vPgA * 2.0 - 1.0), pgR = 0.62 + 0.3 * pgN(vPgW.xz * 1.1) + 0.12 * pgN(vPgW.xz * 4.3) - 0.06;
+          if (pgE > pgR) discard;
+          vec3 pgC = mix(pgP, vec3(pgL) * vec3(1.08, 1.0, 0.88), 0.55) * 1.8;
+          pgC *= mix(1.12, 0.82, smoothstep(0.1, pgR, pgE)) * (0.9 + 0.2 * pgN(vPgW.xz / 7.0));
+          diffuseColor.rgb *= pgC;`);
+      };
+      pm.customProgramCacheKey = () => "fdpath1";
+      mk(Pg, pm);
+    }
   }
 
   // ---- garden walls, fences and hedges (the map's barriers): the texture of a town between its streets ----
   {
     const parts = { wall: [], coping: [], fence: [], post: [], hedge: [] };
+    // (the walls in a photographed material: where the place's stone is its own (Whitby's sandstone, local.stone kit
+    // "whitby"), its baked ashlar; elsewhere the photographed red brick of the house fronts. The drawn brick, red and
+    // even, made the Abbey's ruined footings read as new brick walls)
+    const stoneWalls = local?.stone?.kit === "whitby", WT = stoneWalls ? 2.4 : 1.5;
+    const wallPh = photoTex(stoneWalls ? "whitby_ashlar_diff" : "brick_red_diff"), wallPhN = wallPh && photoTex(stoneWalls ? "whitby_ashlar_nor" : "brick_red_nor", { srgb: false });
     const okHere = (mx, mz) => !(nearSpot(mx, mz, 25) || !landAt([mx, mz]) || PR.some((bx) => inB([mx, mz], bx)));
     for (const b of (local?.generated === false ? [] : place.barriers || [])) {
       for (let k = 0; k + 1 < b.line.length; k++) {
@@ -835,16 +1236,16 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
           box(len + 0.02, top - y0, 0.035, 0.08, parts.fence, [len / 1.8, (top - y0) / 1.8]);
           for (let q = 0; q <= len; q += 1.8) { const f = q / len, px = x1 + (x2 - x1) * f, pz = z1 + (z2 - z1) * f; const g2 = new THREE.BoxGeometry(0.1, top - y0 + 0.08, 0.1); g2.translate(0, (top - y0 + 0.08) / 2, 0); g2.translate(px, y0 - 0.02, pz); parts.post.push(g2); }
         } else { // a brick wall with a coping on top
-          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, [len / 0.9, (top - y0) / 0.6]); // (the brick tile is four bricks by eight courses: 0.9 m by 0.6 m. At 2 m a tile the bricks were half a metre long)
+          box(len + 0.05, top - y0 - 0.06, 0.24, 0, parts.wall, wallPh ? [len / WT, (top - y0) / WT] : [len / 0.9, (top - y0) / 0.6]); // (the drawn brick tile is four bricks by eight courses: 0.9 m by 0.6 m; the photographs' tiles are WT)
           box(len + 0.07, 0.07, 0.3, top - y0 - 0.06, parts.coping);
         }
       }
     }
     const brick = bricks(31, [138, 96, 72]), wood = woodTex();
     const mats = {
-      wall: new THREE.MeshStandardMaterial({ map: brick.map, normalMap: brick.normalMap, roughness: 1, color: 0xb8aa9c }),
+      wall: wallPh ? new THREE.MeshStandardMaterial({ map: wallPh, normalMap: wallPhN, roughness: 1, color: stoneWalls ? 0xd8cebd : 0xe8e2dc }) : new THREE.MeshStandardMaterial({ map: brick.map, normalMap: brick.normalMap, roughness: 1, color: 0xb8aa9c }),
       coping: new THREE.MeshStandardMaterial({ color: 0x8e8a82, roughness: 0.9 }),
-      fence: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.95, color: 0x9a8468 }),
+      fence: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.95, color: 0xb8ab94 }), // (weathered boards: at 0x9a8468 a fence in shade drew as a black slab across the houses behind)
       post: new THREE.MeshStandardMaterial({ color: 0x5f5244, roughness: 0.95 }),
       hedge: weather(new THREE.MeshStandardMaterial({ color: 0x2d4f22, roughness: 1 }), { scale: 0.6, mottle: 0.5 }),
     };
@@ -1239,9 +1640,11 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     // nothing on a fishing spot, the deck round it or in front of it
     avoid: (x, z) => spots.some((s) => Math.hypot(x - s.at[0], z - s.at[2]) < 6),
     near: (x, z) => nearSpot(x, z, NEAR_SOLID + 30),
+    modules: quality >= 2 || (typeof window !== "undefined" && !!window.__fdFine), // (the openings in depth near the camera: windows3d.js)
   });
   setTownStyle(null);
   place.buildingGlow = [...(place.buildingGlow || []), ...res.glow]; for (const m of res.meshes) m.userData.kind = "a building"; targets.push(...res.meshes);
+  { const caps = buildChimneyCaps(group, res.caps, res.brickMat), wins = buildWindowModules(group, res.mods); place.capsUpdate = (t, cam) => { caps.update(t, cam); wins.update(t, cam); }; if (wins.glass) place.buildingGlow = [...(place.buildingGlow || []), wins.glass]; } // (the chimneys' modelled tops, chimneys3d.js; the openings in depth, windows3d.js)
   for (const c of res.colliders) {
     aoRings.push(c.ring);
     const cbp = [], cbi = [];
@@ -1301,7 +1704,24 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
       if (local?.stone) batter(geo, ring, p.h, local.stone.batter ?? 0.14);
       const sideMat = local?.stone ? (stoneSide ||= stoneWall(local.stone, p.h)) : local?.concrete ? (concSide ||= weather(new THREE.MeshStandardMaterial({ map: cTex.map, normalMap: cTex.normalMap, color: 0xb9b5ad, roughness: 0.95 }), { scale: 0.7, mottle: 0.3, grime: [WALL_BOTTOM, 0.6, 0.45], streaks: [p.h, 2.5, 0.2], rough: [0.9, 1.1] })) : new THREE.MeshStandardMaterial({ map: sp.map, normalMap: sp.normalMap, roughness: 0.9 });
       // (and its top: sandstone flags where the walls are sandstone)
-      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall({ ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h)) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      const m = new THREE.Mesh(geo, [local?.stone ? (stoneTop ||= stoneWall(local.stone.kit ? local.stone : { ...local.stone, tint: local.stone.deckTint ?? 0xc9bfae, tile: 0.25 }, p.h, "deck")) : deckSlab, sideMat]); m.castShadow = m.receiveShadow = true; group.add(m); m.userData.kind = `a ${p.kind}`; targets.push(m);
+      // the coping: a course of big squared stones along its edges over the water, a little proud of the wall and of the
+      // deck (Whitby's piers: the photographs along them), in the same stone
+      if (local?.stone?.coping) {
+        const cg = [], C = local.stone.coping;
+        for (let k = 0; k < ring.length; k++) {
+          const [x1, z1] = ring[k], [x2, z2] = ring[(k + 1) % ring.length], len = Math.hypot(x2 - x1, z2 - z1); if (len < 0.3) continue;
+          let nx = -(z2 - z1) / len, nz = (x2 - x1) / len; const mid = [(x1 + x2) / 2, (z1 + z2) / 2];
+          if (inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) { nx = -nx; nz = -nz; }
+          if (landAt([mid[0] + nx * 1.5, mid[1] + nz * 1.5]) && !inside([mid[0] + nx * 1.5, mid[1] + nz * 1.5], ring)) continue;
+          const g2 = new THREE.BoxGeometry(len + C.d * 0.9, C.h, C.d); g2.rotateY(-Math.atan2(z2 - z1, x2 - x1));
+          g2.translate(mid[0] - nx * (C.d / 2 - C.out), p.h + C.up - C.h / 2, mid[1] - nz * (C.d / 2 - C.out)); cg.push(worldUV(g2));
+        }
+        if (cg.length) {
+          const cm = new THREE.Mesh(mergeGeometries(cg), stoneSide); cg.forEach((q) => q.dispose());
+          cm.castShadow = cm.receiveShadow = true; cm.userData.kind = `a ${p.kind}`; group.add(cm); targets.push(cm);
+        }
+      }
       // a solid concrete parapet along its edges over the water, where the mark's photographs show one (Lowestoft's South
       // Pier: both sides and round its head), its outer face flush with the pier's side
       if (local?.concrete) {
@@ -1421,8 +1841,117 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
     const bankAt = (x, z) => { if (!local?.hill) return 0; const d = Math.abs(local.hill(x - 2, z) - local.hill(x + 2, z)); return d > 0.3 ? Math.min(1, d / 0.8) : 0; };
     const woods = (place.woods || []).map(bb), woodAt = (x, z) => woods.some((b) => inB([x, z], b));
     const backsT = (typeof window !== "undefined" && window.__fdNoBackdrop ? null : local?.backdrop) || null;
-    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || PR.some((b) => inB([x, z], b)) /* (never on a pier: the map's coastline often runs round them, so they count as land) */ || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
+    // (nor on an open pier's deck: Whitby's West Pier extension, a timber deck over the sea, had a tree growing out of it
+    // beside the footbridge, as its ring isn't among the solid piers')
+    const allPiers = (place.piers || []).filter((p) => p.ring).map((p) => bb(p.ring));
+    const trees = buildTrees(group, { cls, xs, n, heightAt, avoid: (x, z) => nearSpot(x, z, 20) || !walkable(x, z) || onRoad(x, z) || allPiers.some((b) => inB([x, z], b) || (x > b.x0 - 4 && x < b.x1 + 4 && z > b.z0 - 4 && z < b.z1 + 4 && b.r.some((q, i) => segDist([x, z], q, b.r[(i + 1) % b.r.length]) < 4))) /* (never on a pier, or within 4 m of one: the map's coastline often runs round them, so they count as land) */ || (backsT ? backdropCovers(backsT, x, z, 0) : false), bank: bankAt, bankTrees: local?.bankTrees ?? 1, wood: woodAt, quality, seed: 3 + (place.spots?.length || 0) });
     if (trees) { place.trees = trees.count; place.treesBuilt = trees.built; place.treesUpdate = trees.update; }
+    // ---- tufts of grass standing up out of the lawns, verges and banks near the camera (grassTufts.js): where the ground
+    // is drawn as grass (aGrass), and on the banks but not where their rock shows; not on a road, a car park, a pier or in
+    // a building, nor at your feet where you fish. Their height and colour are the ground's as drawn, read off its grid ----
+    const cell = (v) => { let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m; else hi = m; } return [lo, Math.min(1, Math.max(0, (v - xs[lo]) / Math.max(1e-6, xs[lo + 1] - xs[lo])))]; };
+    // (the triangle of the grid's square the point is in, as the ground's triangles are cut (a, c, b) and (b, c, d))
+    const onGrid = (arr, stride, off, x, z) => {
+      const [i, fx] = cell(x), [j, fz] = cell(z), a = j * n + i, b = a + 1, c = a + n, d = c + 1, A = arr[a * stride + off], B = arr[b * stride + off], C = arr[c * stride + off], D = arr[d * stride + off];
+      return fx + fz <= 1 ? A + fx * (B - A) + fz * (C - A) : D + (1 - fx) * (C - D) + (1 - fz) * (B - D);
+    };
+    const inGrid = (x, z) => x > xs[0] && x < xs[n - 1] && z > xs[0] && z < xs[n - 1];
+    const nearestVertex = (x, z) => { const [i, fx] = cell(x), [j, fz] = cell(z); return (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n; };
+    const lots = (place.parking || []).filter((r) => r.length >= 3).map(bb);
+    const grassOpts = {
+      quality, seed: 7 + (place.spots?.length || 0),
+      grassAt: (x, z) => {
+        if (!inGrid(x, z)) return 0;
+        const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n;
+        // (the banks: thinning out to none where the rock shows; on the fine hillside, by its own slope and bare soil)
+        if (bank[k]) { const fi = fineInfo(x, z); if (fi) return 0.9 * Math.max(0, 1 - fi.soil * 1.4) * (1 - Math.min(1, Math.max(0, (fi.slope - 1.0) / 0.7))); return 0.85 * (1 - Math.min(1, steep[k] * 1.7)); }
+        // (a dune: marram where its shader draws it growing thick, thinning on the bare face)
+        if (dune[k] > 0.05 && faceA[k] >= 0) return marramAt(x, z, faceA[k]).cover * Math.min(1, dune[k] * 2.5) * (1 - 0.6 * faceA[k]);
+        // (not on the worn, muddy patches: the ground's shader draws them, so the tufts keep off them too)
+        return onGrid(grs, 1, 0, x, z) * (1 - Math.min(1, mudAt(x, z, town[k]) * 2.2));
+      },
+      roughAt: (x, z) => { if (!inGrid(x, z)) return 0.5; const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n; return dune[k] > 0.05 && faceA[k] >= 0 && !bank[k] ? 2 : bank[k] ? 1 : town[k] ? 0.6 : 0.15; },
+      yAt: (x, z) => { const f = fineAt(x, z); return f !== null ? f : inGrid(x, z) ? onGrid(pos, 3, 1, x, z) : LAND; },
+      colourAt: (x, z) => {
+        if (!inGrid(x, z)) return null;
+        const [i, fx] = cell(x), [j, fz] = cell(z), k = (fx < 0.5 ? i : i + 1) + (fz < 0.5 ? j : j + 1) * n;
+        // (on a dune, the marram's own straw and grey-green, as its shader mixes them, not the sand's colour under it)
+        if (dune[k] > 0.05 && faceA[k] >= 0 && !bank[k]) { const d = marramAt(x, z, faceA[k]).dry; return [0.115 + (0.34 - 0.115) * d, 0.15 + (0.3 - 0.15) * d, 0.062 + (0.145 - 0.062) * d].map((v) => v * 0.9); }
+        const dry = dryAt(x, z);
+        return [0, 1, 2].map((ch) => onGrid(col, 3, ch, x, z) * 0.95 * (1 + (+GRASS_DRY.tint[ch] - 1) * dry));
+      },
+      avoid: (x, z) => nearSpot(x, z, 3) || onRoad(x, z) || lots.some((b) => inB([x, z], b) && inside([x, z], b.r)) || drawnB.some((b) => inB([x, z], b) && inside([x, z], b.r)) || allPiers.some((b) => inB([x, z], b)),
+    };
+    // (the thick layer of grass blades, grassField.js, and the taller clumps among it, grassTufts.js, from the same
+    // lookups)
+    const field = buildGrassField(group, grassOpts), tufts = buildGrassTufts(group, { ...grassOpts, sparse: !!field });
+    // ---- the ground's clutter from real photoscans (kit3d.js; High and Ultra): along the beaches the tide's wrack, a
+    // stray branch of driftwood, stones and pebbles gathered at the back against the walls and the cliff's foot, rocks
+    // fallen at the foot of the cliff; on the banks willowherb, docks, grass clumps and ferns, mossy rocks where the soil
+    // is bare, nettles where the ground's been disturbed; at the foot of the buildings' walls, docks, nettles, grass and
+    // hart's-tongue fern; dandelions and clumps in the rough grass. Each from the place's own ground, never on a road, a
+    // pier or a spot ----
+    let kit = null;
+    if (quality >= 2 || (typeof window !== "undefined" && window.__fdFine)) {
+      let hs = (7919 * (3 + (place.spots?.length || 0))) >>> 0; const R = () => { hs ^= hs << 13; hs >>>= 0; hs ^= hs >>> 17; hs ^= hs << 5; hs >>>= 0; return hs / 4294967296; };
+      // (plants only above the reach of the tides: never in the water or on the wet foot of a bank)
+      const PLANT = /plant|shrub|grass|fern|dandelion/;
+      const S = {}; const put = (id, x, z, size, tilt = 0) => { if (grassOpts.avoid(x, z)) return; const y = grassOpts.yAt(x, z); if (PLANT.test(id) && y < 1.4) return; (S[id] ||= []).push([x, y, z, R() * Math.PI * 2, size, tilt]); };
+      const nb4 = (k) => [k - 1, k + 1, k - n, k + n];
+      for (let j = 1; j < n - 1; j++) for (let i = 1; i < n - 1; i++) {
+        const k = j * n + i, cw = xs[i + 1] - xs[i], ch = xs[j + 1] - xs[j]; if (cw > 7 || ch > 7) continue;
+        const x0 = xs[i], z0 = xs[j], area = cw * ch;
+        if (cls[k] === 2) {
+          const atBack = nb4(k).some((q) => cls[q] === 1 || cls[q] === 3 || bank[q]), atSea = nb4(k).some((q) => cls[q] === 0);
+          for (let c = 0; c < area * 0.5; c++) {
+            const x = x0 + R() * cw, z = z0 + R() * ch, y = grassOpts.yAt(x, z);
+            if (y > 0.5 && y < 0.95 && R() < 0.5) put("wrack", x, z, 0.6 + R() * 0.7); // (the strand line: where the last tide left it)
+            if (atBack && R() < 0.45) { const fl = R() < 0.55; put(fl ? "rock_09" : "stone_01", x, z, fl ? 0.05 + R() * 0.1 : 0.07 + R() * 0.13, 1); }
+            if (atSea && R() < 0.04) put("rock_moss_set_01", x, z, 0.35 + R() * 0.65, 1);
+            if (y > 0.5 && R() < 0.0015) put(R() < 0.35 ? "dead_tree_trunk" : "dry_branches_medium_01", x, z, 0.35 + R() * 0.3); // (now and then: at one in 170 Great Yarmouth's wide beach was strewn with sticks)
+          }
+        } else if (bank[k] && nb4(k).some((q) => cls[q] === 0 || cls[q] === 2)) {
+          for (let c = 0; c < area * 0.03; c++) put("rock_moss_set_01", x0 + R() * cw, z0 + R() * ch, 0.5 + R() * 1.1, 1); // (fallen at the cliff's foot)
+        }
+        if (bank[k] || cls[k] === 3 || town[k]) {
+          for (let c = 0; c < area * (bank[k] ? 0.05 : 0.02); c++) {
+            const x = x0 + R() * cw, z = z0 + R() * ch, fi = fineInfo(x, z), soil = fi ? fi.soil : 0, slope = fi ? fi.slope : steep[k] * 1.5, r = R();
+            if (slope > 1.4) continue;
+            if (bank[k]) {
+              if (soil > 0.45 && r < 0.2) put("rock_moss_set_01", x, z, 0.3 + R() * 0.6, 1);
+              else if (soil > 0.25 && r < 0.42) put("nettle_plant", x, z, 0.5 + R() * 0.5);
+              else if (r < 0.52) put("shrub_02", x, z, 0.6 + R() * 0.6);
+              else if (r < 0.72) put("grass_medium_01", x, z, 0.35 + R() * 0.3);
+              else if (r < 0.8) put("shrub_sorrel_01", x, z, 0.08 + R() * 0.08);
+              else if (r < 0.9) put("fern_02", x, z, 0.3 + R() * 0.3);
+              else put("weed_plant_02", x, z, 0.2 + R() * 0.15);
+            } else if (r < 0.35) put("dandelion_01", x, z, 0.15 + R() * 0.15);
+            else if (r < 0.6) put("grass_medium_01", x, z, 0.25 + R() * 0.2);
+            else if (r < 0.7) put("weed_plant_02", x, z, 0.18 + R() * 0.15);
+          }
+        }
+      }
+      // (along the foot of the buildings' walls on soft ground: weeds and nettles, now and then)
+      for (const b of place.buildings || []) {
+        const r = b.ring; if (!r || r.length < 3) continue;
+        let cx = 0, cz = 0; for (const [x, z] of r) { cx += x / r.length; cz += z / r.length; }
+        for (let q = 0; q < r.length; q++) {
+          const [x1, z1] = r[q], [x2, z2] = r[(q + 1) % r.length], L = Math.hypot(x2 - x1, z2 - z1); if (L < 1) continue;
+          let ox = -(z2 - z1) / L, oz = (x2 - x1) / L; if (ox * ((x1 + x2) / 2 - cx) + oz * ((z1 + z2) / 2 - cz) < 0) { ox = -ox; oz = -oz; }
+          for (let u = 0.5; u < L; u += 1.6) {
+            if (R() > 0.3) continue;
+            const x = x1 + (x2 - x1) * (u / L) + ox * 0.3, z = z1 + (z2 - z1) * (u / L) + oz * 0.3, c = cAt(x, z); if (c !== 1 && c !== 3) continue;
+            const kk = nearestVertex(x, z); if (!(bank[kk] || town[kk] || cls[kk] === 3)) continue;
+            const w = R(); // (nettles, docks, grass and the hart's-tongue fern that grows from damp wall foots)
+            if (w < 0.25) put("nettle_plant", x, z, 0.4 + R() * 0.4); else if (w < 0.55) put("weed_plant_02", x, z, 0.18 + R() * 0.15);
+            else if (w < 0.8) put("grass_medium_01", x, z, 0.25 + R() * 0.15); else put("fern_02", x, z, 0.25 + R() * 0.2);
+          }
+        }
+      }
+      kit = buildKit(group, Object.entries(S).map(([id, at]) => ({ id, at, flat: id === "wrack", sink: id === "wrack" ? 0 : undefined })));
+      place.kitCounts = Object.fromEntries(Object.entries(S).map(([k, v]) => [k, v.length]));
+    }
+    if (field || tufts || kit) place.tuftsUpdate = (t, cam, wind, windDir) => { field?.update(t, cam, wind, windDir); tufts?.update(t, cam, wind, windDir); kit?.update(t, cam); };
   }
   // the camera keeps above the ground: the height of land, beach or grass under a point (water is 0)
   function cAt(x, z) { let i = 0, j = 0; while (i < n - 1 && xs[i + 1] <= x) i++; while (j < n - 1 && xs[j + 1] <= z) j++; return cls[j * n + i]; }
@@ -1436,7 +1965,7 @@ export function buildRealPlace(group, place, M, solids = [], quality = 1) {
   // beyond the mapped square: real landmarks where they are, an indicative low town over the land (skyline.js)
   place.skyline = buildSkyline(group, place, { groundY: LAND, quality, industry: local?.industry || null, hill: local?.hill || null, town: local?.generated !== false });
   if (place.skyline?.glow?.length) place.buildingGlow = [...(place.buildingGlow || []), ...place.skyline.glow];
-  return (x, z) => { const c = cAt(x, z); if (c !== 0) return H_OF[c] + (local?.hill && (c === 1 || c === 3) ? local.hill(x, z) : 0); const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
+  return (x, z) => { const c = cAt(x, z); if (c !== 0) { const f = fineAt(x, z); return f !== null ? f : H_OF[c] + (local?.hill && (c === 1 || c === 3) ? local.hill(x, z) : 0); } const w = nearestWall(x, z); return w && w.d < 3 && landAt([x, z]) ? LAND : 0; };
 }
 // ---- the other kinds of fence a photograph shows (localDetail.js): runs of [a, b, deck height] ----
 // timber: heavy square posts every 2.4 m with two rails (instanced: two draw calls). bars: a steel railing of upright
@@ -1557,7 +2086,9 @@ function buildRocks(group, cls, xs, n, area, quality) {
       const gm = geo(sc.getObjectByName("armour_mid_" + v)) || gf.clone(); // (a file from before the middling stone: the far one)
       const [near, mid, lit, away] = meshes[v];
       for (const m of meshes[v]) m.geometry.dispose();
-      near.geometry = gn; mid.geometry = gm; lit.geometry = gf; away.geometry = gf.clone();
+      // (past the shadows' reach the stones are a few pixels each: their 80-triangle level where the file has one)
+      const ga = geo(sc.getObjectByName("armour_away_" + v)) || gf.clone();
+      near.geometry = gn; mid.geometry = gm; lit.geometry = gf; away.geometry = ga;
       for (const m of [near, mid, lit]) m.computeBoundingSphere();
     }
     if (atlas?.map) { mat.map = atlas.map; mat.normalMap = atlas.normalMap || null; mat.roughnessMap = atlas.roughnessMap || null; mat.normalScale.set(1, 1); mat.needsUpdate = true; }

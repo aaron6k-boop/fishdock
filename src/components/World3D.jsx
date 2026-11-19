@@ -108,6 +108,7 @@ const World3D = forwardRef(function World3D({ fight = null, fightLive = null, sp
         if (gone) return;
         // (the people's files, the rod and the nets asked for now, to come in while the world is built: world.js prefetch)
         mod.prefetch(props.current.anglers);
+        await mod.preparePlace?.(real); if (gone) return; // (a place's fine relief, fetched before it is built)
         // (and nothing that can wait while it loads: the sound's recordings, the people's detailed files)
         holdRecordings(true); mod.holdDetail(true); release = () => { holdRecordings(false); mod.holdDetail(false); };
         const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();

@@ -7,12 +7,27 @@
 import * as THREE from "three";
 import { kit, walls, prepRing, edgeInfo, bbox, hipRoof, finish } from "./landmarksTown.js";
 import { weather, photoTex } from "./textures3d.js";
+import { heroSwap } from "./heroAssets.js";
+
+// the Blender models of the two lighthouses (source-assets/blender/build_whitby_lights.py), swapped in for the shapes
+// below once loaded. Their stone is the piers' own ashlar, baked in Blender (build_whitby_stone.py), laid by the model's
+// UVs (one tile every 2.4 m, the courses level, a whole number of tiles round the column); the model's vertex colours
+// carry its baked ambient occlusion. Then the game's weathering: grime at the foot, rain streaks down from the top
+const lookLight = (base, top) => (mt) => {
+  if (/sandstone/i.test(mt.name)) {
+    const d = photoTex("whitby_ashlar_diff");
+    if (d) { mt.map = d; mt.normalMap = photoTex("whitby_ashlar_nor", { srgb: false }); mt.roughnessMap = photoTex("whitby_ashlar_rough", { srgb: false }); mt.roughness = 1; mt.metalness = 0; mt.color.setHex(0xfff8ec); mt.needsUpdate = true; }
+    weather(mt, { scale: 0.6, mottle: 0.12, grime: [base, base + 1.2, 0.35], streaks: [top, 6, 0.25], rough: [0.94, 1.06] });
+  } else if (/white/i.test(mt.name)) weather(mt, { scale: 0.8, mottle: 0.08, rust: [0.1, 0.4, 0.25, 0.1] });
+  else if (/glass/i.test(mt.name)) { mt.vertexColors = false; mt.transparent = true; mt.opacity = 0.55; mt.side = THREE.DoubleSide; mt.needsUpdate = true; }
+};
 
 function whitbyMaterials(base, top) {
-  // (sandstone: the photographed ashlar of the piers, at about 2.2 m a tile; finish() lays it by world position)
-  const sd = photoTex("sandstone_wall_diff", { repeat: 0.5 }), sn = sd && photoTex("sandstone_wall_nor", { srgb: false, repeat: 0.5 });
+  // (sandstone: the piers' own ashlar baked in Blender (build_whitby_stone.py), a tile every 2.4 m; finish() lays it by
+  // world position, 1.1 m to a unit, so it repeats 1.1 / 2.4 times a unit)
+  const rep = 1.1 / 2.4, sd = photoTex("whitby_ashlar_diff", { repeat: rep }), sn = sd && photoTex("whitby_ashlar_nor", { srgb: false, repeat: rep }), sr = sd && photoTex("whitby_ashlar_rough", { srgb: false, repeat: rep });
   const M = {
-    stone: new THREE.MeshStandardMaterial({ color: 0xe4d6bc, map: sd || null, normalMap: sn || null, roughness: 0.93 }),
+    stone: new THREE.MeshStandardMaterial({ color: 0xe2dacd, map: sd || null, normalMap: sn || null, roughnessMap: sr || null, roughness: 1 }),
     white: new THREE.MeshStandardMaterial({ color: 0xf2f1ec, roughness: 0.45, metalness: 0.1 }),
     lead: new THREE.MeshStandardMaterial({ color: 0x5d6366, roughness: 0.62, metalness: 0.25 }),
     dark: new THREE.MeshStandardMaterial({ color: 0x25282a, roughness: 0.5, metalness: 0.3 }),
@@ -21,7 +36,7 @@ function whitbyMaterials(base, top) {
     // (windows: dark glass, lit warm after dark; finish() hands it back as what glows)
     glass: new THREE.MeshStandardMaterial({ color: 0x5a646a, roughness: 0.1, metalness: 0.7, emissive: 0xffd28a, emissiveIntensity: 0 }),
   };
-  weather(M.stone, { scale: 0.6, mottle: 0.4, grime: [base, base + 1.4, 0.45], streaks: [top, 6, 0.35], rough: [0.9, 1.1] });
+  weather(M.stone, { scale: 0.6, mottle: 0.2, grime: [base, base + 1.4, 0.45], streaks: [top, 6, 0.3], rough: [0.94, 1.06] });
   weather(M.white, { scale: 0.8, mottle: 0.08, rust: [0.1, 0.4, 0.25, 0.1], grime: [base, base + 0.5, 0.15] });
   return M;
 }
@@ -90,7 +105,9 @@ function westPierLight(group, ring, base) {
   const top = lantern(K, cx, cz, yg, 1.05, 1.6, { sides: 6, dome: true });
   // the vane: a rod and an arrow
   K.box("dark", 0.05, 1.2, 0.05, cx, top + 0.6, cz); K.box("dark", 1.0, 0.06, 0.04, cx, top + 0.9, cz);
-  return finish(group, K, M, { ring: [[cx - 2.4, cz - 2.4], [cx + 2.4, cz - 2.4], [cx + 2.4, cz + 2.4], [cx - 2.4, cz + 2.4]], base, top: base + H });
+  const res = finish(group, K, M, { ring: [[cx - 2.95, cz - 2.95], [cx + 2.95, cz - 2.95], [cx + 2.95, cz + 2.95], [cx - 2.95, cz + 2.95]], base, top: base + H });
+  heroSwap(group, res.meshes, "whitby_lights", "lh_west", { at: [cx, cz], base, look: lookLight(base, base + H) });
+  return res;
 }
 
 // ---- the East Pier lighthouse (1855): a shorter stone tower, plain and tapering, eight-sided, on a square base, a
@@ -106,7 +123,9 @@ function eastPierLight(group, ring, base) {
   const yg = y0 + sh + 0.6;
   gallery(K, cx, cz, yg, 1.55, 8);
   lantern(K, cx, cz, yg, 0.95, 1.4, { sides: 8, dome: false });
-  return finish(group, K, M, { ring: [[cx - 2.2, cz - 2.2], [cx + 2.2, cz - 2.2], [cx + 2.2, cz + 2.2], [cx - 2.2, cz + 2.2]], base, top: base + H });
+  const res = finish(group, K, M, { ring: [[cx - 2.3, cz - 2.3], [cx + 2.3, cz - 2.3], [cx + 2.3, cz + 2.3], [cx - 2.3, cz + 2.3]], base, top: base + H });
+  heroSwap(group, res.meshes, "whitby_lights", "lh_east", { at: [cx, cz], base, look: lookLight(base, base + H) });
+  return res;
 }
 
 // ---- a beacon at the end of a pier extension (1914): four steel legs braced together, about 7 m to the top, a ladder

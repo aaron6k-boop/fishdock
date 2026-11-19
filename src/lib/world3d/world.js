@@ -3,6 +3,7 @@
 // person (behind you), spectator (behind whoever you pick), cinematic (it chooses angles for bites, fights and
 // landings) and free look. Looking round never pauses the fishing. Quality: Performance, Balanced or High Quality,
 // chosen by Auto from the phone, and stepped down if frames run slow. Nothing is drawn while hidden.
+import { DETAIL } from "./detail.js";
 import * as THREE from "three";
 import { setThinPixel } from "./thinAA.js";
 import { checkScene } from "./sceneCheck.js";
@@ -24,8 +25,16 @@ import { createPost } from "./post.js";
 import { setPeopleDetail, prefetchPeople, holdDetail } from "./human3d.js";
 export { holdDetail };
 import { loadPart } from "./glbParts.js";
+import { loadRelief } from "./terrain3d.js";
+import { localFor } from "./localDetail.js";
+import { TEX_BASE } from "./textures3d.js";
 /** The files every place needs, asked for before the world is built so they come in while it is (World3D.jsx): the
  * people's own (human3d.js prefetchPeople), the rod and reel, the nets. */
+/** Before a real place is built: fetch what it needs first (a place's fine relief, terrain3d.js), at most 8 s. */
+export function preparePlace(real) {
+  const l = real?.id ? localFor(real.id) : null; if (!l?.terrain) return Promise.resolve();
+  return Promise.race([loadRelief(l.terrain, TEX_BASE), new Promise((r) => setTimeout(r, 8000))]).catch(() => {});
+}
 export function prefetch(anglers) { prefetchPeople(anglers); for (const n of ["rodkit", "nets"]) loadPart(n).catch(() => {}); }
 import { FILM } from "./film.js";
 import { stepDown, recallPace, rememberPace, SHED, capGfx, recallShed, rememberShed } from "../pacing.js";
@@ -102,6 +111,7 @@ export const CAMERA_MODES = [
 export function createWorld(canvas, { venue = "pier", quality = "balanced", shed = false, onSound, onFeel, reduceMotion = false, real = null, pano = null, trackJumps = true } = {}) {
   const Q = QUALITY3D[quality] || QUALITY3D.balanced;
   setPeopleDetail(Q.q >= 2); // (High and Ultra: the people's full-detail textures)
+  DETAIL.ultra = Q === QUALITY3D.ultra; // (Ultra: the grass layer and the ground's clutter further out, detail.js)
   // (with post-processing the antialiasing is the post buffer's own MSAA, so the screen's would be wasted)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !Q.post, powerPreference: "high-performance" });
   // (three.js asks the graphics driver, after every shader it builds, whether it built and for its log: a question

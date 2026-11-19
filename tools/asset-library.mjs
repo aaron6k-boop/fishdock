@@ -50,6 +50,9 @@ const USE = {
   "nets.glb": ["Drop net and landing net", "close to mid"],
   "eels.glb": ["The conger and the eel (from their straightened pictures)", "close (in the hand) to mid (in the water)"],
   "pierprops.glb": ["Lamps, lifebuoy stations, bollards, benches", "all distances, instanced along the pier"],
+  "armour.glb": ["Rock armour: four scanned boulders, near, middling, far and most distant levels (build_armour.py)", "all distances, instanced, the level by distance"],
+  "chimney_caps.glb": ["the tops of the town's chimney stacks, modelled (build_chimneys.py): oversailing brick courses, cement flaunching and two clay pots; instanced (chimneys3d.js)", "two levels: near within 70 m, far beyond"],
+  "whitby_lights.glb": ["Whitby's West and East Pier lighthouses, modelled (build_whitby_lights.py), three levels each, ambient occlusion in the vertices", "all distances, the level by distance (70 m, 220 m)"],
 };
 
 export function build() {
@@ -63,6 +66,12 @@ export function build() {
     const tex = s.images.length ? s.images.map((i) => (i.w ? `${i.w}x${i.h}` : "?")).join(", ") : "none";
     out.push(`| ${f} | ${what} | ${lod} | ${kb(buf.length)} | ${s.tris.toLocaleString("en-GB")} | ${tex} | ${s.anims.length ? s.anims.length : "none"} |`);
   }
+  // (the ground-clutter kit: one file per photoscanned model, each a few separate plants or rocks at two levels)
+  try {
+    const kd = join(md, "kit"), list = readdirSync(kd).filter((x) => x.endsWith(".glb")).sort();
+    let bytes = 0, tris = 0; for (const f of list) { const buf = readFileSync(join(kd, f)); bytes += buf.length; tris += glbStats(buf).tris; }
+    out.push(`| kit/*.glb (${list.length} files) | The ground's clutter, High and Ultra (kit3d.js): Poly Haven's photoscanned rocks, stones, driftwood, nettles, docks, grass clumps, ferns, sorrel and dandelions, each set split into its separate pieces (build_kit.py), and the modelled wrack (${list.map((f) => f.replace(".glb", "")).join(", ")}) | two levels: near within 45 m, far to 170 m, none beyond | ${kb(bytes)} | ${tris.toLocaleString("en-GB")} (all levels) | 512 px each | none |`);
+  } catch { /* (none yet) */ }
   const fd = join(md, "fish2");
   try {
     const list = readdirSync(fd).filter((x) => x.endsWith(".glb")).sort();

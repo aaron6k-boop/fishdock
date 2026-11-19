@@ -21,7 +21,7 @@ import { OutputPass } from "./vendor/three-post/postprocessing/OutputPass.js";
 // little noise so the sky's long gradients don't band ----
 export const GradeShader = {
   name: "FishDockGrade",
-  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.3 }, uSat: { value: 1.0 }, uVib: { value: 0.3 }, uVignette: { value: 0.3 }, uSeed: { value: 0 }, uFade: { value: 1 }, uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 1024) }, uSharp: { value: 0.5 } },
+  uniforms: { tDiffuse: { value: null }, uContrast: { value: 1.2 }, uSat: { value: 1.0 }, uVib: { value: 0.22 }, uVignette: { value: 0.3 }, uSeed: { value: 0 }, uFade: { value: 1 }, uTexel: { value: new THREE.Vector2(1 / 1024, 1 / 1024) }, uSharp: { value: 0.5 } },
   vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.); }",
   fragmentShader: `uniform sampler2D tDiffuse; uniform float uContrast, uSat, uVib, uVignette, uSeed, uSharp, uFade; uniform vec2 uTexel; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uSeed)*43758.5453); }
@@ -38,7 +38,8 @@ export const GradeShader = {
         vec3 w = -amp*mix(.125, .2, uSharp);
         c = clamp((c + (a + b + d2 + e)*w)/(1. + 4.*w), 0., 1.);
       }
-      // contrast round mid grey, kept off the ends so nothing clips
+      // contrast round mid grey, kept off the ends so nothing clips (1.2 and vibrance 0.22 since 19 November: with the
+      // grass, soil and roofs now photographed, at 1.3 and 0.3 the greens and the pantiles' orange went garish)
       c = mix(c, smoothstep(0., 1., c), uContrast - 1.);
       // colour: the dull colours lifted more than the strong ones (vibrance), so a grey-green sea, a dusk sky and a navy
       // sleeve come alive while skin, the lifebuoy and the signs don't go garish (16 November: Aaron, "like PS2

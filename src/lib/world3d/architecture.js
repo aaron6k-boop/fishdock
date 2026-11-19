@@ -21,13 +21,18 @@ export function styleFor(b) {
   const k = b.kind || "yes";
   const storeyH = 3;
   const tinted = (list) => list[Math.floor(r2 * list.length)];
-  const RENDER = [[1, 1, 1], [0.98, 0.94, 0.84], [0.9, 0.95, 1], [0.98, 0.96, 0.9], [0.95, 0.9, 0.82]];
+  // (render's colour washes: white and creams most, a pale stone, and now and then a soft yellow, pink, grey-blue or
+  // sage, as in any British seaside town's painted terraces)
+  const RENDER = [[1, 1, 1], [0.98, 0.94, 0.84], [0.9, 0.95, 1], [0.98, 0.96, 0.9], [0.95, 0.9, 0.82], [1, 1, 1], [0.99, 0.93, 0.74], [0.98, 0.89, 0.85], [0.87, 0.91, 0.95], [0.89, 0.93, 0.85], [0.97, 0.95, 0.88]];
   const BRICK = [[1, 1, 1], [0.9, 0.86, 0.84], [1.05, 0.95, 0.9], [0.82, 0.78, 0.76]];
+  const BUFF = [[1, 1, 1], [0.96, 0.95, 0.92], [1.03, 1, 0.94], [0.9, 0.89, 0.86]];
+  // (the sheds' painted cladding: goosewing grey, a slate blue, a green, an off-white, a darker grey-green)
+  const CLAD = [[0.78, 0.8, 0.8], [0.42, 0.5, 0.6], [0.4, 0.52, 0.42], [0.95, 0.94, 0.9], [0.5, 0.56, 0.52]];
   if (b.use === "lighthouse") return { type: "lighthouse", walls: "brick", roof: "dome", storeys: 0, h: b.tall ? Math.max(12, b.h) : 21, tint: [1, 1, 1] };
   // (a port's sheds, where a place says so (localDetail.js `sheds`): profiled steel, one tall storey, no windows, a low
   // roof. Drawn as houses or brick mills by their size alone, with a lit window in every bay, they were not what stands
   // on a quay)
-  if (b.use === "portshed") { const flat = A > 1400 || b.roof === "flat"; return { type: "warehouse", walls: "cladding", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: 1, h: b.tall ? Math.min(b.h, 14) : A > 600 ? 9 : 6.5, pitch: 0.2, tint: [1, 1, 1] }; }
+  if (b.use === "portshed") { const flat = A > 1400 || b.roof === "flat"; return { type: "warehouse", walls: "cladding", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: 1, h: b.tall ? Math.min(b.h, 14) : A > 600 ? 9 : 6.5, pitch: 0.2, tint: tinted(CLAD) }; }
   if (b.use === "lookout") return { type: "lookout", walls: "render", roof: "flat", roofMat: "felt", storeys: 2, h: 6.4, tint: [1, 1, 1] };
   // (single storey: sheds, huts, kiosks, and anything mapped as public toilets or a shelter whatever its building tag,
   // such as the Pier Head Public Toilets at Gorleston, which was drawn as a two-storey house)
@@ -37,7 +42,7 @@ export function styleFor(b) {
   if (/^(church|chapel|cathedral)$/.test(k)) return { type: "church", walls: "stone", roof: "gable", roofMat: "slate", storeys: 0, h: b.tall ? b.h : 12, tint: [1, 1, 1] };
   if (/^(industrial|warehouse|commercial|retail|supermarket|hangar|boathouse|transportation|service)$/.test(k) || A > 650) {
     const flat = A > 1400 || b.roof === "flat";
-    return { type: "warehouse", walls: r < 0.55 ? "cladding" : "brick", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: b.levels || 2, h: b.tall ? b.h : 8, pitch: 0.28, tint: [1, 1, 1] };
+    return { type: "warehouse", walls: r < 0.55 ? "cladding" : "brick", roof: flat ? "flat" : "gable", roofMat: flat ? "felt" : "slate", storeys: b.levels || 2, h: b.tall ? b.h : 8, pitch: 0.28, tint: r < 0.55 ? tinted(CLAD) : [1, 1, 1] };
   }
   const storeys = b.levels || (/^(hotel|apartments|flats)$/.test(k) ? 4 : town?.tall ? (A < 70 ? 2 : r < 0.3 ? 4 : 3) : A < 110 ? 2 : r < 0.7 ? 2 : 3);
   const brick = town?.render != null ? r < 1 - town.render : /^(terrace|house|semidetached_house|detached)$/.test(k) ? r < 0.6 : r < 0.45;
@@ -45,12 +50,41 @@ export function styleFor(b) {
   // mansion and the farm by the Abbey: stone walls under slate)
   if (town?.stoneAt) { let cx = 0, cz = 0; for (const [x, z] of b.ring) { cx += x / b.ring.length; cz += z / b.ring.length; } if (town.stoneAt(cx, cz)) { const roofShape = b.roof === "flat" ? "flat" : r2 < 0.5 ? "hip" : "gable"; return { type: "house", walls: "stone", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : "slate", storeys, h: b.tall ? Math.max(3, b.h) : storeys * storeyH, shop: false, chimneys: roofShape !== "flat" ? (A > 60 ? 2 : 1) : 0, tint: [1, 1, 1], wide: false }; } }
   const roofShape = b.roof === "flat" ? "flat" : b.roof === "gabled" ? "gable" : b.roof === "hipped" ? "hip" : k === "terrace" ? "gable" : r2 < 0.55 ? "hip" : "gable";
+  // (of the brick houses, some in pale buff brick rather than red: town.buff, how many (East Anglia's "Suffolk white"
+  // gault brick); a few anywhere else)
+  const buff = brick && hashOf((b.id ?? 5) * 13 + 3) < (town?.buff ?? 0.12);
   return {
-    type: "house", walls: brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < (town?.clay != null ? 1 - town.clay : 0.62) ? "slate" : "clay", // (town.clay: how many of a town's roofs are red clay tiles, Whitby's pantiles)
+    type: "house", walls: buff ? "buff" : brick ? "brick" : "render", roof: roofShape, roofMat: roofShape === "flat" ? "felt" : r2 < (town?.clay != null ? 1 - town.clay : 0.62) ? "slate" : "clay", // (town.clay: how many of a town's roofs are red clay tiles, Whitby's pantiles)
     storeys, h: b.tall ? Math.max(3, b.h) : storeys * storeyH, shop: b.use === "shop", chimneys: roofShape !== "flat" ? (A > 60 ? 2 : 1) : 0,
-    tint: brick ? tinted(BRICK) : tinted(RENDER),
+    tint: buff ? tinted(BUFF) : brick ? tinted(BRICK) : tinted(RENDER),
     wide: r2 > 0.45, // (the wider three-light windows of a seafront house on its upper storeys, on about half of them)
   };
+}
+
+/**
+ * A terrace or block the map draws as one outline, as the row of houses it is: cut along its length into plots 4.6 to
+ * 7.5 m wide (each its own house: its own storeys, height, walls, colour and roof, stepping with the ground), the ridges
+ * along the row. Only for houses whose outline is near enough its box; anything else comes back whole.
+ */
+export function splitRow(b) {
+  if (!b?.ring || b.ring.length < 4 || b.use || b.tall) return [b];
+  const st = styleFor(b); if (st.type !== "house" || st.walls === "stone" && town?.stoneAt) return [b];
+  const box = obb(b.ring); if (!box) return [b];
+  const { c, ax, pz, L, W } = box, A = footprintArea(b.ring);
+  if (L < 9 || W < 4 || W > 16 || A < 0.8 * L * W) return [b];
+  const r = hashOf((b.id ?? 1) * 3 + 11), cuts = [0];
+  let at = 0; const plotW = 4.6 + r * 2.4;
+  while (L - at > plotW * 1.5) { at += plotW * (0.8 + 0.4 * hashOf((b.id ?? 1) * 31 + cuts.length)); cuts.push(at); }
+  cuts.push(L); if (cuts.length < 3) return [b];
+  const out = [];
+  for (let k = 0; k + 1 < cuts.length; k++) {
+    const a0 = cuts[k] - L / 2, a1 = cuts[k + 1] - L / 2, w0 = -W / 2, w1 = W / 2;
+    const P = (a, w) => [c[0] + ax[0] * a + pz[0] * w, c[1] + ax[1] * a + pz[1] * w];
+    const id = (b.id ?? 1) * 64 + k + 1, rk = hashOf(id * 5 + 2);
+    out.push({ ...b, id, ring: [P(a0, w0), P(a1, w0), P(a1, w1), P(a0, w1)], ridge: ax, plotOf: b.id, roof: "gabled",
+      levels: b.levels || (rk < 0.3 ? 3 : 2) });
+  }
+  return out;
 }
 
 /** The footprint's oriented bounding box: centre, long axis (unit), length and width (metres). */
@@ -77,8 +111,15 @@ export function obb(ring) {
  * the full length and the ends are upright triangles (drawn in the wall's material). Returns faces as
  * { pts: [[x, y, z], ...] (3 or 4, outward-facing order), gable: bool }, plus the ridge and its height.
  */
-export function pitchedRoof(ring, base, { shape = "hip", pitch = 0.62, eave = 0.3, maxRise = 5 } = {}) {
-  const box = obb(ring); if (!box) return null;
+export function pitchedRoof(ring, base, { shape = "hip", pitch = 0.62, eave = 0.3, maxRise = 5, axis = null } = {}) {
+  let box = obb(ring); if (!box) return null;
+  // (axis: the ridge's direction given, as a terrace's houses have their ridges along the street whatever their shape)
+  if (axis) {
+    const pz = [-axis[1], axis[0]]; let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+    for (const [x, z] of ring) { const a = x * axis[0] + z * axis[1], bb = x * pz[0] + z * pz[1]; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, bb); b1 = Math.max(b1, bb); }
+    const ca = (a0 + a1) / 2, cb = (b0 + b1) / 2;
+    box = { ...box, ax: axis, pz, L: a1 - a0, W: b1 - b0, c: [axis[0] * ca + pz[0] * cb, axis[1] * ca + pz[1] * cb] };
+  }
   const { c, ax, W, L } = box;
   const rise = Math.min(maxRise, (W / 2) * Math.tan(pitch));
   // the eave: the footprint pushed out a little from its centre; a gable's ridge runs out to the eaves' ends so the

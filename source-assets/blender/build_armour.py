@@ -3,7 +3,7 @@
 # 1k glTF), turns each down to about 2,000 triangles for near, 600 for middling distances and 300 for far, sizes it to the armour's stones (a
 # metre or so across, lying flat), lays their four photographs into one 1024 atlas (512 a stone) (colour turned towards a grey
 # granite's, as quarried armour stone at Gorleston would be, rather than the scans' own red-brown) and writes
-# exports/armour.glb: meshes armour_0..3, armour_mid_0..3 and armour_far_0..3, one material "armour" with the atlas. A check render of
+# exports/armour.glb: meshes armour_0..3, armour_mid_0..3, armour_far_0..3 and armour_away_0..3 (80 triangles), one material "armour" with the atlas. A check render of
 # the four in renders/armour.
 import bpy, bmesh, json, os, urllib.request, math, numpy as np
 from mathutils import Vector
@@ -64,12 +64,15 @@ for k, pid in enumerate(IDS):
   # (and a middling one, for 20 to 60 m: every stone within the sun's shadows' reach, 125 m on Ultra, had the fine one,
   # 80 m away a few pixels a triangle, drawn again in every pass: 6.6 million triangles a frame at Gorleston, most of them these)
   mid = o.copy(); mid.data = me.copy(); mid.name = f"armour_mid_{k}"; bpy.context.scene.collection.objects.link(mid)
-  for ob, want in ((o, 2000), (mid, 600), (far, 300)):
+  # (and the most distant, past the sun's shadows' reach: 300 triangles each to about 1,300 stones beyond it at Whitby was
+  # 380,000 triangles a frame on a phone for stones a few pixels across; 80 keep their outline there)
+  away = o.copy(); away.data = me.copy(); away.name = f"armour_away_{k}"; bpy.context.scene.collection.objects.link(away)
+  for ob, want in ((o, 2000), (mid, 600), (far, 300), (away, 80)):
     m = ob.modifiers.new("dec", "DECIMATE"); m.ratio = min(1.0, want / max(1, tris))
     bpy.context.view_layer.objects.active = ob; bpy.ops.object.modifier_apply(modifier="dec")
     for p in ob.data.polygons: p.use_smooth = True
-  stones += [o, mid, far]
-  print("STONE", pid, "from", tris, "to", *[sum(len(p.vertices) - 2 for p in x.data.polygons) for x in (o, mid, far)], "tris; size", [round(v, 2) for v in (ext * np.array([s, s, sz]))], flush=True)
+  stones += [o, mid, far, away]
+  print("STONE", pid, "from", tris, "to", *[sum(len(p.vertices) - 2 for p in x.data.polygons) for x in (o, mid, far, away)], "tris; size", [round(v, 2) for v in (ext * np.array([s, s, sz]))], flush=True)
 
 # ---- the atlas: four photographs at 512 in one 1024, the colour turned towards grey granite ----
 def atlas(kind, fn=None, fill=(0.5, 0.5, 1, 1)):
@@ -105,8 +108,8 @@ for o in stones:
   o.data.materials.clear(); o.data.materials.append(mat)
 
 # ---- a look at them, and the file ----
-for row, tag in enumerate(("", "mid", "far")):
-  for k, o in enumerate([s for s in stones if (tag in s.name if tag else "_mid_" not in s.name and "_far_" not in s.name)]): o.location = (k * 1.4 - 2.1, row * 2.0, 0)
+for row, tag in enumerate(("", "mid", "far", "away")):
+  for k, o in enumerate([s for s in stones if (tag in s.name if tag else not any(t in s.name for t in ("_mid_", "_far_", "_away_")))]): o.location = (k * 1.4 - 2.1, row * 2.0, 0)
 scn = bpy.context.scene; scn.render.resolution_x, scn.render.resolution_y = 1600, 800
 eng = [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]; scn.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in eng else "BLENDER_EEVEE"
 w = scn.world or bpy.data.worlds.new("w"); scn.world = w; w.use_nodes = True; w.node_tree.nodes["Background"].inputs[0].default_value = (0.5, 0.55, 0.6, 1)
