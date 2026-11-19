@@ -143,11 +143,24 @@ The beaches' sand (public/textures/beach_sand_*.jpg and beach_wet_*.jpg, from 18
 Rob Tuytel (https://polyhaven.com/a/aerial_sand) and "Damp Beach Sand" by Dimitrios Savva
 (https://polyhaven.com/a/damp_beach_sand), both from Poly Haven, CC0 1.0. Credited with thanks.
 
-The sandstone at Whitby (public/textures/sandstone_wall_*.jpg, from 18 November 2026: the piers, the lighthouses, the
-Abbey's ruins and St Mary's Church) is "Large Sandstone Blocks 01" by Rob Tuytel
+The photographed sandstone (public/textures/sandstone_wall_*.jpg, from 18 November 2026: Whitby's piers and buildings
+until the baked stonework below replaced it; kept for a stone pier without its own) is "Large Sandstone Blocks 01" by Rob Tuytel
 (https://polyhaven.com/a/large_sandstone_blocks_01), from Poly Haven, CC0 1.0. Credited with thanks.
 
 The shape of the ground round Whitby's piers (src/lib/world3d/terrain3d.js) is from the Environment Agency's LIDAR
 Composite DTM 2022, 1 m (https://environment.data.gov.uk/dataset/13787b9a-26a4-4775-8523-806d13af58fc):
 © Environment Agency copyright and/or database right 2022. All rights reserved. Contains public sector information
 licensed under the Open Government Licence v3.0 (https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+Whitby's stonework (public/textures/whitby_ashlar_*.jpg and whitby_flags_*.jpg, from 19 November 2026: the piers' walls
+and decks, the lighthouses, the Abbey's ruins and St Mary's Church) is modelled block by block in Blender for FishDock
+(source-assets/blender/build_whitby_stone.py) and baked; each block's grain is from "Sandstone Cracks" by Rob Tuytel
+(https://polyhaven.com/a/sandstone_cracks), from Poly Haven, CC0 1.0. Credited with thanks.
+
+The house fronts (public/textures/facade_*.jpg, from 19 November 2026) are modelled in Blender for FishDock
+(source-assets/blender/build_facades.py) and baked, in "Red Brick 03" (https://polyhaven.com/a/red_brick_03), "White
+Plaster 02" (https://polyhaven.com/a/white_plaster_02) and "Large Sandstone Blocks 01"
+(https://polyhaven.com/a/large_sandstone_blocks_01), all by Rob Tuytel, from Poly Haven, CC0 1.0. Credited with thanks.
+
+Whitby's two pier lighthouses (public/models/whitby_lights.glb) are modelled in Blender for FishDock
+(source-assets/blender/build_whitby_lights.py) from photographs on Wikimedia Commons (docs/REFERENCE-PHOTOS.md).

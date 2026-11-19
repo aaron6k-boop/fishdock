@@ -62,3 +62,26 @@ test("its lighthouses, beacons, Abbey and church each have their builder, and st
   for (const ex of L.extras.filter((e) => /PierLight$/.test(e.kind))) assert.ok(onPier(ex.at, 5), `${ex.kind} on a stone pier head`);
   assert.ok(place.buildings.some((b) => b.id === 158276579), "St Mary's outline in the map data");
 });
+
+// (19 November 2026) the cliffs' survey heights in centimetres every 5 m, joined smoothly: at 8 m in half-metre steps the
+// slopes came out terraced, half-metre ledges showing as stripes along the contours under a low sun
+test("Whitby's cliffs: the Abbey's headland at its surveyed height, and the slopes smooth, not stepped", async () => {
+  const { terrainHill } = await import("../src/lib/world3d/terrain3d.js");
+  const hill = terrainHill(L.terrain);
+  const abbey = hill(233, 308);
+  assert.ok(abbey > 48 && abbey < 60, `the Abbey's ground ${abbey.toFixed(1)} m above the harbour's land`);
+  assert.equal(hill(-150, 100), 0, "the harbour's low ground stays at the land's usual level");
+  // along three lines over the East Cliff, a metre at a time: the slope changes gradually from one metre to the next (on
+  // the old grid it bent sharply at every survey point, 0.41 m a metre at worst along these lines; a terrace shows so)
+  let worstBend = 0, steepest = 0;
+  for (const [x0, z0, dx, dz] of [[150, 120, 0.5, 1], [180, 260, 1, 0.2], [100, 300, 1, 0]]) {
+    let prev = null, prevSlope = null;
+    for (let t = 0; t <= 160; t++) {
+      const h = hill(x0 + t * dx, z0 + t * dz);
+      if (prev !== null) { const s = h - prev; steepest = Math.max(steepest, Math.abs(s)); if (prevSlope !== null) worstBend = Math.max(worstBend, Math.abs(s - prevSlope)); prevSlope = s; }
+      prev = h;
+    }
+  }
+  assert.ok(steepest > 0.3, "the lines do cross the cliff's slopes");
+  assert.ok(worstBend < 0.25, `the slope changes by at most ${worstBend.toFixed(2)} m a metre from one metre to the next`);
+});
